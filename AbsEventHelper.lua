@@ -2,9 +2,8 @@ script_author("1NS")
 script_name("Absolute Events Helper")
 script_description("Assistant for mappers and event makers on Absolute DM")
 script_dependencies('imgui', 'lib.samp.events', 'vkeys', 'memory')
-script_url("vk.com/1nsanemapping")
-script_version("0.2")
-local hostip = "193.84.90.23"
+script_url("https://github.com/ins1x/AbsEventHelper")
+script_version("0.3")
 
 require 'lib.moonloader'
 local keys = require 'vkeys'
@@ -31,6 +30,8 @@ local show_worldlimits = imgui.ImBool(false)
 local show_effects = imgui.ImBool(false)
 local show_info = imgui.ImBool(false)
 local show_chatfucns = imgui.ImBool(false)
+local show_vehs = imgui.ImBool(false)
+local show_notepad = imgui.ImBool(false)
 
 local checkbox_chatfilter = imgui.ImBool(true)
 local checkbox_antiafk = imgui.ImBool(true)
@@ -39,19 +40,23 @@ local checkbox_showobjects = imgui.ImBool(false)
 
 local sliderdrawdist = imgui.ImInt(450)
 local sliderfog = imgui.ImInt(200)
+local vehiclename_buffer = imgui.ImBuffer(128)
 local bind_textbuffer1 = imgui.ImBuffer(256)
 local bind_textbuffer2 = imgui.ImBuffer(256)
 local bind_textbuffer3 = imgui.ImBuffer(256)
 local bind_textbuffer4 = imgui.ImBuffer(256)
 local bind_textbuffer5 = imgui.ImBuffer(256)
 local bind_adtextbuffer = imgui.ImBuffer(256)
+local note_textbuffer = imgui.ImBuffer(1024)
 
 bind_adtextbuffer.v = u8'Заходите на МП "Название МП" в мир , приз ничего'
 bind_textbuffer2.v = u8"Кто будет мешать проведени и драться - кикну"
 bind_textbuffer3.v = u8"Не тупим разбегаемся по карте"
 bind_textbuffer4.v = u8"Запрещено использовать текстурыне баги"
 bind_textbuffer5.v = u8"Запрещено объеденяться больше двух игроков"
-		  
+
+-- If the server changes IP, change it here
+local hostip = "193.84.90.23"
 local color = imgui.ImFloat4(1, 0, 0, 1)
 local antiafk = true
 local chatfilter = true
@@ -62,12 +67,42 @@ local fps = 0
 local fps_counter = 0
 local showobjects = false
 local tpposX, tpposY, tpposZ
+local vehinfomodelid = 0
 
-local function starts_with(str, start)
-   return str:sub(1, #start) == start
-end 
+VehicleNames = {
+	"Landstalker", "Bravura", "Buffalo", "Linerunner", "Pereniel", "Sentinel", "Dumper",
+	"Firetruck", "Trashmaster", "Stretch", "Manana", "Infernus", "Voodoo", "Pony",
+	"Mule", "Cheetah", "Ambulance", "Leviathan", "Moonbeam", "Esperanto", "Taxi",
+	"Washington", "Bobcat", "Mr Whoopee", "BF Injection", "Hunter", "Premier", "Enforcer",
+	"Securicar", "Banshee", "Predator", "Bus", "Rhino", "Barracks", "Hotknife", "Trailer",
+	"Previon", "Coach", "Cabbie", "Stallion", "Rumpo", "RC Bandit","Romero",
+	"Packer", "Monster Truck", "Admiral", "Squalo", "Seasparrow","Pizzaboy",
+	"Tram", "Trailer", "Turismo", "Speeder", "Reefer", "Tropic","Flatbed", "Yankee",
+	"Caddy", "Solair", "Berkley's RC Van", "Skimmer", "PCJ-600", "Faggio", "Freeway",
+	"RC Baron", "RC Raider", "Glendale", "Oceanic", "Sanchez", "Sparrow", "Patriot",
+	"Quad", "Coastguard", "Dinghy", "Hermes", "Sabre", "Rustler", "ZR-350", "Walton",
+	"Regina", "Comet", "BMX", "Burrito", "Camper", "Marquis", "Baggage", "Dozer",
+	"Maverick", "News Chopper", "Rancher", "FBI Rancher", "Virgo", "Greenwood", "Jetmax",
+	"Hotring", "Sandking", "Blista Compact", "Police Maverick", "Boxville",
+	"Benson", "Mesa", "RC Goblin", "Hotring Racer", "Hotring Racer", "Bloodring Banger",
+	"Rancher", "Super GT", "Elegant", "Journey", "Bike", "Mountain Bike", "Beagle",
+	"Cropdust", "Stunt", "Tanker", "RoadTrain", "Nebula", "Majestic", "Buccaneer",
+	"Shamal", "Hydra", "FCR-900", "NRG-500", "HPV1000", "Cement Truck", "Tow Truck",
+	"Fortune", "Cadrona", "FBI Truck", "Willard", "Forklift", "Tractor", "Combine",
+	"Feltzer", "Remington", "Slamvan", "Blade", "Freight", "Streak", "Vortex",
+	"Vincent", "Bullet", "Clover", "Sadler", "Firetruck", "Hustler", "Intruder",
+	"Primo", "Cargobob", "Tampa", "Sunrise", "Merit", "Utility", "Nevada",
+	"Yosemite", "Windsor", "Monster Truck", "Monster Truck", "Uranus", "Jester",
+	"Sultan", "Stratum", "Elegy", "Raindance", "RC Tiger", "Flash", "Tahoma",
+	"Savanna", "Bandito", "Freight", "Trailer", "Kart", "Mower", "Duneride",
+	"Sweeper", "Broadway", "Tornado", "AT-400", "DFT-30", "Huntley", "Stafford","BF-400",
+	"Newsvan", "Tug", "Trailer", "Emperor", "Wayfarer", "Euros", "Hotdog", "Club",
+	"Trailer", "Trailer", "Andromada", "Dodo", "RC Cam", "Launch", "Police Car (LS)",
+	"Police Car (SF)", "Police Car (LV)", "Police Ranger", "Picador", "S.W.A.T. Van",
+	"Alpha", "Phoenix", "Glendale", "Sadler", "Luggage Trailer", "Luggage Trailer",
+	"Stair Trailer", "Boxville", "Farm Plow", "Utility Trailer"
+}
 
--- imgui
 function imgui.OnDrawFrame()
    if main_window_state.v then
       imgui.SetNextWindowSize(imgui.ImVec2(440, 400), imgui.Cond.FirstUseEver)
@@ -78,11 +113,6 @@ function imgui.OnDrawFrame()
 	  if imgui.Button(u8"Информация") then
 		 show_info.v = not show_info.v
 	  end
-	  
-	  imgui.SameLine()
-	  if imgui.Button(u8"Горячие клавиши") then
-		 show_hotkeys.v = not show_hotkeys.v
-	  end
 	
 	  imgui.SameLine()
 	  if imgui.Button(u8"Настройки") then
@@ -90,15 +120,30 @@ function imgui.OnDrawFrame()
 	  end
 	  
 	  imgui.SameLine()
-	  if imgui.Button(u8"О скрипте") then
-		 show_credits.v = not show_credits.v
+	  if imgui.Button(u8"Чат-Бинд") then
+	     show_chatfucns.v = not show_chatfucns.v
 	  end
 	  
 	  imgui.SameLine()
-	  if imgui.Button(u8"Скрыть") then
-		 main_window_state.v = not main_window_state.v 
+	  if imgui.Button(u8"Скрыть все окна") then
+	     show_favorites.v = false
+		 show_credits.v = false
+		 show_hotkeys.v = false
+		 show_settings.v = false
+		 show_colors.v = false
+	     show_worldlimits.v = false
+		 show_effects.v = false
+		 show_info.v = false
+		 show_chatfucns.v = false
+		 show_vehs.v = false
+		 show_notepad.v = false
       end
-	    
+	  
+	  imgui.SameLine()
+	  if imgui.Button(u8"Свернуть") then
+		 main_window_state.v = not main_window_state.v 
+      end	  
+	  
 	  --local id = sampGetPlayerIdByCharHandle(PLAYER_PED)
 	  --local nickname = sampGetPlayerNickname(id)
 	  local servername = sampGetCurrentServerName()
@@ -115,30 +160,6 @@ function imgui.OnDrawFrame()
 	  imgui.Text(string.format(u8"Игроков в стриме: %i Транспорта: %i",
 	  streamedplayers, getVehicleInStream()))
 	  
-	  local closestcarid = getClosestCarId()
-	  imgui.Text(string.format(u8"Ближайший транспорт: %i", closestcarid))
-	  
-	  imgui.SameLine()
-	  if imgui.Button(u8"Заказать машину") then
-	     if not sampIsChatInputActive() and not sampIsDialogActive() and not isPauseMenuActive() and not isSampfuncsConsoleActive() then sampSendChat("/vfibye2") end
-	  end
-	  
-	  imgui.SameLine()
-	  if imgui.Button(u8"Флип") then
-	      if isCharInAnyCar(PLAYER_PED) and not sampIsChatInputActive() and not sampIsDialogActive() and not isPauseMenuActive() and not isSampfuncsConsoleActive() then sampSendChat("/f") end
-		  --if isCharInAnyCar(PLAYER_PED) and not sampIsChatInputActive() and not sampIsDialogActive() and not sampIsCursorActive() then
-		  --if isKeyDown(VK_DELETE) then
-		  --		addToCarRotationVelocity(storeCarCharIsInNoSave(PLAYER_PED), 0.0, -0.15, 0.0)
-		  -- elseif isKeyDown(VK_END) then
-		  --	addToCarRotationVelocity(storeCarCharIsInNoSave(PLAYER_PED), 0.0, 0.15, 0.0)
-		  -- end
-		  --end
-	  end
-	  
-	  imgui.Separator()
-	  -----------------------------------------------------------------------
-	  
-	  imgui.Text(u8"615-18300 [GTASA], 18632-19521 [SAMP]")
 	  if imgui.Button(u8"Избранные объекты") then
 		 show_favorites.v = not show_favorites.v
 	  end
@@ -160,6 +181,11 @@ function imgui.OnDrawFrame()
 	  -----------------------------------------------------------------------
 	  
 	  imgui.Text(" ")
+	  
+	  if imgui.Button(u8"Транспорт", imgui.ImVec2(250, 20)) then
+		 show_vehs.v = not show_vehs.v
+	  end
+	  
 	  if imgui.Button(u8"Получить координаты", imgui.ImVec2(250, 20)) then
 	     if not sampIsChatInputActive() and not sampIsDialogActive() and not isPauseMenuActive() and not isSampfuncsConsoleActive() then 
 		    sampSendChat("/коорд")
@@ -183,8 +209,14 @@ function imgui.OnDrawFrame()
 		 if not sampIsChatInputActive() and not sampIsDialogActive() and not isPauseMenuActive() and not isSampfuncsConsoleActive() then sampSendChat("/ghsu") end
 	  end
 	  
-	  if imgui.Button(u8"Чат", imgui.ImVec2(250, 20)) then
-	     show_chatfucns.v = not show_chatfucns.v
+	  if imgui.Button(u8"Заметки", imgui.ImVec2(250, 20)) then
+		 show_notepad.v = not show_notepad.v
+	  end
+	  
+	  local ip, port = sampGetCurrentServerAddress()
+	  if not ip:find(hostip) then
+	     imgui.TextColoredRGB("{FF0000}Некоторые функции будут недоступны")
+	     imgui.TextColoredRGB("{FF0000}Скрипт предназначен для работы на Absolute Play DM")
 	  end
 	  
       imgui.End()
@@ -204,6 +236,14 @@ function imgui.OnDrawFrame()
 		 show_colors.v = not show_colors.v
 	  end
 	  
+	  if imgui.Button(u8"Горячие клавиши", imgui.ImVec2(200, 20)) then
+		 show_hotkeys.v = not show_hotkeys.v
+	  end
+	  
+	  if imgui.Button(u8"О скрипте", imgui.ImVec2(200, 20)) then
+		 show_credits.v = not show_credits.v
+	  end
+	  
       imgui.End()
    end
 	
@@ -217,6 +257,7 @@ function imgui.OnDrawFrame()
       imgui.Text(u8"Бетонные блоки: 18766, 18765, 18764, 18763, 18762")
       imgui.Text(u8"Горы: вулкан 18752, песочница 18751, песочные горы ландшафт 19548")
       imgui.Text(u8"Платформы: тонкая платформа 19552, 19538, решетчатая 18753, 18754")
+      imgui.Text(u8"Поверхности: 19531, 4242, 4247, 8171, 5004, 16685")
       imgui.Text(u8"Стены: 19355, 19435(маленькая), 19447(длинная), 19391(дверь), 19408(окно)")
 	  imgui.Separator()
 	  imgui.TextColoredRGB("Не нашли нужный объект? посмотрите на {007DFF}dev.prineside.com")
@@ -239,6 +280,11 @@ function imgui.OnDrawFrame()
       imgui.Text(u8"Искры 18717, горящие дрова 19632")
       imgui.Text(u8"Неон красный 18647, синий 18648, зеленый 18649")
 	  imgui.Text(u8"Неон желтый 18650, розовый 18651, белый 18652")
+	  imgui.Text(u8"Свет.шар (не моргает) белый 19281, красн. 19282, зел. 19283, синий 19284")
+	  imgui.Text(u8"Свет.шар (моргает быстро) белый 19285, красн. 19286, зел. 19287, син. 19288")
+	  imgui.Text(u8"Свет.шар (моргает медленно) белый 19289, красн. 19290, зел. 19291, син. 19292")
+	  imgui.Text(u8"Свет.шар (моргает медленно) фиолетовый 19293, желтый 19294")
+	  imgui.Text(u8"Свет.шар (большой не моргает) бел. 19295, красн. 19296, зел. 19297, син. 19298")
       imgui.Text(u8"Сигнальный огонь 18728, нитро 18702, флейм 18693")
 	  
 	  imgui.Separator()
@@ -364,7 +410,6 @@ function imgui.OnDrawFrame()
 	   end
 	   
 	   if imgui.InputText("##Bind2", bind_textbuffer2) then 
-		  --u8:decode(bind_textbuffer2.v)
 	   end
 	   
 	   imgui.SameLine()
@@ -373,7 +418,6 @@ function imgui.OnDrawFrame()
 	   end
 	   
 	   if imgui.InputText("##Bind3", bind_textbuffer3) then 
-		  --u8:decode(bind_textbuffer2.v)
 	   end
 	   
 	   imgui.SameLine()
@@ -382,7 +426,6 @@ function imgui.OnDrawFrame()
 	   end
 	   
 	   if imgui.InputText("##Bind4", bind_textbuffer4) then 
-		  --u8:decode(bind_textbuffer2.v)
 	   end
 	   
 	   imgui.SameLine()
@@ -391,7 +434,6 @@ function imgui.OnDrawFrame()
 	   end
 	   
 	   if imgui.InputText("##Bind5", bind_textbuffer5) then 
-		  --u8:decode(bind_textbuffer2.v)
 	   end
 	   
 	   imgui.SameLine()
@@ -401,7 +443,6 @@ function imgui.OnDrawFrame()
 	   
 	   imgui.Text(" ")
 	   if imgui.InputText("##BindAd", bind_adtextbuffer) then 
-		  --u8:decode(bind_textbuffer2.v)
 	   end
 	   
 	   if imgui.Button(u8"Дать объявление в общий чат") then
@@ -434,7 +475,62 @@ function imgui.OnDrawFrame()
 	
 	   imgui.End()
 	end
+	
+    if show_vehs.v then
+	   imgui.SetNextWindowPos(imgui.ImVec2(sizeX / 2, sizeY / 8),
+	   imgui.Cond.FirstUseEver, imgui.ImVec2(0.5, 0.5))
+	   imgui.SetNextWindowSize(imgui.ImVec2(350, 150), imgui.Cond.FirstUseEver)
+	   imgui.Begin(u8"Транспорт", show_vehs)
 	   
+	   -- https://wiki.multitheftauto.com/wiki/Vehicle_IDs
+	   imgui.InputText("##BindVehs", vehiclename_buffer)
+	   
+	   imgui.SameLine()
+	   imgui.Text(string.format(u8"ID: %i", vehinfomodelid))
+	   
+	   local closestcarid = getClosestCarId()
+	   imgui.Text(string.format(u8"Ближайший транспорт: %i (внутренний ID)", closestcarid))
+
+	  
+ 	   --imgui.SameLine()
+	   --if imgui.Button(u8"Флип") then
+	      --if isCharInAnyCar(PLAYER_PED) and not sampIsChatInputActive() and not sampIsDialogActive() and not isPauseMenuActive() and not isSampfuncsConsoleActive() then sampSendChat("/f") end
+		  --if isCharInAnyCar(PLAYER_PED) and not sampIsChatInputActive() and not sampIsDialogActive() and not sampIsCursorActive() then
+		  --if isKeyDown(VK_DELETE) then
+		  --		addToCarRotationVelocity(storeCarCharIsInNoSave(PLAYER_PED), 0.0, -0.15, 0.0)
+		  -- elseif isKeyDown(VK_END) then
+		  --	addToCarRotationVelocity(storeCarCharIsInNoSave(PLAYER_PED), 0.0, 0.15, 0.0)
+		  -- end
+		  --end
+	   --end
+	   
+	   if imgui.Button(u8"Найти ID транспорта по имени", imgui.ImVec2(320, 20)) then
+		  for k, vehname in ipairs(VehicleNames) do
+		     if vehname:lower():find(u8:decode(vehiclename_buffer.v:lower())) then
+			    vehinfomodelid = 399+k
+			    printStringNow(vehinfomodelid, 1000)
+			 end 
+		  end
+	   end
+	   
+	   if imgui.Button(u8"Заказать машину по имени", imgui.ImVec2(320, 20)) then
+	      if not sampIsChatInputActive() and not sampIsDialogActive() and not isPauseMenuActive() and not  isSampfuncsConsoleActive() then
+		     for k, vehname in ipairs(VehicleNames) do
+		        if vehname:lower():find(u8:decode(vehiclename_buffer.v:lower())) then
+			       vehinfomodelid = 399+k
+			    end 
+		     end
+			 sampSendChat(string.format(u8"/vfibye2 %i", vehinfomodelid))
+		  end
+	   end
+	   
+	   if imgui.Button(u8"Заказать машину из списка", imgui.ImVec2(320, 20)) then
+	      if not sampIsChatInputActive() and not sampIsDialogActive() and not isPauseMenuActive() and not isSampfuncsConsoleActive() then sampSendChat("/vfibye2") end
+	   end
+	   
+	   imgui.End()
+	end
+	
 	if show_hotkeys.v then
 	   imgui.SetNextWindowPos(imgui.ImVec2(sizeX / 7, sizeY / 4),
 	   imgui.Cond.FirstUseEver, imgui.ImVec2(0.5, 0.5))
@@ -457,7 +553,7 @@ function imgui.OnDrawFrame()
        imgui.TextColoredRGB("{00FF00}Клавиша RMB (Правая кл.мыши){FFFFFF}  — скопирует номер модели объекта")
        imgui.TextColoredRGB("{00FF00}Клавиша SHIFT{FFFFFF} — переключение между объектами")
        imgui.Text(" ")
-	   imgui.Text(u8"Восстановленые скриптом и доступные без SAMP ADDON:")
+	   imgui.TextColoredRGB("Восстановленые скриптом и доступные без {00FF00}SAMP ADDON:")
        imgui.TextColoredRGB("{00FF00}J{FFFFFF} - полет в мире")
        imgui.TextColoredRGB("{00FF00}Z{FFFFFF} - починить транспорт")
        imgui.TextColoredRGB("{00FF00}U{FFFFFF} - анимации")
@@ -512,9 +608,13 @@ function imgui.OnDrawFrame()
 	      antiafk = not antiafk
 	   end
 		
-	   imgui.Checkbox(u8("Фикс горячих клавиш"), checkbox_keybinds)
+	   imgui.Checkbox(u8("Фикс горячих клавиш аддона"), checkbox_keybinds)
 	   if checkbox_keybinds.v then
 	      keybinds = not keybinds
+	   end
+	   
+	   if imgui.Button(u8"Перегрузить скрипт", imgui.ImVec2(200, 20)) then
+		  thisScript():reload()
 	   end
 	   
 	   -- Thanks samp++
@@ -541,14 +641,56 @@ function imgui.OnDrawFrame()
        imgui.Text(u8"Автор: 1NS (Git: in1x)")
 	   --imgui.Text(string.format(u8"Demo version: %s", os.date("%x")))
        imgui.Text(u8"Помошник для мапперов и организаторов мероприятий на Absolute DM")
-       imgui.Text(u8"Homepage: Русскоязычное сообщество мапперов: vk.com\1nsanemapping")
+	   imgui.TextColoredRGB("Homepage: {007DFF}github.com/ins1x/AbsEventHelper")
+       imgui.TextColoredRGB("Русскоязычное сообщество мапперов: {007DFF}vk.com\1nsanemapping")
+       imgui.TextColoredRGB("Сайт Absolute Play: {007DFF}gta-samp.ru")
+       imgui.TextColoredRGB("Чат Absolute Play DM: {007DFF}dsc.gg/absdm")
+	   imgui.Text(" ")
        imgui.Text(u8"Credits:")
-       imgui.Text(u8"FYP - imgui and SAMP lua library")
+       imgui.Text(u8"FYP - imgui, SAMP lua library")
        imgui.Text(u8"MOL - antiafk")
        imgui.Text(u8"Gorskin - useful memory hacks")
        imgui.End()
 	end
 	
+	if show_notepad.v then
+	   imgui.SetNextWindowPos(imgui.ImVec2(sizeY / 4, sizeY / 2),
+	   imgui.Cond.FirstUseEver, imgui.ImVec2(0.5, 0.5))
+	   imgui.SetNextWindowSize(imgui.ImVec2(300, 200), imgui.Cond.FirstUseEver)
+	   imgui.Begin(u8"Блокнот", show_notepad)
+	   
+	   --imgui.BeginChild('##textmultiline1',imgui.ImVec2(250,250),true)
+	   imgui.InputTextMultiline('##bufftext', note_textbuffer, imgui.ImVec2(285, 125))
+	   --imgui.InputTextMultiline("notepad", notepad, 65535, imgui.ImVec2(385, 362.5), imgui.Cond.FirstUseEver)
+	   --imgui.EndChild()
+
+	   if imgui.Button(u8"Сохранить", imgui.ImVec2(85, 20)) then
+	      file = io.open(getGameDirectory().."//moonloader//resource//abseventhelper//notes.txt", "w")
+          file:write(note_textbuffer.v)
+          file:close()
+		  printStringNow("Saved moonloader/resource/abseventhelper/notes.txt", 4000)
+	   end
+	   
+	   -- imgui.SameLine()
+	   -- if imgui.Button(u8"Загрузить", imgui.ImVec2(120, 20)) then
+	      -- file = io.open(getGameDirectory().."//moonloader//resource//abseventhelper//notes.txt", "a")
+          -- note_textbuffer.v = file:read("*a")
+          -- file:close()
+		  -- printStringNow("Loaded", 1000)
+	   -- end
+	   
+	   imgui.SameLine()
+	   if imgui.Button(u8"Очистить", imgui.ImVec2(85, 20)) then
+	      note_textbuffer.v = u8" "
+	   end
+	   
+	   imgui.SameLine()
+	   if imgui.Button(u8"Скрыть", imgui.ImVec2(85, 20)) then
+	      show_notepad.v = not show_notepad.v
+	   end
+	   
+	   imgui.End()
+	end 
 end
 
 function main()
@@ -560,6 +702,19 @@ function main()
 	     keybinds = false
 	     -- sampAddChatMessage("Keybinds work only Absolute DM", 0x00FF0000)
 	  end
+	  
+	  if not doesDirectoryExist("moonloader/resource/abseventhelper") then 
+	     createDirectory("moonloader/resource/abseventhelper")
+	  end
+	  
+	  sampRegisterChatCommand("abshelp", function ()
+         main_window_state.v = not main_window_state.v 
+	  end)
+	  
+	  sampRegisterChatCommand("absnote", function ()
+         show_notepad.v = not show_notepad.v 
+	  end)
+	  
 	  while true do
 	  wait(0)
 	  
@@ -569,7 +724,6 @@ function main()
 	  -- chatfilter
 	  function sampev.onServerMessage(color, text)
 		if chatfilter then 
-			--if starts_with(text, "Игрок") then
 			if text:find("подключился к серверу") or text:find("вышел с сервера") then
 				chatlog = io.open(getFolderPath(5).."\\GTA San Andreas User Files\\SAMP\\chatlog.txt", "a")
 				chatlog:write(os.date("[%H:%M:%S] ")..text)
@@ -611,14 +765,11 @@ function main()
          --if isKeyJustPressed(VK_N) and not sampIsChatInputActive() and not sampIsDialogActive() and not --isPauseMenuActive() and not isSampfuncsConsoleActive() then sampSendDialogResponse(1422, 0, 0, " --") end
       end
 	  
-      if isKeyJustPressed(VK_X) and not sampIsChatInputActive() and not sampIsDialogActive() and not isPauseMenuActive() and not isSampfuncsConsoleActive() then 
+	  -- ALT+X
+      if isKeyDown(VK_MENU) and isKeyJustPressed(VK_X) and not sampIsChatInputActive() and not    sampIsDialogActive() and not isPauseMenuActive() and not isSampfuncsConsoleActive() then 
          if showobjects then showobjects = false end
 		 main_window_state.v = not main_window_state.v 
       end
-	  
-	  sampRegisterChatCommand("abshelp", function ()
-         main_window_state.v = not main_window_state.v 
-	  end)
 	  
 	  if showobjects then
 	     for _, v in pairs(getAllObjects()) do
