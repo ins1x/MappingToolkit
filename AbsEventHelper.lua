@@ -3,7 +3,7 @@ script_name("Absolute Events Helper")
 script_description("Assistant for mappers and event makers on Absolute DM")
 script_dependencies('imgui', 'lib.samp.events', 'vkeys', 'memory')
 script_url("https://github.com/ins1x/AbsEventHelper")
-script_version("0.3")
+script_version("0.4")
 
 require 'lib.moonloader'
 local keys = require 'vkeys'
@@ -32,11 +32,13 @@ local show_info = imgui.ImBool(false)
 local show_chatfucns = imgui.ImBool(false)
 local show_vehs = imgui.ImBool(false)
 local show_notepad = imgui.ImBool(false)
+local show_special = imgui.ImBool(false)
 
 local checkbox_chatfilter = imgui.ImBool(true)
 local checkbox_antiafk = imgui.ImBool(true)
 local checkbox_keybinds = imgui.ImBool(true)
 local checkbox_showobjects = imgui.ImBool(false)
+local checkbox_objectcollision = imgui.ImBool(false)
 
 local sliderdrawdist = imgui.ImInt(450)
 local sliderfog = imgui.ImInt(200)
@@ -63,6 +65,7 @@ local chatfilter = true
 local keybinds = true
 local effects = true
 local disablealleffects = false
+local objectcollision = false
 local fps = 0
 local fps_counter = 0
 local showobjects = false
@@ -154,27 +157,42 @@ function imgui.OnDrawFrame()
 	  positionX, positionY, positionZ, getActiveInterior()))
 	  
 	  imgui.Text(string.format(u8"Направление: %s", direction()))
-	  imgui.Text(string.format(u8"FPS: %i", fps))
 	  
 	  local streamedplayers = sampGetPlayerCount(true) - 1
-	  imgui.Text(string.format(u8"Игроков в стриме: %i Транспорта: %i",
-	  streamedplayers, getVehicleInStream()))
+	  imgui.Text(string.format(u8"Игроков в стриме: %i Транспорта: %i FPS: %i",
+	  streamedplayers, getVehicleInStream(), fps))
+	  
+	  --imgui.Separator()
+	  -----------------------------------------------------------------------
+	  
+	  if imgui.Checkbox(u8("Отключить коллизию у объектов рядом"), checkbox_objectcollision) then 
+	     if checkbox_objectcollision.v then
+            objectcollision = true
+         else
+            objectcollision = false
+         end
+	  end
+	  
+	  if imgui.Checkbox(u8("Показывать ID объектов рядом"), checkbox_showobjects) then 
+		 if checkbox_showobjects.v  then
+            showobjects = true
+         else
+            showobjects = false
+         end
+	  end
 	  
 	  if imgui.Button(u8"Избранные объекты") then
 		 show_favorites.v = not show_favorites.v
 	  end
 	  
 	  imgui.SameLine()
-	  if imgui.Button(u8"Эффекты") then
-		 show_effects.v = not show_effects.v
+	  if imgui.Button(u8"Специальные объекты") then
+		 show_special.v = not show_special.v
 	  end
 	  
 	  imgui.SameLine()
-	  imgui.Checkbox(u8("Показывать ID объектов рядом"), checkbox_showobjects)
-	  if checkbox_showobjects.v then
-		 if not showobjects then 
-		    showobjects = true
-		 end
+      if imgui.Button(u8"Эффекты") then
+		 show_effects.v = not show_effects.v
 	  end
 	  
 	  imgui.Separator()
@@ -263,7 +281,23 @@ function imgui.OnDrawFrame()
 	  imgui.TextColoredRGB("Не нашли нужный объект? посмотрите на {007DFF}dev.prineside.com")
       imgui.End()
    end
-	
+   
+   if show_special.v then
+	  imgui.SetNextWindowPos(imgui.ImVec2(sizeX / 8, sizeY / 4),
+	  imgui.Cond.FirstUseEver, imgui.ImVec2(0.5, 0.5))
+	  
+      imgui.Begin(u8"Специальные", show_special)
+      imgui.Text(u8"Коровка 19833, Веревка 19087, Веревка длин. 19089")
+      imgui.Text(u8"Стекло (Разрушаемое) 3858, стекло от травы 3261, сено 3374")
+      imgui.Text(u8"Факел с черепом 3524, факел 3461, красный стоп сигнал 3877")
+      imgui.Text(u8"Попуг 19079, восточная лампа 3534")
+      imgui.Text(u8"Водяная бочка 1554, ржавая бочка 1217, взрыв. бочка 1225")
+      imgui.Text(u8"Черная бездна 13656, стеклянный блок 18887")
+      imgui.Text(u8"Партикл воды с колизией 19603, большой 19604")
+      imgui.Text(u8"Финиш гонки 18761")
+      imgui.End()
+   end
+   
    if show_effects.v then	  
 	  imgui.SetNextWindowPos(imgui.ImVec2(sizeX / 8, sizeY / 4),
 	  imgui.Cond.FirstUseEver, imgui.ImVec2(0.5, 0.5))
@@ -276,7 +310,7 @@ function imgui.OnDrawFrame()
 	  imgui.Text(u8"Большой взрыв 18682, средний взрыв 18683, маленький взрыв 18686")
 	  imgui.Text(u8"Спрей 18729, кровь 18668, огнетушитель 18687, слезоточивый 18732")
 	  imgui.Text(u8"Рябь на воде 18741, брызги воды 18744")
-	  imgui.Text(u8"Фонтан 18739, гидрант 18740")
+	  imgui.Text(u8"Фонтан 18739, гидрант 18740, водопад 19841, вода 19842")
       imgui.Text(u8"Искры 18717, горящие дрова 19632")
       imgui.Text(u8"Неон красный 18647, синий 18648, зеленый 18649")
 	  imgui.Text(u8"Неон желтый 18650, розовый 18651, белый 18652")
@@ -285,7 +319,7 @@ function imgui.OnDrawFrame()
 	  imgui.Text(u8"Свет.шар (моргает медленно) белый 19289, красн. 19290, зел. 19291, син. 19292")
 	  imgui.Text(u8"Свет.шар (моргает медленно) фиолетовый 19293, желтый 19294")
 	  imgui.Text(u8"Свет.шар (большой не моргает) бел. 19295, красн. 19296, зел. 19297, син. 19298")
-      imgui.Text(u8"Сигнальный огонь 18728, нитро 18702, флейм 18693")
+      imgui.Text(u8"Сигнальный огонь 18728, лазер 18643, нитро 18702, флейм 18693")
 	  
 	  imgui.Separator()
 	  if imgui.Button(u8"Отключить дым из труб и прочие эффекты факелов и дыма",
@@ -598,19 +632,22 @@ function imgui.OnDrawFrame()
 	   imgui.Cond.FirstUseEver, imgui.ImVec2(0.5, 0.5))
 	 
        imgui.Begin(u8"Настройки", show_settings)
-       imgui.Checkbox(u8("Фильтр подключений в чате"), checkbox_chatfilter)
-	   if checkbox_chatfilter.v then
-	      chatfilter = not chatfilter
-       end
+       if imgui.Checkbox(u8("Фильтр подключений в чате"), checkbox_chatfilter) then
+	      if checkbox_chatfilter.v then
+	         chatfilter = not chatfilter
+          end
+	   end
 	  
-   	   imgui.Checkbox(u8("Анти-афк"), checkbox_antiafk)
-	   if checkbox_antiafk.v then
-	      antiafk = not antiafk
+   	   if imgui.Checkbox(u8("Анти-афк"), checkbox_antiafk) then 
+	      if checkbox_antiafk.v then
+	         antiafk = not antiafk
+		  end
 	   end
 		
-	   imgui.Checkbox(u8("Фикс горячих клавиш аддона"), checkbox_keybinds)
-	   if checkbox_keybinds.v then
-	      keybinds = not keybinds
+	   if imgui.Checkbox(u8("Фикс горячих клавиш аддона"), checkbox_keybinds) then 
+	      if checkbox_keybinds.v then
+	         keybinds = not keybinds
+	      end
 	   end
 	   
 	   if imgui.Button(u8"Перегрузить скрипт", imgui.ImVec2(200, 20)) then
@@ -771,7 +808,8 @@ function main()
 		 main_window_state.v = not main_window_state.v 
       end
 	  
-	  if showobjects then
+	  -- Objects render
+	  if showobjects and not isPauseMenuActive() then
 	     for _, v in pairs(getAllObjects()) do
 		    if isObjectOnScreen(v) then
 			   local _, x, y, z = getObjectCoordinates(v)
@@ -781,7 +819,22 @@ function main()
 			end
 		 end
 	  end
-		
+	  
+	  if objectcollision then
+         find_obj_x, find_obj_y, find_obj_z = getCharCoordinates(PLAYER_PED)
+         result, objectHandle = findAllRandomObjectsInSphere(find_obj_x, find_obj_y, find_obj_z, 25, true)
+         if result then
+            setObjectCollision(objectHandle, false)
+         end
+      else
+         find_obj_x, find_obj_y, find_obj_z = getCharCoordinates(PLAYER_PED)
+         result, objectHandle = findAllRandomObjectsInSphere(find_obj_x, find_obj_y, find_obj_z, 25, true)
+         if result then
+            setObjectCollision(objectHandle, true)
+         end
+      end
+	  
+	  -- END main
    end
 end
 
