@@ -2,8 +2,9 @@ script_author("1NS")
 script_name("Absolute Events Helper")
 script_description("Assistant for mappers and event makers on Absolute DM")
 script_dependencies('imgui', 'lib.samp.events', 'vkeys', 'memory')
+script_properties("work-in-pause")
 script_url("https://github.com/ins1x/AbsEventHelper")
-script_version("0.5")
+script_version("0.6")
 
 require 'lib.moonloader'
 local keys = require 'vkeys'
@@ -16,10 +17,40 @@ encoding.default = 'CP1251'
 u8 = encoding.UTF8
 font = renderCreateFont("Arial", 8, 5)
 
+------------------------[ cfg ] -------------------
+local inicfg = require 'inicfg'
+local configIni = "AbsEventHelper.ini"
+local ini = inicfg.load({
+   settings =
+   {
+      antiafk = true,
+      chatfilter = true,
+      keybinds = true
+   },
+   binds =
+   {
+      textbuffer1 = " ",
+	  textbuffer2 = " ",
+	  textbuffer3 = " ",
+	  textbuffer4 = " ",
+	  textbuffer5 = " ",
+	  textbuffer6 = " ",
+	  textbuffer7 = " ",
+	  adtextbuffer = " "
+   }
+}, configIni)
+inicfg.save(ini, configIni)
+
+function save()
+    inicfg.save(ini, configIni)
+end
+---------------------------------------------------------
+
 local sizeX, sizeY = getScreenResolution()
 local main_window_state = imgui.ImBool(false)
 local moonloaderVersion = getMoonloaderVersion()
 local v = nil
+local tab = 1
 
 local show_favorites = imgui.ImBool(false)
 local show_credits = imgui.ImBool(false)
@@ -27,16 +58,15 @@ local show_hotkeys = imgui.ImBool(false)
 local show_settings = imgui.ImBool(false)
 local show_colors = imgui.ImBool(false)
 local show_worldlimits = imgui.ImBool(false)
-local show_effects = imgui.ImBool(false)
 local show_info = imgui.ImBool(false)
 local show_chatfucns = imgui.ImBool(false)
 local show_vehs = imgui.ImBool(false)
 local show_notepad = imgui.ImBool(false)
-local show_special = imgui.ImBool(false)
 
-local checkbox_antiafk = imgui.ImBool(true)
-local checkbox_chatfilter = imgui.ImBool(true)
-local checkbox_keybinds = imgui.ImBool(true)
+--local checkbox_antiafk = imgui.ImBool(true)
+local checkbox_antiafk = imgui.ImBool(ini.settings.antiafk)
+local checkbox_chatfilter = imgui.ImBool(ini.settings.chatfilter)
+local checkbox_keybinds = imgui.ImBool(ini.settings.keybinds)
 local checkbox_showobjects = imgui.ImBool(false)
 local checkbox_objectcollision = imgui.ImBool(false)
 
@@ -49,23 +79,30 @@ local bind_textbuffer2 = imgui.ImBuffer(256)
 local bind_textbuffer3 = imgui.ImBuffer(256)
 local bind_textbuffer4 = imgui.ImBuffer(256)
 local bind_textbuffer5 = imgui.ImBuffer(256)
+local bind_textbuffer6 = imgui.ImBuffer(256)
+local bind_textbuffer7 = imgui.ImBuffer(256)
 local bind_adtextbuffer = imgui.ImBuffer(256)
 local note_textbuffer = imgui.ImBuffer(1024)
 
-bind_adtextbuffer.v = u8'Çàõîäèòå íà ÌÏ "Íàçâàíèå ÌÏ" â ìèğ , ïğèç íè÷åãî'
-bind_textbuffer2.v = u8"Êòî áóäåò ìåøàòü ïğîâåäåíè è äğàòüñÿ - êèêíó"
-bind_textbuffer3.v = u8"Íå òóïèì ğàçáåãàåìñÿ ïî êàğòå"
-bind_textbuffer4.v = u8"Çàïğåùåíî èñïîëüçîâàòü òåêñòóğûíå áàãè"
-bind_textbuffer5.v = u8"Çàïğåùåíî îáúåäåíÿòüñÿ áîëüøå äâóõ èãğîêîâ"
+bind_textbuffer1.v = u8(ini.binds.textbuffer1)
+bind_textbuffer2.v = u8(ini.binds.textbuffer2)
+bind_textbuffer3.v = u8(ini.binds.textbuffer3)
+bind_textbuffer4.v = u8(ini.binds.textbuffer4)
+bind_textbuffer5.v = u8(ini.binds.textbuffer5)
+bind_textbuffer6.v = u8(ini.binds.textbuffer6)
+bind_textbuffer7.v = u8(ini.binds.textbuffer7)
+bind_adtextbuffer.v = u8(ini.binds.adtextbuffer)
+--bind_adtextbuffer.v = u8'Ğ—Ğ°Ñ…Ğ¾Ğ´Ğ¸Ñ‚Ğµ Ğ½Ğ° ĞœĞŸ "ĞĞ°Ğ·Ğ²Ğ°Ğ½Ğ¸Ğµ ĞœĞŸ" Ğ² Ğ¼Ğ¸Ñ€ , Ğ¿Ñ€Ğ¸Ğ· Ğ½Ğ¸Ñ‡ĞµĞ³Ğ¾'
+--bind_textbuffer2.v = u8"ĞšÑ‚Ğ¾ Ğ±ÑƒĞ´ĞµÑ‚ Ğ¼ĞµÑˆĞ°Ñ‚ÑŒ Ğ¿Ñ€Ğ¾Ğ²ĞµĞ´ĞµĞ½Ğ¸ Ğ¸ Ğ´Ñ€Ğ°Ñ‚ÑŒÑÑ - ĞºĞ¸ĞºĞ½Ñƒ"
+--bind_textbuffer3.v = u8"ĞĞµ Ñ‚ÑƒĞ¿Ğ¸Ğ¼ Ñ€Ğ°Ğ·Ğ±ĞµĞ³Ğ°ĞµĞ¼ÑÑ Ğ¿Ğ¾ ĞºĞ°Ñ€Ñ‚Ğµ"
+--bind_textbuffer4.v = u8"Ğ—Ğ°Ğ¿Ñ€ĞµÑ‰ĞµĞ½Ğ¾ Ğ¸ÑĞ¿Ğ¾Ğ»ÑŒĞ·Ğ¾Ğ²Ğ°Ñ‚ÑŒ Ñ‚ĞµĞºÑÑ‚ÑƒÑ€Ñ‹Ğ½Ğµ Ğ±Ğ°Ğ³Ğ¸"
+--bind_textbuffer5.v = u8"Ğ—Ğ°Ğ¿Ñ€ĞµÑ‰ĞµĞ½Ğ¾ Ğ¾Ğ±ÑŠĞµĞ´ĞµĞ½ÑÑ‚ÑŒÑÑ Ğ±Ğ¾Ğ»ÑŒÑˆĞµ Ğ´Ğ²ÑƒÑ… Ğ¸Ğ³Ñ€Ğ¾ĞºĞ¾Ğ²"
 
 -- If the server changes IP, change it here
 local hostip = "193.84.90.23"
-local antiafk = true
-local chatfilter = true
-local keybinds = true
 local effects = true
 local disablealleffects = false
-local objectcollision = false
+local disableObjectCollision = false
 local fps = 0
 local fps_counter = 0
 local showobjects = false
@@ -108,34 +145,23 @@ VehicleNames = {
 
 function imgui.OnDrawFrame()
    if main_window_state.v then
-      imgui.SetNextWindowSize(imgui.ImVec2(470, 460), imgui.Cond.FirstUseEver)
+      imgui.SetNextWindowSize(imgui.ImVec2(330, 490), imgui.Cond.FirstUseEver)
 	  imgui.SetNextWindowPos(imgui.ImVec2(sizeX / 2, sizeY / 2),
 	  imgui.Cond.FirstUseEver, imgui.ImVec2(0.5, 0.5))
       imgui.Begin("Absolute Events Helper", main_window_state)
-	  
-	  if imgui.Button(u8"Èíôîğìàöèÿ") then
-		 show_info.v = not show_info.v
-	  end
 	
-	  imgui.SameLine()
-	  if imgui.Button(u8"Íàñòğîéêè") then
+	  if imgui.Button(u8"ĞĞ°ÑÑ‚Ñ€Ğ¾Ğ¹ĞºĞ¸") then
 		 show_settings.v = not show_settings.v
 	  end
 	  
 	  imgui.SameLine()
-	  if imgui.Button(u8"×àò-Áèíä") then
-	     show_chatfucns.v = not show_chatfucns.v
-	  end
-	  
-	  imgui.SameLine()
-	  if imgui.Button(u8"Ñêğûòü âñå îêíà") then
+	  if imgui.Button(u8"Ğ¡ĞºÑ€Ñ‹Ñ‚ÑŒ Ğ²ÑĞµ Ğ¾ĞºĞ½Ğ°") then
 	     show_favorites.v = false
 		 show_credits.v = false
 		 show_hotkeys.v = false
 		 show_settings.v = false
 		 show_colors.v = false
 	     show_worldlimits.v = false
-		 show_effects.v = false
 		 show_info.v = false
 		 show_chatfucns.v = false
 		 show_vehs.v = false
@@ -143,37 +169,40 @@ function imgui.OnDrawFrame()
       end
 	  
 	  imgui.SameLine()
-	  if imgui.Button(u8"Ñâåğíóòü") then
+	  if imgui.Button(u8"Ğ¡Ğ²ĞµÑ€Ğ½ÑƒÑ‚ÑŒ") then
 		 main_window_state.v = not main_window_state.v 
       end	  
 	  
-	  --local id = sampGetPlayerIdByCharHandle(PLAYER_PED)
-	  --local nickname = sampGetPlayerNickname(id)
-	  local servername = sampGetCurrentServerName()
-	  imgui.Text(string.format(u8"Ñåğâåğ: %s", servername))
+	  _, pID = sampGetPlayerIdByCharHandle(playerPed)
+	  local name = sampGetPlayerNickname(pID)
+      local score = sampGetPlayerScore(pID)
+	  local ucolor = sampGetPlayerColor(pID)
+	  
+	  imgui.TextColoredRGB(string.format("Ğ›Ğ¾Ğ³Ğ¸Ğ½: {%0.6x}%s (%d)",
+	  bit.band(ucolor,0xffffff), name, pID))
+	  
+	  -- local servername = sampGetCurrentServerName()
+	  -- imgui.TextColoredRGB(string.format("Ğ¡ĞµÑ€Ğ²ĞµÑ€: {007DFF}%s", servername))
 	
 	  local positionX, positionY, positionZ = getCharCoordinates(PLAYER_PED)
-	  imgui.Text(string.format(u8"Ïîçèöèÿ x: %.1f, y: %.1f, z: %.1f Èíòåğüåğ: %i",
+	  imgui.Text(string.format(u8"ĞŸĞ¾Ğ·Ğ¸Ñ†Ğ¸Ñ x: %.1f, y: %.1f, z: %.1f Ğ˜Ğ½Ñ‚ĞµÑ€ÑŒĞµÑ€: %i",
 	  positionX, positionY, positionZ, getActiveInterior()))
 	  
-	  imgui.Text(string.format(u8"Íàïğàâëåíèå: %s", direction()))
+	  imgui.Text(string.format(u8"ĞĞ°Ğ¿Ñ€Ğ°Ğ²Ğ»ĞµĞ½Ğ¸Ğµ: %s", direction()))
 	  
 	  local streamedplayers = sampGetPlayerCount(true) - 1
-	  imgui.Text(string.format(u8"Èãğîêîâ â ñòğèìå: %i Òğàíñïîğòà: %i FPS: %i",
+	  imgui.Text(string.format(u8"Ğ˜Ğ³Ñ€Ğ¾ĞºĞ¾Ğ² Ğ² ÑÑ‚Ñ€Ğ¸Ğ¼Ğµ: %i Ğ¢Ñ€Ğ°Ğ½ÑĞ¿Ğ¾Ñ€Ñ‚Ğ°: %i FPS: %i",
 	  streamedplayers, getVehicleInStream(), fps))
 	  
-	  --imgui.Separator()
-	  -----------------------------------------------------------------------
-	  
-	  if imgui.Checkbox(u8("Îòêëş÷èòü êîëëèçèş ó îáúåêòîâ ğÿäîì"), checkbox_objectcollision) then 
+	  if imgui.Checkbox(u8("ĞÑ‚ĞºĞ»ÑÑ‡Ğ¸Ñ‚ÑŒ ĞºĞ¾Ğ»Ğ»Ğ¸Ğ·Ğ¸Ñ Ñƒ Ğ¾Ğ±ÑŠĞµĞºÑ‚Ğ¾Ğ² Ñ€ÑĞ´Ğ¾Ğ¼"), checkbox_objectcollision) then 
 	     if checkbox_objectcollision.v then
-            objectcollision = true
+            disableObjectCollision = true
          else
-            objectcollision = false
+            disableObjectCollision = false
          end
 	  end
 	  
-	  if imgui.Checkbox(u8("Ïîêàçûâàòü ID îáúåêòîâ ğÿäîì"), checkbox_showobjects) then 
+	  if imgui.Checkbox(u8("ĞŸĞ¾ĞºĞ°Ğ·Ñ‹Ğ²Ğ°Ñ‚ÑŒ ID Ğ¾Ğ±ÑŠĞµĞºÑ‚Ğ¾Ğ² Ñ€ÑĞ´Ğ¾Ğ¼"), checkbox_showobjects) then 
 		 if checkbox_showobjects.v  then
             showobjects = true
          else
@@ -181,61 +210,54 @@ function imgui.OnDrawFrame()
          end
 	  end
 	  
-	  if imgui.Button(u8"Èçáğàííûå îáúåêòû") then
-		 show_favorites.v = not show_favorites.v
-	  end
-	  
-	  imgui.SameLine()
-	  if imgui.Button(u8"Ñïåöèàëüíûå îáúåêòû") then
-		 show_special.v = not show_special.v
-	  end
-	  
-	  imgui.SameLine()
-      if imgui.Button(u8"İôôåêòû") then
-		 show_effects.v = not show_effects.v
-	  end
-	  
-	  imgui.Separator()
-	  -----------------------------------------------------------------------
+	  --imgui.Separator()
 	  
 	  imgui.Text(" ")
 	  
-	  if imgui.Button(u8"Òğàíñïîğò", imgui.ImVec2(250, 25)) then
+	  if imgui.Button(u8"Ğ˜Ğ½Ñ„Ğ¾Ñ€Ğ¼Ğ°Ñ†Ğ¸Ñ", imgui.ImVec2(250, 25)) then
+		 show_info.v = not show_info.v
+	  end
+	  
+	  if imgui.Button(u8"Ğ§Ğ°Ñ‚-Ğ‘Ğ¸Ğ½Ğ´", imgui.ImVec2(250, 25)) then
+	     show_chatfucns.v = not show_chatfucns.v
+	  end
+	  
+	  if imgui.Button(u8"Ğ¢Ñ€Ğ°Ğ½ÑĞ¿Ğ¾Ñ€Ñ‚", imgui.ImVec2(250, 25)) then
 		 show_vehs.v = not show_vehs.v
 	  end
 	  
-	  if imgui.Button(u8"Ïîëó÷èòü êîîğäèíàòû", imgui.ImVec2(250, 25)) then
+	  if imgui.Button(u8"ĞŸĞ¾Ğ»ÑƒÑ‡Ğ¸Ñ‚ÑŒ ĞºĞ¾Ğ¾Ñ€Ğ´Ğ¸Ğ½Ğ°Ñ‚Ñ‹", imgui.ImVec2(250, 25)) then
 	     if not sampIsChatInputActive() and not sampIsDialogActive() and not isPauseMenuActive() and not isSampfuncsConsoleActive() then 
-		    sampSendChat("/êîîğä")
+		    sampSendChat("/ĞºĞ¾Ğ¾Ñ€Ğ´")
 			tpposX, tpposY, tpposZ = getCharCoordinates(PLAYER_PED)
 			setClipboardText(math.floor(tpposX) .. ' ' .. math.floor(tpposY) .. ' ' .. math.floor(tpposZ))
-			sampAddChatMessage("Êîîğäèíàòû ñîõğàíåíû â áóôåğ", 0x0FFFFFF)
+			sampAddChatMessage("ĞšĞ¾Ğ¾Ñ€Ğ´Ğ¸Ğ½Ğ°Ñ‚Ñ‹ ÑĞ¾Ñ…Ñ€Ğ°Ğ½ĞµĞ½Ñ‹ Ğ² Ğ±ÑƒÑ„ĞµÑ€", 0x0FFFFFF)
 		 end
 	  end
 	  
-	  if imgui.Button(u8"Òåëåïîğò ïî êîğäèíàòàì", imgui.ImVec2(250, 25)) then
-	     --sampSendChat("/òïê " .. tpposX, tpposY, tpposZ, 0x0FFFFFF)
+	  if imgui.Button(u8"Ğ¢ĞµĞ»ĞµĞ¿Ğ¾Ñ€Ñ‚ Ğ¿Ğ¾ ĞºĞ¾Ñ€Ğ´Ğ¸Ğ½Ğ°Ñ‚Ğ°Ğ¼", imgui.ImVec2(250, 25)) then
+	     --sampSendChat("/Ñ‚Ğ¿Ğº " .. tpposX, tpposY, tpposZ, 0x0FFFFFF)
 		 if tpposX then
 	        sampSendChat(string.format("/ngr %f %f %f", tpposX, tpposY, tpposZ), 0x0FFFFFF)
-		    sampAddChatMessage(string.format("Âû áûëè òåëåïîğòèğîâàííû íà ñîõğàííåíûå êîîğäèíàòû %f %f %f"
+		    sampAddChatMessage(string.format("Ğ’Ñ‹ Ğ±Ñ‹Ğ»Ğ¸ Ñ‚ĞµĞ»ĞµĞ¿Ğ¾Ñ€Ñ‚Ğ¸Ñ€Ğ¾Ğ²Ğ°Ğ½Ğ½Ñ‹ Ğ½Ğ° ÑĞ¾Ñ…Ñ€Ğ°Ğ½Ğ½ĞµĞ½Ñ‹Ğµ ĞºĞ¾Ğ¾Ñ€Ğ´Ğ¸Ğ½Ğ°Ñ‚Ñ‹ %f %f %f"
 			,tpposX, tpposY, tpposZ), 0x0FFFFFF)
 		 else
-		    sampAddChatMessage("Êîîğäèíàòû íå áûëè ñîõğàíåíû. Íàæìèòå êîîğä", 0x0FFFFFF)
+		    sampAddChatMessage("ĞšĞ¾Ğ¾Ñ€Ğ´Ğ¸Ğ½Ğ°Ñ‚Ñ‹ Ğ½Ğµ Ğ±Ñ‹Ğ»Ğ¸ ÑĞ¾Ñ…Ñ€Ğ°Ğ½ĞµĞ½Ñ‹. ĞĞ°Ğ¶Ğ¼Ğ¸Ñ‚Ğµ ĞºĞ¾Ğ¾Ñ€Ğ´", 0x0FFFFFF)
 		 end
 	  end
 	  
-	  if imgui.Button(u8"Ïğûãíóòü âïåğåä", imgui.ImVec2(250, 25)) then
+	  if imgui.Button(u8"ĞŸÑ€Ñ‹Ğ³Ğ½ÑƒÑ‚ÑŒ Ğ²Ğ¿ĞµÑ€ĞµĞ´", imgui.ImVec2(250, 25)) then
 		 if not sampIsChatInputActive() and not sampIsDialogActive() and not isPauseMenuActive() and not isSampfuncsConsoleActive() then sampSendChat("/ghsu") end
 	  end
 	  
-	  if imgui.Button(u8"Çàìåòêè", imgui.ImVec2(250, 25)) then
+	  if imgui.Button(u8"Ğ—Ğ°Ğ¼ĞµÑ‚ĞºĞ¸", imgui.ImVec2(250, 25)) then
 		 show_notepad.v = not show_notepad.v
 	  end
 	  
 	  local ip, port = sampGetCurrentServerAddress()
 	  if not ip:find(hostip) then
-	     imgui.TextColoredRGB("{FF0000}Íåêîòîğûå ôóíêöèè áóäóò íåäîñòóïíû")
-	     imgui.TextColoredRGB("{FF0000}Ñêğèïò ïğåäíàçíà÷åí äëÿ ğàáîòû íà Absolute Play DM")
+	     imgui.TextColoredRGB("{FF0000}ĞĞµĞºĞ¾Ñ‚Ğ¾Ñ€Ñ‹Ğµ Ñ„ÑƒĞ½ĞºÑ†Ğ¸Ğ¸ Ğ±ÑƒĞ´ÑƒÑ‚ Ğ½ĞµĞ´Ğ¾ÑÑ‚ÑƒĞ¿Ğ½Ñ‹")
+	     imgui.TextColoredRGB("{FF0000}Ğ¡ĞºÑ€Ğ¸Ğ¿Ñ‚ Ğ¿Ñ€ĞµĞ´Ğ½Ğ°Ğ·Ğ½Ğ°Ñ‡ĞµĞ½ Ğ´Ğ»Ñ Ñ€Ğ°Ğ±Ğ¾Ñ‚Ñ‹ Ğ½Ğ° Absolute Play DM")
 	  end
 	  
       imgui.End()
@@ -245,21 +267,25 @@ function imgui.OnDrawFrame()
 	  imgui.SetNextWindowPos(imgui.ImVec2(sizeX / 2, sizeY / 6),
 	  imgui.Cond.FirstUseEver, imgui.ImVec2(0.5, 0.5))
 	  
-      imgui.Begin(u8"Èíôîğìàöèÿ", show_info)
+      imgui.Begin(u8"Ğ˜Ğ½Ñ„Ğ¾Ñ€Ğ¼Ğ°Ñ†Ğ¸Ñ", show_info)
 	  
-	  if imgui.Button(u8"Ëèìèòû", imgui.ImVec2(200, 25)) then
+	  if imgui.Button(u8"Ğ›Ğ¸Ğ¼Ğ¸Ñ‚Ñ‹", imgui.ImVec2(200, 25)) then
 		 show_worldlimits.v = not show_worldlimits.v
 	  end
 	  
-	  if imgui.Button(u8"Öâåòà", imgui.ImVec2(200, 25)) then
+	  if imgui.Button(u8"Ğ¦Ğ²ĞµÑ‚Ğ°", imgui.ImVec2(200, 25)) then
 		 show_colors.v = not show_colors.v
 	  end
 	  
-	  if imgui.Button(u8"Ãîğÿ÷èå êëàâèøè", imgui.ImVec2(200, 25)) then
+	  if imgui.Button(u8"Ğ“Ğ¾Ñ€ÑÑ‡Ğ¸Ğµ ĞºĞ»Ğ°Ğ²Ğ¸ÑˆĞ¸", imgui.ImVec2(200, 25)) then
 		 show_hotkeys.v = not show_hotkeys.v
 	  end
 	  
-	  if imgui.Button(u8"Î ñêğèïòå", imgui.ImVec2(200, 25)) then
+	  if imgui.Button(u8"Ğ˜Ğ·Ğ±Ñ€Ğ°Ğ½Ğ½Ñ‹Ğµ Ğ¾Ğ±ÑŠĞµĞºÑ‚Ñ‹", imgui.ImVec2(200, 25)) then
+		 show_favorites.v = not show_favorites.v
+	  end
+	  
+	  if imgui.Button(u8"Ğ ÑĞºÑ€Ğ¸Ğ¿Ñ‚Ğµ", imgui.ImVec2(200, 25)) then
 		 show_credits.v = not show_credits.v
 	  end
 	  
@@ -267,89 +293,85 @@ function imgui.OnDrawFrame()
    end
 	
    if show_favorites.v then
+      imgui.SetNextWindowSize(imgui.ImVec2(530, 510), imgui.Cond.FirstUseEver)
 	  imgui.SetNextWindowPos(imgui.ImVec2(sizeX / 8, sizeY / 4),
 	  imgui.Cond.FirstUseEver, imgui.ImVec2(0.5, 0.5))
 	  
-      imgui.Begin(u8"Èçáğàííûå", show_favorites)
-      imgui.Text(u8"Áîëüøèå ïğîçğà÷íûå îáúåêòû äëÿ òåêñòà: 19481, 19480, 19482, 19477")
-      imgui.Text(u8"Ìàëåíüêèå îáúåêòû äëÿ òåêñòà: 19476, 2662")
-      imgui.Text(u8"Áåòîííûå áëîêè: 18766, 18765, 18764, 18763, 18762")
-      imgui.Text(u8"Ãîğû: âóëêàí 18752, ïåñî÷íèöà 18751, ïåñî÷íûå ãîğû ëàíäøàôò 19548")
-      imgui.Text(u8"Ïëàòôîğìû: òîíêàÿ ïëàòôîğìà 19552, 19538, ğåøåò÷àòàÿ 18753, 18754")
-      imgui.Text(u8"Ïîâåğõíîñòè: 19531, 4242, 4247, 8171, 5004, 16685")
-      imgui.Text(u8"Ñòåíû: 19355, 19435(ìàëåíüêàÿ), 19447(äëèííàÿ), 19391(äâåğü), 19408(îêíî)")
-	  imgui.Separator()
-	  imgui.TextColoredRGB("Íå íàøëè íóæíûé îáúåêò? ïîñìîòğèòå íà {007DFF}dev.prineside.com")
-      imgui.End()
-   end
-   
-   if show_special.v then
-	  imgui.SetNextWindowPos(imgui.ImVec2(sizeX / 8, sizeY / 4),
-	  imgui.Cond.FirstUseEver, imgui.ImVec2(0.5, 0.5))
+      imgui.Begin(u8"ĞĞ±ÑŠĞµĞºÑ‚Ñ‹", show_favorites)
 	  
-      imgui.Begin(u8"Ñïåöèàëüíûå", show_special)
-      imgui.Text(u8"Êîğîâêà 19833, Âåğåâêà 19087, Âåğåâêà äëèí. 19089")
-      imgui.Text(u8"Ñòåêëî (Ğàçğóøàåìîå) 3858, ñòåêëî îò òğàâû 3261, ñåíî 3374")
-      imgui.Text(u8"Ôàêåë ñ ÷åğåïîì 3524, ôàêåë 3461, êğàñíûé ñòîï ñèãíàë 3877")
-      imgui.Text(u8"Ïîïóã 19079, âîñòî÷íàÿ ëàìïà 3534")
-      imgui.Text(u8"Âîäÿíàÿ áî÷êà 1554, ğæàâàÿ áî÷êà 1217, âçğûâ. áî÷êà 1225")
-      imgui.Text(u8"×åğíàÿ áåçäíà 13656, ñòåêëÿííûé áëîê 18887")
-      imgui.Text(u8"Ïàğòèêë âîäû ñ êîëèçèåé 19603, áîëüøîé 19604")
-      imgui.Text(u8"Ôèíèø ãîíêè 18761")
-      imgui.End()
-   end
-   
-   if show_effects.v then	  
-	  imgui.SetNextWindowPos(imgui.ImVec2(sizeX / 8, sizeY / 4),
-	  imgui.Cond.FirstUseEver, imgui.ImVec2(0.5, 0.5))
+	  if imgui.Button(u8"ĞÑĞ½Ğ¾Ğ²Ğ½Ñ‹Ğµ") then tab = 1 end 
+	  imgui.SameLine()
+	  if imgui.Button(u8"Ğ¡Ğ¿ĞµÑ†Ğ¸Ğ°Ğ»ÑŒĞ½Ñ‹Ğµ") then tab = 2 end
+	  imgui.SameLine()
+	  if imgui.Button(u8"Ğ­Ñ„Ñ„ĞµĞºÑ‚Ñ‹") then tab = 3 end
 	  
-      imgui.Begin(u8"İôôåêòû", show_effects)
-	  imgui.Text(u8"Îãîíü áîëüøîé 18691, ñğåäíèé îãîíü 18692, ïëàìÿ+äûì (èñ÷åçàåò) 18723")
-	  imgui.Text(u8"Îãîíü îò îãíåìåòà 18694, îãîíü îò ìàøèíû 18690")
-	  imgui.Text(u8"Ïàğ îò âåíòèëÿöèè 18736, äûì îò ñèãàğåòû 18673, äûì ñ ôàáğèêè 18748")
-	  imgui.Text(u8"Áåëûé äûì 18725, ÷åğíûé äûì 18726, áîëüøîé ñåğûé äûì 18727")
-	  imgui.Text(u8"Áîëüøîé âçğûâ 18682, ñğåäíèé âçğûâ 18683, ìàëåíüêèé âçğûâ 18686")
-	  imgui.Text(u8"Ñïğåé 18729, êğîâü 18668, îãíåòóøèòåëü 18687, ñëåçîòî÷èâûé 18732")
-	  imgui.Text(u8"Ğÿáü íà âîäå 18741, áğûçãè âîäû 18744")
-	  imgui.Text(u8"Ôîíòàí 18739, ãèäğàíò 18740, âîäîïàä 19841, âîäà 19842")
-      imgui.Text(u8"Èñêğû 18717, ãîğÿùèå äğîâà 19632")
-      imgui.Text(u8"Íåîí êğàñíûé 18647, ñèíèé 18648, çåëåíûé 18649")
-	  imgui.Text(u8"Íåîí æåëòûé 18650, ğîçîâûé 18651, áåëûé 18652")
-	  imgui.Text(u8"Ñâåò.øàğ (íå ìîğãàåò) áåëûé 19281, êğàñí. 19282, çåë. 19283, ñèíèé 19284")
-	  imgui.Text(u8"Ñâåò.øàğ (ìîğãàåò áûñòğî) áåëûé 19285, êğàñí. 19286, çåë. 19287, ñèí. 19288")
-	  imgui.Text(u8"Ñâåò.øàğ (ìîğãàåò ìåäëåííî) áåëûé 19289, êğàñí. 19290, çåë. 19291, ñèí. 19292")
-	  imgui.Text(u8"Ñâåò.øàğ (ìîğãàåò ìåäëåííî) ôèîëåòîâûé 19293, æåëòûé 19294")
-	  imgui.Text(u8"Ñâåò.øàğ (áîëüøîé íå ìîğãàåò) áåë. 19295, êğàñí. 19296, çåë. 19297, ñèí. 19298")
-      imgui.Text(u8"Ñèãíàëüíûé îãîíü 18728, ëàçåğ 18643, íèòğî 18702, ôëåéì 18693")
+	  if tab == 1 then
+	     imgui.Text(u8"Ğ‘Ğ¾Ğ»ÑŒÑˆĞ¸Ğµ Ğ¿Ñ€Ğ¾Ğ·Ñ€Ğ°Ñ‡Ğ½Ñ‹Ğµ Ğ¾Ğ±ÑŠĞµĞºÑ‚Ñ‹ Ğ´Ğ»Ñ Ñ‚ĞµĞºÑÑ‚Ğ°: 19481, 19480, 19482, 19477")
+         imgui.Text(u8"ĞœĞ°Ğ»ĞµĞ½ÑŒĞºĞ¸Ğµ Ğ¾Ğ±ÑŠĞµĞºÑ‚Ñ‹ Ğ´Ğ»Ñ Ñ‚ĞµĞºÑÑ‚Ğ°: 19476, 2662")
+         imgui.Text(u8"Ğ‘ĞµÑ‚Ğ¾Ğ½Ğ½Ñ‹Ğµ Ğ±Ğ»Ğ¾ĞºĞ¸: 18766, 18765, 18764, 18763, 18762")
+         imgui.Text(u8"Ğ“Ğ¾Ñ€Ñ‹: Ğ²ÑƒĞ»ĞºĞ°Ğ½ 18752, Ğ¿ĞµÑĞ¾Ñ‡Ğ½Ğ¸Ñ†Ğ° 18751, Ğ¿ĞµÑĞ¾Ñ‡Ğ½Ñ‹Ğµ Ğ³Ğ¾Ñ€Ñ‹ Ğ»Ğ°Ğ½Ğ´ÑˆĞ°Ñ„Ñ‚ 19548")
+         imgui.Text(u8"ĞŸĞ»Ğ°Ñ‚Ñ„Ğ¾Ñ€Ğ¼Ñ‹: Ñ‚Ğ¾Ğ½ĞºĞ°Ñ Ğ¿Ğ»Ğ°Ñ‚Ñ„Ğ¾Ñ€Ğ¼Ğ° 19552, 19538, Ñ€ĞµÑˆĞµÑ‚Ñ‡Ğ°Ñ‚Ğ°Ñ 18753, 18754")
+         imgui.Text(u8"ĞŸĞ¾Ğ²ĞµÑ€Ñ…Ğ½Ğ¾ÑÑ‚Ğ¸: 19531, 4242, 4247, 8171, 5004, 16685")
+         imgui.Text(u8"Ğ¡Ñ‚ĞµĞ½Ñ‹: 19355, 19435(Ğ¼Ğ°Ğ»ĞµĞ½ÑŒĞºĞ°Ñ), 19447(Ğ´Ğ»Ğ¸Ğ½Ğ½Ğ°Ñ), 19391(Ğ´Ğ²ĞµÑ€ÑŒ), 19408(Ğ¾ĞºĞ½Ğ¾)")
+	     imgui.Separator()
+	     imgui.TextColoredRGB("ĞĞµ Ğ½Ğ°ÑˆĞ»Ğ¸ Ğ½ÑƒĞ¶Ğ½Ñ‹Ğ¹ Ğ¾Ğ±ÑŠĞµĞºÑ‚? Ğ¿Ğ¾ÑĞ¼Ğ¾Ñ‚Ñ€Ğ¸Ñ‚Ğµ Ğ½Ğ° {007DFF}dev.prineside.com")
+	  elseif tab == 2 then
+		 imgui.Text(u8"ĞšĞ¾Ñ€Ğ¾Ğ²ĞºĞ° 19833, Ğ’ĞµÑ€ĞµĞ²ĞºĞ° 19087, Ğ’ĞµÑ€ĞµĞ²ĞºĞ° Ğ´Ğ»Ğ¸Ğ½. 19089")
+         imgui.Text(u8"Ğ¡Ñ‚ĞµĞºĞ»Ğ¾ (Ğ Ğ°Ğ·Ñ€ÑƒÑˆĞ°ĞµĞ¼Ğ¾Ğµ) 3858, ÑÑ‚ĞµĞºĞ»Ğ¾ Ğ¾Ñ‚ Ñ‚Ñ€Ğ°Ğ²Ñ‹ 3261, ÑĞµĞ½Ğ¾ 3374")
+         imgui.Text(u8"Ğ¤Ğ°ĞºĞµĞ» Ñ Ñ‡ĞµÑ€ĞµĞ¿Ğ¾Ğ¼ 3524, Ñ„Ğ°ĞºĞµĞ» 3461, ĞºÑ€Ğ°ÑĞ½Ñ‹Ğ¹ ÑÑ‚Ğ¾Ğ¿ ÑĞ¸Ğ³Ğ½Ğ°Ğ» 3877")
+         imgui.Text(u8"ĞŸĞ¾Ğ¿ÑƒĞ³ 19079, Ğ²Ğ¾ÑÑ‚Ğ¾Ñ‡Ğ½Ğ°Ñ Ğ»Ğ°Ğ¼Ğ¿Ğ° 3534")
+         imgui.Text(u8"Ğ’Ğ¾Ğ´ÑĞ½Ğ°Ñ Ğ±Ğ¾Ñ‡ĞºĞ° 1554, Ñ€Ğ¶Ğ°Ğ²Ğ°Ñ Ğ±Ğ¾Ñ‡ĞºĞ° 1217, Ğ²Ğ·Ñ€Ñ‹Ğ². Ğ±Ğ¾Ñ‡ĞºĞ° 1225")
+         imgui.Text(u8"Ğ§ĞµÑ€Ğ½Ğ°Ñ Ğ±ĞµĞ·Ğ´Ğ½Ğ° 13656, ÑÑ‚ĞµĞºĞ»ÑĞ½Ğ½Ñ‹Ğ¹ Ğ±Ğ»Ğ¾Ğº 18887")
+         imgui.Text(u8"ĞŸĞ°Ñ€Ñ‚Ğ¸ĞºĞ» Ğ²Ğ¾Ğ´Ñ‹ Ñ ĞºĞ¾Ğ»Ğ¸Ğ·Ğ¸ĞµĞ¹ 19603, Ğ±Ğ¾Ğ»ÑŒÑˆĞ¾Ğ¹ 19604")
+         imgui.Text(u8"Ğ¤Ğ¸Ğ½Ğ¸Ñˆ Ğ³Ğ¾Ğ½ĞºĞ¸ 18761")
+	  elseif tab == 3 then
+	     imgui.Text(u8"ĞĞ³Ğ¾Ğ½ÑŒ Ğ±Ğ¾Ğ»ÑŒÑˆĞ¾Ğ¹ 18691, ÑÑ€ĞµĞ´Ğ½Ğ¸Ğ¹ Ğ¾Ğ³Ğ¾Ğ½ÑŒ 18692, Ğ¿Ğ»Ğ°Ğ¼Ñ+Ğ´Ñ‹Ğ¼ (Ğ¸ÑÑ‡ĞµĞ·Ğ°ĞµÑ‚) 18723")
+	     imgui.Text(u8"ĞĞ³Ğ¾Ğ½ÑŒ Ğ¾Ñ‚ Ğ¾Ğ³Ğ½ĞµĞ¼ĞµÑ‚Ğ° 18694, Ğ¾Ğ³Ğ¾Ğ½ÑŒ Ğ¾Ñ‚ Ğ¼Ğ°ÑˆĞ¸Ğ½Ñ‹ 18690")
+	     imgui.Text(u8"ĞŸĞ°Ñ€ Ğ¾Ñ‚ Ğ²ĞµĞ½Ñ‚Ğ¸Ğ»ÑÑ†Ğ¸Ğ¸ 18736, Ğ´Ñ‹Ğ¼ Ğ¾Ñ‚ ÑĞ¸Ğ³Ğ°Ñ€ĞµÑ‚Ñ‹ 18673, Ğ´Ñ‹Ğ¼ Ñ Ñ„Ğ°Ğ±Ñ€Ğ¸ĞºĞ¸ 18748")
+	     imgui.Text(u8"Ğ‘ĞµĞ»Ñ‹Ğ¹ Ğ´Ñ‹Ğ¼ 18725, Ñ‡ĞµÑ€Ğ½Ñ‹Ğ¹ Ğ´Ñ‹Ğ¼ 18726, Ğ±Ğ¾Ğ»ÑŒÑˆĞ¾Ğ¹ ÑĞµÑ€Ñ‹Ğ¹ Ğ´Ñ‹Ğ¼ 18727")
+	     imgui.Text(u8"Ğ‘Ğ¾Ğ»ÑŒÑˆĞ¾Ğ¹ Ğ²Ğ·Ñ€Ñ‹Ğ² 18682, ÑÑ€ĞµĞ´Ğ½Ğ¸Ğ¹ Ğ²Ğ·Ñ€Ñ‹Ğ² 18683, Ğ¼Ğ°Ğ»ĞµĞ½ÑŒĞºĞ¸Ğ¹ Ğ²Ğ·Ñ€Ñ‹Ğ² 18686")
+	     imgui.Text(u8"Ğ¡Ğ¿Ñ€ĞµĞ¹ 18729, ĞºÑ€Ğ¾Ğ²ÑŒ 18668, Ğ¾Ğ³Ğ½ĞµÑ‚ÑƒÑˆĞ¸Ñ‚ĞµĞ»ÑŒ 18687, ÑĞ»ĞµĞ·Ğ¾Ñ‚Ğ¾Ñ‡Ğ¸Ğ²Ñ‹Ğ¹ 18732")
+	     imgui.Text(u8"Ğ ÑĞ±ÑŒ Ğ½Ğ° Ğ²Ğ¾Ğ´Ğµ 18741, Ğ±Ñ€Ñ‹Ğ·Ğ³Ğ¸ Ğ²Ğ¾Ğ´Ñ‹ 18744")
+	     imgui.Text(u8"Ğ¤Ğ¾Ğ½Ñ‚Ğ°Ğ½ 18739, Ğ³Ğ¸Ğ´Ñ€Ğ°Ğ½Ñ‚ 18740, Ğ²Ğ¾Ğ´Ğ¾Ğ¿Ğ°Ğ´ 19841, Ğ²Ğ¾Ğ´Ğ° 19842")
+         imgui.Text(u8"Ğ˜ÑĞºÑ€Ñ‹ 18717, Ğ³Ğ¾Ñ€ÑÑ‰Ğ¸Ğµ Ğ´Ñ€Ğ¾Ğ²Ğ° 19632")
+         imgui.Text(u8"ĞĞµĞ¾Ğ½ ĞºÑ€Ğ°ÑĞ½Ñ‹Ğ¹ 18647, ÑĞ¸Ğ½Ğ¸Ğ¹ 18648, Ğ·ĞµĞ»ĞµĞ½Ñ‹Ğ¹ 18649")
+	     imgui.Text(u8"ĞĞµĞ¾Ğ½ Ğ¶ĞµĞ»Ñ‚Ñ‹Ğ¹ 18650, Ñ€Ğ¾Ğ·Ğ¾Ğ²Ñ‹Ğ¹ 18651, Ğ±ĞµĞ»Ñ‹Ğ¹ 18652")
+	     imgui.Text(u8"Ğ¡Ğ²ĞµÑ‚.ÑˆĞ°Ñ€ (Ğ½Ğµ Ğ¼Ğ¾Ñ€Ğ³Ğ°ĞµÑ‚) Ğ±ĞµĞ»Ñ‹Ğ¹ 19281, ĞºÑ€Ğ°ÑĞ½. 19282, Ğ·ĞµĞ». 19283, ÑĞ¸Ğ½Ğ¸Ğ¹ 19284")
+	     imgui.Text(u8"Ğ¡Ğ²ĞµÑ‚.ÑˆĞ°Ñ€ (Ğ¼Ğ¾Ñ€Ğ³Ğ°ĞµÑ‚ Ğ±Ñ‹ÑÑ‚Ñ€Ğ¾) Ğ±ĞµĞ»Ñ‹Ğ¹ 19285, ĞºÑ€Ğ°ÑĞ½. 19286, Ğ·ĞµĞ». 19287, ÑĞ¸Ğ½. 19288")
+	     imgui.Text(u8"Ğ¡Ğ²ĞµÑ‚.ÑˆĞ°Ñ€ (Ğ¼Ğ¾Ñ€Ğ³Ğ°ĞµÑ‚ Ğ¼ĞµĞ´Ğ»ĞµĞ½Ğ½Ğ¾) Ğ±ĞµĞ»Ñ‹Ğ¹ 19289, ĞºÑ€Ğ°ÑĞ½. 19290, Ğ·ĞµĞ». 19291, ÑĞ¸Ğ½. 19292")
+	     imgui.Text(u8"Ğ¡Ğ²ĞµÑ‚.ÑˆĞ°Ñ€ (Ğ¼Ğ¾Ñ€Ğ³Ğ°ĞµÑ‚ Ğ¼ĞµĞ´Ğ»ĞµĞ½Ğ½Ğ¾) Ñ„Ğ¸Ğ¾Ğ»ĞµÑ‚Ğ¾Ğ²Ñ‹Ğ¹ 19293, Ğ¶ĞµĞ»Ñ‚Ñ‹Ğ¹ 19294")
+	     imgui.Text(u8"Ğ¡Ğ²ĞµÑ‚.ÑˆĞ°Ñ€ (Ğ±Ğ¾Ğ»ÑŒÑˆĞ¾Ğ¹ Ğ½Ğµ Ğ¼Ğ¾Ñ€Ğ³Ğ°ĞµÑ‚) Ğ±ĞµĞ». 19295, ĞºÑ€Ğ°ÑĞ½. 19296, Ğ·ĞµĞ». 19297, ÑĞ¸Ğ½. 19298")
+         imgui.Text(u8"Ğ¡Ğ¸Ğ³Ğ½Ğ°Ğ»ÑŒĞ½Ñ‹Ğ¹ Ğ¾Ğ³Ğ¾Ğ½ÑŒ 18728, Ğ»Ğ°Ğ·ĞµÑ€ 18643, Ğ½Ğ¸Ñ‚Ñ€Ğ¾ 18702, Ñ„Ğ»ĞµĞ¹Ğ¼ 18693")
 	  
-	  imgui.Separator()
-	  if imgui.Button(u8"Îòêëş÷èòü äûì èç òğóá è ïğî÷èå ıôôåêòû ôàêåëîâ è äûìà",
-	  imgui.ImVec2(450, 25)) then
-		 effects = not effects
-		 if effects then
-            memory.hex2bin('8B4E08E88B900000', 0x4A125D, 8)
-		 else 
-		    memory.fill(0x4A125D, 0x90, 8, true)
-		 end
-	  end 
+	     imgui.Separator()
+	     if imgui.Button(u8"ĞÑ‚ĞºĞ»ÑÑ‡Ğ¸Ñ‚ÑŒ Ğ´Ñ‹Ğ¼ Ğ¸Ğ· Ñ‚Ñ€ÑƒĞ± Ğ¸ Ğ¿Ñ€Ğ¾Ñ‡Ğ¸Ğµ ÑÑ„Ñ„ĞµĞºÑ‚Ñ‹ Ñ„Ğ°ĞºĞµĞ»Ğ¾Ğ² Ğ¸ Ğ´Ñ‹Ğ¼Ğ°",
+	     imgui.ImVec2(450, 25)) then
+		    effects = not effects
+		    if effects then
+               memory.hex2bin('8B4E08E88B900000', 0x4A125D, 8)
+		    else 
+ 		       memory.fill(0x4A125D, 0x90, 8, true)
+		    end
+	     end 
 	  
-	  -- nop all effects render
-	  if imgui.Button(u8"Îòêëş÷èòü âñå ıôôåêòû (âåğíóòü îáğàòíî òîëüêî ğåëîãîì)",
-	  imgui.ImVec2(450, 25)) then
-		 if not disablealleffects then
-	        memory.fill(0x53EAD3, 0x90, 5, true)
-			disablealleffects = true
-		 end
+	     -- nop all effects render
+	     if imgui.Button(u8"ĞÑ‚ĞºĞ»ÑÑ‡Ğ¸Ñ‚ÑŒ Ğ²ÑĞµ ÑÑ„Ñ„ĞµĞºÑ‚Ñ‹ (Ğ²ĞµÑ€Ğ½ÑƒÑ‚ÑŒ Ğ¾Ğ±Ñ€Ğ°Ñ‚Ğ½Ğ¾ Ñ‚Ğ¾Ğ»ÑŒĞºĞ¾ Ñ€ĞµĞ»Ğ¾Ğ³Ğ¾Ğ¼)",
+	     imgui.ImVec2(450, 25)) then
+		    if not disablealleffects then
+	           memory.fill(0x53EAD3, 0x90, 5, true)
+			   disablealleffects = true
+		    end
+	     end
+		 
 	  end
-	  
       imgui.End()
-	end
+   end
 	
 	if show_colors.v then
 	   imgui.SetNextWindowPos(imgui.ImVec2(sizeX / 6, sizeY / 4),
 	   imgui.Cond.FirstUseEver, imgui.ImVec2(0.5, 0.5))
 	   
-       imgui.Begin(u8"Öâåòîâàÿ ïàëèòğà", show_colors)
+       imgui.Begin(u8"Ğ¦Ğ²ĞµÑ‚Ğ¾Ğ²Ğ°Ñ Ğ¿Ğ°Ğ»Ğ¸Ñ‚Ñ€Ğ°", show_colors)
 	   
 	   imgui.PushStyleColor(imgui.Col.Button, imgui.ImVec4(1.0, 0.0, 0.0, 1.0))
 	   imgui.Button("{FF0000}  RED    ", imgui.ImVec2(300, 20))
@@ -415,9 +437,9 @@ function imgui.OnDrawFrame()
 	   imgui.Button("{000000}  BLACK ", imgui.ImVec2(300, 20))
 	   imgui.PopStyleColor()
 	   
-	   imgui.TextColoredRGB("Äğóãèå öâåòà {007DFF}https://encycolorpedia.ru/websafe")
+	   imgui.TextColoredRGB("Ğ”Ñ€ÑƒĞ³Ğ¸Ğµ Ñ†Ğ²ĞµÑ‚Ğ° {007DFF}https://encycolorpedia.ru/websafe")
 	   
-	   imgui.Text(u8"RR — êğàñíàÿ ÷àñòü öâåòà, GG — çåëåíàÿ, BB — ñèíÿÿ, AA — àëüôà")
+	   imgui.Text(u8"RR â€” ĞºÑ€Ğ°ÑĞ½Ğ°Ñ Ñ‡Ğ°ÑÑ‚ÑŒ Ñ†Ğ²ĞµÑ‚Ğ°, GG â€” Ğ·ĞµĞ»ĞµĞ½Ğ°Ñ, BB â€” ÑĞ¸Ğ½ÑÑ, AA â€” Ğ°Ğ»ÑŒÑ„Ğ°")
 	   imgui.ColorEdit4("", color)
 	   imgui.SameLine()
 	   imgui.Text("HEX: " ..intToHex(join_argb(color.v[4] * 255, color.v[1] * 255,
@@ -425,14 +447,15 @@ function imgui.OnDrawFrame()
 	   
 	   imgui.End()
 	end
-	
+    
 	if show_chatfucns.v then
 	   imgui.SetNextWindowPos(imgui.ImVec2(sizeX / 6, sizeY / 4),
 	   imgui.Cond.FirstUseEver, imgui.ImVec2(0.5, 0.5))
-	   imgui.SetNextWindowSize(imgui.ImVec2(480, 420), imgui.Cond.FirstUseEver)
-	   imgui.Begin(u8"×àò", show_chatfucns)
+	   imgui.SetNextWindowSize(imgui.ImVec2(490, 510), imgui.Cond.FirstUseEver)
+	   imgui.Begin(u8"Ğ§Ğ°Ñ‚", show_chatfucns)
 	   
-	   imgui.Text(u8"Çäåñü âû ìîæåòå íàñòğîèòü ÷àò-áèíäû äëÿ ìåğîïğèÿòèÿ")
+	   imgui.Text(u8"Ğ—Ğ´ĞµÑÑŒ Ğ²Ñ‹ Ğ¼Ğ¾Ğ¶ĞµÑ‚Ğµ Ğ½Ğ°ÑÑ‚Ñ€Ğ¾Ğ¸Ñ‚ÑŒ Ñ‡Ğ°Ñ‚-Ğ±Ğ¸Ğ½Ğ´Ñ‹ Ğ´Ğ»Ñ Ğ¼ĞµÑ€Ğ¾Ğ¿Ñ€Ğ¸ÑÑ‚Ğ¸Ñ")
+	   imgui.TextColoredRGB("{00FF00}@ Ğ½Ğ¾Ğ¼ĞµÑ€ Ğ¸Ğ³Ñ€Ğ¾ĞºĞ° - {bababa}Ğ·Ğ°Ğ¼ĞµĞ½Ğ¸Ñ‚ id Ğ½Ğ° Ğ½Ğ¸ĞºĞ½ĞµĞ¹Ğ¼ Ğ¸Ğ³Ñ€Ğ¾ĞºĞ°")
 	   
 	   if imgui.InputText("##Bind1", bind_textbuffer1) then 
 		  --bind_textbuffer1 = u8:decode(bind_textbuffer1.v)
@@ -440,84 +463,110 @@ function imgui.OnDrawFrame()
 	   end
 	   
 	   imgui.SameLine()
-	   if imgui.Button(u8"Îòïğàâèòü â ì÷àò [1]") then
+	   if imgui.Button(u8"ĞÑ‚Ğ¿Ñ€Ğ°Ğ²Ğ¸Ñ‚ÑŒ Ğ² Ğ¼Ñ‡Ğ°Ñ‚ [1]") then
 	      u8:decode(bind_textbuffer1.v)
-	      sampSendChat(string.format("/ì÷àò %s", u8:decode(bind_textbuffer1.v)))
+	      sampSendChat(string.format("/Ğ¼Ñ‡Ğ°Ñ‚ %s", u8:decode(bind_textbuffer1.v)))
 	   end
 	   
 	   if imgui.InputText("##Bind2", bind_textbuffer2) then 
 	   end
 	   
 	   imgui.SameLine()
-	   if imgui.Button(u8"Îòïğàâèòü â ì÷àò [2]") then
-	      sampSendChat(string.format("/ì÷àò %s", u8:decode(bind_textbuffer2.v)))
+	   if imgui.Button(u8"ĞÑ‚Ğ¿Ñ€Ğ°Ğ²Ğ¸Ñ‚ÑŒ Ğ² Ğ¼Ñ‡Ğ°Ñ‚ [2]") then
+	      sampSendChat(string.format("/Ğ¼Ñ‡Ğ°Ñ‚ %s", u8:decode(bind_textbuffer2.v)))
 	   end
 	   
 	   if imgui.InputText("##Bind3", bind_textbuffer3) then 
 	   end
 	   
 	   imgui.SameLine()
-	   if imgui.Button(u8"Îòïğàâèòü â ì÷àò [3]") then
-	      sampSendChat(string.format("/ì÷àò %s", u8:decode(bind_textbuffer3.v)))
+	   if imgui.Button(u8"ĞÑ‚Ğ¿Ñ€Ğ°Ğ²Ğ¸Ñ‚ÑŒ Ğ² Ğ¼Ñ‡Ğ°Ñ‚ [3]") then
+	      sampSendChat(string.format("/Ğ¼Ñ‡Ğ°Ñ‚ %s", u8:decode(bind_textbuffer3.v)))
 	   end
 	   
 	   if imgui.InputText("##Bind4", bind_textbuffer4) then 
 	   end
 	   
 	   imgui.SameLine()
-	   if imgui.Button(u8"Îòïğàâèòü â ì÷àò [4]") then
-	      sampSendChat(string.format("/ì÷àò %s", u8:decode(bind_textbuffer4.v)))
+	   if imgui.Button(u8"ĞÑ‚Ğ¿Ñ€Ğ°Ğ²Ğ¸Ñ‚ÑŒ Ğ² Ğ¼Ñ‡Ğ°Ñ‚ [4]") then
+	      sampSendChat(string.format("/Ğ¼Ñ‡Ğ°Ñ‚ %s", u8:decode(bind_textbuffer4.v)))
 	   end
 	   
 	   if imgui.InputText("##Bind5", bind_textbuffer5) then 
 	   end
 	   
 	   imgui.SameLine()
-	   if imgui.Button(u8"Îòïğàâèòü â ì÷àò [5]") then
-	      sampSendChat(string.format("/ì÷àò %s", u8:decode(bind_textbuffer5.v)))
+	   if imgui.Button(u8"ĞÑ‚Ğ¿Ñ€Ğ°Ğ²Ğ¸Ñ‚ÑŒ Ğ² Ğ¼Ñ‡Ğ°Ñ‚ [5]") then
+	      sampSendChat(string.format("/Ğ¼Ñ‡Ğ°Ñ‚ %s", u8:decode(bind_textbuffer5.v)))
+	   end
+	   
+	   if imgui.InputText("##Bind6", bind_textbuffer6) then 
+	   end
+	   
+	   imgui.SameLine()
+	   if imgui.Button(u8"ĞÑ‚Ğ¿Ñ€Ğ°Ğ²Ğ¸Ñ‚ÑŒ Ğ² Ğ¼Ñ‡Ğ°Ñ‚ [6]") then
+	      sampSendChat(string.format("/Ğ¼Ñ‡Ğ°Ñ‚ %s", u8:decode(bind_textbuffer6.v)))
+	   end
+	   
+	   if imgui.InputText("##Bind7", bind_textbuffer7) then 
+	   end
+	   
+	   imgui.SameLine()
+	   if imgui.Button(u8"ĞÑ‚Ğ¿Ñ€Ğ°Ğ²Ğ¸Ñ‚ÑŒ Ğ² Ğ¼Ñ‡Ğ°Ñ‚ [7]") then
+	      sampSendChat(string.format("/Ğ¼Ñ‡Ğ°Ñ‚ %s", u8:decode(bind_textbuffer7.v)))
 	   end
 	   
 	   imgui.Text(" ")
+	   imgui.Text(u8"ĞĞ±ÑŠÑĞ²Ğ»ĞµĞ½Ğ¸Ñ")
 	   if imgui.InputText("##BindAd", bind_adtextbuffer) then 
 	   end
 	   
-	   if imgui.Button(u8"Äàòü îáúÿâëåíèå â îáùèé ÷àò") then
+	   if imgui.Button(u8"Ğ”Ğ°Ñ‚ÑŒ Ğ¾Ğ±ÑŠÑĞ²Ğ»ĞµĞ½Ğ¸Ğµ Ğ² Ğ¾Ğ±Ñ‰Ğ¸Ğ¹ Ñ‡Ğ°Ñ‚") then
 	      sampSendChat(string.format("* %s", u8:decode(bind_adtextbuffer.v)))
 	   end
 	   
 	   imgui.SameLine()
-	   if imgui.Button(u8"Äàòü îáúÿâëåíèå â /îá") then
-	      sampSendChat(string.format("/îá %s", u8:decode(bind_adtextbuffer.v)))
+	   if imgui.Button(u8"Ğ”Ğ°Ñ‚ÑŒ Ğ¾Ğ±ÑŠÑĞ²Ğ»ĞµĞ½Ğ¸Ğµ Ğ² /Ğ¾Ğ±") then
+	      sampSendChat(string.format("/Ğ¾Ğ± %s", u8:decode(bind_adtextbuffer.v)))
 	   end
 	   
 	   imgui.Text(" ")
-	   imgui.Separator()
 	   
-       if imgui.Button(u8("Ñîõğàíèòü")) then
-	      -- ini.config.text_bind1 = u8:decode(bind_textbuffer1.v)
-          --if inicfg.save(table1, ini) then
-            -- printStringNow(u8("Ñîõğàíåíî"), 1000)
-          --end
+       if imgui.Button(u8("Ğ¡Ğ¾Ñ…Ñ€Ğ°Ğ½Ğ¸Ñ‚ÑŒ")) then
+	      ini.binds.textbuffer1 = u8:decode(bind_textbuffer1.v)
+	      ini.binds.textbuffer2 = u8:decode(bind_textbuffer2.v)
+	      ini.binds.textbuffer3 = u8:decode(bind_textbuffer3.v)
+	      ini.binds.textbuffer4 = u8:decode(bind_textbuffer4.v)
+	      ini.binds.textbuffer5 = u8:decode(bind_textbuffer5.v)
+	      ini.binds.textbuffer6 = u8:decode(bind_textbuffer6.v)
+	      ini.binds.textbuffer7 = u8:decode(bind_textbuffer7.v)
+	      ini.binds.adtextbuffer = u8:decode(bind_adtextbuffer.v)
+		  save()
+          if inicfg.save(table1, ini) then
+             printStringNow(u8("Ğ¡Ğ¾Ñ…Ñ€Ğ°Ğ½ĞµĞ½Ğ¾"), 1000)
+          end
        end
 	   
 	   imgui.SameLine()
-	   if imgui.Button(u8"Î÷èñòèòü âñå áèíäû") then
+	   if imgui.Button(u8"ĞÑ‡Ğ¸ÑÑ‚Ğ¸Ñ‚ÑŒ Ğ²ÑĞµ Ğ±Ğ¸Ğ½Ğ´Ñ‹") then
 	      bind_textbuffer1.v = " "
 	      bind_textbuffer2.v = " "
 	      bind_textbuffer3.v = " "
 	      bind_textbuffer4.v = " "
 	      bind_textbuffer5.v = " "
+	      bind_textbuffer6.v = " "
+	      bind_textbuffer7.v = " "
 		  bind_adtextbuffer.v = " "
 	   end
 	   
 	   imgui.SameLine()
-	   if imgui.Button(u8"Î÷èñòèòü ñåáå ÷àò") then
+	   if imgui.Button(u8"ĞÑ‡Ğ¸ÑÑ‚Ğ¸Ñ‚ÑŒ ÑĞµĞ±Ğµ Ñ‡Ğ°Ñ‚") then
 		  memory.fill(sampGetChatInfoPtr() + 306, 0x0, 25200)
           memory.write(sampGetChatInfoPtr() + 306, 25562, 4, 0x0)
           memory.write(sampGetChatInfoPtr() + 0x63DA, 1, 1)
 	   end
 	   
-	   if imgui.Button(u8"Ñêğïèğîâàòü ïîñëåä ñîîáùåíèå èç ÷àòà â áóôôåğ (CTRL + C)") then
+	   if imgui.Button(u8"Ğ¡ĞºĞ¾Ğ¿Ğ¸Ñ€Ğ¾Ğ²Ğ°Ñ‚ÑŒ Ğ¿Ğ¾ÑĞ»ĞµĞ´ ÑĞ¾Ğ¾Ğ±Ñ‰ĞµĞ½Ğ¸Ğµ Ğ¸Ğ· Ñ‡Ğ°Ñ‚Ğ° Ğ² Ğ±ÑƒÑ„Ñ„ĞµÑ€ (CTRL + C)") then
 	       text, prefix, color, pcolor = sampGetChatString(99)
 		   setClipboardText(text)
 	   end
@@ -529,7 +578,7 @@ function imgui.OnDrawFrame()
 	   imgui.SetNextWindowPos(imgui.ImVec2(sizeX / 2, sizeY / 8),
 	   imgui.Cond.FirstUseEver, imgui.ImVec2(0.5, 0.5))
 	   imgui.SetNextWindowSize(imgui.ImVec2(360, 240), imgui.Cond.FirstUseEver)
-	   imgui.Begin(u8"Òğàíñïîğò", show_vehs)
+	   imgui.Begin(u8"Ğ¢Ñ€Ğ°Ğ½ÑĞ¿Ğ¾Ñ€Ñ‚", show_vehs)
 	   
 	   -- https://wiki.multitheftauto.com/wiki/Vehicle_IDs
 	   imgui.InputText("##BindVehs", vehiclename_buffer)
@@ -538,19 +587,19 @@ function imgui.OnDrawFrame()
 	   imgui.Text(string.format(u8"ID: %i", vehinfomodelid))
 	   
 	   local closestcarid = getClosestCarId()
-	   imgui.Text(string.format(u8"Áëèæàéøèé òğàíñïîğò: %i (âíóòğåííèé ID)", closestcarid))
+	   imgui.Text(string.format(u8"Ğ‘Ğ»Ğ¸Ğ¶Ğ°Ğ¹ÑˆĞ¸Ğ¹ Ñ‚Ñ€Ğ°Ğ½ÑĞ¿Ğ¾Ñ€Ñ‚: %i (Ğ²Ğ½ÑƒÑ‚Ñ€ĞµĞ½Ğ½Ğ¸Ğ¹ ID)", closestcarid))
 	   
 	   if isCharInAnyCar(PLAYER_PED) then 
           local carhandle = storeCarCharIsInNoSave(PLAYER_PED)
           local carmodel = getCarModel(carhandle)
-		  imgui.Text(string.format(u8"Âû â òğàíñïîğòå: %s(%i)  õï: %i",
+		  imgui.Text(string.format(u8"Ğ’Ñ‹ Ğ² Ñ‚Ñ€Ğ°Ğ½ÑĞ¿Ğ¾Ñ€Ñ‚Ğµ: %s(%i)  Ñ…Ğ¿: %i",
 		  VehicleNames[carmodel-399], carmodel, getCarHealth(carhandle)))
-		  imgui.Text(string.format(u8"Öâåò %d è %d", getCarColours(carhandle)))
+		  imgui.Text(string.format(u8"Ğ¦Ğ²ĞµÑ‚ %d Ğ¸ %d", getCarColours(carhandle)))
        end
 
 	  
  	   --imgui.SameLine()
-	   --if imgui.Button(u8"Ôëèï") then
+	   --if imgui.Button(u8"Ğ¤Ğ»Ğ¸Ğ¿") then
 	      --if isCharInAnyCar(PLAYER_PED) and not sampIsChatInputActive() and not sampIsDialogActive() and not isPauseMenuActive() and not isSampfuncsConsoleActive() then sampSendChat("/f") end
 		  --if isCharInAnyCar(PLAYER_PED) and not sampIsChatInputActive() and not sampIsDialogActive() and not sampIsCursorActive() then
 		  --if isKeyDown(VK_DELETE) then
@@ -561,7 +610,7 @@ function imgui.OnDrawFrame()
 		  --end
 	   --end
 	   
-	   if imgui.Button(u8"Íàéòè ID òğàíñïîğòà ïî èìåíè", imgui.ImVec2(320, 25)) then
+	   if imgui.Button(u8"ĞĞ°Ğ¹Ñ‚Ğ¸ ID Ñ‚Ñ€Ğ°Ğ½ÑĞ¿Ğ¾Ñ€Ñ‚Ğ° Ğ¿Ğ¾ Ğ¸Ğ¼ĞµĞ½Ğ¸", imgui.ImVec2(320, 25)) then
 		  for k, vehname in ipairs(VehicleNames) do
 		     if vehname:lower():find(u8:decode(vehiclename_buffer.v:lower())) then
 			    vehinfomodelid = 399+k
@@ -570,7 +619,7 @@ function imgui.OnDrawFrame()
 		  end
 	   end
 	   
-	   if imgui.Button(u8"Çàêàçàòü ìàøèíó ïî èìåíè", imgui.ImVec2(320, 25)) then
+	   if imgui.Button(u8"Ğ—Ğ°ĞºĞ°Ğ·Ğ°Ñ‚ÑŒ Ğ¼Ğ°ÑˆĞ¸Ğ½Ñƒ Ğ¿Ğ¾ Ğ¸Ğ¼ĞµĞ½Ğ¸", imgui.ImVec2(320, 25)) then
 	      if not sampIsChatInputActive() and not sampIsDialogActive() and not isPauseMenuActive() and not  isSampfuncsConsoleActive() then
 		     for k, vehname in ipairs(VehicleNames) do
 		        if vehname:lower():find(u8:decode(vehiclename_buffer.v:lower())) then
@@ -581,7 +630,7 @@ function imgui.OnDrawFrame()
 		  end
 	   end
 	   
-	   if imgui.Button(u8"Çàêàçàòü ìàøèíó èç ñïèñêà", imgui.ImVec2(320, 25)) then
+	   if imgui.Button(u8"Ğ—Ğ°ĞºĞ°Ğ·Ğ°Ñ‚ÑŒ Ğ¼Ğ°ÑˆĞ¸Ğ½Ñƒ Ğ¸Ğ· ÑĞ¿Ğ¸ÑĞºĞ°", imgui.ImVec2(320, 25)) then
 	      if not sampIsChatInputActive() and not sampIsDialogActive() and not isPauseMenuActive() and not isSampfuncsConsoleActive() then sampSendChat("/vfibye2") end
 	   end
 	   
@@ -592,33 +641,33 @@ function imgui.OnDrawFrame()
 	   imgui.SetNextWindowPos(imgui.ImVec2(sizeX / 7, sizeY / 4),
 	   imgui.Cond.FirstUseEver, imgui.ImVec2(0.5, 0.5))
 	  
-       imgui.Begin(u8"Ãîğÿ÷èå êëàâèøè", show_hotkeys)
+       imgui.Begin(u8"Ğ“Ğ¾Ñ€ÑÑ‡Ğ¸Ğµ ĞºĞ»Ğ°Ğ²Ğ¸ÑˆĞ¸", show_hotkeys)
 	   
-	   imgui.TextColoredRGB("Äîñòóïíûå òîëüêî ñ {FF0000}SAMP ADDON:")
-       imgui.TextColoredRGB("{00FF00}Êëàâèøà N{FFFFFF} — ìåíş ğåäàêòîğà êàğò (â ïîëåòå)")
-       imgui.TextColoredRGB("{00FF00}Êëàâèøà J{FFFFFF} — ïîëåò â íàáëşäåíèè (/ïîëåò)")
-       imgui.TextColoredRGB("{00FF00}Áîêîâûå êëàâèøè ìûøè{FFFFFF} — îòìåíÿşò è ñîõğàíÿşò ğåäàêòèğîâàíèå îáúåêòà")
+	   imgui.TextColoredRGB("Ğ”Ğ¾ÑÑ‚ÑƒĞ¿Ğ½Ñ‹Ğµ Ñ‚Ğ¾Ğ»ÑŒĞºĞ¾ Ñ {FF0000}SAMP ADDON:")
+       imgui.TextColoredRGB("{00FF00}ĞšĞ»Ğ°Ğ²Ğ¸ÑˆĞ° N{FFFFFF} â€” Ğ¼ĞµĞ½Ñ Ñ€ĞµĞ´Ğ°ĞºÑ‚Ğ¾Ñ€Ğ° ĞºĞ°Ñ€Ñ‚ (Ğ² Ğ¿Ğ¾Ğ»ĞµÑ‚Ğµ)")
+       imgui.TextColoredRGB("{00FF00}ĞšĞ»Ğ°Ğ²Ğ¸ÑˆĞ° J{FFFFFF} â€” Ğ¿Ğ¾Ğ»ĞµÑ‚ Ğ² Ğ½Ğ°Ğ±Ğ»ÑĞ´ĞµĞ½Ğ¸Ğ¸ (/Ğ¿Ğ¾Ğ»ĞµÑ‚)")
+       imgui.TextColoredRGB("{00FF00}Ğ‘Ğ¾ĞºĞ¾Ğ²Ñ‹Ğµ ĞºĞ»Ğ°Ğ²Ğ¸ÑˆĞ¸ Ğ¼Ñ‹ÑˆĞ¸{FFFFFF} â€” Ğ¾Ñ‚Ğ¼ĞµĞ½ÑÑÑ‚ Ğ¸ ÑĞ¾Ñ…Ñ€Ğ°Ğ½ÑÑÑ‚ Ñ€ĞµĞ´Ğ°ĞºÑ‚Ğ¸Ñ€Ğ¾Ğ²Ğ°Ğ½Ğ¸Ğµ Ğ¾Ğ±ÑŠĞµĞºÑ‚Ğ°")
        imgui.Text(" ")
-       imgui.TextColoredRGB("Â ğåæèìå ğåäàêòèğîâàíèÿ:")
-       imgui.TextColoredRGB("{00FF00}Çàæàòèå êëàâèøè ALT{FFFFFF} — ñêğûòü îáúåêò")
-       imgui.TextColoredRGB("{00FF00}Çàæàòèå êëàâèøè CTRL{FFFFFF} — âèçóàëüíî óâåëè÷èòü îáúåêò")
-       imgui.TextColoredRGB("{00FF00}Çàæàòèå êëàâèøè SHIFT{FFFFFF} — ïëàâíîå ïåğåìåùåíèå îáúåêòà")
-       imgui.TextColoredRGB("{00FF00}Êëàâèøà RMB (Ïğàâàÿ êë.ìûøè){FFFFFF}  — âåğíóòü îáúåêò íà èñõîäíóş ïîçèöèş")
-       imgui.TextColoredRGB("{00FF00}Êëàâèøà Enter{FFFFFF}  — ñîõğàíèòü ğåäàêòèğóåìûé îáúåêò")
+       imgui.TextColoredRGB("Ğ’ Ñ€ĞµĞ¶Ğ¸Ğ¼Ğµ Ñ€ĞµĞ´Ğ°ĞºÑ‚Ğ¸Ñ€Ğ¾Ğ²Ğ°Ğ½Ğ¸Ñ:")
+       imgui.TextColoredRGB("{00FF00}Ğ—Ğ°Ğ¶Ğ°Ñ‚Ğ¸Ğµ ĞºĞ»Ğ°Ğ²Ğ¸ÑˆĞ¸ ALT{FFFFFF} â€” ÑĞºÑ€Ñ‹Ñ‚ÑŒ Ğ¾Ğ±ÑŠĞµĞºÑ‚")
+       imgui.TextColoredRGB("{00FF00}Ğ—Ğ°Ğ¶Ğ°Ñ‚Ğ¸Ğµ ĞºĞ»Ğ°Ğ²Ğ¸ÑˆĞ¸ CTRL{FFFFFF} â€” Ğ²Ğ¸Ğ·ÑƒĞ°Ğ»ÑŒĞ½Ğ¾ ÑƒĞ²ĞµĞ»Ğ¸Ñ‡Ğ¸Ñ‚ÑŒ Ğ¾Ğ±ÑŠĞµĞºÑ‚")
+       imgui.TextColoredRGB("{00FF00}Ğ—Ğ°Ğ¶Ğ°Ñ‚Ğ¸Ğµ ĞºĞ»Ğ°Ğ²Ğ¸ÑˆĞ¸ SHIFT{FFFFFF} â€” Ğ¿Ğ»Ğ°Ğ²Ğ½Ğ¾Ğµ Ğ¿ĞµÑ€ĞµĞ¼ĞµÑ‰ĞµĞ½Ğ¸Ğµ Ğ¾Ğ±ÑŠĞµĞºÑ‚Ğ°")
+       imgui.TextColoredRGB("{00FF00}ĞšĞ»Ğ°Ğ²Ğ¸ÑˆĞ° RMB (ĞŸÑ€Ğ°Ğ²Ğ°Ñ ĞºĞ».Ğ¼Ñ‹ÑˆĞ¸){FFFFFF}  â€” Ğ²ĞµÑ€Ğ½ÑƒÑ‚ÑŒ Ğ¾Ğ±ÑŠĞµĞºÑ‚ Ğ½Ğ° Ğ¸ÑÑ…Ğ¾Ğ´Ğ½ÑƒÑ Ğ¿Ğ¾Ğ·Ğ¸Ñ†Ğ¸Ñ")
+       imgui.TextColoredRGB("{00FF00}ĞšĞ»Ğ°Ğ²Ğ¸ÑˆĞ° Enter{FFFFFF}  â€” ÑĞ¾Ñ…Ñ€Ğ°Ğ½Ğ¸Ñ‚ÑŒ Ñ€ĞµĞ´Ğ°ĞºÑ‚Ğ¸Ñ€ÑƒĞµĞ¼Ñ‹Ğ¹ Ğ¾Ğ±ÑŠĞµĞºÑ‚")
        imgui.Text(" ")
-       imgui.TextColoredRGB("Â ğåæèìå âûäåëåíèÿ:")
-       imgui.TextColoredRGB("{00FF00}Êëàâèøà RMB (Ïğàâàÿ êë.ìûøè){FFFFFF}  — ñêîïèğóåò íîìåğ ìîäåëè îáúåêòà")
-       imgui.TextColoredRGB("{00FF00}Êëàâèøà SHIFT{FFFFFF} — ïåğåêëş÷åíèå ìåæäó îáúåêòàìè")
+       imgui.TextColoredRGB("Ğ’ Ñ€ĞµĞ¶Ğ¸Ğ¼Ğµ Ğ²Ñ‹Ğ´ĞµĞ»ĞµĞ½Ğ¸Ñ:")
+       imgui.TextColoredRGB("{00FF00}ĞšĞ»Ğ°Ğ²Ğ¸ÑˆĞ° RMB (ĞŸÑ€Ğ°Ğ²Ğ°Ñ ĞºĞ».Ğ¼Ñ‹ÑˆĞ¸){FFFFFF}  â€” ÑĞºĞ¾Ğ¿Ğ¸Ñ€ÑƒĞµÑ‚ Ğ½Ğ¾Ğ¼ĞµÑ€ Ğ¼Ğ¾Ğ´ĞµĞ»Ğ¸ Ğ¾Ğ±ÑŠĞµĞºÑ‚Ğ°")
+       imgui.TextColoredRGB("{00FF00}ĞšĞ»Ğ°Ğ²Ğ¸ÑˆĞ° SHIFT{FFFFFF} â€” Ğ¿ĞµÑ€ĞµĞºĞ»ÑÑ‡ĞµĞ½Ğ¸Ğµ Ğ¼ĞµĞ¶Ğ´Ñƒ Ğ¾Ğ±ÑŠĞµĞºÑ‚Ğ°Ğ¼Ğ¸")
        imgui.Text(" ")
-	   imgui.TextColoredRGB("Âîññòàíîâëåíûå ñêğèïòîì è äîñòóïíûå áåç {00FF00}SAMP ADDON:")
-       imgui.TextColoredRGB("{00FF00}J{FFFFFF} - ïîëåò â ìèğå")
-       imgui.TextColoredRGB("{00FF00}Z{FFFFFF} - ïî÷èíèòü òğàíñïîğò")
-       imgui.TextColoredRGB("{00FF00}U{FFFFFF} - àíèìàöèè")
-       imgui.TextColoredRGB("{00FF00}M{FFFFFF} - äîìàøíèé òğàíñïîğò")
-       imgui.TextColoredRGB("{00FF00}K{FFFFFF} - çàêàçàòü òğàíñïîğò")
-       imgui.TextColoredRGB("{00FF00}H{FFFFFF} - ïåğåâåğíóòü òğàíñïîğò")
+	   imgui.TextColoredRGB("Ğ’Ğ¾ÑÑÑ‚Ğ°Ğ½Ğ¾Ğ²Ğ»ĞµĞ½Ñ‹Ğµ ÑĞºÑ€Ğ¸Ğ¿Ñ‚Ğ¾Ğ¼ Ğ¸ Ğ´Ğ¾ÑÑ‚ÑƒĞ¿Ğ½Ñ‹Ğµ Ğ±ĞµĞ· {00FF00}SAMP ADDON:")
+       imgui.TextColoredRGB("{00FF00}J{FFFFFF} - Ğ¿Ğ¾Ğ»ĞµÑ‚ Ğ² Ğ¼Ğ¸Ñ€Ğµ")
+       imgui.TextColoredRGB("{00FF00}Z{FFFFFF} - Ğ¿Ğ¾Ñ‡Ğ¸Ğ½Ğ¸Ñ‚ÑŒ Ñ‚Ñ€Ğ°Ğ½ÑĞ¿Ğ¾Ñ€Ñ‚")
+       imgui.TextColoredRGB("{00FF00}U{FFFFFF} - Ğ°Ğ½Ğ¸Ğ¼Ğ°Ñ†Ğ¸Ğ¸")
+       imgui.TextColoredRGB("{00FF00}M{FFFFFF} - Ğ´Ğ¾Ğ¼Ğ°ÑˆĞ½Ğ¸Ğ¹ Ñ‚Ñ€Ğ°Ğ½ÑĞ¿Ğ¾Ñ€Ñ‚")
+       imgui.TextColoredRGB("{00FF00}K{FFFFFF} - Ğ·Ğ°ĞºĞ°Ğ·Ğ°Ñ‚ÑŒ Ñ‚Ñ€Ğ°Ğ½ÑĞ¿Ğ¾Ñ€Ñ‚")
+       imgui.TextColoredRGB("{00FF00}H{FFFFFF} - Ğ¿ĞµÑ€ĞµĞ²ĞµÑ€Ğ½ÑƒÑ‚ÑŒ Ñ‚Ñ€Ğ°Ğ½ÑĞ¿Ğ¾Ñ€Ñ‚")
 	   imgui.Separator()
-	   imgui.Text(u8"Åñëè ó âàñ óñòàíîâëåí SAMP ADDON âû ìîæåòå îòêëş÷èòü ôèêñ ãîğÿ÷èõ êëàâèøè â íàñòğîéêàõ")
+	   imgui.Text(u8"Ğ•ÑĞ»Ğ¸ Ñƒ Ğ²Ğ°Ñ ÑƒÑÑ‚Ğ°Ğ½Ğ¾Ğ²Ğ»ĞµĞ½ SAMP ADDON Ğ²Ñ‹ Ğ¼Ğ¾Ğ¶ĞµÑ‚Ğµ Ğ¾Ñ‚ĞºĞ»ÑÑ‡Ğ¸Ñ‚ÑŒ Ñ„Ğ¸ĞºÑ Ğ³Ğ¾Ñ€ÑÑ‡Ğ¸Ñ… ĞºĞ»Ğ°Ğ²Ğ¸ÑˆĞ¸ Ğ² Ğ½Ğ°ÑÑ‚Ñ€Ğ¾Ğ¹ĞºĞ°Ñ…")
        imgui.End()
 	end
 	
@@ -626,27 +675,27 @@ function imgui.OnDrawFrame()
 	   imgui.SetNextWindowPos(imgui.ImVec2(sizeX / 10, sizeY / 4),
 	   imgui.Cond.FirstUseEver, imgui.ImVec2(0.5, 0.5))
 	  
-       imgui.Begin(u8"Ëèìèòû", show_worldlimits)
-	   imgui.Text(u8"Êàæäûé èãğîê îò 20 óğîâíÿ ìîæåò ïğè íàëè÷èè ñâîáîäíûõ ñëîòîâ ñîçäàòü ñâîé ìèğ äëÿ ñòğîèòåëüñòâà.")
-	   imgui.Text(u8"Åñëè âñå ñëîòû óæå áûëè çàíÿòû, âû ìîæåòå âîñïîëüçîâàòüñÿ ëşáûì îòêğûòûì ìèğîì.")
-	   imgui.TextColoredRGB("Äëÿ ñîçäàíèÿ ìèğà íåîáõîäèìî èìåòü {00FF00}100 ÎÀ (Î÷êîâ àïãğåéäà) è 1.000.000$.{FFFFFF}")
-       imgui.TextColoredRGB("Ïî óìîë÷àíèş â ìèğå ìîæíî ñîçäàâàòü òîëüêî {00FF00}50 îáúåêòîâ, ëèìèò ìîæíî ğàñøèğèòü äî {00FF00}300{FFFFFF}.")
-	   imgui.TextColoredRGB("VIP èãğîêè ìîãóò ğàñøèğÿòü ëèìèò äî {00FF00}2000 îáúåêòîâ.{FFFFFF}")
-	   imgui.TextColoredRGB("Ñòîèìîñòü ğàñøèğåíèÿ ìèğà {00FF00}20 ÎÀ è 500.000$ çà 10 îáúåêòîâ.{FFFFFF}") 
-	   imgui.TextColoredRGB("Ìàêñèìàëüíîå êîëè÷åñòâî ñîçäàííûõ ìèğîâ {00FF00}500{FFFFFF}.")
-	   imgui.TextColoredRGB("Ïğè îòñóòñòâèè íà ñåğâåğå {FF0000}90 äíåé ìèğ óäàëÿåòñÿ{FFFFFF}")
+       imgui.Begin(u8"Ğ›Ğ¸Ğ¼Ğ¸Ñ‚Ñ‹", show_worldlimits)
+	   imgui.Text(u8"ĞšĞ°Ğ¶Ğ´Ñ‹Ğ¹ Ğ¸Ğ³Ñ€Ğ¾Ğº Ğ¾Ñ‚ 20 ÑƒÑ€Ğ¾Ğ²Ğ½Ñ Ğ¼Ğ¾Ğ¶ĞµÑ‚ Ğ¿Ñ€Ğ¸ Ğ½Ğ°Ğ»Ğ¸Ñ‡Ğ¸Ğ¸ ÑĞ²Ğ¾Ğ±Ğ¾Ğ´Ğ½Ñ‹Ñ… ÑĞ»Ğ¾Ñ‚Ğ¾Ğ² ÑĞ¾Ğ·Ğ´Ğ°Ñ‚ÑŒ ÑĞ²Ğ¾Ğ¹ Ğ¼Ğ¸Ñ€ Ğ´Ğ»Ñ ÑÑ‚Ñ€Ğ¾Ğ¸Ñ‚ĞµĞ»ÑŒÑÑ‚Ğ²Ğ°.")
+	   imgui.Text(u8"Ğ•ÑĞ»Ğ¸ Ğ²ÑĞµ ÑĞ»Ğ¾Ñ‚Ñ‹ ÑƒĞ¶Ğµ Ğ±Ñ‹Ğ»Ğ¸ Ğ·Ğ°Ğ½ÑÑ‚Ñ‹, Ğ²Ñ‹ Ğ¼Ğ¾Ğ¶ĞµÑ‚Ğµ Ğ²Ğ¾ÑĞ¿Ğ¾Ğ»ÑŒĞ·Ğ¾Ğ²Ğ°Ñ‚ÑŒÑÑ Ğ»ÑĞ±Ñ‹Ğ¼ Ğ¾Ñ‚ĞºÑ€Ñ‹Ñ‚Ñ‹Ğ¼ Ğ¼Ğ¸Ñ€Ğ¾Ğ¼.")
+	   imgui.TextColoredRGB("Ğ”Ğ»Ñ ÑĞ¾Ğ·Ğ´Ğ°Ğ½Ğ¸Ñ Ğ¼Ğ¸Ñ€Ğ° Ğ½ĞµĞ¾Ğ±Ñ…Ğ¾Ğ´Ğ¸Ğ¼Ğ¾ Ğ¸Ğ¼ĞµÑ‚ÑŒ {00FF00}100 ĞĞ (ĞÑ‡ĞºĞ¾Ğ² Ğ°Ğ¿Ğ³Ñ€ĞµĞ¹Ğ´Ğ°) Ğ¸ 1.000.000$.{FFFFFF}")
+       imgui.TextColoredRGB("ĞŸĞ¾ ÑƒĞ¼Ğ¾Ğ»Ñ‡Ğ°Ğ½Ğ¸Ñ Ğ² Ğ¼Ğ¸Ñ€Ğµ Ğ¼Ğ¾Ğ¶Ğ½Ğ¾ ÑĞ¾Ğ·Ğ´Ğ°Ğ²Ğ°Ñ‚ÑŒ Ñ‚Ğ¾Ğ»ÑŒĞºĞ¾ {00FF00}50 Ğ¾Ğ±ÑŠĞµĞºÑ‚Ğ¾Ğ², Ğ»Ğ¸Ğ¼Ğ¸Ñ‚ Ğ¼Ğ¾Ğ¶Ğ½Ğ¾ Ñ€Ğ°ÑÑˆĞ¸Ñ€Ğ¸Ñ‚ÑŒ Ğ´Ğ¾ {00FF00}300{FFFFFF}.")
+	   imgui.TextColoredRGB("VIP Ğ¸Ğ³Ñ€Ğ¾ĞºĞ¸ Ğ¼Ğ¾Ğ³ÑƒÑ‚ Ñ€Ğ°ÑÑˆĞ¸Ñ€ÑÑ‚ÑŒ Ğ»Ğ¸Ğ¼Ğ¸Ñ‚ Ğ´Ğ¾ {00FF00}2000 Ğ¾Ğ±ÑŠĞµĞºÑ‚Ğ¾Ğ².{FFFFFF}")
+	   imgui.TextColoredRGB("Ğ¡Ñ‚Ğ¾Ğ¸Ğ¼Ğ¾ÑÑ‚ÑŒ Ñ€Ğ°ÑÑˆĞ¸Ñ€ĞµĞ½Ğ¸Ñ Ğ¼Ğ¸Ñ€Ğ° {00FF00}20 ĞĞ Ğ¸ 500.000$ Ğ·Ğ° 10 Ğ¾Ğ±ÑŠĞµĞºÑ‚Ğ¾Ğ².{FFFFFF}") 
+	   imgui.TextColoredRGB("ĞœĞ°ĞºÑĞ¸Ğ¼Ğ°Ğ»ÑŒĞ½Ğ¾Ğµ ĞºĞ¾Ğ»Ğ¸Ñ‡ĞµÑÑ‚Ğ²Ğ¾ ÑĞ¾Ğ·Ğ´Ğ°Ğ½Ğ½Ñ‹Ñ… Ğ¼Ğ¸Ñ€Ğ¾Ğ² {00FF00}500{FFFFFF}.")
+	   imgui.TextColoredRGB("ĞŸÑ€Ğ¸ Ğ¾Ñ‚ÑÑƒÑ‚ÑÑ‚Ğ²Ğ¸Ğ¸ Ğ½Ğ° ÑĞµÑ€Ğ²ĞµÑ€Ğµ {FF0000}90 Ğ´Ğ½ĞµĞ¹ Ğ¼Ğ¸Ñ€ ÑƒĞ´Ğ°Ğ»ÑĞµÑ‚ÑÑ{FFFFFF}")
 	   imgui.Separator()
-       imgui.Text(u8"Ëèìèòû â ìèğå")
-       imgui.TextColoredRGB("ìàêñ. îáúåêòîâ: {00FF00}300 (VIP 2000)")
-       imgui.TextColoredRGB("ìàêñ. îáúåêòîâ â îäíîé òî÷êå: {00FF00}200 ")
-       imgui.TextColoredRGB("ìàêñ. ïèêàïîâ: {00FF00}500")
-       imgui.TextColoredRGB("ìàêñ. ìàğêåğîâ äëÿ ãîíîê: {00FF00}40")
-       imgui.TextColoredRGB("ìàêñ. òğàíñïîğòà: {00FF00}50")
-       imgui.TextColoredRGB("ìàêñ. ñëîòîâ ïîä ãîíêè: {00FF00}5")
-       imgui.TextColoredRGB("ìàêñ. âèğòóàëüíûõ ìèğîâ: {00FF00}500")
+       imgui.Text(u8"Ğ›Ğ¸Ğ¼Ğ¸Ñ‚Ñ‹ Ğ² Ğ¼Ğ¸Ñ€Ğµ")
+       imgui.TextColoredRGB("Ğ¼Ğ°ĞºÑ. Ğ¾Ğ±ÑŠĞµĞºÑ‚Ğ¾Ğ²: {00FF00}300 (VIP 2000)")
+       imgui.TextColoredRGB("Ğ¼Ğ°ĞºÑ. Ğ¾Ğ±ÑŠĞµĞºÑ‚Ğ¾Ğ² Ğ² Ğ¾Ğ´Ğ½Ğ¾Ğ¹ Ñ‚Ğ¾Ñ‡ĞºĞµ: {00FF00}200 ")
+       imgui.TextColoredRGB("Ğ¼Ğ°ĞºÑ. Ğ¿Ğ¸ĞºĞ°Ğ¿Ğ¾Ğ²: {00FF00}500")
+       imgui.TextColoredRGB("Ğ¼Ğ°ĞºÑ. Ğ¼Ğ°Ñ€ĞºĞµÑ€Ğ¾Ğ² Ğ´Ğ»Ñ Ğ³Ğ¾Ğ½Ğ¾Ğº: {00FF00}40")
+       imgui.TextColoredRGB("Ğ¼Ğ°ĞºÑ. Ñ‚Ñ€Ğ°Ğ½ÑĞ¿Ğ¾Ñ€Ñ‚Ğ°: {00FF00}50")
+       imgui.TextColoredRGB("Ğ¼Ğ°ĞºÑ. ÑĞ»Ğ¾Ñ‚Ğ¾Ğ² Ğ¿Ğ¾Ğ´ Ğ³Ğ¾Ğ½ĞºĞ¸: {00FF00}5")
+       imgui.TextColoredRGB("Ğ¼Ğ°ĞºÑ. Ğ²Ğ¸Ñ€Ñ‚ÑƒĞ°Ğ»ÑŒĞ½Ñ‹Ñ… Ğ¼Ğ¸Ñ€Ğ¾Ğ²: {00FF00}500")
 	   imgui.Separator()
-	   imgui.Text(u8"Â ğàäèóñå 150 ìåòğîâ íåëüçÿ ñîçäàâàòü áîëåå 200 îáúåêòîâ.")
-	   imgui.Text(u8"Ìàêñèìàëüíàÿ äëèíà òåêñòà íà îáúåêòàõ â ğåäàêòîğå ìèğîâ - 50 ñèìâîëîâ")
+	   imgui.Text(u8"Ğ’ Ñ€Ğ°Ğ´Ğ¸ÑƒÑĞµ 150 Ğ¼ĞµÑ‚Ñ€Ğ¾Ğ² Ğ½ĞµĞ»ÑŒĞ·Ñ ÑĞ¾Ğ·Ğ´Ğ°Ğ²Ğ°Ñ‚ÑŒ Ğ±Ğ¾Ğ»ĞµĞµ 200 Ğ¾Ğ±ÑŠĞµĞºÑ‚Ğ¾Ğ².")
+	   imgui.Text(u8"ĞœĞ°ĞºÑĞ¸Ğ¼Ğ°Ğ»ÑŒĞ½Ğ°Ñ Ğ´Ğ»Ğ¸Ğ½Ğ° Ñ‚ĞµĞºÑÑ‚Ğ° Ğ½Ğ° Ğ¾Ğ±ÑŠĞµĞºÑ‚Ğ°Ñ… Ğ² Ñ€ĞµĞ´Ğ°ĞºÑ‚Ğ¾Ñ€Ğµ Ğ¼Ğ¸Ñ€Ğ¾Ğ² - 50 ÑĞ¸Ğ¼Ğ²Ğ¾Ğ»Ğ¾Ğ²")
        imgui.End()
 	end
 	
@@ -654,41 +703,44 @@ function imgui.OnDrawFrame()
 	   imgui.SetNextWindowPos(imgui.ImVec2(sizeX / 7, sizeY / 4),
 	   imgui.Cond.FirstUseEver, imgui.ImVec2(0.5, 0.5))
 	 
-       imgui.Begin(u8"Íàñòğîéêè", show_settings)
-       if imgui.Checkbox(u8("Ôèëüòğ ïîäêëş÷åíèé â ÷àòå"), checkbox_chatfilter) then
+       imgui.Begin(u8"ĞĞ°ÑÑ‚Ñ€Ğ¾Ğ¹ĞºĞ¸", show_settings)
+       if imgui.Checkbox(u8("Ğ¤Ğ¸Ğ»ÑŒÑ‚Ñ€ Ğ¿Ğ¾Ğ´ĞºĞ»ÑÑ‡ĞµĞ½Ğ¸Ğ¹ Ğ² Ñ‡Ğ°Ñ‚Ğµ"), checkbox_chatfilter) then
 	      if checkbox_chatfilter.v then
-	         chatfilter = not chatfilter
+	         ini.settings.chatfilter = not ini.settings.chatfilter
+			 save()
           end
 	   end
 	  
-   	   if imgui.Checkbox(u8("Àíòè-àôê"), checkbox_antiafk) then 
+   	   if imgui.Checkbox(u8("ĞĞ½Ñ‚Ğ¸-Ğ°Ñ„Ğº"), checkbox_antiafk) then 
 	      if checkbox_antiafk.v then
-	         antiafk = not antiafk
+			 ini.settings.antiafk = not ini.settings.antiafk
+			 save()
 		  end
 	   end
 		
-	   if imgui.Checkbox(u8("Ôèêñ ãîğÿ÷èõ êëàâèø àääîíà"), checkbox_keybinds) then 
+	   if imgui.Checkbox(u8("Ğ¤Ğ¸ĞºÑ Ğ³Ğ¾Ñ€ÑÑ‡Ğ¸Ñ… ĞºĞ»Ğ°Ğ²Ğ¸Ñˆ Ğ°Ğ´Ğ´Ğ¾Ğ½Ğ°"), checkbox_keybinds) then 
 	      if checkbox_keybinds.v then
-	         keybinds = not keybinds
+	         ini.settings.keybinds = not ini.settings.keybinds
+			 save()
 	      end
 	   end
 	   
-	   --if imgui.Button(u8"Ñîõğàíèòü êîíôèã", imgui.ImVec2(200, 25)) then
-		  -- inicfg.save(ini, "AbsEventHelper.ini")
-	   --end
+	   if imgui.Button(u8"ĞĞ±Ğ½Ğ¾Ğ²Ğ¸Ñ‚ÑŒ ĞºĞ¾Ğ½Ñ„Ğ¸Ğ³", imgui.ImVec2(200, 25)) then
+		  inicfg.save(ini, configIni)
+	   end
 	   
-	   if imgui.Button(u8"Ïåğåãğóçèòü ñêğèïò", imgui.ImVec2(200, 25)) then
+	   if imgui.Button(u8"ĞŸĞµÑ€ĞµĞ³Ñ€ÑƒĞ·Ğ¸Ñ‚ÑŒ ÑĞºÑ€Ğ¸Ğ¿Ñ‚", imgui.ImVec2(200, 25)) then
 		  thisScript():reload()
 	   end
 	   
 	   -- Thanks samp++
-	   -- imgui.Text(u8"Äàëüíîñòü ïğîğèñîâêè:")
+	   -- imgui.Text(u8"Ğ”Ğ°Ğ»ÑŒĞ½Ğ¾ÑÑ‚ÑŒ Ğ¿Ñ€Ğ¾Ñ€Ğ¸ÑĞ¾Ğ²ĞºĞ¸:")
 	   -- if imgui.SliderInt(u8"##Drawdist", sliderdrawdist, 50, 3000) then
 		  -- sliderdrawdist = sliderdrawdist.v
 		  -- memory.setfloat(12044272, sliderdrawdist, true)
 	   -- end
 		
-		-- imgui.Text(u8"Äàëüíîñòü òóìàíà:")
+		-- imgui.Text(u8"Ğ”Ğ°Ğ»ÑŒĞ½Ğ¾ÑÑ‚ÑŒ Ñ‚ÑƒĞ¼Ğ°Ğ½Ğ°:")
 		-- if imgui.SliderInt(u8"##fog", sliderfog, -390, 390) then
 		   -- sliderfog = sliderfog.v
 		   -- memory.setfloat(13210352, sliderfog, true)
@@ -701,18 +753,17 @@ function imgui.OnDrawFrame()
 	   imgui.SetNextWindowPos(imgui.ImVec2(sizeX / 7, sizeY / 4),
 	   imgui.Cond.FirstUseEver, imgui.ImVec2(0.5, 0.5))
 	   
-       imgui.Begin(u8"Î ñêğèïòå", show_credits)
-       imgui.Text(u8"Àâòîğ: 1NS (Git: in1x)")
+       imgui.Begin(u8"Ğ ÑĞºÑ€Ğ¸Ğ¿Ñ‚Ğµ", show_credits)
+       imgui.Text(u8"ĞĞ²Ñ‚Ğ¾Ñ€: 1NS (Git: in1x)")
 	   --imgui.Text(string.format(u8"Demo version: %s", os.date("%x")))
-       imgui.Text(u8"Ïîìîøíèê äëÿ ìàïïåğîâ è îğãàíèçàòîğîâ ìåğîïğèÿòèé íà Absolute DM")
+       imgui.Text(u8"ĞŸĞ¾Ğ¼Ğ¾ÑˆĞ½Ğ¸Ğº Ğ´Ğ»Ñ Ğ¼Ğ°Ğ¿Ğ¿ĞµÑ€Ğ¾Ğ² Ğ¸ Ğ¾Ñ€Ğ³Ğ°Ğ½Ğ¸Ğ·Ğ°Ñ‚Ğ¾Ñ€Ğ¾Ğ² Ğ¼ĞµÑ€Ğ¾Ğ¿Ñ€Ğ¸ÑÑ‚Ğ¸Ğ¹ Ğ½Ğ° Absolute DM")
 	   imgui.TextColoredRGB("Homepage: {007DFF}github.com/ins1x/AbsEventHelper")
-       imgui.TextColoredRGB("Ğóññêîÿçû÷íîå ñîîáùåñòâî ìàïïåğîâ: {007DFF}vk.com\1nsanemapping")
-       imgui.TextColoredRGB("Ñàéò Absolute Play: {007DFF}gta-samp.ru")
-       imgui.TextColoredRGB("×àò Absolute Play DM: {007DFF}dsc.gg/absdm")
+       imgui.TextColoredRGB("Ğ ÑƒÑÑĞºĞ¾ÑĞ·Ñ‹Ñ‡Ğ½Ğ¾Ğµ ÑĞ¾Ğ¾Ğ±Ñ‰ĞµÑÑ‚Ğ²Ğ¾ Ğ¼Ğ°Ğ¿Ğ¿ĞµÑ€Ğ¾Ğ²: {007DFF}vk.com\1nsanemapping")
+       imgui.TextColoredRGB("Ğ¡Ğ°Ğ¹Ñ‚ Absolute Play: {007DFF}gta-samp.ru")
+       imgui.TextColoredRGB("Ğ§Ğ°Ñ‚ Absolute Play DM: {007DFF}dsc.gg/absdm")
 	   imgui.Text(" ")
        imgui.Text(u8"Credits:")
        imgui.Text(u8"FYP - imgui, SAMP lua library")
-       imgui.Text(u8"MOL - antiafk")
        imgui.Text(u8"Gorskin - useful memory hacks")
        imgui.End()
 	end
@@ -721,14 +772,11 @@ function imgui.OnDrawFrame()
 	   imgui.SetNextWindowPos(imgui.ImVec2(sizeY / 4, sizeY / 2),
 	   imgui.Cond.FirstUseEver, imgui.ImVec2(0.5, 0.5))
 	   imgui.SetNextWindowSize(imgui.ImVec2(300, 200), imgui.Cond.FirstUseEver)
-	   imgui.Begin(u8"Áëîêíîò", show_notepad)
+	   imgui.Begin(u8"Ğ‘Ğ»Ğ¾ĞºĞ½Ğ¾Ñ‚", show_notepad)
 	   
-	   --imgui.BeginChild('##textmultiline1',imgui.ImVec2(250,250),true)
 	   imgui.InputTextMultiline('##bufftext', note_textbuffer, imgui.ImVec2(285, 125))
-	   --imgui.InputTextMultiline("notepad", notepad, 65535, imgui.ImVec2(385, 362.5), imgui.Cond.FirstUseEver)
-	   --imgui.EndChild()
 
-	   if imgui.Button(u8"Ñîõğàíèòü", imgui.ImVec2(85, 25)) then
+	   if imgui.Button(u8"Ğ¡Ğ¾Ñ…Ñ€Ğ°Ğ½Ğ¸Ñ‚ÑŒ", imgui.ImVec2(85, 25)) then
 	      file = io.open(getGameDirectory().."//moonloader//resource//abseventhelper//notes.txt", "w")
           file:write(note_textbuffer.v)
           file:close()
@@ -736,7 +784,7 @@ function imgui.OnDrawFrame()
 	   end
 	   
 	   -- imgui.SameLine()
-	   -- if imgui.Button(u8"Çàãğóçèòü", imgui.ImVec2(120, 25)) then
+	   -- if imgui.Button(u8"Ğ—Ğ°Ğ³Ñ€ÑƒĞ·Ğ¸Ñ‚ÑŒ", imgui.ImVec2(120, 25)) then
 	      -- file = io.open(getGameDirectory().."//moonloader//resource//abseventhelper//notes.txt", "a")
           -- note_textbuffer.v = file:read("*a")
           -- file:close()
@@ -744,12 +792,12 @@ function imgui.OnDrawFrame()
 	   -- end
 	   
 	   imgui.SameLine()
-	   if imgui.Button(u8"Î÷èñòèòü", imgui.ImVec2(85, 25)) then
+	   if imgui.Button(u8"ĞÑ‡Ğ¸ÑÑ‚Ğ¸Ñ‚ÑŒ", imgui.ImVec2(85, 25)) then
 	      note_textbuffer.v = u8" "
 	   end
 	   
 	   imgui.SameLine()
-	   if imgui.Button(u8"Ñêğûòü", imgui.ImVec2(85, 25)) then
+	   if imgui.Button(u8"Ğ¡ĞºÑ€Ñ‹Ñ‚ÑŒ", imgui.ImVec2(85, 25)) then
 	      show_notepad.v = not show_notepad.v
 	   end
 	   
@@ -763,7 +811,7 @@ function main()
 	  sampAddChatMessage("" .. tag, 0xFFFFFF)
 	  local ip, port = sampGetCurrentServerAddress()
 	  if not ip:find(hostip) then
-	     keybinds = false
+	     ini.settings.keybinds = false
 	     -- sampAddChatMessage("Keybinds work only Absolute DM", 0x00FF0000)
 	  end
 	  
@@ -787,8 +835,8 @@ function main()
 	  
 	  -- chatfilter
 	  function sampev.onServerMessage(color, text)
-		if chatfilter then 
-			if text:find("ïîäêëş÷èëñÿ ê ñåğâåğó") or text:find("âûøåë ñ ñåğâåğà") then
+		if ini.settings.chatfilter then 
+			if text:find("Ğ¿Ğ¾Ğ´ĞºĞ»ÑÑ‡Ğ¸Ğ»ÑÑ Ğº ÑĞµÑ€Ğ²ĞµÑ€Ñƒ") or text:find("Ğ²Ñ‹ÑˆĞµĞ» Ñ ÑĞµÑ€Ğ²ĞµÑ€Ğ°") then
 				chatlog = io.open(getFolderPath(5).."\\GTA San Andreas User Files\\SAMP\\chatlog.txt", "a")
 				chatlog:write(os.date("[%H:%M:%S] ")..text)
 				chatlog:write("\n")
@@ -796,16 +844,16 @@ function main()
 				return false
 			end
 			
-			if text:find("âûõîäà èç ÷èòìèğà") then
+			if text:find("Ğ²Ñ‹Ñ…Ğ¾Ğ´Ğ° Ğ¸Ğ· Ñ‡Ğ¸Ñ‚Ğ¼Ğ¸Ñ€Ğ°") then
 			   return false
 			end
 		end
 	  end
 	  
 	  -- copy Nockname to clipboard on click TAB
-	  function sampev.onSendClickPlayer(id)
-         setClipboardText(sampGetPlayerNickname(id))
-      end
+	  --function sampev.onSendClickPlayer(id)
+         --setClipboardText(sampGetPlayerNickname(id))
+      --end
 	  
 	  -- chatfix
 	  if isKeyJustPressed(0x54) and not sampIsDialogActive() and not sampIsScoreboardOpen() and not isSampfuncsConsoleActive() then
@@ -813,16 +861,21 @@ function main()
 	  end
 	  
 	  -- antiafk 
-      if antiafk then
+      if ini.settings.antiafk then
          writeMemory(7634870, 1, 1, 1)
          writeMemory(7635034, 1, 1, 1)
          memory.fill(7623723, 144, 8)
          memory.fill(5499528, 144, 6)
+	  else
+	     memory.setuint8(7634870, 0, false)
+         memory.setuint8(7635034, 0, false)
+         memory.hex2bin('0F 84 7B 01 00 00', 7623723, 8)
+         memory.hex2bin('50 51 FF 15 00 83 85 00', 5499528, 6)
 	  end
 	  
 	  -- Absolute Play Key Binds
 	  -- Sets hotkeys that are only available with the samp addon
-	  if keybinds then
+	  if ini.settings.keybinds then
          if isKeyJustPressed(VK_Z) and not sampIsChatInputActive() and not sampIsDialogActive() and not isPauseMenuActive() and not isSampfuncsConsoleActive() then sampSendChat("/xbybnm") end
 	 
          if isKeyJustPressed(VK_K) and not sampIsChatInputActive() and not sampIsDialogActive() and not isPauseMenuActive() and not isSampfuncsConsoleActive() then sampSendChat("/vfibye2") end
@@ -864,17 +917,19 @@ function main()
 		 end
 	  end
 	  
-	  if objectcollision then
+	  if disableObjectCollision then
          find_obj_x, find_obj_y, find_obj_z = getCharCoordinates(PLAYER_PED)
          result, objectHandle = findAllRandomObjectsInSphere(find_obj_x, find_obj_y, find_obj_z, 25, true)
          if result then
-            setObjectCollision(objectHandle, false)
+		    setObjectCollision(objectHandle, false)			
+			--setObjectCollisionDamageEffect(objectHandle, false)
          end
       else
          find_obj_x, find_obj_y, find_obj_z = getCharCoordinates(PLAYER_PED)
          result, objectHandle = findAllRandomObjectsInSphere(find_obj_x, find_obj_y, find_obj_z, 25, true)
          if result then
             setObjectCollision(objectHandle, true)
+			--setObjectCollisionDamageEffect(objectHandle, true)
          end
       end
 	  
@@ -887,29 +942,29 @@ function direction()
       local angel = math.ceil(getCharHeading(PLAYER_PED))
       if angel then
          if (angel >= 0 and angel <= 30) or (angel <= 360 and angel >= 330) then
-            return u8"Ñåâåğ"
+            return u8"Ğ¡ĞµĞ²ĞµÑ€"
          elseif (angel > 80 and angel < 100) then
-            return u8"Çàïàä"
+            return u8"Ğ—Ğ°Ğ¿Ğ°Ğ´"
          elseif (angel > 260 and angel < 280) then
-            return u8"Âîñòîê"
+            return u8"Ğ’Ğ¾ÑÑ‚Ğ¾Ğº"
          elseif (angel >= 170 and angel <= 190) then
-            return u8"Şã"
+            return u8"Ğ®Ğ³"
          elseif (angel >= 31 and angel <= 79) then
-            return u8"Ñåâåğî-çàïàä"
+            return u8"Ğ¡ĞµĞ²ĞµÑ€Ğ¾-Ğ·Ğ°Ğ¿Ğ°Ğ´"
          elseif (angel >= 191 and angel <= 259) then
-            return u8"Şãî-âîñòîê"
+            return u8"Ğ®Ğ³Ğ¾-Ğ²Ğ¾ÑÑ‚Ğ¾Ğº"
          elseif (angel >= 81 and angel <= 169) then
-            return u8"Şãî-çàïàä"
+            return u8"Ğ®Ğ³Ğ¾-Ğ·Ğ°Ğ¿Ğ°Ğ´"
          elseif (angel >= 259 and angel <= 329) then
-            return u8"Ñåâåğî-âîñòîê"
+            return u8"Ğ¡ĞµĞ²ĞµÑ€Ğ¾-Ğ²Ğ¾ÑÑ‚Ğ¾Ğº"
          else
             return angel
          end
       else
-         return u8"Íåèçâåñòíî"
+         return u8"ĞĞµĞ¸Ğ·Ğ²ĞµÑÑ‚Ğ½Ğ¾"
       end
    else
-      return u8"Íåèçâåñòíî"
+      return u8"ĞĞµĞ¸Ğ·Ğ²ĞµÑÑ‚Ğ½Ğ¾"
    end
 end
 

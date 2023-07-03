@@ -1,16 +1,20 @@
 # Absolute Event Helper
 
-![logo](https://i.imgur.com/EyleDW3.png)
+![logo](https://i.imgur.com/MYGFcWQ.png)
 
 #### ENGLISH
 Lua script Assistant for mappers and event makers on [Absolute Play DM](https://sa-mp.ru/) server.  
-The script partially restores the functionality of the [Samp Addon](https://sa-mp.ru/sampaddon).  
+The script is a convenient assistant for organizing events expanding our capabilities  
 Find more about mapping on server at [forum.gta-samp.ru](https://forum.gta-samp.ru/index.php?/topic/1016832-%D0%BC%D0%B8%D1%80%D1%8B-%D0%BE%D0%BF%D0%B8%D1%81%D0%B0%D0%BD%D0%B8%D0%B5-%D1%80%D0%B0%D0%B1%D0%BE%D1%82%D1%8B-%D1%80%D0%B5%D0%B4%D0%B0%D0%BA%D1%82%D0%BE%D1%80%D0%B0-%D0%BA%D0%B0%D1%80%D1%82/).  
+
+> The script partially restores the functionality of the [Samp Addon](https://sa-mp.ru/sampaddon).  
 
 #### RUS
 LUA ассистент для мапперов и организаторов мероприятий на сервере [Absolute Play DM](https://sa-mp.ru/).  
-Этот скрипт так же восстанавливает некоторые функции [Samp Addon](https://sa-mp.ru/sampaddon).  
+Скрипт является удобным помощником для организации мероприятий расширяя наши возможности  
 Больше информации по маппингу на сервере [forum.gta-samp.ru](https://forum.gta-samp.ru/index.php?/topic/1016832-%D0%BC%D0%B8%D1%80%D1%8B-%D0%BE%D0%BF%D0%B8%D1%81%D0%B0%D0%BD%D0%B8%D0%B5-%D1%80%D0%B0%D0%B1%D0%BE%D1%82%D1%8B-%D1%80%D0%B5%D0%B4%D0%B0%D0%BA%D1%82%D0%BE%D1%80%D0%B0-%D0%BA%D0%B0%D1%80%D1%82/).  
+
+> Этот скрипт так же восстанавливает некоторые функции [Samp Addon](https://sa-mp.ru/sampaddon).  
 
 ## Возможности
 - Удобный графический интерфейс на [imgui](https://www.blast.hk/threads/19292/)
@@ -25,7 +29,7 @@ LUA ассистент для мапперов и организаторов м�
 - Чат фильтр подключений/отключений игроков
 - Рендер объектов в области стрима
 - Отключение коллизии у объектов в области стрима
-- Сохранение в буфер обмена координат, последю строчку чата и никнейма по клику игрока в TAB
+- Сохранение в буфер обмена координат и последней строчки из чата 
 
 ## Как использовать
 * Нажмите ALT + X или введите команду /abshelp
@@ -34,6 +38,8 @@ LUA ассистент для мапперов и организаторов м�
 * moonloader - https://www.blast.hk/threads/13305/
 * lua imgui - https://www.blast.hk/threads/19292/
 * lib.samp.events - https://github.com/THE-FYP/SAMP.Lua
- 
+
+## Disclaimer
+Автор не является оффициальным представителем, разработчиком либо частью команды проекта Absolute Play  
 ![WTFPL](http://www.wtfpl.net/wp-content/uploads/2012/12/wtfpl-badge-4.png)
 
