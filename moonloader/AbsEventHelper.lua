@@ -25,7 +25,9 @@ local ini = inicfg.load({
    {
       antiafk = true,
       chatfilter = true,
-      keybinds = true
+      keybinds = true,
+	  drawdist = "450",
+      fog = "200",
    },
    binds =
    {
@@ -62,17 +64,19 @@ local show_info = imgui.ImBool(false)
 local show_chatfucns = imgui.ImBool(false)
 local show_vehs = imgui.ImBool(false)
 local show_notepad = imgui.ImBool(false)
+local show_textures = imgui.ImBool(false)
+local show_fonts = imgui.ImBool(false)
 
---local checkbox_antiafk = imgui.ImBool(true)
 local checkbox_antiafk = imgui.ImBool(ini.settings.antiafk)
 local checkbox_chatfilter = imgui.ImBool(ini.settings.chatfilter)
 local checkbox_keybinds = imgui.ImBool(ini.settings.keybinds)
 local checkbox_showobjects = imgui.ImBool(false)
 local checkbox_objectcollision = imgui.ImBool(false)
+local checkbox_seffects = imgui.ImBool(false)
 
 local color = imgui.ImFloat4(1, 0, 0, 1)
-local sliderdrawdist = imgui.ImInt(450)
-local sliderfog = imgui.ImInt(200)
+local sliderfog = imgui.ImInt(ini.settings.fog)
+local sliderdrawdist = imgui.ImInt(ini.settings.drawdist)
 local vehiclename_buffer = imgui.ImBuffer(128)
 local bind_textbuffer1 = imgui.ImBuffer(256)
 local bind_textbuffer2 = imgui.ImBuffer(256)
@@ -92,11 +96,6 @@ bind_textbuffer5.v = u8(ini.binds.textbuffer5)
 bind_textbuffer6.v = u8(ini.binds.textbuffer6)
 bind_textbuffer7.v = u8(ini.binds.textbuffer7)
 bind_adtextbuffer.v = u8(ini.binds.adtextbuffer)
---bind_adtextbuffer.v = u8'Заходите на МП "Название МП" в мир , приз ничего'
---bind_textbuffer2.v = u8"Кто будет мешать проведени и драться - кикну"
---bind_textbuffer3.v = u8"Не тупим разбегаемся по карте"
---bind_textbuffer4.v = u8"Запрещено использовать текстурыне баги"
---bind_textbuffer5.v = u8"Запрещено объеденяться больше двух игроков"
 
 -- If the server changes IP, change it here
 local hostip = "193.84.90.23"
@@ -108,6 +107,7 @@ local fps_counter = 0
 local showobjects = false
 local tpposX, tpposY, tpposZ
 local vehinfomodelid = 0 
+local removelogo = false
 
 VehicleNames = {
 	"Landstalker", "Bravura", "Buffalo", "Linerunner", "Pereniel", "Sentinel", "Dumper",
@@ -145,7 +145,7 @@ VehicleNames = {
 
 function imgui.OnDrawFrame()
    if main_window_state.v then
-      imgui.SetNextWindowSize(imgui.ImVec2(330, 490), imgui.Cond.FirstUseEver)
+      imgui.SetNextWindowSize(imgui.ImVec2(290, 490), imgui.Cond.FirstUseEver)
 	  imgui.SetNextWindowPos(imgui.ImVec2(sizeX / 2, sizeY / 2),
 	  imgui.Cond.FirstUseEver, imgui.ImVec2(0.5, 0.5))
       imgui.Begin("Absolute Events Helper", main_window_state)
@@ -161,11 +161,13 @@ function imgui.OnDrawFrame()
 		 show_hotkeys.v = false
 		 show_settings.v = false
 		 show_colors.v = false
+		 show_textures.v = false
 	     show_worldlimits.v = false
 		 show_info.v = false
 		 show_chatfucns.v = false
 		 show_vehs.v = false
 		 show_notepad.v = false
+		 show_fonts.v = false
       end
 	  
 	  imgui.SameLine()
@@ -185,8 +187,8 @@ function imgui.OnDrawFrame()
 	  -- imgui.TextColoredRGB(string.format("Сервер: {007DFF}%s", servername))
 	
 	  local positionX, positionY, positionZ = getCharCoordinates(PLAYER_PED)
-	  imgui.Text(string.format(u8"Позиция x: %.1f, y: %.1f, z: %.1f Интерьер: %i",
-	  positionX, positionY, positionZ, getActiveInterior()))
+	  imgui.Text(string.format(u8"Позиция x: %.1f, y: %.1f, z: %.1f",
+	  positionX, positionY, positionZ))
 	  
 	  imgui.Text(string.format(u8"Направление: %s", direction()))
 	  
@@ -232,6 +234,7 @@ function imgui.OnDrawFrame()
 			tpposX, tpposY, tpposZ = getCharCoordinates(PLAYER_PED)
 			setClipboardText(math.floor(tpposX) .. ' ' .. math.floor(tpposY) .. ' ' .. math.floor(tpposZ))
 			sampAddChatMessage("Координаты сохранены в буфер", 0x0FFFFFF)
+			sampAddChatMessage(string.format("Интерьер: %i", getActiveInterior()), 0x0FFFFFF)
 		 end
 	  end
 	  
@@ -264,7 +267,7 @@ function imgui.OnDrawFrame()
    end
    
    if show_info.v then
-	  imgui.SetNextWindowPos(imgui.ImVec2(sizeX / 2, sizeY / 6),
+	  imgui.SetNextWindowPos(imgui.ImVec2(sizeX / 2, sizeY / 8),
 	  imgui.Cond.FirstUseEver, imgui.ImVec2(0.5, 0.5))
 	  
       imgui.Begin(u8"Информация", show_info)
@@ -277,6 +280,14 @@ function imgui.OnDrawFrame()
 		 show_colors.v = not show_colors.v
 	  end
 	  
+	  if imgui.Button(u8"Текстуры", imgui.ImVec2(200, 25)) then
+	     show_textures.v = not show_textures.v
+	  end
+	  
+	  if imgui.Button(u8"Шрифты", imgui.ImVec2(200, 25)) then
+		 show_fonts.v = not show_fonts.v
+	  end
+	
 	  if imgui.Button(u8"Горячие клавиши", imgui.ImVec2(200, 25)) then
 		 show_hotkeys.v = not show_hotkeys.v
 	  end
@@ -291,9 +302,89 @@ function imgui.OnDrawFrame()
 	  
       imgui.End()
    end
+   
+   if show_textures.v then
+	  imgui.SetNextWindowPos(imgui.ImVec2(sizeX / 2, sizeY / 8),
+	  imgui.Cond.FirstUseEver, imgui.ImVec2(0.5, 0.5))
+	  
+      imgui.Begin(u8"Текстуры", show_textures)
+	  
+	  show_info.v = false
+	  
+	  if imgui.Button(u8"1-60", imgui.ImVec2(200, 25)) then
+	     hideAllTextureImages()
+		 show_texture1 = not show_texture1
+	  end
+	  
+	  if imgui.Button(u8"60-120", imgui.ImVec2(200, 25)) then
+	     hideAllTextureImages()
+		 show_texture2 = not show_texture2
+	  end
+	  
+	  if imgui.Button(u8"120-180", imgui.ImVec2(200, 25)) then
+	     hideAllTextureImages()
+	     show_texture3 = not show_texture3
+	  end
 	
+	  if imgui.Button(u8"180-240", imgui.ImVec2(200, 25)) then
+	     hideAllTextureImages()
+		 show_texture4 = not show_texture4
+	  end
+	  
+	  if imgui.Button(u8"240-302", imgui.ImVec2(200, 25)) then
+	     hideAllTextureImages()
+		 show_texture5 = not show_texture5
+	  end
+	  
+	  if imgui.Button(u8"Скрыть все", imgui.ImVec2(200, 25)) then
+		 hideAllTextureImages()
+	  end
+	  
+      imgui.End()
+   end
+   
+   if show_fonts.v then
+	  imgui.SetNextWindowPos(imgui.ImVec2(sizeX / 2, sizeY / 8),
+	  imgui.Cond.FirstUseEver, imgui.ImVec2(0.5, 0.5))
+	  
+      imgui.Begin(u8"Текстуры", show_fonts)
+	  
+	  show_info.v = false
+	  
+	  if imgui.Button(u8"GTAWeapon3", imgui.ImVec2(200, 25)) then
+	     hideAllFontsImages()
+		 show_fontsimg1 = not show_fontsimg1
+	  end
+	  
+	  if imgui.Button(u8"WebdingsEN", imgui.ImVec2(200, 25)) then
+	     hideAllFontsImages()
+		 show_fontsimg2 = not show_fontsimg2
+	  end
+	  
+	  if imgui.Button(u8"WebdingsRU", imgui.ImVec2(200, 25)) then
+	     hideAllFontsImages()
+	     show_fontsimg3 = not show_fontsimg3
+	  end
+	
+	  if imgui.Button(u8"WingdingsEN", imgui.ImVec2(200, 25)) then
+	     hideAllFontsImages()
+		 show_fontsimg4 = not show_fontsimg4
+	  end
+	  
+	  if imgui.Button(u8"fWingdingsRU", imgui.ImVec2(200, 25)) then
+		 hideAllFontsImages()
+		 show_fontsimg5 = not show_fontsimg5
+	  end
+	  
+	  if imgui.Button(u8"Скрыть все", imgui.ImVec2(200, 25)) then
+		 hideAllFontsImages()
+	  end
+	  
+      imgui.End()
+   end
+   
    if show_favorites.v then
-      imgui.SetNextWindowSize(imgui.ImVec2(530, 510), imgui.Cond.FirstUseEver)
+      imgui.SetNextWindowSize(imgui.ImVec2(530, 340), imgui.Cond.FirstUseEver)
 	  imgui.SetNextWindowPos(imgui.ImVec2(sizeX / 8, sizeY / 4),
 	  imgui.Cond.FirstUseEver, imgui.ImVec2(0.5, 0.5))
 	  
@@ -304,6 +395,8 @@ function imgui.OnDrawFrame()
 	  if imgui.Button(u8"Специальные") then tab = 2 end
 	  imgui.SameLine()
 	  if imgui.Button(u8"Эффекты") then tab = 3 end
+	  imgui.SameLine()
+	  if imgui.Button(u8"Освещение") then tab = 4 end
 	  
 	  if tab == 1 then
 	     imgui.Text(u8"Большие прозрачные объекты для текста: 19481, 19480, 19482, 19477")
@@ -313,8 +406,6 @@ function imgui.OnDrawFrame()
          imgui.Text(u8"Платформы: тонкая платформа 19552, 19538, решетчатая 18753, 18754")
          imgui.Text(u8"Поверхности: 19531, 4242, 4247, 8171, 5004, 16685")
          imgui.Text(u8"Стены: 19355, 19435(маленькая), 19447(длинная), 19391(дверь), 19408(окно)")
-	     imgui.Separator()
-	     imgui.TextColoredRGB("Не нашли нужный объект? посмотрите на {007DFF}dev.prineside.com")
 	  elseif tab == 2 then
 		 imgui.Text(u8"Коровка 19833, Веревка 19087, Веревка длин. 19089")
          imgui.Text(u8"Стекло (Разрушаемое) 3858, стекло от травы 3261, сено 3374")
@@ -334,36 +425,21 @@ function imgui.OnDrawFrame()
 	     imgui.Text(u8"Рябь на воде 18741, брызги воды 18744")
 	     imgui.Text(u8"Фонтан 18739, гидрант 18740, водопад 19841, вода 19842")
          imgui.Text(u8"Искры 18717, горящие дрова 19632")
-         imgui.Text(u8"Неон красный 18647, синий 18648, зеленый 18649")
+         imgui.Text(u8"Сигнальный огонь 18728, лазер 18643, нитро 18702, флейм 18693")
+	  elseif tab == 4 then
+	     imgui.Text(u8"Неон красный 18647, синий 18648, зеленый 18649")
 	     imgui.Text(u8"Неон желтый 18650, розовый 18651, белый 18652")
 	     imgui.Text(u8"Свет.шар (не моргает) белый 19281, красн. 19282, зел. 19283, синий 19284")
 	     imgui.Text(u8"Свет.шар (моргает быстро) белый 19285, красн. 19286, зел. 19287, син. 19288")
 	     imgui.Text(u8"Свет.шар (моргает медленно) белый 19289, красн. 19290, зел. 19291, син. 19292")
 	     imgui.Text(u8"Свет.шар (моргает медленно) фиолетовый 19293, желтый 19294")
 	     imgui.Text(u8"Свет.шар (большой не моргает) бел. 19295, красн. 19296, зел. 19297, син. 19298")
-         imgui.Text(u8"Сигнальный огонь 18728, лазер 18643, нитро 18702, флейм 18693")
-	  
-	     imgui.Separator()
-	     if imgui.Button(u8"Отключить дым из труб и прочие эффекты факелов и дыма",
-	     imgui.ImVec2(450, 25)) then
-		    effects = not effects
-		    if effects then
-               memory.hex2bin('8B4E08E88B900000', 0x4A125D, 8)
-		    else 
- 		       memory.fill(0x4A125D, 0x90, 8, true)
-		    end
-	     end 
-	  
-	     -- nop all effects render
-	     if imgui.Button(u8"Отключить все эффекты (вернуть обратно только релогом)",
-	     imgui.ImVec2(450, 25)) then
-		    if not disablealleffects then
-	           memory.fill(0x53EAD3, 0x90, 5, true)
-			   disablealleffects = true
-		    end
-	     end
-		 
 	  end
+	  
+	  imgui.Text(u8"")
+	  imgui.Separator()
+	  imgui.TextColoredRGB("Не нашли нужный объект? посмотрите на {007DFF}dev.prineside.com")
+	  
       imgui.End()
    end
 	
@@ -458,8 +534,6 @@ function imgui.OnDrawFrame()
 	   imgui.TextColoredRGB("{00FF00}@ номер игрока - {bababa}заменит id на никнейм игрока")
 	   
 	   if imgui.InputText("##Bind1", bind_textbuffer1) then 
-		  --bind_textbuffer1 = u8:decode(bind_textbuffer1.v)
-		  --u8:decode(bind_textbuffer1.v)
 	   end
 	   
 	   imgui.SameLine()
@@ -541,11 +615,22 @@ function imgui.OnDrawFrame()
 	      ini.binds.textbuffer6 = u8:decode(bind_textbuffer6.v)
 	      ini.binds.textbuffer7 = u8:decode(bind_textbuffer7.v)
 	      ini.binds.adtextbuffer = u8:decode(bind_adtextbuffer.v)
-		  save()
-          if inicfg.save(table1, ini) then
-             printStringNow(u8("Сохранено"), 1000)
-          end
+		  save()          
+          printStringNow("Saved", 1000)
        end
+	   
+	   imgui.SameLine()
+	   if imgui.Button(u8("Перегрузить")) then
+	      bind_textbuffer1.v = u8(ini.binds.textbuffer1)
+          bind_textbuffer2.v = u8(ini.binds.textbuffer2)
+          bind_textbuffer3.v = u8(ini.binds.textbuffer3)
+          bind_textbuffer4.v = u8(ini.binds.textbuffer4)
+          bind_textbuffer5.v = u8(ini.binds.textbuffer5)
+          bind_textbuffer6.v = u8(ini.binds.textbuffer6)
+          bind_textbuffer7.v = u8(ini.binds.textbuffer7)
+          bind_adtextbuffer.v = u8(ini.binds.adtextbuffer)        
+          printStringNow("Reloaded", 1000)
+	   end
 	   
 	   imgui.SameLine()
 	   if imgui.Button(u8"Очистить все бинды") then
@@ -566,7 +651,7 @@ function imgui.OnDrawFrame()
           memory.write(sampGetChatInfoPtr() + 0x63DA, 1, 1)
 	   end
 	   
-	   if imgui.Button(u8"Скопировать послед сообщение из чата в буффер (CTRL + C)") then
+	   if imgui.Button(u8"Скопировать послед сообщение из чата в буффер") then
 	       text, prefix, color, pcolor = sampGetChatString(99)
 		   setClipboardText(text)
 	   end
@@ -614,6 +699,7 @@ function imgui.OnDrawFrame()
 		  for k, vehname in ipairs(VehicleNames) do
 		     if vehname:lower():find(u8:decode(vehiclename_buffer.v:lower())) then
 			    vehinfomodelid = 399+k
+				setClipboardText(vehinfomodelid)
 			    printStringNow(vehinfomodelid, 1000)
 			 end 
 		  end
@@ -643,31 +729,35 @@ function imgui.OnDrawFrame()
 	  
        imgui.Begin(u8"Горячие клавиши", show_hotkeys)
 	   
-	   imgui.TextColoredRGB("Доступные только с {FF0000}SAMP ADDON:")
-       imgui.TextColoredRGB("{00FF00}Клавиша N{FFFFFF} — меню редактора карт (в полете)")
-       imgui.TextColoredRGB("{00FF00}Клавиша J{FFFFFF} — полет в наблюдении (/полет)")
-       imgui.TextColoredRGB("{00FF00}Боковые клавиши мыши{FFFFFF} — отменяют и сохраняют редактирование объекта")
-       imgui.Text(" ")
-       imgui.TextColoredRGB("В режиме редактирования:")
-       imgui.TextColoredRGB("{00FF00}Зажатие клавиши ALT{FFFFFF} — скрыть объект")
-       imgui.TextColoredRGB("{00FF00}Зажатие клавиши CTRL{FFFFFF} — визуально увеличить объект")
-       imgui.TextColoredRGB("{00FF00}Зажатие клавиши SHIFT{FFFFFF} — плавное перемещение объекта")
-       imgui.TextColoredRGB("{00FF00}Клавиша RMB (Правая кл.мыши){FFFFFF}  — вернуть объект на исходную позицию")
-       imgui.TextColoredRGB("{00FF00}Клавиша Enter{FFFFFF}  — сохранить редактируемый объект")
-       imgui.Text(" ")
-       imgui.TextColoredRGB("В режиме выделения:")
-       imgui.TextColoredRGB("{00FF00}Клавиша RMB (Правая кл.мыши){FFFFFF}  — скопирует номер модели объекта")
-       imgui.TextColoredRGB("{00FF00}Клавиша SHIFT{FFFFFF} — переключение между объектами")
-       imgui.Text(" ")
-	   imgui.TextColoredRGB("Восстановленые скриптом и доступные без {00FF00}SAMP ADDON:")
-       imgui.TextColoredRGB("{00FF00}J{FFFFFF} - полет в мире")
-       imgui.TextColoredRGB("{00FF00}Z{FFFFFF} - починить транспорт")
-       imgui.TextColoredRGB("{00FF00}U{FFFFFF} - анимации")
-       imgui.TextColoredRGB("{00FF00}M{FFFFFF} - домашний транспорт")
-       imgui.TextColoredRGB("{00FF00}K{FFFFFF} - заказать транспорт")
-       imgui.TextColoredRGB("{00FF00}H{FFFFFF} - перевернуть транспорт")
-	   imgui.Separator()
-	   imgui.Text(u8"Если у вас установлен SAMP ADDON вы можете отключить фикс горячих клавиши в настройках")
+	   if imgui.Button(u8"Доступные только с SAMP ADDON") then tab = 1 end 
+	   imgui.SameLine()
+	   if imgui.Button(u8"Восстановленые скриптом") then tab = 2 end
+	  
+	   if tab == 1 then
+          imgui.TextColoredRGB("{00FF00}Клавиша N{FFFFFF} — меню редактора карт (в полете)")
+          imgui.TextColoredRGB("{00FF00}Клавиша J{FFFFFF} — полет в наблюдении (/полет)")
+          imgui.TextColoredRGB("{00FF00}Боковые клавиши мыши{FFFFFF} — отменяют и сохраняют редактирование объекта")
+          imgui.Text(" ")
+          imgui.TextColoredRGB("В режиме редактирования:")
+          imgui.TextColoredRGB("{00FF00}Зажатие клавиши ALT{FFFFFF} — скрыть объект")
+          imgui.TextColoredRGB("{00FF00}Зажатие клавиши CTRL{FFFFFF} — визуально увеличить объект")
+          imgui.TextColoredRGB("{00FF00}Зажатие клавиши SHIFT{FFFFFF} — плавное перемещение объекта")
+          imgui.TextColoredRGB("{00FF00}Клавиша RMB (Правая кл.мыши){FFFFFF}  — вернуть объект на исходную позицию")
+          imgui.TextColoredRGB("{00FF00}Клавиша Enter{FFFFFF}  — сохранить редактируемый объект")
+          imgui.Text(" ")
+          imgui.TextColoredRGB("В режиме выделения:")
+          imgui.TextColoredRGB("{00FF00}Клавиша RMB (Правая кл.мыши){FFFFFF}  — скопирует номер модели объекта")
+          imgui.TextColoredRGB("{00FF00}Клавиша SHIFT{FFFFFF} — переключение между объектами")
+	   elseif tab == 2 then
+	      imgui.TextColoredRGB("Восстановленые скриптом и доступные без {00FF00}SAMP ADDON:")
+          imgui.TextColoredRGB("{00FF00}J{FFFFFF} - полет в мире")
+          imgui.TextColoredRGB("{00FF00}Z{FFFFFF} - починить транспорт")
+          imgui.TextColoredRGB("{00FF00}U{FFFFFF} - анимации")
+          imgui.TextColoredRGB("{00FF00}M{FFFFFF} - домашний транспорт")
+          imgui.TextColoredRGB("{00FF00}K{FFFFFF} - заказать транспорт")
+          imgui.TextColoredRGB("{00FF00}H{FFFFFF} - перевернуть транспорт")
+	   end
+	   
        imgui.End()
 	end
 	
@@ -682,8 +772,6 @@ function imgui.OnDrawFrame()
        imgui.TextColoredRGB("По умолчанию в мире можно создавать только {00FF00}50 объектов, лимит можно расширить до {00FF00}300{FFFFFF}.")
 	   imgui.TextColoredRGB("VIP игроки могут расширять лимит до {00FF00}2000 объектов.{FFFFFF}")
 	   imgui.TextColoredRGB("Стоимость расширения мира {00FF00}20 ОА и 500.000$ за 10 объектов.{FFFFFF}") 
-	   imgui.TextColoredRGB("Максимальное количество созданных миров {00FF00}500{FFFFFF}.")
-	   imgui.TextColoredRGB("При отсутствии на сервере {FF0000}90 дней мир удаляется{FFFFFF}")
 	   imgui.Separator()
        imgui.Text(u8"Лимиты в мире")
        imgui.TextColoredRGB("макс. объектов: {00FF00}300 (VIP 2000)")
@@ -725,26 +813,63 @@ function imgui.OnDrawFrame()
 	      end
 	   end
 	   
+	   if imgui.Checkbox(u8"Отключить дым из труб и прочие эффекты факелов и дыма",
+	   checkbox_seffects) then
+		  if checkbox_seffects.v then
+		     effects = not effects
+		     if effects then
+                memory.hex2bin('8B4E08E88B900000', 0x4A125D, 8)
+		     else 
+   		        memory.fill(0x4A125D, 0x90, 8, true)
+	         end 
+	      end
+	   end
+	   
+	   -- Thanks samp++
+	   imgui.Text(u8"Дальность прорисовки:")
+	   if imgui.SliderInt(u8"##Drawdist", sliderdrawdist, 50, 3000) then
+		  ini.settings.drawdist = sliderdrawdist.v
+		  save()
+		  memory.setfloat(12044272, ini.settings.drawdist, true)
+	   end
+		
+	   imgui.Text(u8"Дальность тумана:")
+	   if imgui.SliderInt(u8"##fog", sliderfog, -390, 390) then
+		  ini.settings.fog = sliderfog.v
+		  save()
+		  memory.setfloat(13210352, ini.settings.fog, true)
+	   end
+		
+	   imgui.Separator()
+	   imgui.Text(u8"Необратимые функции (вернуть обратно только релогом)")
+	   
+	   if imgui.Button(u8"Отключить все эффекты", imgui.ImVec2(200, 25)) then
+	      if not disablealleffects then
+	         memory.fill(0x53EAD3, 0x90, 5, true)
+		     disablealleffects = true
+		  end
+	   end
+	   
+	   if imgui.Button(u8"Удалить логотип",imgui.ImVec2(200, 25)) then
+	      if removelogo then
+			 removelogo = false
+	      else
+		     removelogo = true
+			 -- remove server logo
+			 sampTextdrawDelete(2048)
+             sampTextdrawDelete(420)
+		  end
+	   end
+	   
+	   imgui.Separator()
 	   if imgui.Button(u8"Обновить конфиг", imgui.ImVec2(200, 25)) then
 		  inicfg.save(ini, configIni)
 	   end
 	   
+	   imgui.SameLine()
 	   if imgui.Button(u8"Перегрузить скрипт", imgui.ImVec2(200, 25)) then
 		  thisScript():reload()
 	   end
-	   
-	   -- Thanks samp++
-	   -- imgui.Text(u8"Дальность прорисовки:")
-	   -- if imgui.SliderInt(u8"##Drawdist", sliderdrawdist, 50, 3000) then
-		  -- sliderdrawdist = sliderdrawdist.v
-		  -- memory.setfloat(12044272, sliderdrawdist, true)
-	   -- end
-		
-		-- imgui.Text(u8"Дальность тумана:")
-		-- if imgui.SliderInt(u8"##fog", sliderfog, -390, 390) then
-		   -- sliderfog = sliderfog.v
-		   -- memory.setfloat(13210352, sliderfog, true)
-		-- end
 			
        imgui.End()
 	end
@@ -755,23 +880,24 @@ function imgui.OnDrawFrame()
 	   
        imgui.Begin(u8"О скрипте", show_credits)
        imgui.Text(u8"Автор: 1NS (Git: in1x)")
-	   --imgui.Text(string.format(u8"Demo version: %s", os.date("%x")))
        imgui.Text(u8"Помошник для мапперов и организаторов мероприятий на Absolute DM")
 	   imgui.TextColoredRGB("Homepage: {007DFF}github.com/ins1x/AbsEventHelper")
        imgui.TextColoredRGB("Русскоязычное сообщество мапперов: {007DFF}vk.com\1nsanemapping")
        imgui.TextColoredRGB("Сайт Absolute Play: {007DFF}gta-samp.ru")
        imgui.TextColoredRGB("Чат Absolute Play DM: {007DFF}dsc.gg/absdm")
+	   imgui.Text(u8"Disclaimer: Автор не является частью команды проекта Absolute Play")
 	   imgui.Text(" ")
        imgui.Text(u8"Credits:")
        imgui.Text(u8"FYP - imgui, SAMP lua library")
-       imgui.Text(u8"Gorskin - useful memory hacks")
+       imgui.Text(u8"Gorskin - useful code snippets and memory hacks")
+       imgui.Text(u8"Brainer, Romzes, Nexius (pawnokit.ru) - specsymbols images")
        imgui.End()
-	end
+	end 
 	
 	if show_notepad.v then
 	   imgui.SetNextWindowPos(imgui.ImVec2(sizeY / 4, sizeY / 2),
 	   imgui.Cond.FirstUseEver, imgui.ImVec2(0.5, 0.5))
-	   imgui.SetNextWindowSize(imgui.ImVec2(300, 200), imgui.Cond.FirstUseEver)
+	   imgui.SetNextWindowSize(imgui.ImVec2(310, 210), imgui.Cond.FirstUseEver)
 	   imgui.Begin(u8"Блокнот", show_notepad)
 	   
 	   imgui.InputTextMultiline('##bufftext', note_textbuffer, imgui.ImVec2(285, 125))
@@ -814,11 +940,25 @@ function main()
 	     ini.settings.keybinds = false
 	     -- sampAddChatMessage("Keybinds work only Absolute DM", 0x00FF0000)
 	  end
-	  
+	
 	  if not doesDirectoryExist("moonloader/resource/abseventhelper") then 
 	     createDirectory("moonloader/resource/abseventhelper")
 	  end
 	  
+	  local texture1 = renderLoadTextureFromFile(getGameDirectory() .. '\\moonloader\\resource\\abseventhelper\\texture1.jpg')
+	  local texture2 = renderLoadTextureFromFile(getGameDirectory() .. '\\moonloader\\resource\\abseventhelper\\texture2.jpg')
+	  local texture3 = renderLoadTextureFromFile(getGameDirectory() .. '\\moonloader\\resource\\abseventhelper\\texture3.jpg')
+	  local texture4 = renderLoadTextureFromFile(getGameDirectory() .. '\\moonloader\\resource\\abseventhelper\\texture4.jpg')
+	  local texture5 = renderLoadTextureFromFile(getGameDirectory() .. '\\moonloader\\resource\\abseventhelper\\texture5.jpg')
+	  
+	  -- Rights to the images belong to the pawnokit project
+	  -- https://pawnokit.ru/ru/spec_symbols
+	  local fontsimg1 = renderLoadTextureFromFile(getGameDirectory() .. '\\moonloader\\resource\\abseventhelper\\fGTAWeapon3.jpg')
+	  local fontsimg2 = renderLoadTextureFromFile(getGameDirectory() .. '\\moonloader\\resource\\abseventhelper\\fWebdingsEN.jpg')
+	  local fontsimg3 = renderLoadTextureFromFile(getGameDirectory() .. '\\moonloader\\resource\\abseventhelper\\fWebdingsRU.jpg')
+	  local fontsimg4 = renderLoadTextureFromFile(getGameDirectory() .. '\\moonloader\\resource\\abseventhelper\\fWingdingsEN.jpg')
+	  local fontsimg5 = renderLoadTextureFromFile(getGameDirectory() .. '\\moonloader\\resource\\abseventhelper\\fWingdingsRU.jpg')
+  
 	  sampRegisterChatCommand("abshelp", function ()
          main_window_state.v = not main_window_state.v 
 	  end)
@@ -827,9 +967,70 @@ function main()
          show_notepad.v = not show_notepad.v 
 	  end)
 	  
+	  memory.setfloat(12044272, ini.settings.drawdist, true)
+      memory.setfloat(13210352, ini.settings.fog, true)
+	  --- END init
 	  while true do
 	  wait(0)
 	  
+	  local imgX, imgY = 770, 480 -- image size
+	  
+	  if(show_textures.v) then
+		  if show_texture1 then
+			 renderDrawTexture(texture1, (sizeX - imgX) / 2,
+			 (sizeY - imgY) / 2,imgX, imgY, 0, 0xffffffff)
+		  end
+		  
+		  if show_texture2 then
+			 renderDrawTexture(texture2, (sizeX - imgX) / 2,
+			 (sizeY - imgY) / 2, imgX, imgY, 0, 0xffffffff)
+		  end
+		  
+		  if show_texture3 then
+			 renderDrawTexture(texture3, (sizeX - imgX) / 2,
+			 (sizeY - imgY) / 2, imgX, imgY, 0, 0xffffffff)
+		  end
+		  
+		  if show_texture4 then
+			 renderDrawTexture(texture4, (sizeX - imgX) / 2,
+			 (sizeY - imgY) / 2, imgX, imgY, 0, 0xffffffff)
+		  end
+		  
+		  if show_texture5 then
+			 renderDrawTexture(texture5, (sizeX - imgX) / 2,
+			 (sizeY - imgY) / 2, imgX, imgY, 0, 0xffffffff)
+		  end
+	  end
+	  
+	  local imgX, imgY = 500, 450 -- image size
+	  
+	  if(show_fonts.v) then
+	      if show_fontsimg1 then
+			 renderDrawTexture(fontsimg1, (sizeX - imgX) / 2,
+			 (sizeY - imgY) / 2, imgX, imgY, 0, 0xffffffff)
+		  end
+		  
+		  if show_fontsimg2 then
+			 renderDrawTexture(fontsimg2, (sizeX - imgX) / 2,
+			 (sizeY - imgY) / 2, imgX, imgY, 0, 0xffffffff)
+		  end
+		  
+		  if show_fontsimg3 then
+			 renderDrawTexture(fontsimg3, (sizeX - imgX) / 2,
+			 (sizeY - imgY) / 2, imgX, imgY, 0, 0xffffffff)
+		  end
+		  
+		  if show_fontsimg4 then
+			 renderDrawTexture(fontsimg4, (sizeX - imgX) / 2,
+			 (sizeY - imgY) / 2, imgX, imgY, 0, 0xffffffff)
+		  end
+		  
+		  if show_fontsimg5 then
+			 renderDrawTexture(fontsimg5, (sizeX - imgX) / 2,
+			 (sizeY - imgY) / 2, imgX, imgY, 0, 0xffffffff)
+		  end
+	   end
+	   
 	  -- Imgui menu
 	  imgui.Process = main_window_state.v
 	  
@@ -895,14 +1096,6 @@ function main()
       if isKeyDown(VK_MENU) and isKeyJustPressed(VK_X) and not sampIsChatInputActive() and not    sampIsDialogActive() and not isPauseMenuActive() and not isSampfuncsConsoleActive() then 
          if showobjects then showobjects = false end
 		 main_window_state.v = not main_window_state.v 
-      end
-	  
-	  -- ALT+C
-      if isKeyDown(VK_CONTROL) and isKeyJustPressed(VK_C) and not sampIsChatInputActive() and not    sampIsDialogActive() and not isPauseMenuActive() and not isSampfuncsConsoleActive() then 
-         text, prefix, color, pcolor = sampGetChatString(99)
-		 local text_rus = u8:decode(text, 'CP1251')
-		 setClipboardText(text_rus)
-		 printStringNow("Last message copied to buffer", 1000)
       end
 	  
 	  -- Objects render
@@ -1026,6 +1219,22 @@ end
 function intToHex(int)
     return '{'..string.sub(bit.tohex(int), 3, 8)..'}'
 end
+
+function hideAllFontsImages()
+   show_fontsimg1 = false
+   show_fontsimg2 = false
+   show_fontsimg3 = false
+   show_fontsimg4 = false
+   show_fontsimg5 = false
+end
+
+function hideAllTextureImages()
+   show_texture1 = false
+   show_texture2 = false
+   show_texture3 = false
+   show_texture4 = false
+   show_texture5 = false
+end 
 
 function imgui.TextColoredRGB(text)
     local style = imgui.GetStyle()
