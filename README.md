@@ -1,6 +1,6 @@
 # Absolute Event Helper
 
-![logo](https://i.imgur.com/O8zsxks.png)
+![logo](https://github.com/ins1x/AbsEventHelper/raw/main/moonloader/resource/abseventhelper/demo.png)
 
 #### ENGLISH
 Lua script Assistant for mappers and event makers on [Absolute Play DM](https://sa-mp.ru/) server.  
@@ -37,12 +37,17 @@ LUA ассистент для мапперов и организаторов м�
 - Установить [moonloader](https://www.blast.hk/threads/13305/)  
 - Скопировать содержимое в папку moonloader  
 
-* В игре нажмите ALT + X или введите команду /abshelp
+> В игре нажмите ALT + X или введите команду /abshelp
 
 ## Зависимости
 * moonloader - https://www.blast.hk/threads/13305/
 * lua imgui - https://www.blast.hk/threads/19292/
 * lib.samp.events - https://github.com/THE-FYP/SAMP.Lua
+
+## Credits 
+* FYP - imgui, SAMP lua библиотеки")
+* Gorskin - полезные сниппеты и мемхаки
+* Brainer, Romzes, Nexius (pawnokit.ru) - [картинки спецсимволов](https://pawnokit.ru/ru/spec_symbols)
 
 ## Disclaimer
 Автор не является оффициальным представителем, разработчиком либо частью команды проекта Absolute Play  
