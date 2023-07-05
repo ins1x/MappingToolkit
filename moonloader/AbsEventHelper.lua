@@ -4,7 +4,7 @@ script_description("Assistant for mappers and event makers on Absolute DM")
 script_dependencies('imgui', 'lib.samp.events', 'vkeys', 'memory')
 script_properties("work-in-pause")
 script_url("https://github.com/ins1x/AbsEventHelper")
-script_version("0.6")
+script_version("0.8")
 
 require 'lib.moonloader'
 local keys = require 'vkeys'
@@ -66,6 +66,7 @@ local show_vehs = imgui.ImBool(false)
 local show_notepad = imgui.ImBool(false)
 local show_textures = imgui.ImBool(false)
 local show_fonts = imgui.ImBool(false)
+local show_players = imgui.ImBool(false)
 
 local checkbox_antiafk = imgui.ImBool(ini.settings.antiafk)
 local checkbox_chatfilter = imgui.ImBool(ini.settings.chatfilter)
@@ -108,6 +109,8 @@ local showobjects = false
 local tpposX, tpposY, tpposZ
 local vehinfomodelid = 0 
 local removelogo = false
+local objectsDel = {}
+local playersTable = {}
 
 VehicleNames = {
 	"Landstalker", "Bravura", "Buffalo", "Linerunner", "Pereniel", "Sentinel", "Dumper",
@@ -145,7 +148,7 @@ VehicleNames = {
 
 function imgui.OnDrawFrame()
    if main_window_state.v then
-      imgui.SetNextWindowSize(imgui.ImVec2(290, 490), imgui.Cond.FirstUseEver)
+      imgui.SetNextWindowSize(imgui.ImVec2(295, 510), imgui.Cond.FirstUseEver)
 	  imgui.SetNextWindowPos(imgui.ImVec2(sizeX / 2, sizeY / 2),
 	  imgui.Cond.FirstUseEver, imgui.ImVec2(0.5, 0.5))
       imgui.Begin("Absolute Events Helper", main_window_state)
@@ -168,6 +171,7 @@ function imgui.OnDrawFrame()
 		 show_vehs.v = false
 		 show_notepad.v = false
 		 show_fonts.v = false
+		 show_players.v  = false
       end
 	  
 	  imgui.SameLine()
@@ -177,7 +181,6 @@ function imgui.OnDrawFrame()
 	  
 	  _, pID = sampGetPlayerIdByCharHandle(playerPed)
 	  local name = sampGetPlayerNickname(pID)
-      local score = sampGetPlayerScore(pID)
 	  local ucolor = sampGetPlayerColor(pID)
 	  
 	  imgui.TextColoredRGB(string.format("Логин: {%0.6x}%s (%d)",
@@ -228,6 +231,10 @@ function imgui.OnDrawFrame()
 		 show_vehs.v = not show_vehs.v
 	  end
 	  
+	  if imgui.Button(u8"Игроки", imgui.ImVec2(250, 25)) then
+		 show_players.v = not show_players.v
+	  end
+	  
 	  if imgui.Button(u8"Получить координаты", imgui.ImVec2(250, 25)) then
 	     if not sampIsChatInputActive() and not sampIsDialogActive() and not isPauseMenuActive() and not isSampfuncsConsoleActive() then 
 		    sampSendChat("/коорд")
@@ -267,7 +274,7 @@ function imgui.OnDrawFrame()
    end
    
    if show_info.v then
-	  imgui.SetNextWindowPos(imgui.ImVec2(sizeX / 2, sizeY / 8),
+	  imgui.SetNextWindowPos(imgui.ImVec2(sizeX / 1.5, sizeY / 8),
 	  imgui.Cond.FirstUseEver, imgui.ImVec2(0.5, 0.5))
 	  
       imgui.Begin(u8"Информация", show_info)
@@ -304,12 +311,10 @@ function imgui.OnDrawFrame()
    end
    
    if show_textures.v then
-	  imgui.SetNextWindowPos(imgui.ImVec2(sizeX / 2, sizeY / 8),
+	  imgui.SetNextWindowPos(imgui.ImVec2(sizeX / 1.5, sizeY / 10),
 	  imgui.Cond.FirstUseEver, imgui.ImVec2(0.5, 0.5))
 	  
       imgui.Begin(u8"Текстуры", show_textures)
-	  
-	  show_info.v = false
 	  
 	  if imgui.Button(u8"1-60", imgui.ImVec2(200, 25)) then
 	     hideAllTextureImages()
@@ -344,12 +349,10 @@ function imgui.OnDrawFrame()
    end
    
    if show_fonts.v then
-	  imgui.SetNextWindowPos(imgui.ImVec2(sizeX / 2, sizeY / 8),
+	  imgui.SetNextWindowPos(imgui.ImVec2(sizeX / 2, sizeY / 10),
 	  imgui.Cond.FirstUseEver, imgui.ImVec2(0.5, 0.5))
 	  
       imgui.Begin(u8"Текстуры", show_fonts)
-	  
-	  show_info.v = false
 	  
 	  if imgui.Button(u8"GTAWeapon3", imgui.ImVec2(200, 25)) then
 	     hideAllFontsImages()
@@ -654,6 +657,99 @@ function imgui.OnDrawFrame()
 	   if imgui.Button(u8"Скопировать послед сообщение из чата в буффер") then
 	       text, prefix, color, pcolor = sampGetChatString(99)
 		   setClipboardText(text)
+	   end
+	   
+	   imgui.End()
+	end
+	
+	if show_players.v then
+	   imgui.SetNextWindowPos(imgui.ImVec2(sizeX / 4, sizeY / 4),
+	   imgui.Cond.FirstUseEver, imgui.ImVec2(0.5, 0.5))
+	   imgui.SetNextWindowSize(imgui.ImVec2(560, 540), imgui.Cond.FirstUseEver)
+	   imgui.Begin(u8"Игроки", show_players)
+	   
+	   imgui.Text(u8"Перед началом мероприятия обновите список игроков, и сохраните")
+	   
+	   if imgui.Button(u8"Обновить список игроков", imgui.ImVec2(250, 25)) then
+		  for k, v in ipairs(getAllChars()) do
+			 local res, id = sampGetPlayerIdByCharHandle(v)
+			 if res then
+				table.insert(playersTable, id, id)
+			 end
+		  end
+	   end
+	   
+	   imgui.SameLine()
+	   if imgui.Button(u8"Сохранить список игроков", imgui.ImVec2(250, 25)) then
+	      ptablefile = io.open(getGameDirectory().."/moonloader/resource/abseventhelper/players.txt", "w")
+	      for k, v in pairs(playersTable) do
+              ptablefile:write(string.format("[%d]%s lvl: %i \n",
+			  v, sampGetPlayerNickname(v), sampGetPlayerScore(v) ))
+		  end
+		  ptablefile:close()
+		  printStringNow("Saved moonloader/resource/abseventhelper/players.txt", 4000)
+	   end
+	   
+	   imgui.Text(u8"Нажмите на id чтобы скопировать в буффер id игрока")
+	   imgui.Text(u8"Нажмите на никнейм чтобы открыть меню игрока")
+	   imgui.Text(u8" ")
+	   
+	   imgui.Separator()
+	   imgui.Columns(5)
+	   imgui.Text("[ID]")
+	   imgui.NextColumn()
+	   imgui.Text("Nickname")
+	   imgui.NextColumn()
+	   imgui.Text("Level")
+	   imgui.NextColumn()
+	   imgui.Text("HP (Armour)")
+	   imgui.NextColumn()
+	   imgui.Text("Ping")
+	   imgui.Columns(1)
+	   imgui.Separator()
+		  
+	   for k, v in pairs(playersTable) do
+	      local health = sampGetPlayerHealth(v)
+		  local armor = sampGetPlayerArmor(v)
+		  local ping = sampGetPlayerPing(v)
+		  local nickname = sampGetPlayerNickname(v)
+		  local score = sampGetPlayerScore(v)
+		  local ucolor = sampGetPlayerColor(v)
+		  
+		  imgui.Columns(5)
+		  imgui.TextColoredRGB(string.format("[%d]", v ))
+		  if imgui.IsItemClicked() then
+			 setClipboardText(v)
+			 printStringNow("copied to clipboard", 1000)
+		  end
+		  imgui.SetColumnWidth(-1, 50)
+		  imgui.NextColumn()
+		  imgui.TextColoredRGB(string.format("{%0.6x} %s", bit.band(ucolor,0xffffff), nickname))
+		  if imgui.IsItemClicked() then
+			 sampSendChat(string.format("/и %i", v))
+		  end
+		  imgui.SetColumnWidth(-1, 200)
+		  imgui.NextColumn()
+		  if(score < 20) then
+		     imgui.TextColoredRGB(string.format("{FF0000}%i", score))
+		  else 
+		     imgui.TextColoredRGB(string.format("%i", score))
+	      end
+		  imgui.NextColumn()
+		  imgui.TextColoredRGB(string.format("%i (%i)", health, armor))
+		  imgui.NextColumn()
+		  if(ping > 90) then
+		     imgui.TextColoredRGB(string.format("{FF0000}%i", ping))
+		  else
+		     imgui.TextColoredRGB(string.format("%i", ping))
+		  end
+		  imgui.Columns(1)
+          imgui.Separator()
+		  
+		  --imgui.TextColoredRGB(string.format("%s(%d) lvl: %i hp: %i(%i) ping: %i",
+		  --sampGetPlayerNickname(v), v, sampGetPlayerScore(v),
+		  --health, armor, ping))
+		  
 	   end
 	   
 	   imgui.End()
@@ -1114,14 +1210,18 @@ function main()
          find_obj_x, find_obj_y, find_obj_z = getCharCoordinates(PLAYER_PED)
          result, objectHandle = findAllRandomObjectsInSphere(find_obj_x, find_obj_y, find_obj_z, 25, true)
          if result then
-		    setObjectCollision(objectHandle, false)			
+		    setObjectCollision(objectHandle, false)
+			table.insert(objectsDel, objectHandle, objectHandle)			
 			--setObjectCollisionDamageEffect(objectHandle, false)
          end
       else
          find_obj_x, find_obj_y, find_obj_z = getCharCoordinates(PLAYER_PED)
          result, objectHandle = findAllRandomObjectsInSphere(find_obj_x, find_obj_y, find_obj_z, 25, true)
          if result then
-            setObjectCollision(objectHandle, true)
+		    for k, v in pairs(objectsDel) do
+               if doesObjectExist(v) then setObjectCollision(v, true) end
+            end
+            --setObjectCollision(objectHandle, true)
 			--setObjectCollisionDamageEffect(objectHandle, true)
          end
       end
