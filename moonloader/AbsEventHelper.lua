@@ -4,7 +4,7 @@ script_description("Assistant for mappers and event makers on Absolute DM")
 script_dependencies('imgui', 'lib.samp.events', 'vkeys', 'memory')
 script_properties("work-in-pause")
 script_url("https://github.com/ins1x/AbsEventHelper")
-script_version("0.9")
+script_version("1.0")
 
 require 'lib.moonloader'
 local keys = require 'vkeys'
@@ -15,7 +15,6 @@ local memory = require 'memory'
 local encoding = require 'encoding'
 encoding.default = 'CP1251'
 u8 = encoding.UTF8
-font = renderCreateFont("Arial", 8, 5)
 
 ------------------------[ cfg ] -------------------
 local inicfg = require 'inicfg'
@@ -26,6 +25,9 @@ local ini = inicfg.load({
       antiafk = true,
       chatfilter = true,
       keybinds = true,
+	  addonfixes = true,
+	  noeffects = false,
+	  showhud = true,
 	  drawdist = "450",
       fog = "200",
    },
@@ -48,6 +50,7 @@ function save()
 end
 ---------------------------------------------------------
 
+font = renderCreateFont("Arial", 8, 5)
 local sizeX, sizeY = getScreenResolution()
 local main_window_state = imgui.ImBool(false)
 local moonloaderVersion = getMoonloaderVersion()
@@ -72,9 +75,11 @@ local show_coords = imgui.ImBool(false)
 local checkbox_antiafk = imgui.ImBool(ini.settings.antiafk)
 local checkbox_chatfilter = imgui.ImBool(ini.settings.chatfilter)
 local checkbox_keybinds = imgui.ImBool(ini.settings.keybinds)
+local checkbox_addonfixes = imgui.ImBool(ini.settings.addonfixes)
+local checkbox_noeffects = imgui.ImBool(ini.settings.noeffects)
+local checkbox_showhud = imgui.ImBool(ini.settings.showhud)
 local checkbox_showobjects = imgui.ImBool(false)
 local checkbox_objectcollision = imgui.ImBool(false)
-local checkbox_seffects = imgui.ImBool(false)
 
 local color = imgui.ImFloat4(1, 0, 0, 1)
 local sliderfog = imgui.ImInt(ini.settings.fog)
@@ -102,7 +107,6 @@ bind_adtextbuffer.v = u8(ini.binds.adtextbuffer)
 -- If the server changes IP, change it here
 local hostip = "193.84.90.23"
 local tpposX, tpposY, tpposZ
-local effects = true
 local disablealleffects = false
 local disableObjectCollision = false
 local showobjects = false
@@ -840,19 +844,6 @@ function imgui.OnDrawFrame()
 		  VehicleNames[carmodel-399], carmodel, getCarHealth(carhandle)))
 		  imgui.Text(string.format(u8"Цвет %d и %d", getCarColours(carhandle)))
        end
-
-	  
- 	   --imgui.SameLine()
-	   --if imgui.Button(u8"Флип") then
-	      --if isCharInAnyCar(PLAYER_PED) and not sampIsChatInputActive() and not sampIsDialogActive() and not isPauseMenuActive() and not isSampfuncsConsoleActive() then sampSendChat("/f") end
-		  --if isCharInAnyCar(PLAYER_PED) and not sampIsChatInputActive() and not sampIsDialogActive() and not sampIsCursorActive() then
-		  --if isKeyDown(VK_DELETE) then
-		  --		addToCarRotationVelocity(storeCarCharIsInNoSave(PLAYER_PED), 0.0, -0.15, 0.0)
-		  -- elseif isKeyDown(VK_END) then
-		  --	addToCarRotationVelocity(storeCarCharIsInNoSave(PLAYER_PED), 0.0, 0.15, 0.0)
-		  -- end
-		  --end
-	   --end
 	   
 	   if imgui.Button(u8"Найти ID транспорта по имени", imgui.ImVec2(320, 25)) then
 		  for k, vehname in ipairs(VehicleNames) do
@@ -957,6 +948,7 @@ function imgui.OnDrawFrame()
 		  imgui.TextColoredRGB("{00FF00}/players{FFFFFF} — таблица игроков")
 		  imgui.TextColoredRGB("{00FF00}/vehicles{FFFFFF} — таблица транспорта")
 		  imgui.TextColoredRGB("{00FF00}/info{FFFFFF} — показать инфо меню")
+		  imgui.TextColoredRGB("{00FF00}/onjectrender{FFFFFF} — рендер объектов")
 		  imgui.Text(" ")
 	   end
 	   
@@ -999,10 +991,15 @@ function imgui.OnDrawFrame()
 			 save()
           end
 	   end
-       
+	   
        imgui.SameLine()
        imgui.TextQuestion("( ? )", u8"Убирает сообщения о подключениях-отключениях игроков в общм чате")
 	  
+	   imgui.SameLine()
+	   if imgui.Button(u8"Обновить конфиг", imgui.ImVec2(165, 25)) then
+		  inicfg.save(ini, configIni)
+	   end
+	   
    	   if imgui.Checkbox(u8("Анти-афк"), checkbox_antiafk) then 
 	      if checkbox_antiafk.v then
 			 ini.settings.antiafk = not ini.settings.antiafk
@@ -1022,21 +1019,53 @@ function imgui.OnDrawFrame()
        imgui.SameLine()
        imgui.TextQuestion("( ? )", u8"Восстанавливает стандартные горячие клавиши доступные с samp addon")
 
-	   if imgui.Checkbox(u8"Отключить дым из труб и прочие эффекты факелов и дыма",
-	   checkbox_seffects) then
-		  if checkbox_seffects.v then
-		     effects = not effects
-		     if effects then
-                memory.hex2bin('8B4E08E88B900000', 0x4A125D, 8)
-		     else 
-   		        memory.fill(0x4A125D, 0x90, 8, true)
-	         end 
+       if imgui.Checkbox(u8("Включить фиксы samp addon"), checkbox_addonfixes) then 
+	     if checkbox_addonfixes.v then
+	         ini.settings.addonfixes = not ini.settings.addonfixes
+			 save()
+	      end
+	   end
+       imgui.SameLine()
+       imgui.TextQuestion("( ? )", u8"Включает фиксы как в samp аддоне")
+	   
+	   if imgui.Checkbox(u8"Отключить эффекты",
+	   checkbox_noeffects) then
+		  if checkbox_noeffects.v then
+		     ini.settings.noeffects = not ini.settings.noeffects
+			 save() 
 	      end
 	   end
 	   
        imgui.SameLine()
-       imgui.TextQuestion("( ? )", u8"Отключает некоторые эффекты дыма и факелов")
+       imgui.TextQuestion("( ? )", u8"Отключает эффекты дыма, пыли, тени (требуется релог)")
 
+	   if imgui.Checkbox(u8(ini.settings.showhud and 'Скрыть' or 'Показать')..u8" HUD",
+	   checkbox_showhud) then
+	      ini.settings.showhud = not ini.settings.showhud
+		  save()
+		  if ini.settings.showhud then
+			 displayHud(true)
+             memory.setint8(0xBA676C, 0)
+	      else
+		     displayHud(false)
+             memory.setint8(0xBA676C, 2)
+			 -- remove server logo
+			 sampTextdrawDelete(2048)
+             sampTextdrawDelete(420)
+		  end
+	   end
+       imgui.SameLine()
+       imgui.TextQuestion("( ? )", u8"Скрывает HUD и логотип Absolute DM ")
+	   
+	   if imgui.Button(u8"Активировать nopostfx", imgui.ImVec2(200, 25)) then
+	      if not disablealleffects then
+	         memory.fill(0x53EAD3, 0x90, 5, true)
+		     disablealleffects = true
+		  end
+	   end
+       imgui.SameLine()
+       imgui.TextQuestion("( ? )", u8"Отключает пост-обработку (PostFX), рекомендуется использовать только для тестов)")
+	   
 	   -- Thanks samp++
 	   imgui.Text(u8"Дальность прорисовки:")
 	   if imgui.SliderInt(u8"##Drawdist", sliderdrawdist, 50, 3000) then
@@ -1051,42 +1080,18 @@ function imgui.OnDrawFrame()
 		  save()
 		  memory.setfloat(13210352, ini.settings.fog, true)
 	   end
-		
-	   imgui.Separator()
-	   imgui.Text(u8"Необратимые функции (вернуть обратно только релогом)")
 	   
-	   if imgui.Button(u8"Отключить все эффекты", imgui.ImVec2(200, 25)) then
-	      if not disablealleffects then
-	         memory.fill(0x53EAD3, 0x90, 5, true)
-		     disablealleffects = true
-		  end
-	   end
-       imgui.SameLine()
-       imgui.TextQuestion("( ? )", u8"Отключает все эффекты, рекомендуется использовать только для тестов")
-	   
-	   if imgui.Button(u8"Удалить логотип",imgui.ImVec2(200, 25)) then
-	      if removelogo then
-			 removelogo = false
-	      else
-		     removelogo = true
-			 -- remove server logo
-			 sampTextdrawDelete(2048)
-             sampTextdrawDelete(420)
-		  end
-	   end
-       imgui.SameLine()
-       imgui.TextQuestion("( ? )", u8"Удаляет логотип Absolute DM вверху справа")
-
-	   imgui.Separator()
-	   if imgui.Button(u8"Обновить конфиг", imgui.ImVec2(200, 25)) then
-		  inicfg.save(ini, configIni)
-	   end
-	   
-	   imgui.SameLine()
 	   if imgui.Button(u8"Перегрузить скрипт", imgui.ImVec2(200, 25)) then
 		  thisScript():reload()
 	   end
-			
+	   
+	   imgui.SameLine()
+	   if imgui.Button(u8"Выгрузить скрипт", imgui.ImVec2(200, 25)) then
+	      sampAddChatMessage("Скрипт AbsEventHelper успешно выгружен.", -1)
+		  sampAddChatMessage("Для запуска используйте комбинацию клавиш CTRL + R.", -1)
+		  thisScript():unload()
+	   end
+
        imgui.End()
 	end
 	
@@ -1134,7 +1139,7 @@ function imgui.OnDrawFrame()
 	   imgui.SetNextWindowPos(imgui.ImVec2(sizeX / 7, sizeY / 4),
 	   imgui.Cond.FirstUseEver, imgui.ImVec2(0.5, 0.5))
 	   
-       imgui.Begin(u8"О скрипте", show_credits)
+       imgui.Begin(u8"О скрипте v".. thisScript().version, show_credits)
        imgui.Text(u8"Автор: 1NS (Git: in1x)")
        imgui.Text(u8"Помошник для мапперов и организаторов мероприятий на Absolute DM")
 	   imgui.TextColoredRGB("Homepage: {007DFF}github.com/ins1x/AbsEventHelper")
@@ -1259,10 +1264,76 @@ function main()
          main_window_state.v = true
          show_info.v = not show_info.v 
 	  end)
-
+	  
+	  sampRegisterChatCommand("objectrender", function ()
+         showobjects = not showobjects
+	  end)
+      
+	  -- set drawdist and figdist
 	  memory.setfloat(12044272, ini.settings.drawdist, true)
       memory.setfloat(13210352, ini.settings.fog, true)
-
+	  
+	  -- dirty hack nop F1 and F4 keys functions
+	  require('memory').setuint8(getModuleHandle('samp.dll') + 0x67450, 0xC3, true)
+	  memory.write(sampGetBase()+0x797E, 0, 1, true)
+	  
+	  if(ini.settings.addonfixes) then
+	     -- other fixes
+		 memory.write(0x745BC9, 0x9090, 2, false) --SADisplayResolutions(1920x1080// 16:9)
+         memory.fill(0x460773, 0x90, 7, false) --CJFix
+		 memory.setuint32(0x736F88, 0, false) -- the helicopter doesn't explode many times
+		 memory.write(8931716, 0, 4, false) -- fix blackroads
+		 
+	     -- fps fix
+         memory.write(0x53E94C, 0, 1, false) --del fps delay 14 ms
+         memory.setuint32(12761548, 1051965045, false) -- car speed fps fix
+		 
+		 -- birds on
+		 memory.write(5497200, 232, 1, false)
+         memory.write(5497201, 1918619, 4, false)
+		 
+		 -- interioRreflections
+		 memory.write(0x555854, 0x90909090, 4, false)
+         memory.write(0x555858, 0x90, 1, false)
+		 
+		 -- interior run
+		 memory.write(5630064, -1027591322, 4, false)
+         memory.write(5630068, 4, 2, false)
+		 
+		 -- fixing spawn with a bottle
+		 memory.fill(0x4217F4, 0x90, 21, false)
+         memory.fill(0x4218D8, 0x90, 17, false)
+         memory.fill(0x5F80C0, 0x90, 10, false)
+         memory.fill(0x5FBA47, 0x90, 10, false)
+	  end
+	  
+	  if(ini.settings.noeffects) then
+	     -- no smoke and decorative flame
+	     memory.hex2bin('8B4E08E88B900000', 0x4A125D, 8)
+		 
+		 -- nodust
+		 memory.write(7205311, 1056964608, 4, false)
+		 memory.write(7205316, 1065353216, 4, false)
+		 memory.write(7205321, 1065353216, 4, false)
+		 memory.write(7205389, 1056964608, 4, false)
+		 memory.write(7204123, 1050253722, 4, false)
+		 memory.write(7204128, 1065353216, 4, false)
+		 memory.write(7204133, 1060320051, 4, false)
+		 memory.write(5527777, 1036831949, 4, false)
+		 memory.write(4846974, 1053609165, 4, false)
+		 memory.write(4846757, 1053609165, 4, false)
+		 
+		 -- noshadows
+         memory.write(5497177, 233, 1, false)
+		 memory.write(5489067, 492560616, 4, false)
+		 memory.write(5489071, 0, 1, false)
+		 memory.write(6186889, 33807, 2, false)
+		 memory.write(7388587, 111379727, 4, false)
+		 memory.write(7388591, 0, 2, false)
+		 memory.write(7391066, 32081167, 4, false)
+		 memory.write(7391070, -1869611008, 4, false)
+	  end
+	  
 	  --- END init
 	  while true do
 	  wait(0)
@@ -1346,11 +1417,6 @@ function main()
 		end
 	  end
 	  
-	  -- copy Nockname to clipboard on click TAB
-	  --function sampev.onSendClickPlayer(id)
-         --setClipboardText(sampGetPlayerNickname(id))
-      --end
-	  
 	  -- chatfix
 	  if isKeyJustPressed(0x54) and not sampIsDialogActive() and not sampIsScoreboardOpen() and not isSampfuncsConsoleActive() then
 	     sampSetChatInputEnabled(true)
@@ -1382,9 +1448,8 @@ function main()
 	  
          if isKeyJustPressed(VK_J) and not sampIsChatInputActive() and not sampIsDialogActive() and not isPauseMenuActive() and not isSampfuncsConsoleActive() then sampSendChat("/gjktn") end
 	  
-         if isKeyJustPressed(VK_H) and isCharInAnyCar(PLAYER_PED) and not sampIsChatInputActive() and not sampIsDialogActive() and not isPauseMenuActive() and not isSampfuncsConsoleActive() then sampSendChat("/f") end
-	   
-         --if isKeyJustPressed(VK_N) and not sampIsChatInputActive() and not sampIsDialogActive() and not --isPauseMenuActive() and not isSampfuncsConsoleActive() then sampSendDialogResponse(1422, 0, 0, " --") end
+         if isKeyJustPressed(VK_H) and isCharInAnyCar(PLAYER_PED) and not sampIsChatInputActive() and not sampIsDialogActive() and not isPauseMenuActive() and not isSampfuncsConsoleActive() then  sampSendChat("/f") end
+		 
       end
 	  
 	  -- ALT+X
@@ -1405,6 +1470,7 @@ function main()
 		 end
 	  end
 	  
+	  -- Collision
 	  if disableObjectCollision then
          find_obj_x, find_obj_y, find_obj_z = getCharCoordinates(PLAYER_PED)
          result, objectHandle = findAllRandomObjectsInSphere(find_obj_x, find_obj_y, find_obj_z, 25, true)
