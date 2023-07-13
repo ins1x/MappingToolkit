@@ -4,7 +4,7 @@ script_description("Assistant for mappers and event makers on Absolute DM")
 script_dependencies('imgui', 'lib.samp.events', 'vkeys', 'memory')
 script_properties("work-in-pause")
 script_url("https://github.com/ins1x/AbsEventHelper")
-script_version("1.1")
+script_version("1.2")
 -- script_moonloader(16) moonloader v.0.26
 
 require 'lib.moonloader'
@@ -112,10 +112,9 @@ bind_adtextbuffer.v = u8(ini.binds.adtextbuffer)
 -- If the server changes IP, change it here
 local hostip = "193.84.90.23"
 local tpposX, tpposY, tpposZ
-local disablealleffects = false
 local disableObjectCollision = false
 local showobjects = false
-local removelogo = false
+streamedObjects = 0
 
 local objects_tab = 1
 local hotkeys_tab = 1
@@ -127,6 +126,7 @@ local vehinfomodelid = 0
 
 local objectsDel = {}
 local playersTable = {}
+playersTotal = 0
 
 VehicleNames = {
 	"Landstalker", "Bravura", "Buffalo", "Linerunner", "Pereniel", "Sentinel", "Dumper",
@@ -217,8 +217,12 @@ function imgui.OnDrawFrame()
 	  end
 	  
 	  local streamedplayers = sampGetPlayerCount(true) - 1
-	  imgui.Text(string.format(u8"Игроков в стриме: %i Транспорта: %i",
+	  imgui.Text(string.format(u8"Игроков в области стрима: %i Транспорта: %i",
 	  streamedplayers, getVehicleInStream()))
+	  
+	  if showobjects then
+	     imgui.Text(string.format(u8"Объектов в области в стрима: %i", streamedObjects))
+	  end
 	  
 	  if imgui.Checkbox(u8("Отключить коллизию у объектов"), checkbox_objectcollision) then 
 	     if checkbox_objectcollision.v then
@@ -768,35 +772,40 @@ function imgui.OnDrawFrame()
 	   
 	   if imgui.Button(u8"Обновить список игроков", imgui.ImVec2(250, 25)) then
 		  playersTable = {}
+		  playersTotal = 0
 		  
 		  for k, v in ipairs(getAllChars()) do
 			 local res, id = sampGetPlayerIdByCharHandle(v)
 			 if res then
 				table.insert(playersTable, id)
+				playersTotal = playersTotal + 1
 			 end
 		  end
 	   end
 	   
 	   imgui.SameLine()
 	   if imgui.Button(u8"Сохранить список игроков", imgui.ImVec2(250, 25)) then
-	      ptablefile = io.open(getGameDirectory().."/moonloader/resource/abseventhelper/players.txt", "w")
+	      ptablefile = io.open(getGameDirectory().."/moonloader/resource/abseventhelper/players.txt", "a")
+		  ptablefile:write("\n")
+		  ptablefile:write(string.format("%s \n", os.date("%d.%m.%y %H:%M:%S")))
+		  local counter = 0
 	      for k, v in pairs(playersTable) do
-              ptablefile:write(string.format("[%d]%s lvl: %i \n",
-			  v, sampGetPlayerNickname(v), sampGetPlayerScore(v) ))
+             ptablefile:write(string.format("%d [id:%d] %s lvl: %i \n",
+			 counter + 1, v, sampGetPlayerNickname(v), sampGetPlayerScore(v)))
+			 counter = counter + 1
 		  end
+		  ptablefile:write(string.format("Total: %d \n", counter))
 		  ptablefile:close()
-		  printStringNow("Saved moonloader/resource/abseventhelper/players.txt", 4000)
+		  printStringNow("Saved. moonloader/resource/abseventhelper/players.txt", 4000)
 	   end
 	   
-	   imgui.Text(u8"Нажмите на id чтобы скопировать в буффер id игрока")
-	   imgui.Text(u8"Нажмите на никнейм чтобы открыть меню игрока")
 	   imgui.Text(u8" ")
 	   
 	   imgui.Separator()
 	   imgui.Columns(5)
-	   imgui.Text("[ID]")
+       imgui.TextQuestion("[ID]", u8"Нажмите на id чтобы скопировать в буффер id игрока")
 	   imgui.NextColumn()
-	   imgui.Text("Nickname")
+       imgui.TextQuestion("Nickname", u8"Нажмите на никнейм чтобы открыть меню игрока")
 	   imgui.NextColumn()
 	   imgui.Text("Level")
 	   imgui.NextColumn()
@@ -844,7 +853,8 @@ function imgui.OnDrawFrame()
 		  imgui.Columns(1)
           imgui.Separator()
 	   end
-		  
+	
+	   imgui.Text(u8"Всего игроков: ".. playersTotal)
 	   imgui.End()
 	end
 	
@@ -1626,12 +1636,14 @@ function main()
 	  
 	  -- Objects render
 	  if showobjects and not isPauseMenuActive() then
+	     streamedObjects = 0
 	     for _, v in pairs(getAllObjects()) do
 		    if isObjectOnScreen(v) then
 			   local _, x, y, z = getObjectCoordinates(v)
 			   local x1, y1 = convert3DCoordsToScreen(x,y,z)
 			   local model = getObjectModel(v)
 			   renderFontDrawText(font, "{80FFFFFF}" .. model, x1, y1, -1)
+			   streamedObjects = streamedObjects + 1
 			end
 		 end
 	  end
@@ -1660,9 +1672,10 @@ function sampev.onPlayerQuit(id, reason)
    end
    
    for key, value in ipairs(playersTable) do
-	   if key then 
-	      sampAddChatMessage("Игрок " .. nick .. " вышел по причине " .. reas, 0xFFFF00)
-	   end
+	  if value == id then 
+	     sampAddChatMessage("Игрок " .. nick .. " вышел по причине: " .. reas, 0x00FF00)
+		 table.remove(playersTable, key)
+	  end
    end
 end
 
