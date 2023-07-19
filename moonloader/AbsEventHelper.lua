@@ -1,10 +1,10 @@
 script_author("1NS")
 script_name("Absolute Events Helper")
 script_description("Assistant for mappers and event makers on Absolute DM")
-script_dependencies('imgui', 'lib.samp.events', 'vkeys', 'memory')
+script_dependencies('imgui', 'lib.samp.events', 'vkeys')
 script_properties("work-in-pause")
 script_url("https://github.com/ins1x/AbsEventHelper")
-script_version("1.3")
+script_version("1.4")
 -- script_moonloader(16) moonloader v.0.26
 
 require 'lib.moonloader'
@@ -31,6 +31,8 @@ local ini = inicfg.load({
 	  showhud = true,
 	  nopostfx = false,
 	  noabsunload = false,
+	  nogametext = false,
+	  addonupgrades = true,
 	  drawdist = "450",
       fog = "200",
    },
@@ -55,7 +57,7 @@ function save()
 end
 ---------------------------------------------------------
 
-font = renderCreateFont("Arial", 8, 5)
+objectsrenderfont = renderCreateFont("Arial", 8, 5)
 local sizeX, sizeY = getScreenResolution()
 local v = nil
 local color = imgui.ImFloat4(1, 0, 0, 1)
@@ -89,6 +91,7 @@ local checkbox = {
    showhud = imgui.ImBool(ini.settings.showhud),
    nopostfx = imgui.ImBool(ini.settings.nopostfx),
    noabsunload = imgui.ImBool(ini.settings.noabsunload),
+   addonupgrades = imgui.ImBool(ini.settings.addonupgrades),
    showobjects = imgui.ImBool(false),
    objectcollision = imgui.ImBool(false)
 }
@@ -96,6 +99,12 @@ local checkbox = {
 local slider = {
    fog = imgui.ImInt(ini.settings.fog),
    drawdist = imgui.ImInt(ini.settings.drawdist)
+}
+
+local tabmenu = {
+   objects = 1,
+   hotkeys = 1,
+   cmds = 1
 }
 
 local textbuffer = {
@@ -114,12 +123,6 @@ local textbuffer = {
    note = imgui.ImBuffer(1024)
 }
 
-local tabmenu = {
-   objects = 1,
-   hotkeys = 1,
-   cmds = 1
-}
-
 textbuffer.bind1.v = u8(ini.binds.textbuffer1)
 textbuffer.bind2.v = u8(ini.binds.textbuffer2)
 textbuffer.bind3.v = u8(ini.binds.textbuffer3)
@@ -135,6 +138,7 @@ textbuffer.bindad.v = u8(ini.binds.adtextbuffer)
 local hostip = "193.84.90.23"
 local tpposX, tpposY, tpposZ
 local disableObjectCollision = false
+local prepareTeleport = false
 local showobjects = false
 streamedObjects = 0
 
@@ -453,10 +457,10 @@ function imgui.OnDrawFrame()
          imgui.Text(u8"Поверхности: 19531, 4242, 4247, 8171, 5004, 16685")
          imgui.Text(u8"Стены: 19355, 19435(маленькая), 19447(длинная), 19391(дверь), 19408(окно)")
 	  elseif tabmenu.objects == 2 then
-		 imgui.Text(u8"Коровка 19833, Веревка 19087, Веревка длин. 19089")
+		 imgui.Text(u8"Веревка 19087, Веревка длин. 19089")
          imgui.Text(u8"Стекло (Разрушаемое) 3858, стекло от травы 3261, сено 3374")
-         imgui.Text(u8"Факел с черепом 3524, факел 3461, красный стоп сигнал 3877")
-         imgui.Text(u8"Попуг 19079, восточная лампа 3534")
+         imgui.Text(u8"Факел с черепом 3524, факел 3461, красный фонарь 3877")
+         imgui.Text(u8"Попуг 19079, коровка 19833, восточная лампа 3534")
          imgui.Text(u8"Водяная бочка 1554, ржавая бочка 1217, взрыв. бочка 1225")
          imgui.Text(u8"Черная бездна 13656, стеклянный блок 18887")
          imgui.Text(u8"Партикл воды с колизией 19603, большой 19604")
@@ -1254,14 +1258,23 @@ function imgui.OnDrawFrame()
        imgui.SameLine()
        imgui.TextQuestion("( ? )", u8"Восстанавливает стандартные горячие клавиши доступные с samp addon")
 
-       if imgui.Checkbox(u8("Включить фиксы samp addon"), checkbox.addonfixes) then 
+       if imgui.Checkbox(u8("Включить фиксы как в samp addon"), checkbox.addonfixes) then 
 	     if checkbox.addonfixes.v then
 	         ini.settings.addonfixes = not ini.settings.addonfixes
 			 save()
 	      end
 	   end
        imgui.SameLine()
-       imgui.TextQuestion("( ? )", u8"Включает фиксы как в samp аддоне")
+       imgui.TextQuestion("( ? )", u8"Включает некоторые фиксы и буст FPS как в samp аддоне")
+	   
+	   if imgui.Checkbox(u8("Включить апгрейды samp addon"), checkbox.addonupgrades) then 
+	     if checkbox.addonupgrades.v then
+	         ini.settings.addonupgrades = not ini.settings.addonupgrades
+			 save()
+	      end
+	   end
+       imgui.SameLine()
+       imgui.TextQuestion("( ? )", u8"Включает улучшения бесконечного бега, бег в интерьере, анти падение с байка")
 	   
 	   if imgui.Checkbox(u8("Выгружать скрипт на других серверах"), checkbox.noabsunload) then
 	      if checkbox.noabsunload.v then
@@ -1333,16 +1346,6 @@ function imgui.OnDrawFrame()
 		  sampAddChatMessage("Для запуска используйте комбинацию клавиш CTRL + R.", -1)
 		  thisScript():unload()
 	   end
-       
-	   if imgui.Button(u8"Проверить обновления", imgui.ImVec2(200, 25)) then
-	      os.execute('explorer "https://github.com/ins1x/AbsEventHelper"')
-		  printStringNow("Url opened in default webbrowser", 3000)
-	   end
-	   
-	   -- imgui.SameLine()
-	   -- if imgui.Button(u8"Обновить конфиг", imgui.ImVec2(200, 25)) then
-		  -- inicfg.save(ini, configIni)
-	   -- end
 	   
        imgui.End()
 	end
@@ -1371,10 +1374,12 @@ function imgui.OnDrawFrame()
 	  
 	   if imgui.Button(u8"Телепорт по кординатам", imgui.ImVec2(250, 25)) then
 		  if tpposX then
+		     prepareTeleport = true
 	         sampSendChat(string.format("/ngr %f %f %f", tpposX, tpposY, tpposZ), 0x0FFFFFF)
-		     sampAddChatMessage(string.format("Вы были телепортированны на сохранненые координаты %f %f %f"
+		     sampAddChatMessage(string.format("Телепорт на координаты: %.1f %.1f %.1f"
 			,tpposX, tpposY, tpposZ), 0x0FFFFFF)
 		  else
+		     prepareTeleport = false
 		     sampAddChatMessage("Координаты не были сохранены. Нажмите коорд", 0x0FFFFFF)
 		  end
 	   end
@@ -1393,6 +1398,7 @@ function imgui.OnDrawFrame()
        imgui.Begin(u8"О скрипте v".. thisScript().version, dialog.credits)
        imgui.Text(u8"Автор: 1NS (Git: in1x)")
        imgui.Text(u8"Помошник для мапперов и организаторов мероприятий на Absolute DM")
+	   imgui.Text(u8"Скрипт распостраняется с открытым исходным кодом")
 	   imgui.TextColoredRGB("Homepage: {007DFF}github.com/ins1x/AbsEventHelper")
 	   if imgui.IsItemClicked() then
 	  	  setClipboardText("github.com/ins1x/AbsEventHelper")
@@ -1432,10 +1438,12 @@ function imgui.OnDrawFrame()
 	   imgui.InputTextMultiline('##bufftext', textbuffer.note, imgui.ImVec2(285, 125))
 
 	   if imgui.Button(u8"Сохранить", imgui.ImVec2(85, 25)) then
-	      file = io.open(getGameDirectory().."//moonloader//resource//abseventhelper//notes.txt", "w")
-          file:write(textbuffer.note.v)
-          file:close()
-		  printStringNow("Saved moonloader/resource/abseventhelper/notes.txt", 4000)
+	      notefile = io.open(getGameDirectory().."//moonloader//resource//abseventhelper//notes.txt", "a")
+		  notefile:write("\n")
+		  notefile:write(string.format("%s \n", os.date("%d.%m.%y %H:%M:%S")))
+          notefile:write(textbuffer.note.v)
+          notefile:close()
+		  printStringNow("Saved moonloader/resource/abseventhelper/notes.txt", 3000)
 	   end
 	   
 	   imgui.SameLine()
@@ -1540,15 +1548,20 @@ function main()
 		 memory.write(0x555854, 0x90909090, 4, false)
          memory.write(0x555858, 0x90, 1, false)
 		 
-		 -- interior run
-		 memory.write(5630064, -1027591322, 4, false)
-         memory.write(5630068, 4, 2, false)
-		 
 		 -- fixing spawn with a bottle
 		 memory.fill(0x4217F4, 0x90, 21, false)
          memory.fill(0x4218D8, 0x90, 17, false)
          memory.fill(0x5F80C0, 0x90, 10, false)
          memory.fill(0x5FBA47, 0x90, 10, false)
+	  end
+	  
+	  if(ini.settings.addonupgrades) then
+	  	 -- interior run
+		 memory.write(5630064, -1027591322, 4, false)
+         memory.write(5630068, 4, 2, false)
+		 
+		 -- infinity run
+		 memory.setint8(0xB7CEE4, 1)
 	  end
 	  
 	  if(ini.settings.noeffects) then
@@ -1581,6 +1594,7 @@ function main()
 	  if(ini.settings.nopostfx) then
 	     memory.fill(0x53EAD3, 0x90, 5, true)
 	  end
+	  
 	  --- END init
 	  while true do
 	  wait(0)
@@ -1651,6 +1665,18 @@ function main()
 	     sampSetChatInputEnabled(true)
 	  end
 	  
+	  -- nobike
+	  if ini.settings.addonupgrades then
+	     if isCharInAnyCar(PLAYER_PED) then
+            setCharCanBeKnockedOffBike(PLAYER_PED, true)
+         else
+            setCharCanBeKnockedOffBike(PLAYER_PED, false)
+         end
+         if isCharInAnyCar(PLAYER_PED) and isCarInWater(storeCarCharIsInNoSave(PLAYER_PED)) then
+            setCharCanBeKnockedOffBike(PLAYER_PED, false)
+         end
+	  end
+	  
 	  -- antiafk 
       if ini.settings.antiafk then
          writeMemory(7634870, 1, 1, 1)
@@ -1663,7 +1689,7 @@ function main()
          memory.hex2bin('0F 84 7B 01 00 00', 7623723, 8)
          memory.hex2bin('50 51 FF 15 00 83 85 00', 5499528, 6)
 	  end
-	  
+	
 	  -- Absolute Play Key Binds
 	  -- Sets hotkeys that are only available with the samp addon
 	  if ini.settings.keybinds then
@@ -1695,7 +1721,7 @@ function main()
 			   local _, x, y, z = getObjectCoordinates(v)
 			   local x1, y1 = convert3DCoordsToScreen(x,y,z)
 			   local model = getObjectModel(v)
-			   renderFontDrawText(font, "{80FFFFFF}" .. model, x1, y1, -1)
+			   renderFontDrawText(objectsrenderfont, "{80FFFFFF}" .. model, x1, y1, -1)
 			   streamedObjects = streamedObjects + 1
 			end
 		 end
@@ -1746,7 +1772,32 @@ function sampev.onServerMessage(color, text)
 	  if text:find("выхода из читмира") then
 		 return false
 	  end
+	  
+	  if text:find("Ни 1 клан не создан") then
+		 return false
+	  end
    end
+   
+   -- in-game mapeditor errors solutions tips and fix
+   if text:find("У тебя нет прав использовать эту команду") and prepareTeleport then
+	  sampAddChatMessage("В мире телепортация отключена", 0x00FF00)
+	  return false
+   end
+   
+   if text:find("Установи 0.3DL чтобы включать полёт в этом месте") then
+	  sampAddChatMessage("Необходимо уходить в полет с другой точки где мало объектов рядом (выйти из зоны стрима)", 0x00FF00)
+   end
+   
+   if text:find("Ты уже находишься в редакторе миров") then
+	  sampSendChat("/exit")
+   end
+   
+   if text:find("В этой области создано слишком много объектов") then
+	  sampAddChatMessage("Вы создали много объектов в одной области.", 0x00FF00)
+	  sampAddChatMessage("В радиусе 150 метров нельзя создавать больше 200 объектов.", 0x00FF00)
+	  return false
+   end
+   
 end
 
 function sampev.onScriptTerminate(script, quitGame)
@@ -1758,6 +1809,11 @@ function sampev.onScriptTerminate(script, quitGame)
     end
 end
 
+function sampev.onDisplayGameText(style, time, text)
+   if ini.settings.nogametext then 
+      return false
+   end
+end
 -- END hooks
 
 function direction()
