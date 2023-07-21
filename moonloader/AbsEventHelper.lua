@@ -4,12 +4,11 @@ script_description("Assistant for mappers and event makers on Absolute DM")
 script_dependencies('imgui', 'lib.samp.events', 'vkeys')
 script_properties("work-in-pause")
 script_url("https://github.com/ins1x/AbsEventHelper")
-script_version("1.4")
+script_version("1.5")
 -- script_moonloader(16) moonloader v.0.26
 
 require 'lib.moonloader'
 local keys = require 'vkeys'
-local tag = "{00BFFF}Absolute {FFD700}Events {FFFFFF}Helper"
 local sampev = require 'lib.samp.events'
 local imgui = require 'imgui'
 local memory = require 'memory'
@@ -33,6 +32,8 @@ local ini = inicfg.load({
 	  noabsunload = false,
 	  nogametext = false,
 	  addonupgrades = true,
+	  autoupdplayerstable = false,
+	  disconnectreminder = true,
 	  drawdist = "450",
       fog = "200",
    },
@@ -79,6 +80,7 @@ local dialog = {
    players = imgui.ImBool(false),
    cmds = imgui.ImBool(false),
    coords = imgui.ImBool(false),
+   playermenu = imgui.ImBool(false),
    faq = imgui.ImBool(false)
 }
 
@@ -92,7 +94,10 @@ local checkbox = {
    nopostfx = imgui.ImBool(ini.settings.nopostfx),
    noabsunload = imgui.ImBool(ini.settings.noabsunload),
    addonupgrades = imgui.ImBool(ini.settings.addonupgrades),
+   autoupdplayerstable = imgui.ImBool(ini.settings.autoupdplayerstable),
+   disconnectreminder = imgui.ImBool(ini.settings.disconnectreminder),
    showobjects = imgui.ImBool(false),
+   vehstream = imgui.ImBool(false),
    objectcollision = imgui.ImBool(false)
 }
 
@@ -136,10 +141,14 @@ textbuffer.bindad.v = u8(ini.binds.adtextbuffer)
 
 -- If the server changes IP, change it here
 local hostip = "193.84.90.23"
+local teamtag = "brutal"
 local tpposX, tpposY, tpposZ
 local disableObjectCollision = false
 local prepareTeleport = false
 local showobjects = false
+local disconnectremind = true
+local showDisconnectedTeammates = true
+local chosenplayer = 0
 streamedObjects = 0
 
 local fps = 0
@@ -148,6 +157,9 @@ local vehinfomodelid = 0
 
 local objectsDel = {}
 local playersTable = {}
+local teammatesTable = {}
+local vehiclesTable = {}
+vehiclesTotal = 0
 playersTotal = 0
 
 VehicleNames = {
@@ -210,6 +222,7 @@ function imgui.OnDrawFrame()
 		 dialog.notepad.v = false
 		 dialog.fonts.v = false
 		 dialog.players.v  = false
+		 dialog.playermenu.v  = false
 		 dialog.cmds.v  = false
 		 dialog.coords.v  = false
 		 dialog.faq.v  = false
@@ -306,7 +319,7 @@ function imgui.OnDrawFrame()
 	     imgui.TextColoredRGB("{FF0000}Некоторые функции будут недоступны")
 	     imgui.TextColoredRGB("{FF0000}Скрипт предназначен для работы на Absolute Play DM")
 	  end
-	  
+			 
       imgui.End()
    end
    
@@ -805,7 +818,7 @@ function imgui.OnDrawFrame()
 
 	   imgui.End()
 	end
-	
+
 	if dialog.players.v then
 	   imgui.SetNextWindowPos(imgui.ImVec2(sizeX / 4, sizeY / 4),
 	   imgui.Cond.FirstUseEver, imgui.ImVec2(0.5, 0.5))
@@ -815,7 +828,7 @@ function imgui.OnDrawFrame()
 	   imgui.Text(u8"Перед началом мероприятия обновите список игроков, и сохраните")
 	   
 	   if imgui.Button(u8"Обновить список игроков", imgui.ImVec2(250, 25)) then
-		  playersTable = {}
+		  playersTable = {}		  
 		  playersTotal = 0
 		  
 		  for k, v in ipairs(getAllChars()) do
@@ -843,13 +856,41 @@ function imgui.OnDrawFrame()
 		  printStringNow("Saved. moonloader/resource/abseventhelper/players.txt", 4000)
 	   end
 	   
-	   imgui.Text(u8" ")
+	   imgui.TextColoredRGB("{FF0000}Красным{CDCDCD} в таблице отмечены подозрительные игроки (малый лвл, большой пинг)")
+	  
+       -- if imgui.Checkbox(u8("Показывать информацию о транспорте игрока"), checkbox.vehhealth) then
+	   -- end
+			 
+	   imgui.Checkbox(u8("Автоообновление списка игроков"), checkbox.autoupdplayerstable)
 	   
+	   if checkbox.autoupdplayerstable.v then
+	   	  playersTable = {}		  
+		  playersTotal = 0
+		  
+		  for k, v in ipairs(getAllChars()) do
+			 local res, id = sampGetPlayerIdByCharHandle(v)
+			 if res then
+				table.insert(playersTable, id)
+				playersTotal = playersTotal + 1
+			 end
+		  end
+	   end
+	   
+	   imgui.SameLine()
+	   if imgui.Checkbox(u8("Уведомлять о дисконнекте игрока"), checkbox.disconnectreminder) then
+	      if checkbox.disconnectreminder.v then
+	         disconnectremind = true
+		  else
+		     disconnectremind = false
+	      end
+	   end
+	   
+	   imgui.Text(u8" ")
 	   imgui.Separator()
 	   imgui.Columns(5)
        imgui.TextQuestion("[ID]", u8"Нажмите на id чтобы скопировать в буффер id игрока")
 	   imgui.NextColumn()
-       imgui.TextQuestion("Nickname", u8"Нажмите на никнейм чтобы открыть меню игрока")
+	   imgui.TextQuestion("Nickname", u8"Нажмите на никнейм чтобы открыть меню игрока")
 	   imgui.NextColumn()
 	   imgui.Text("Level")
 	   imgui.NextColumn()
@@ -881,24 +922,30 @@ function imgui.OnDrawFrame()
 		  end
 		  imgui.SetColumnWidth(-1, 200)
 		  imgui.NextColumn()
-		  if(score < 20) then
+		  if (score < 20) then
 		     imgui.TextColoredRGB(string.format("{FF0000}%i", score))
 		  else 
 		     imgui.TextColoredRGB(string.format("%i", score))
 	      end
+		  imgui.SetColumnWidth(-1, 60)
 		  imgui.NextColumn()
-		  imgui.TextColoredRGB(string.format("%i (%i)", health, armor))
+		  if (health <= 100) then
+		     imgui.TextColoredRGB(string.format("%i (%i)", health, armor))
+		  else
+		     imgui.TextColoredRGB(string.format("{FF0000}%i (%i)", health, armor))
+		  end
 		  imgui.NextColumn()
-		  if(ping > 90) then
+		  if (ping > 90) then
 		     imgui.TextColoredRGB(string.format("{FF0000}%i", ping))
 		  else
 		     imgui.TextColoredRGB(string.format("%i", ping))
 		  end
+		  imgui.NextColumn()
 		  imgui.Columns(1)
           imgui.Separator()
 	   end
 	
-	   imgui.Text(u8"Всего игроков: ".. playersTotal)
+	   imgui.Text(u8"Всего игроков в таблице: ".. playersTotal)
 	   imgui.End()
 	end
 	
@@ -909,13 +956,33 @@ function imgui.OnDrawFrame()
 	   imgui.Begin(u8"Транспорт", dialog.vehs)
 	   
 	   -- https://wiki.multitheftauto.com/wiki/Vehicle_IDs
-	   imgui.InputText("##BindVehs", textbuffer.vehiclename)
+	   if imgui.InputText("##BindVehs", textbuffer.vehiclename) then 
+	      for k, vehname in ipairs(VehicleNames) do
+		     if vehname:lower():find(u8:decode(textbuffer.vehiclename.v:lower())) then
+			    vehinfomodelid = 399+k
+			 end
+		  end
+	   end 
 	   
 	   imgui.SameLine()
-	   imgui.Text(string.format(u8"ID: %i", vehinfomodelid))
+	   if textbuffer.vehiclename.v == "" then
+	      imgui.Text(u8" ")
+	   else
+	      imgui.Text(string.format(u8"ID: %i", vehinfomodelid))
+	   end
+	   imgui.SameLine()
+	   imgui.TextQuestion("( ? )", u8"Введите имя транспорта, например Infernus")
 	   
-	   local closestcarid = getClosestCarId()
-	   imgui.Text(string.format(u8"Ближайший транспорт: %i (внутренний ID)", closestcarid))
+	   local closestcarhandle, closestcarid = getClosestCar()
+	   if closestcarhandle then
+	      local closestcarmodel = getCarModel(closestcarhandle)
+	      imgui.Text(string.format(u8"Ближайший транспорт: %s [id: %i] (%i)",
+	      VehicleNames[closestcarmodel-399], closestcarmodel, closestcarid))
+	      imgui.SameLine()
+	      imgui.TextQuestion("( ? )", u8"В скобках указан внутренний ID (/dl)")
+	   else
+	      imgui.Text(u8"Нет транспорта в зоне стрима")
+	   end
 	   
 	   if isCharInAnyCar(PLAYER_PED) then 
           local carhandle = storeCarCharIsInNoSave(PLAYER_PED)
@@ -929,8 +996,9 @@ function imgui.OnDrawFrame()
 		  for k, vehname in ipairs(VehicleNames) do
 		     if vehname:lower():find(u8:decode(textbuffer.vehiclename.v:lower())) then
 			    vehinfomodelid = 399+k
-				setClipboardText(vehinfomodelid)
-			    printStringNow(vehinfomodelid, 1000)
+				if vehinfomodelid < 611 or vehinfomodelid > 1 and textbuffer.vehiclename.v ~= "" then
+ 				   setClipboardText(vehinfomodelid)
+				end
 			 end 
 		  end
 	   end
@@ -948,6 +1016,53 @@ function imgui.OnDrawFrame()
 	   
 	   if imgui.Button(u8"Заказать машину из списка", imgui.ImVec2(320, 25)) then
 	      if not sampIsChatInputActive() and not sampIsDialogActive() and not isPauseMenuActive() and not isSampfuncsConsoleActive() then sampSendChat("/vfibye2") end
+	   end
+	   
+	   if imgui.Checkbox(u8("Показать список транспорта в стриме"), checkbox.vehstream) then
+	      vehiclesTable = {}
+		  vehiclesTotal = 0
+		  
+          for k, v in ipairs(getAllVehicles()) do
+             local streamed, id = sampGetVehicleIdByCarHandle(v)
+			 if streamed then
+                table.insert(vehiclesTable, v)
+				vehiclesTotal = vehiclesTotal + 1
+		     end
+          end
+	   end
+	   
+	   if checkbox.vehstream.v then
+
+		  imgui.Separator()
+	      imgui.Columns(3)
+		  imgui.TextQuestion("ID", u8"Внутренний ID (/dl)")
+		  imgui.NextColumn()
+		  imgui.Text("Vehicle")
+		  imgui.NextColumn()
+		  imgui.Text("Health")
+		  imgui.NextColumn()
+		  imgui.Columns(1)
+	      imgui.Separator()
+		  
+		  for k, v in ipairs(getAllVehicles()) do
+			 local health = getCarHealth(v)
+			 local carmodel = getCarModel(v)
+			 local streamed, id = sampGetVehicleIdByCarHandle(v)
+			 
+			 imgui.Columns(3)
+			 imgui.TextColoredRGB(string.format("%i", id))
+			 imgui.SetColumnWidth(-1, 50)
+			 imgui.NextColumn()
+			 imgui.TextColoredRGB(string.format("%s", VehicleNames[carmodel-399]))
+			 imgui.NextColumn()
+			 imgui.TextColoredRGB(string.format("%i", health))
+			 imgui.Columns(1)
+			 imgui.Separator()
+          end
+		  
+		  if checkbox.vehstream.v then
+	         imgui.Text(u8"Всего транспорта в таблице: ".. vehiclesTotal)
+	      end
 	   end
 	   
 	   imgui.End()
@@ -1025,6 +1140,8 @@ function imgui.OnDrawFrame()
 		  imgui.TextColoredRGB("{00FF00}/players{FFFFFF} — таблица игроков")
 		  imgui.TextColoredRGB("{00FF00}/vehicles{FFFFFF} — таблица транспорта")
 		  imgui.TextColoredRGB("{00FF00}/onjectrender{FFFFFF} — рендер объектов")
+		  imgui.TextColoredRGB("{00FF00}/jump{FFFFFF} — прыгнуть вперед")
+		  imgui.TextColoredRGB("{00FF00}/slap{FFFFFF} — слапнуть(подбросить) себя")
 		  imgui.Text(" ")
 	   end
 	   
@@ -1267,7 +1384,7 @@ function imgui.OnDrawFrame()
        imgui.SameLine()
        imgui.TextQuestion("( ? )", u8"Включает некоторые фиксы и буст FPS как в samp аддоне")
 	   
-	   if imgui.Checkbox(u8("Включить апгрейды samp addon"), checkbox.addonupgrades) then 
+	   if imgui.Checkbox(u8("Включить апгрейды как в samp addon"), checkbox.addonupgrades) then 
 	     if checkbox.addonupgrades.v then
 	         ini.settings.addonupgrades = not ini.settings.addonupgrades
 			 save()
@@ -1283,7 +1400,7 @@ function imgui.OnDrawFrame()
 	      end
 	   end
        imgui.SameLine()
-       imgui.TextQuestion("( ? )", u8"Выгружает скрипт при аодключении не на Absolute DM")
+       imgui.TextQuestion("( ? )", u8"Выгружает скрипт при подключении не на Absolute DM")
 	   
 	   if imgui.Checkbox(u8"Отключить эффекты", checkbox.noeffects) then
 		  if checkbox.noeffects.v then
@@ -1463,7 +1580,7 @@ end
 function main()
    if not isSampLoaded() or not isSampfuncsLoaded() then return end
       while not isSampAvailable() do wait(100) end
-	  sampAddChatMessage("" .. tag, 0xFFFFFF)
+	  sampAddChatMessage("{00BFFF}Absolute {FFD700}Events {FFFFFF}Helper", 0xFFFFFF)
 	  local ip, port = sampGetCurrentServerAddress()
 	  if not ip:find(hostip) then
 	     -- sampAddChatMessage("Keybinds work only Absolute DM", 0x00FF0000)
@@ -1521,6 +1638,40 @@ function main()
          showobjects = not showobjects
 	  end)
       
+	  sampRegisterChatCommand("slap", function ()
+	     if sampIsLocalPlayerSpawned() then
+            local posX, posY, posZ = getCharCoordinates(PLAYER_PED)
+		    setCharCoordinates(PLAYER_PED, posX, posY, posZ+1.0)
+		 end
+	  end)
+	  
+	  sampRegisterChatCommand("jump", function ()
+	     if sampIsLocalPlayerSpawned() then
+            local posX, posY, posZ = getCharCoordinates(PLAYER_PED)
+			local angle = math.ceil(getCharHeading(PLAYER_PED))
+			local dist = 2.0
+			if angle then
+			   if (angle >= 0 and angle <= 30 or (angle <= 360 and angle >= 330)) then
+				  setCharCoordinates(PLAYER_PED, posX, posY+dist, posZ)
+			   elseif (angle > 80 and angle < 100) then
+				  setCharCoordinates(PLAYER_PED, posX-dist, posY+dist, posZ)
+			   elseif (angle > 260 and angle < 280) then
+				  setCharCoordinates(PLAYER_PED, posX+dist, posY, posZ)
+			   elseif (angle >= 170 and angle <= 190) then
+				  setCharCoordinates(PLAYER_PED, posX-dist, posY-dist, posZ)
+			   elseif (angle >= 31 and angle <= 79) then
+				  setCharCoordinates(PLAYER_PED, posX, posY-dist, posZ)				
+			   elseif (angle >= 191 and angle <= 259) then
+				  setCharCoordinates(PLAYER_PED, posX+dist, posY-dist, posZ)
+			   elseif (angle >= 81 and angle <= 169) then
+				  setCharCoordinates(PLAYER_PED, posX-dist, posY, posZ)
+			   elseif (angle >= 259 and angle <= 329) then
+				  setCharCoordinates(PLAYER_PED, posX+dist, posY+dist, posZ)
+			   end
+		    end
+		 end
+	  end)
+	  
 	  -- set drawdist and figdist
 	  memory.setfloat(12044272, ini.settings.drawdist, true)
       memory.setfloat(13210352, ini.settings.fog, true)
@@ -1742,6 +1893,15 @@ function main()
    end
 end
 
+function sampev.onPlayerJoin(id, color, isNpc, nickname)
+	--(string.format("Игрок %s [%d] подключился к серверу.", nickname, id))
+	if showDisconnectedTeammates then
+	   if nickname:lower():find(teamtag) then
+          table.insert(teammatesTable, id)
+	   end
+	end
+end
+
 function sampev.onPlayerQuit(id, reason)
    local nick = sampGetPlayerNickname(id)
    
@@ -1750,25 +1910,35 @@ function sampev.onPlayerQuit(id, reason)
    elseif reason == 2 then reas = 'Вышло время подключения'
    end
    
-   for key, value in ipairs(playersTable) do
-	  if value == id then 
-	     sampAddChatMessage("Игрок " .. nick .. " вышел по причине: " .. reas, 0x00FF00)
-		 table.remove(playersTable, key)
+   if disconnectremind then
+      for key, value in ipairs(playersTable) do
+	     if value == id then 
+	        sampAddChatMessage("Игрок " .. nick .. " вышел по причине: " .. reas, 0x00FF00)
+		    table.remove(playersTable, key)
+		 end
+	  end
+   end
+   
+   if showDisconnectedTeammates then
+      for key, value in ipairs(teammatesTable) do
+	     if value == id then 
+	        sampAddChatMessage("Соклан " .. nick .. " вышел по причине: " .. reas, 0x00FFFF)
+		    table.remove(teammatesTable, key)
+		 end
 	  end
    end
 end
 
 function sampev.onServerMessage(color, text)
    if ini.settings.chatfilter then 
-      if text:find("подключился к серверу") or text:find("вышел с сервера") then
-		 --if text:find("соклан") then return true	end
+	  if text:find("подключился к серверу") or text:find("вышел с сервера") then
 		 chatlog = io.open(getFolderPath(5).."\\GTA San Andreas User Files\\SAMP\\chatlog.txt", "a")
 		 chatlog:write(os.date("[%H:%M:%S] ")..text)
 		 chatlog:write("\n")
-	     chatlog:close()
-	     return false
+		 chatlog:close()
+		 return false
 	  end
-		
+	  
 	  if text:find("выхода из читмира") then
 		 return false
 	  end
@@ -1818,26 +1988,26 @@ end
 
 function direction()
    if sampIsLocalPlayerSpawned() then
-      local angel = math.ceil(getCharHeading(PLAYER_PED))
-      if angel then
-         if (angel >= 0 and angel <= 30) or (angel <= 360 and angel >= 330) then
+      local angle = math.ceil(getCharHeading(PLAYER_PED))
+      if angle then
+         if (angle >= 0 and angle <= 30) or (angle <= 360 and angle >= 330) then
             return u8"Север"
-         elseif (angel > 80 and angel < 100) then
+         elseif (angle > 80 and angle < 100) then
             return u8"Запад"
-         elseif (angel > 260 and angel < 280) then
+         elseif (angle > 260 and angle < 280) then
             return u8"Восток"
-         elseif (angel >= 170 and angel <= 190) then
+         elseif (angle >= 170 and angle <= 190) then
             return u8"Юг"
-         elseif (angel >= 31 and angel <= 79) then
+         elseif (angle >= 31 and angle <= 79) then
             return u8"Северо-запад"
-         elseif (angel >= 191 and angel <= 259) then
+         elseif (angle >= 191 and angle <= 259) then
             return u8"Юго-восток"
-         elseif (angel >= 81 and angel <= 169) then
+         elseif (angle >= 81 and angle <= 169) then
             return u8"Юго-запад"
-         elseif (angel >= 259 and angel <= 329) then
+         elseif (angle >= 259 and angle <= 329) then
             return u8"Северо-восток"
          else
-            return angel
+            return angle
          end
       else
          return u8"Неизвестно"
@@ -1847,9 +2017,11 @@ function direction()
    end
 end
 
-function getClosestCarId()
+function getClosestCar()
+   -- return 2 values: car handle and car id
    local minDist = 9999
    local closestId = -1
+   local closestHandle = false
    local x, y, z = getCharCoordinates(PLAYER_PED)
    for i, k in ipairs(getAllVehicles()) do
       local streamed, carId = sampGetVehicleIdByCarHandle(k)
@@ -1859,10 +2031,11 @@ function getClosestCarId()
          if dist < minDist then
             minDist = dist
             closestId = carId
+			closestHandle = k
          end
       end
    end
-   return closestId
+   return closestHandle, closestId
 end
 
 function getVehicleInStream()
