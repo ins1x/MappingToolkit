@@ -4,7 +4,7 @@ script_description("Assistant for mappers and event makers on Absolute DM")
 script_dependencies('imgui', 'lib.samp.events', 'vkeys')
 script_properties("work-in-pause")
 script_url("https://github.com/ins1x/AbsEventHelper")
-script_version("1.5")
+script_version("2.0")
 -- script_moonloader(16) moonloader v.0.26
 
 require 'lib.moonloader'
@@ -22,16 +22,8 @@ local configIni = "AbsEventHelper.ini"
 local ini = inicfg.load({
    settings =
    {
-      antiafk = true,
-      chatfilter = true,
-      keybinds = true,
-	  addonfixes = true,
-	  noeffects = false,
 	  showhud = true,
-	  nopostfx = false,
 	  noabsunload = false,
-	  nogametext = false,
-	  addonupgrades = true,
 	  autoupdplayerstable = false,
 	  disconnectreminder = true,
 	  drawdist = "450",
@@ -85,15 +77,8 @@ local dialog = {
 }
 
 local checkbox = {
-   antiafk = imgui.ImBool(ini.settings.antiafk),
-   chatfilter = imgui.ImBool(ini.settings.chatfilter),
-   keybinds = imgui.ImBool(ini.settings.keybinds),
-   addonfixes = imgui.ImBool(ini.settings.addonfixes),
-   noeffects = imgui.ImBool(ini.settings.noeffects),
    showhud = imgui.ImBool(ini.settings.showhud),
-   nopostfx = imgui.ImBool(ini.settings.nopostfx),
    noabsunload = imgui.ImBool(ini.settings.noabsunload),
-   addonupgrades = imgui.ImBool(ini.settings.addonupgrades),
    autoupdplayerstable = imgui.ImBool(ini.settings.autoupdplayerstable),
    disconnectreminder = imgui.ImBool(ini.settings.disconnectreminder),
    showobjects = imgui.ImBool(false),
@@ -108,7 +93,6 @@ local slider = {
 
 local tabmenu = {
    objects = 1,
-   hotkeys = 1,
    cmds = 1
 }
 
@@ -198,7 +182,7 @@ VehicleNames = {
 
 function imgui.OnDrawFrame()
    if dialog.main.v then
-      imgui.SetNextWindowSize(imgui.ImVec2(295, 430), imgui.Cond.FirstUseEver)
+      imgui.SetNextWindowSize(imgui.ImVec2(295, 360), imgui.Cond.FirstUseEver)
 	  imgui.SetNextWindowPos(imgui.ImVec2(sizeX / 2, sizeY / 2),
 	  imgui.Cond.FirstUseEver, imgui.ImVec2(0.5, 0.5))
       imgui.Begin("Absolute Events Helper", dialog.main)
@@ -258,35 +242,6 @@ function imgui.OnDrawFrame()
 	  if showobjects then
 	     imgui.Text(string.format(u8"Объектов в области в стрима: %i", streamedObjects))
 	  end
-	  
-	  if imgui.Checkbox(u8("Отключить коллизию у объектов"), checkbox.objectcollision) then 
-	     if checkbox.objectcollision.v then
-            disableObjectCollision = true
-         else
-            disableObjectCollision = false
-			find_obj_x, find_obj_y, find_obj_z = getCharCoordinates(PLAYER_PED)
-            result, objectHandle = findAllRandomObjectsInSphere(find_obj_x, find_obj_y, find_obj_z, 25, true)
-            if result then
-		       for k, v in pairs(objectsDel) do
-                  if doesObjectExist(v) then setObjectCollision(v, true) end
-               end
-            end
-         end
-	  end
-	  
-      imgui.SameLine()
-      imgui.TextQuestion("( ? )", u8"Применимо только для объектов в области стрима")
-
-	  if imgui.Checkbox(u8("Показывать ID объектов"), checkbox.showobjects) then 
-		 if checkbox.showobjects.v  then
-            showobjects = true
-         else
-            showobjects = false
-         end
-	  end
-	  
-      imgui.SameLine()
-      imgui.TextQuestion("( ? )", u8"Применимо только для объектов в области стрима")
 
 	  imgui.Text(" ")
 	  
@@ -317,7 +272,7 @@ function imgui.OnDrawFrame()
 	  local ip, port = sampGetCurrentServerAddress()
 	  if not ip:find(hostip) then
 	     imgui.TextColoredRGB("{FF0000}Некоторые функции будут недоступны")
-	     imgui.TextColoredRGB("{FF0000}Скрипт предназначен для работы на Absolute Play DM")
+	     imgui.TextColoredRGB("{FF0000}Скрипт предназначен для Absolute Play")
 	  end
 			 
       imgui.End()
@@ -1074,37 +1029,22 @@ function imgui.OnDrawFrame()
 	  
        imgui.Begin(u8"Горячие клавиши", dialog.hotkeys)
 	   
-	   if imgui.Button(u8"Доступные только с SAMP ADDON") then tabmenu.hotkeys = 1 end 
-	   imgui.SameLine()
-	   if imgui.Button(u8"Восстановленые скриптом") then tabmenu.hotkeys = 2 end
-	  
-	   if tabmenu.hotkeys == 1 then
-          imgui.TextColoredRGB("{00FF00}Клавиша N{FFFFFF} — меню редактора карт (в полете)")
-          imgui.TextColoredRGB("{00FF00}Клавиша J{FFFFFF} — полет в наблюдении (/полет)")
-          imgui.TextColoredRGB("{00FF00}Боковые клавиши мыши{FFFFFF} — отменяют и сохраняют редактирование объекта")
-          imgui.Text(" ")
-          imgui.TextColoredRGB("В режиме редактирования:")
-          imgui.TextColoredRGB("{00FF00}Зажатие клавиши ALT{FFFFFF} — скрыть объект")
-          imgui.TextColoredRGB("{00FF00}Зажатие клавиши CTRL{FFFFFF} — визуально увеличить объект")
-          imgui.TextColoredRGB("{00FF00}Зажатие клавиши SHIFT{FFFFFF} — плавное перемещение объекта")
-          imgui.TextColoredRGB("{00FF00}Клавиша RMB (Правая кл.мыши){FFFFFF}  — вернуть объект на исходную позицию")
-          imgui.TextColoredRGB("{00FF00}Клавиша Enter{FFFFFF}  — сохранить редактируемый объект")
-          imgui.Text(" ")
-          imgui.TextColoredRGB("В режиме выделения:")
-          imgui.TextColoredRGB("{00FF00}Клавиша RMB (Правая кл.мыши){FFFFFF}  — скопирует номер модели объекта")
-          imgui.TextColoredRGB("{00FF00}Клавиша SHIFT{FFFFFF} — переключение между объектами")
-	   elseif tabmenu.hotkeys == 2 then
-	      imgui.TextColoredRGB("Восстановленые скриптом и доступные без {00FF00}SAMP ADDON:")
-          imgui.TextColoredRGB("{00FF00}J{FFFFFF} - полет в мире")
-          imgui.TextColoredRGB("{00FF00}Z{FFFFFF} - починить транспорт")
-          imgui.TextColoredRGB("{00FF00}U{FFFFFF} - анимации")
-          imgui.TextColoredRGB("{00FF00}M{FFFFFF} - домашний транспорт")
-          imgui.TextColoredRGB("{00FF00}K{FFFFFF} - заказать транспорт")
-		  imgui.Text(" ")
-		  imgui.TextColoredRGB("Дополнительные бинды:")
-          imgui.TextColoredRGB("{00FF00}H{FFFFFF} - перевернуть транспорт")
-	   end
-	   
+       imgui.TextColoredRGB("{00FF00}Клавиша N{FFFFFF} — меню редактора карт (в полете)")
+       imgui.TextColoredRGB("{00FF00}Клавиша J{FFFFFF} — полет в наблюдении (/полет)")
+       imgui.TextColoredRGB("{00FF00}Боковые клавиши мыши{FFFFFF} — отменяют и сохраняют редактирование объекта")
+       imgui.Text(" ")
+       imgui.TextColoredRGB("В режиме редактирования:")
+       imgui.TextColoredRGB("{00FF00}Зажатие клавиши ALT{FFFFFF} — скрыть объект")
+       imgui.TextColoredRGB("{00FF00}Зажатие клавиши CTRL{FFFFFF} — визуально увеличить объект")
+       imgui.TextColoredRGB("{00FF00}Зажатие клавиши SHIFT{FFFFFF} — плавное перемещение объекта")
+       imgui.TextColoredRGB("{00FF00}Клавиша RMB (Правая кл.мыши){FFFFFF}  — вернуть объект на исходную позицию")
+       imgui.TextColoredRGB("{00FF00}Клавиша Enter{FFFFFF}  — сохранить редактируемый объект")
+       imgui.Text(" ")
+       imgui.TextColoredRGB("В режиме выделения:")
+       imgui.TextColoredRGB("{00FF00}Клавиша RMB (Правая кл.мыши){FFFFFF}  — скопирует номер модели объекта")
+       imgui.TextColoredRGB("{00FF00}Клавиша SHIFT{FFFFFF} — переключение между объектами")
+	   imgui.Text(u8" ")
+	   imgui.Text(u8"Доступны только с SAMP ADDON")
        imgui.End()
 	end
 	
@@ -1346,54 +1286,36 @@ function imgui.OnDrawFrame()
 	   imgui.Cond.FirstUseEver, imgui.ImVec2(0.5, 0.5))
 	 
        imgui.Begin(u8"Настройки", dialog.settings)
-       if imgui.Checkbox(u8("Фильтр подключений в чате"), checkbox.chatfilter) then
-	      if checkbox.chatfilter.v then
-	         ini.settings.chatfilter = not ini.settings.chatfilter
-			 save()
-          end
-	   end
 	   
-       imgui.SameLine()
-       imgui.TextQuestion("( ? )", u8"Убирает сообщения о подключениях-отключениях игроков в общем чате")
-	   
-   	   if imgui.Checkbox(u8("Анти-афк"), checkbox.antiafk) then 
-	      if checkbox.antiafk.v then
-			 ini.settings.antiafk = not ini.settings.antiafk
-			 save()
-		  end
-	   end
-	   
-       imgui.SameLine()
-       imgui.TextQuestion("( ? )", u8"При сворачивании окна игрок не будет уходить в афк")
+	   if imgui.Checkbox(u8("Отключить коллизию у объектов"), checkbox.objectcollision) then 
+	     if checkbox.objectcollision.v then
+            disableObjectCollision = true
+         else
+            disableObjectCollision = false
+			find_obj_x, find_obj_y, find_obj_z = getCharCoordinates(PLAYER_PED)
+            result, objectHandle = findAllRandomObjectsInSphere(find_obj_x, find_obj_y, find_obj_z, 25, true)
+            if result then
+		       for k, v in pairs(objectsDel) do
+                  if doesObjectExist(v) then setObjectCollision(v, true) end
+               end
+            end
+         end
+	  end
+	  
+      imgui.SameLine()
+      imgui.TextQuestion("( ? )", u8"Применимо только для объектов в области стрима")
 
-	   if imgui.Checkbox(u8("Фикс горячих клавиш аддона"), checkbox.keybinds) then 
-	      if checkbox.keybinds.v then
-	         ini.settings.keybinds = not ini.settings.keybinds
-			 save()
-	      end
-	   end
-       imgui.SameLine()
-       imgui.TextQuestion("( ? )", u8"Восстанавливает стандартные горячие клавиши доступные с samp addon")
-
-       if imgui.Checkbox(u8("Включить фиксы как в samp addon"), checkbox.addonfixes) then 
-	     if checkbox.addonfixes.v then
-	         ini.settings.addonfixes = not ini.settings.addonfixes
-			 save()
-	      end
-	   end
-       imgui.SameLine()
-       imgui.TextQuestion("( ? )", u8"Включает некоторые фиксы и буст FPS как в samp аддоне")
-	   
-	   if imgui.Checkbox(u8("Включить апгрейды как в samp addon"), checkbox.addonupgrades) then 
-	     if checkbox.addonupgrades.v then
-	         ini.settings.addonupgrades = not ini.settings.addonupgrades
-			 save()
-	      end
-	   end
-       imgui.SameLine()
-       imgui.TextQuestion("( ? )", u8"Включает улучшения бесконечного бега, бег в интерьере, анти падение с байка")
-	   
-	   if imgui.Checkbox(u8("Выгружать скрипт на других серверах"), checkbox.noabsunload) then
+	  if imgui.Checkbox(u8("Показывать ID объектов"), checkbox.showobjects) then 
+		 if checkbox.showobjects.v  then
+            showobjects = true
+         else
+            showobjects = false
+         end
+	  end
+	  imgui.SameLine()
+      imgui.TextQuestion("( ? )", u8"Применимо только для объектов в области стрима")
+	  
+	  if imgui.Checkbox(u8("Выгружать скрипт на других серверах"), checkbox.noabsunload) then
 	      if checkbox.noabsunload.v then
 	         ini.settings.noabsunload = not ini.settings.noabsunload
 			 save()
@@ -1401,16 +1323,6 @@ function imgui.OnDrawFrame()
 	   end
        imgui.SameLine()
        imgui.TextQuestion("( ? )", u8"Выгружает скрипт при подключении не на Absolute DM")
-	   
-	   if imgui.Checkbox(u8"Отключить эффекты", checkbox.noeffects) then
-		  if checkbox.noeffects.v then
-		     ini.settings.noeffects = not ini.settings.noeffects
-			 save() 
-	      end
-	   end
-	   
-       imgui.SameLine()
-       imgui.TextQuestion("( ? )", u8"Отключает эффекты дыма, пыли, тени (требуется релог)")
 
 	   if imgui.Checkbox(u8(ini.settings.showhud and 'Скрыть' or 'Показать')..u8" HUD",
 	   checkbox.showhud) then
@@ -1422,21 +1334,10 @@ function imgui.OnDrawFrame()
 	      else
 		     displayHud(false)
              memory.setint8(0xBA676C, 2)
-			 -- remove server logo
-			 sampTextdrawDelete(2048)
-             sampTextdrawDelete(420)
 		  end
 	   end
        imgui.SameLine()
-       imgui.TextQuestion("( ? )", u8"Скрывает HUD и логотип Absolute DM ")
-	   
-	   if imgui.Checkbox(u8"Активировать nopostfx", checkbox.nopostfx) then
-	      ini.settings.nopostfx = not ini.settings.nopostfx
-		  save()
-	      memory.fill(0x53EAD3, 0x90, 5, true)
-	   end
-       imgui.SameLine()
-       imgui.TextQuestion("( ? )", u8"Отключает пост-обработку (PostFX), рекомендуется использовать только для тестов (вернуть обратно только релогом)")
+       imgui.TextQuestion("( ? )", u8"Скрывает HUD")
 	   
 	   -- Thanks samp++
 	   imgui.Text(u8"Дальность прорисовки:")
@@ -1453,11 +1354,10 @@ function imgui.OnDrawFrame()
 		  memory.setfloat(13210352, ini.settings.fog, true)
 	   end
 	   
-	   if imgui.Button(u8"Перегрузить скрипт", imgui.ImVec2(200, 25)) then
-		  thisScript():reload()
-	   end
+	   -- if imgui.Button(u8"Перегрузить скрипт", imgui.ImVec2(200, 25)) then
+		  -- thisScript():reload()
+	   -- end
 	   
-	   imgui.SameLine()
 	   if imgui.Button(u8"Выгрузить скрипт", imgui.ImVec2(200, 25)) then
 	      sampAddChatMessage("Скрипт AbsEventHelper успешно выгружен.", -1)
 		  sampAddChatMessage("Для запуска используйте комбинацию клавиш CTRL + R.", -1)
@@ -1513,9 +1413,8 @@ function imgui.OnDrawFrame()
 	   imgui.Cond.FirstUseEver, imgui.ImVec2(0.5, 0.5))
 	   
        imgui.Begin(u8"О скрипте v".. thisScript().version, dialog.credits)
-       imgui.Text(u8"Автор: 1NS (Git: in1x)")
        imgui.Text(u8"Помошник для мапперов и организаторов мероприятий на Absolute DM")
-	   imgui.Text(u8"Скрипт распостраняется с открытым исходным кодом")
+	   imgui.Text(u8"Скрипт распостраняется только с открытым исходным кодом")
 	   imgui.TextColoredRGB("Homepage: {007DFF}github.com/ins1x/AbsEventHelper")
 	   if imgui.IsItemClicked() then
 	  	  setClipboardText("github.com/ins1x/AbsEventHelper")
@@ -1583,11 +1482,8 @@ function main()
 	  sampAddChatMessage("{00BFFF}Absolute {FFD700}Events {FFFFFF}Helper", 0xFFFFFF)
 	  local ip, port = sampGetCurrentServerAddress()
 	  if not ip:find(hostip) then
-	     -- sampAddChatMessage("Keybinds work only Absolute DM", 0x00FF0000)
-	     ini.settings.keybinds = false
 		 if ini.settings.noabsunload then
 		    thisScript():unload()
-			-- sampAddChatMessage("Script unloaded", 0x00FF0000)
 		 end
 	  end
 	
@@ -1676,76 +1572,6 @@ function main()
 	  memory.setfloat(12044272, ini.settings.drawdist, true)
       memory.setfloat(13210352, ini.settings.fog, true)
 	  
-	  -- dirty hack nop F1 and F4 keys functions
-	  require('memory').setuint8(getModuleHandle('samp.dll') + 0x67450, 0xC3, true)
-	  memory.write(sampGetBase()+0x797E, 0, 1, true)
-	  
-	  if(ini.settings.addonfixes) then
-	     -- other fixes
-		 memory.write(0x745BC9, 0x9090, 2, false) --SADisplayResolutions(1920x1080// 16:9)
-         memory.fill(0x460773, 0x90, 7, false) --CJFix
-		 memory.setuint32(0x736F88, 0, false) -- the helicopter doesn't explode many times
-		 memory.write(8931716, 0, 4, false) -- fix blackroads
-		 
-	     -- fps fix
-         memory.write(0x53E94C, 0, 1, false) --del fps delay 14 ms
-         memory.setuint32(12761548, 1051965045, false) -- car speed fps fix
-		 
-		 -- birds on
-		 memory.write(5497200, 232, 1, false)
-         memory.write(5497201, 1918619, 4, false)
-		 
-		 -- interior reflections
-		 memory.write(0x555854, 0x90909090, 4, false)
-         memory.write(0x555858, 0x90, 1, false)
-		 
-		 -- fixing spawn with a bottle
-		 memory.fill(0x4217F4, 0x90, 21, false)
-         memory.fill(0x4218D8, 0x90, 17, false)
-         memory.fill(0x5F80C0, 0x90, 10, false)
-         memory.fill(0x5FBA47, 0x90, 10, false)
-	  end
-	  
-	  if(ini.settings.addonupgrades) then
-	  	 -- interior run
-		 memory.write(5630064, -1027591322, 4, false)
-         memory.write(5630068, 4, 2, false)
-		 
-		 -- infinity run
-		 memory.setint8(0xB7CEE4, 1)
-	  end
-	  
-	  if(ini.settings.noeffects) then
-	     -- no smoke and decorative flame
-	     memory.hex2bin('8B4E08E88B900000', 0x4A125D, 8)
-		 
-		 -- nodust
-		 memory.write(7205311, 1056964608, 4, false)
-		 memory.write(7205316, 1065353216, 4, false)
-		 memory.write(7205321, 1065353216, 4, false)
-		 memory.write(7205389, 1056964608, 4, false)
-		 memory.write(7204123, 1050253722, 4, false)
-		 memory.write(7204128, 1065353216, 4, false)
-		 memory.write(7204133, 1060320051, 4, false)
-		 memory.write(5527777, 1036831949, 4, false)
-		 memory.write(4846974, 1053609165, 4, false)
-		 memory.write(4846757, 1053609165, 4, false)
-		 
-		 -- noshadows
-         memory.write(5497177, 233, 1, false)
-		 memory.write(5489067, 492560616, 4, false)
-		 memory.write(5489071, 0, 1, false)
-		 memory.write(6186889, 33807, 2, false)
-		 memory.write(7388587, 111379727, 4, false)
-		 memory.write(7388591, 0, 2, false)
-		 memory.write(7391066, 32081167, 4, false)
-		 memory.write(7391070, -1869611008, 4, false)
-	  end
-	  
-	  if(ini.settings.nopostfx) then
-	     memory.fill(0x53EAD3, 0x90, 5, true)
-	  end
-	  
 	  --- END init
 	  while true do
 	  wait(0)
@@ -1811,53 +1637,6 @@ function main()
 	  -- Imgui menu
 	  imgui.Process = dialog.main.v
 	  
-	  -- chatfix
-	  if isKeyJustPressed(0x54) and not sampIsDialogActive() and not sampIsScoreboardOpen() and not isSampfuncsConsoleActive() then
-	     sampSetChatInputEnabled(true)
-	  end
-	  
-	  -- nobike
-	  if ini.settings.addonupgrades then
-	     if isCharInAnyCar(PLAYER_PED) then
-            setCharCanBeKnockedOffBike(PLAYER_PED, true)
-         else
-            setCharCanBeKnockedOffBike(PLAYER_PED, false)
-         end
-         if isCharInAnyCar(PLAYER_PED) and isCarInWater(storeCarCharIsInNoSave(PLAYER_PED)) then
-            setCharCanBeKnockedOffBike(PLAYER_PED, false)
-         end
-	  end
-	  
-	  -- antiafk 
-      if ini.settings.antiafk then
-         writeMemory(7634870, 1, 1, 1)
-         writeMemory(7635034, 1, 1, 1)
-         memory.fill(7623723, 144, 8)
-         memory.fill(5499528, 144, 6)
-	  else
-	     memory.setuint8(7634870, 0, false)
-         memory.setuint8(7635034, 0, false)
-         memory.hex2bin('0F 84 7B 01 00 00', 7623723, 8)
-         memory.hex2bin('50 51 FF 15 00 83 85 00', 5499528, 6)
-	  end
-	
-	  -- Absolute Play Key Binds
-	  -- Sets hotkeys that are only available with the samp addon
-	  if ini.settings.keybinds then
-         if isKeyJustPressed(VK_Z) and not sampIsChatInputActive() and not sampIsDialogActive() and not isPauseMenuActive() and not isSampfuncsConsoleActive() then sampSendChat("/xbybnm") end
-	 
-         if isKeyJustPressed(VK_K) and not sampIsChatInputActive() and not sampIsDialogActive() and not isPauseMenuActive() and not isSampfuncsConsoleActive() then sampSendChat("/vfibye2") end
-
-         if isKeyJustPressed(VK_M) and not sampIsChatInputActive() and not sampIsDialogActive() and not isPauseMenuActive() and not isSampfuncsConsoleActive() then sampSendChat("/vfibye") end
-	  
-         if isKeyJustPressed(VK_U) and not sampIsChatInputActive() and not sampIsDialogActive() and not isPauseMenuActive() and not isSampfuncsConsoleActive() then sampSendChat("/anim") end
-	  
-         if isKeyJustPressed(VK_J) and not sampIsChatInputActive() and not sampIsDialogActive() and not isPauseMenuActive() and not isSampfuncsConsoleActive() then sampSendChat("/gjktn") end
-	  
-         if isKeyJustPressed(VK_H) and isCharInAnyCar(PLAYER_PED) and not sampIsChatInputActive() and not sampIsDialogActive() and not isPauseMenuActive() and not isSampfuncsConsoleActive() then  sampSendChat("/f") end
-		 
-      end
-	  
 	  -- ALT+X (Activation combination)
       if isKeyDown(VK_MENU) and isKeyJustPressed(VK_X) and not sampIsChatInputActive() and not    sampIsDialogActive() and not isPauseMenuActive() and not isSampfuncsConsoleActive() then 
          if showobjects then showobjects = false end
@@ -1894,10 +1673,10 @@ function main()
 end
 
 function sampev.onPlayerJoin(id, color, isNpc, nickname)
-	--(string.format("Игрок %s [%d] подключился к серверу.", nickname, id))
-	if showDisconnectedTeammates then
+	if sampIsLocalPlayerSpawned() and showDisconnectedTeammates then
 	   if nickname:lower():find(teamtag) then
           table.insert(teammatesTable, id)
+		  sampAddChatMessage("Соклан " .. nickname .. " подключился к серверу.", 0x00FF00)
 	   end
 	end
 end
@@ -1930,24 +1709,6 @@ function sampev.onPlayerQuit(id, reason)
 end
 
 function sampev.onServerMessage(color, text)
-   if ini.settings.chatfilter then 
-	  if text:find("подключился к серверу") or text:find("вышел с сервера") then
-		 chatlog = io.open(getFolderPath(5).."\\GTA San Andreas User Files\\SAMP\\chatlog.txt", "a")
-		 chatlog:write(os.date("[%H:%M:%S] ")..text)
-		 chatlog:write("\n")
-		 chatlog:close()
-		 return false
-	  end
-	  
-	  if text:find("выхода из читмира") then
-		 return false
-	  end
-	  
-	  if text:find("Ни 1 клан не создан") then
-		 return false
-	  end
-   end
-   
    -- in-game mapeditor errors solutions tips and fix
    if text:find("У тебя нет прав использовать эту команду") and prepareTeleport then
 	  sampAddChatMessage("В мире телепортация отключена", 0x00FF00)
