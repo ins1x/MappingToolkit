@@ -125,13 +125,11 @@ textbuffer.bindad.v = u8(ini.binds.adtextbuffer)
 
 -- If the server changes IP, change it here
 local hostip = "193.84.90.23"
-local teamtag = "brutal"
 local tpposX, tpposY, tpposZ
 local disableObjectCollision = false
 local prepareTeleport = false
 local showobjects = false
 local disconnectremind = true
-local showDisconnectedTeammates = true
 local chosenplayer = 0
 streamedObjects = 0
 
@@ -141,7 +139,6 @@ local vehinfomodelid = 0
 
 local objectsDel = {}
 local playersTable = {}
-local teammatesTable = {}
 local vehiclesTable = {}
 vehiclesTotal = 0
 playersTotal = 0
@@ -418,7 +415,7 @@ function imgui.OnDrawFrame()
 	  
 	  if tabmenu.objects == 1 then
 	     imgui.Text(u8"Большие прозрачные объекты для текста: 19481, 19480, 19482, 19477")
-         imgui.Text(u8"Маленькие объекты для текста: 19476, 2662")
+         imgui.Text(u8"Маленькие объекты для текста: 19475, 19476, 2662")
          imgui.Text(u8"Бетонные блоки: 18766, 18765, 18764, 18763, 18762")
          imgui.Text(u8"Горы: вулкан 18752, песочница 18751, песочные горы ландшафт 19548")
          imgui.Text(u8"Платформы: тонкая платформа 19552, 19538, решетчатая 18753, 18754")
@@ -1479,7 +1476,7 @@ end
 function main()
    if not isSampLoaded() or not isSampfuncsLoaded() then return end
       while not isSampAvailable() do wait(100) end
-	  sampAddChatMessage("{00BFFF}Absolute {FFD700}Events {FFFFFF}Helper", 0xFFFFFF)
+	  sampAddChatMessage("{00BFFF}Absolute {FFD700}Events {FFFFFF}Helper. Открыть меню: ALT + X", 0xFFFFFF)
 	  local ip, port = sampGetCurrentServerAddress()
 	  if not ip:find(hostip) then
 		 if ini.settings.noabsunload then
@@ -1672,15 +1669,6 @@ function main()
    end
 end
 
-function sampev.onPlayerJoin(id, color, isNpc, nickname)
-	if sampIsLocalPlayerSpawned() and showDisconnectedTeammates then
-	   if nickname:lower():find(teamtag) then
-          table.insert(teammatesTable, id)
-		  sampAddChatMessage("Соклан " .. nickname .. " подключился к серверу.", 0x00FF00)
-	   end
-	end
-end
-
 function sampev.onPlayerQuit(id, reason)
    local nick = sampGetPlayerNickname(id)
    
@@ -1698,14 +1686,6 @@ function sampev.onPlayerQuit(id, reason)
 	  end
    end
    
-   if showDisconnectedTeammates then
-      for key, value in ipairs(teammatesTable) do
-	     if value == id then 
-	        sampAddChatMessage("Соклан " .. nick .. " вышел по причине: " .. reas, 0x00FFFF)
-		    table.remove(teammatesTable, key)
-		 end
-	  end
-   end
 end
 
 function sampev.onServerMessage(color, text)
