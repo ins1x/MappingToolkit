@@ -4,7 +4,7 @@ script_description("Assistant for mappers and event makers on Absolute DM")
 script_dependencies('imgui', 'lib.samp.events', 'vkeys')
 script_properties("work-in-pause")
 script_url("https://github.com/ins1x/AbsEventHelper")
-script_version("2.0")
+script_version("2.1")
 -- script_moonloader(16) moonloader v.0.26
 
 require 'lib.moonloader'
@@ -112,6 +112,19 @@ local textbuffer = {
    note = imgui.ImBuffer(1024)
 }
 
+local txd = {
+   texture1 = nil,
+   texture2 = nil,
+   texture3 = nil,
+   texture4 = nil,
+   texture5 = nil,
+   fontsimg1 = nil,
+   fontsimg2 = nil,
+   fontsimg3 = nil, 
+   fontsimg4 = nil,
+   fontsimg5 = nil
+}
+ 
 textbuffer.bind1.v = u8(ini.binds.textbuffer1)
 textbuffer.bind2.v = u8(ini.binds.textbuffer2)
 textbuffer.bind3.v = u8(ini.binds.textbuffer3)
@@ -129,6 +142,7 @@ local tpposX, tpposY, tpposZ
 local disableObjectCollision = false
 local prepareTeleport = false
 local showobjects = false
+local ENBSeries = false
 local disconnectremind = true
 local chosenplayer = 0
 streamedObjects = 0
@@ -1476,31 +1490,86 @@ end
 function main()
    if not isSampLoaded() or not isSampfuncsLoaded() then return end
       while not isSampAvailable() do wait(100) end
-	  sampAddChatMessage("{00BFFF}Absolute {FFD700}Events {FFFFFF}Helper. Открыть меню: ALT + X", 0xFFFFFF)
 	  local ip, port = sampGetCurrentServerAddress()
 	  if not ip:find(hostip) then
 		 if ini.settings.noabsunload then
 		    thisScript():unload()
 		 end
+	  else
+	     sampAddChatMessage("{00BFFF}Absolute {FFD700}Events {FFFFFF}Helper. Открыть меню: ALT + X", 0xFFFFFF)
 	  end
-	
+      
+      -- ENB check
+	  if doesFileExist(getGameDirectory() .. "\\enbseries.asi") or 
+	  doesFileExist(getGameDirectory() .. "\\d3d9.dll") then
+	     ENBSeries = true
+	  end
+	  
 	  if not doesDirectoryExist("moonloader/resource/abseventhelper") then 
 	     createDirectory("moonloader/resource/abseventhelper")
 	  end
 	  
-	  local texture1 = renderLoadTextureFromFile(getGameDirectory() .. '\\moonloader\\resource\\abseventhelper\\texture1.jpg')
-	  local texture2 = renderLoadTextureFromFile(getGameDirectory() .. '\\moonloader\\resource\\abseventhelper\\texture2.jpg')
-	  local texture3 = renderLoadTextureFromFile(getGameDirectory() .. '\\moonloader\\resource\\abseventhelper\\texture3.jpg')
-	  local texture4 = renderLoadTextureFromFile(getGameDirectory() .. '\\moonloader\\resource\\abseventhelper\\texture4.jpg')
-	  local texture5 = renderLoadTextureFromFile(getGameDirectory() .. '\\moonloader\\resource\\abseventhelper\\texture5.jpg')
+	  if doesFileExist(getGameDirectory() .. '\\moonloader\\resource\\abseventhelper\\texture1.jpg') then
+	  	 txd.texture1 = renderLoadTextureFromFile(getGameDirectory() .. '\\moonloader\\resource\\abseventhelper\\texture1.jpg')
+	  else
+	     print("AbsEventHelper failed import texture1")
+	  end
+	  
+	  if doesFileExist(getGameDirectory() .. '\\moonloader\\resource\\abseventhelper\\texture2.jpg') then
+	     txd.texture2 = renderLoadTextureFromFile(getGameDirectory() .. '\\moonloader\\resource\\abseventhelper\\texture2.jpg')
+	  else
+	     print("AbsEventHelper failed import texture2")
+	  end
+	  
+	  if doesFileExist(getGameDirectory() .. '\\moonloader\\resource\\abseventhelper\\texture3.jpg') then
+	     txd.texture3 = renderLoadTextureFromFile(getGameDirectory() .. '\\moonloader\\resource\\abseventhelper\\texture3.jpg')
+	  else
+	     print("AbsEventHelper failed import texture3")
+	  end
+	  
+	  if doesFileExist(getGameDirectory() .. '\\moonloader\\resource\\abseventhelper\\texture3.jpg') then
+	     txd.texture4 = renderLoadTextureFromFile(getGameDirectory() .. '\\moonloader\\resource\\abseventhelper\\texture4.jpg')
+	  else
+	     print("AbsEventHelper failed import texture4")
+      end
+	  
+	  if doesFileExist(getGameDirectory() .. '\\moonloader\\resource\\abseventhelper\\texture3.jpg') then
+	     txd.texture5 = renderLoadTextureFromFile(getGameDirectory() .. '\\moonloader\\resource\\abseventhelper\\texture5.jpg')
+	  else
+	     print("AbsEventHelper failed import texture5")
+	  end
 	  
 	  -- Rights to the images belong to the pawnokit project
 	  -- https://pawnokit.ru/ru/spec_symbols
-	  local fontsimg1 = renderLoadTextureFromFile(getGameDirectory() .. '\\moonloader\\resource\\abseventhelper\\fGTAWeapon3.jpg')
-	  local fontsimg2 = renderLoadTextureFromFile(getGameDirectory() .. '\\moonloader\\resource\\abseventhelper\\fWebdingsEN.jpg')
-	  local fontsimg3 = renderLoadTextureFromFile(getGameDirectory() .. '\\moonloader\\resource\\abseventhelper\\fWebdingsRU.jpg')
-	  local fontsimg4 = renderLoadTextureFromFile(getGameDirectory() .. '\\moonloader\\resource\\abseventhelper\\fWingdingsEN.jpg')
-	  local fontsimg5 = renderLoadTextureFromFile(getGameDirectory() .. '\\moonloader\\resource\\abseventhelper\\fWingdingsRU.jpg')
+	  if doesFileExist(getGameDirectory() .. '\\moonloader\\resource\\abseventhelper\\fGTAWeapon3.jpg') then
+	     txd.fontsimg1 = renderLoadTextureFromFile(getGameDirectory() .. '\\moonloader\\resource\\abseventhelper\\fGTAWeapon3.jpg')
+	  else
+	     print("AbsEventHelper failed import fGTAWeapon3.jpg")
+	  end
+	  
+	  if doesFileExist(getGameDirectory() .. '\\moonloader\\resource\\abseventhelper\\fWebdingsEN.jpg') then
+	     txd.fontsimg2 = renderLoadTextureFromFile(getGameDirectory() .. '\\moonloader\\resource\\abseventhelper\\fWebdingsEN.jpg')
+	  else
+	     print("AbsEventHelper failed import fWebdingsEN.jpg")
+	  end
+	  
+	  if doesFileExist(getGameDirectory() .. '\\moonloader\\resource\\abseventhelper\\fWebdingsRU.jpg') then
+	     txd.fontsimg3 = renderLoadTextureFromFile(getGameDirectory() .. '\\moonloader\\resource\\abseventhelper\\fWebdingsRU.jpg')
+	  else
+	     print("AbsEventHelper failed import fWebdingsRU.jpg")
+	  end
+	  
+	  if doesFileExist(getGameDirectory() .. '\\moonloader\\resource\\abseventhelper\\fWingdingsEN.jpg') then
+	     txd.fontsimg4 = renderLoadTextureFromFile(getGameDirectory() .. '\\moonloader\\resource\\abseventhelper\\fWingdingsEN.jpg')
+	  else
+	     print("AbsEventHelper failed import fWingdingsEN.jpg")
+	  end
+	  
+	  if doesFileExist(getGameDirectory() .. '\\moonloader\\resource\\abseventhelper\\fWingdingsRU.jpg') then
+	     txd.fontsimg5 = renderLoadTextureFromFile(getGameDirectory() .. '\\moonloader\\resource\\abseventhelper\\fWingdingsRU.jpg')
+	  else
+	     print("AbsEventHelper failed import fWingdingsRU.jpg")
+	  end
 	  
       -- commands section
 	  sampRegisterChatCommand("abshelper", function ()
@@ -1576,28 +1645,28 @@ function main()
 	  local imgX, imgY = 770, 480 -- image size
 	  
 	  if(dialog.textures.v) then
-		  if show_texture1 then
-			 renderDrawTexture(texture1, (sizeX - imgX) / 2,
+		  if show_texture1 and txd.texture1 then
+			 renderDrawTexture(txd.texture1, (sizeX - imgX) / 2,
 			 (sizeY - imgY) / 2,imgX, imgY, 0, 0xffffffff)
 		  end
 		  
-		  if show_texture2 then
-			 renderDrawTexture(texture2, (sizeX - imgX) / 2,
+		  if show_texture2 and txd.texture2 then
+			 renderDrawTexture(txd.texture2, (sizeX - imgX) / 2,
 			 (sizeY - imgY) / 2, imgX, imgY, 0, 0xffffffff)
 		  end
 		  
-		  if show_texture3 then
-			 renderDrawTexture(texture3, (sizeX - imgX) / 2,
+		  if show_texture3 and txd.texture3 then
+			 renderDrawTexture(txd.texture3, (sizeX - imgX) / 2,
 			 (sizeY - imgY) / 2, imgX, imgY, 0, 0xffffffff)
 		  end
 		  
-		  if show_texture4 then
-			 renderDrawTexture(texture4, (sizeX - imgX) / 2,
+		  if show_texture4 and txd.texture4 then
+			 renderDrawTexture(txd.texture4, (sizeX - imgX) / 2,
 			 (sizeY - imgY) / 2, imgX, imgY, 0, 0xffffffff)
 		  end
 		  
-		  if show_texture5 then
-			 renderDrawTexture(texture5, (sizeX - imgX) / 2,
+		  if show_texture5 and txd.texture5 then
+			 renderDrawTexture(txd.texture5, (sizeX - imgX) / 2,
 			 (sizeY - imgY) / 2, imgX, imgY, 0, 0xffffffff)
 		  end
 	  end
@@ -1605,34 +1674,34 @@ function main()
 	  local imgX, imgY = 500, 450 -- image size
 	  
 	  if(dialog.fonts.v) then
-	      if show_fontsimg1 then
-			 renderDrawTexture(fontsimg1, (sizeX - imgX) / 2,
+	      if show_fontsimg1 and txd.fontsimg1 then
+			 renderDrawTexture(txd.fontsimg1, (sizeX - imgX) / 2,
 			 (sizeY - imgY) / 2, imgX, imgY, 0, 0xffffffff)
 		  end
 		  
-		  if show_fontsimg2 then
-			 renderDrawTexture(fontsimg2, (sizeX - imgX) / 2,
+		  if show_fontsimg2 and txd.fontsimg2 then
+			 renderDrawTexture(txd.fontsimg2, (sizeX - imgX) / 2,
 			 (sizeY - imgY) / 2, imgX, imgY, 0, 0xffffffff)
 		  end
 		  
-		  if show_fontsimg3 then
-			 renderDrawTexture(fontsimg3, (sizeX - imgX) / 2,
+		  if show_fontsimg3 and txd.fontsimg3 then
+			 renderDrawTexture(txd.fontsimg3, (sizeX - imgX) / 2,
 			 (sizeY - imgY) / 2, imgX, imgY, 0, 0xffffffff)
 		  end
 		  
-		  if show_fontsimg4 then
-			 renderDrawTexture(fontsimg4, (sizeX - imgX) / 2,
+		  if show_fontsimg4 and txd.fontsimg4 then
+			 renderDrawTexture(txd.fontsimg4, (sizeX - imgX) / 2,
 			 (sizeY - imgY) / 2, imgX, imgY, 0, 0xffffffff)
 		  end
 		  
-		  if show_fontsimg5 then
-			 renderDrawTexture(fontsimg5, (sizeX - imgX) / 2,
+		  if show_fontsimg5 and txd.fontsimg5 then
+			 renderDrawTexture(txd.fontsimg5, (sizeX - imgX) / 2,
 			 (sizeY - imgY) / 2, imgX, imgY, 0, 0xffffffff)
 		  end
 	   end
 	   
 	  -- Imgui menu
-	  imgui.Process = dialog.main.v
+	  if not ENBSeries then imgui.Process = dialog.main.v end
 	  
 	  -- ALT+X (Activation combination)
       if isKeyDown(VK_MENU) and isKeyJustPressed(VK_X) and not sampIsChatInputActive() and not    sampIsDialogActive() and not isPauseMenuActive() and not isSampfuncsConsoleActive() then 
@@ -1720,11 +1789,13 @@ function sampev.onScriptTerminate(script, quitGame)
     end
 end
 
-function sampev.onDisplayGameText(style, time, text)
-   if ini.settings.nogametext then 
-      return false
-   end
-end
+-- function sampev.onPlayerChatBubble(id, col, dist, dur, msg)
+   -- if afkremind and msg:find("Отошел") then
+      -- local nick = sampGetPlayerNickname(id)
+	  -- sampAddChatMessage("Игрок " .. nick .. " отошел AFK", 0x00FF00)
+   -- end
+-- end
+
 -- END hooks
 
 function direction()
@@ -1794,6 +1865,11 @@ function getObjectsInStream()
 	local count = 0
     for _ in pairs(getAllObject()) do count = count + 1 end
     return count
+end
+
+function doesFileExist(path)
+   local f=io.open(path,"r")
+   if f~=nil then io.close(f) return true else return false end
 end
 
 lua_thread.create(function()
