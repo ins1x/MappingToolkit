@@ -4,7 +4,7 @@ script_description("Assistant for mappers and event makers on Absolute DM")
 script_dependencies('imgui', 'lib.samp.events', 'vkeys')
 script_properties("work-in-pause")
 script_url("https://github.com/ins1x/AbsEventHelper")
-script_version("2.1")
+script_version("2.2")
 -- script_moonloader(16) moonloader v.0.26
 
 require 'lib.moonloader'
@@ -26,6 +26,7 @@ local ini = inicfg.load({
 	  noabsunload = false,
 	  autoupdplayerstable = false,
 	  disconnectreminder = true,
+	  lockserverweather = false,
 	  drawdist = "450",
       fog = "200",
    },
@@ -73,6 +74,7 @@ local dialog = {
    cmds = imgui.ImBool(false),
    coords = imgui.ImBool(false),
    playermenu = imgui.ImBool(false),
+   fastanswer = imgui.ImBool(false),
    faq = imgui.ImBool(false)
 }
 
@@ -81,6 +83,7 @@ local checkbox = {
    noabsunload = imgui.ImBool(ini.settings.noabsunload),
    autoupdplayerstable = imgui.ImBool(ini.settings.autoupdplayerstable),
    disconnectreminder = imgui.ImBool(ini.settings.disconnectreminder),
+   lockserverweather = imgui.ImBool(ini.settings.lockserverweather),
    showobjects = imgui.ImBool(false),
    vehstream = imgui.ImBool(false),
    objectcollision = imgui.ImBool(false)
@@ -124,7 +127,20 @@ local txd = {
    fontsimg4 = nil,
    fontsimg5 = nil
 }
- 
+
+local combobox = {
+   item1 = imgui.ImInt(0),
+   item2 = imgui.ImInt(0),
+   item3 = imgui.ImInt(0),
+   item4 = imgui.ImInt(0),
+   item5 = imgui.ImInt(0),
+   item6 = imgui.ImInt(0),
+   item7 = imgui.ImInt(0),
+   item8 = imgui.ImInt(0),
+   item9 = imgui.ImInt(0),
+   itemad = imgui.ImInt(0)
+}
+
 textbuffer.bind1.v = u8(ini.binds.textbuffer1)
 textbuffer.bind2.v = u8(ini.binds.textbuffer2)
 textbuffer.bind3.v = u8(ini.binds.textbuffer3)
@@ -144,7 +160,8 @@ local prepareTeleport = false
 local showobjects = false
 local ENBSeries = false
 local disconnectremind = true
-local chosenplayer = 0
+local chosenplayer = nil
+local heavyweaponwarn = true
 streamedObjects = 0
 
 local fps = 0
@@ -216,11 +233,12 @@ function imgui.OnDrawFrame()
 		 dialog.vehs.v = false
 		 dialog.notepad.v = false
 		 dialog.fonts.v = false
-		 dialog.players.v  = false
-		 dialog.playermenu.v  = false
-		 dialog.cmds.v  = false
+		 dialog.players.v = false
+		 dialog.playermenu.v = false
+		 dialog.cmds.v = false
 		 dialog.coords.v  = false
-		 dialog.faq.v  = false
+		 dialog.faq.v = false
+		 dialog.fastanswer.v = false
       end
 	  
 	  imgui.SameLine()
@@ -482,112 +500,123 @@ function imgui.OnDrawFrame()
        imgui.Begin(u8"Цветовая палитра", dialog.colors)
 	   
 	   imgui.PushStyleColor(imgui.Col.Button, imgui.ImVec4(1.0, 0.0, 0.0, 1.0))
-	   if imgui.Button("{FF0000}  RED    ", imgui.ImVec2(300, 20)) then
+	   if imgui.Button("{FF0000}  RED    ", imgui.ImVec2(120, 25)) then
 	      setClipboardText("{FF0000}")
 		  printStringNow("copied to clipboard", 1000)
 	   end
 	   imgui.PopStyleColor()
 	   
 	   imgui.PushStyleColor(imgui.Col.Button, imgui.ImVec4(0.0, 0.5, 0.0, 1.0))
-	   if imgui.Button("{008000}  GREEN ", imgui.ImVec2(300, 20)) then 
+	   imgui.SameLine()
+	   if imgui.Button("{008000}  GREEN ", imgui.ImVec2(120, 25)) then 
 	      setClipboardText("{008000}")
 		  printStringNow("copied to clipboard", 1000)
 	   end
 	   imgui.PopStyleColor()
 	   
 	   imgui.PushStyleColor(imgui.Col.Button, imgui.ImVec4(0.0, 0.0, 1.0, 1.0))
-	   if imgui.Button("{0000FF}  BLUE  ", imgui.ImVec2(300, 20)) then
+	   imgui.SameLine()
+	   if imgui.Button("{0000FF}  BLUE  ", imgui.ImVec2(120, 25)) then
 	      setClipboardText("{0000FF}")
 		  printStringNow("copied to clipboard", 1000)
 	   end
 	   imgui.PopStyleColor()
 	   
+	   -- next line
+	   
 	   imgui.PushStyleColor(imgui.Col.Button, imgui.ImVec4(1.0, 1.0, 0.0, 1.0))
-	   if imgui.Button("{FFFF00}  YELLOW", imgui.ImVec2(300, 20)) then
+	   if imgui.Button("{FFFF00}  YELLOW", imgui.ImVec2(120, 25)) then
 	      setClipboardText("{FFFF00}")
 		  printStringNow("copied to clipboard", 1000)
 	   end
 	   imgui.PopStyleColor()
 	   
 	   imgui.PushStyleColor(imgui.Col.Button, imgui.ImVec4(1.0, 0.0, 1.0, 1.0))
-	   if imgui.Button("{FF00FF}  PINK  ", imgui.ImVec2(300, 20)) then
+	   imgui.SameLine()
+	   if imgui.Button("{FF00FF}  PINK  ", imgui.ImVec2(120, 25)) then
 	      setClipboardText("{FF00FF}")
 		  printStringNow("copied to clipboard", 1000)
 	   end
 	   imgui.PopStyleColor()
 	   
 	   imgui.PushStyleColor(imgui.Col.Button, imgui.ImVec4(0.0, 1.0, 1.0, 1.0))
-	   if imgui.Button("{00FFFF}  AQUA  ", imgui.ImVec2(300, 20)) then
+	   imgui.SameLine()
+	   if imgui.Button("{00FFFF}  AQUA  ", imgui.ImVec2(120, 25)) then
 	      setClipboardText("{00FFFF}")
 		  printStringNow("copied to clipboard", 1000)
 	   end
 	   imgui.PopStyleColor()
 	   
+	   -- next line
+	   
 	   imgui.PushStyleColor(imgui.Col.Button, imgui.ImVec4(0.0, 1.0, 0.0, 1.0))
-	   if imgui.Button("{00FF00}  LIME  ", imgui.ImVec2(300, 20)) then 
+	   if imgui.Button("{00FF00}  LIME  ", imgui.ImVec2(120, 25)) then 
 	      setClipboardText("{00FF00}")
 		  printStringNow("copied to clipboard", 1000)
 	   end
 	   imgui.PopStyleColor()
 	   
 	   imgui.PushStyleColor(imgui.Col.Button, imgui.ImVec4(0.5, 0.0, 0.5, 1.0))
-	   if imgui.Button("{800080}  PURPLE", imgui.ImVec2(300, 20)) then
+	   imgui.SameLine()
+	   if imgui.Button("{800080}  PURPLE", imgui.ImVec2(120, 25)) then
 	      setClipboardText("{800080}")
 		  printStringNow("copied to clipboard", 1000)
 	   end
 	   imgui.PopStyleColor()
 	   
 	   imgui.PushStyleColor(imgui.Col.Button, imgui.ImVec4(0.5, 0.0, 0.0, 1.0))
-	   if imgui.Button("{800000}  MAROON", imgui.ImVec2(300, 20)) then
+	   imgui.SameLine()
+	   if imgui.Button("{800000}  MAROON", imgui.ImVec2(120, 25)) then
 	      setClipboardText("{800000}")
 		  printStringNow("copied to clipboard", 1000)
 	   end
 	   imgui.PopStyleColor()
 	   
+	   -- next line
+		
 	   imgui.PushStyleColor(imgui.Col.Button, imgui.ImVec4(0.5, 0.5, 0.0, 1.0))
-	   if imgui.Button("{808000}  OLIVE ", imgui.ImVec2(300, 20)) then
+	   if imgui.Button("{808000}  OLIVE ", imgui.ImVec2(120, 25)) then
 	      setClipboardText("{808000}")
 		  printStringNow("copied to clipboard", 1000)
 	   end
 	   imgui.PopStyleColor()
 	   
 	   imgui.PushStyleColor(imgui.Col.Button, imgui.ImVec4(0.0, 0.5, 0.5, 1.0))
-	   if imgui.Button("{008080}  TEAL  ", imgui.ImVec2(300, 20)) then
+	   imgui.SameLine()
+	   if imgui.Button("{008080}  TEAL  ", imgui.ImVec2(120, 25)) then
 		  setClipboardText("{008080}")
 		  printStringNow("copied to clipboard", 1000)
 	   end	   
 	   imgui.PopStyleColor()
 	   
 	   imgui.PushStyleColor(imgui.Col.Button, imgui.ImVec4(1.0, 0.6, 0.0, 1.0))
-	   if imgui.Button("{FF9900}  ORANGE", imgui.ImVec2(300, 20)) then
+	   imgui.SameLine()
+	   if imgui.Button("{FF9900}  ORANGE", imgui.ImVec2(120, 25)) then
 	      setClipboardText("{FF9900}")
 		  printStringNow("copied to clipboard", 1000)
 	   end
 	   imgui.PopStyleColor()
 	   
-	   imgui.PushStyleColor(imgui.Col.Button, imgui.ImVec4(1.0, 0.89, 0.76, 1.0))
-	   if imgui.Button("{FFE4C4}  BISQUE", imgui.ImVec2(300, 20)) then
-	      setClipboardText("{FFE4C4}")
-		  printStringNow("copied to clipboard", 1000)
-	   end
-	   imgui.PopStyleColor()
+	   -- next line
 	   
 	   imgui.PushStyleColor(imgui.Col.Button, imgui.ImVec4(1.0, 1.0, 1.0, 1.0))
-	   if imgui.Button("{FFFFFF}  WHITE ", imgui.ImVec2(300, 20)) then 
+	   if imgui.Button("{FFFFFF}  WHITE ", imgui.ImVec2(120, 25)) then 
 	      setClipboardText("{FFFFFF}")
 		  printStringNow("copied to clipboard", 1000)
 	   end
 	   imgui.PopStyleColor()
 	   
 	   imgui.PushStyleColor(imgui.Col.Button, imgui.ImVec4(0.5, 0.5, 0.5, 1.0))
-	   if imgui.Button("{808080}  GREY  ", imgui.ImVec2(300, 20)) then 
+	   imgui.SameLine()
+	   if imgui.Button("{808080}  GREY  ", imgui.ImVec2(120, 25)) then 
 	      setClipboardText("{808080}")
 		  printStringNow("copied to clipboard", 1000)
 	   end
 	   imgui.PopStyleColor()
 	   
 	   imgui.PushStyleColor(imgui.Col.Button, imgui.ImVec4(0.0, 0.0, 0.0, 1.0))
-	   if imgui.Button("{000000}  BLACK ", imgui.ImVec2(300, 20)) then
+	   imgui.SameLine()
+	   if imgui.Button("{000000}  BLACK ", imgui.ImVec2(120, 25)) then
 	      setClipboardText("{000000}")
 		  printStringNow("copied to clipboard", 1000)
 	   end
@@ -612,6 +641,8 @@ function imgui.OnDrawFrame()
 	  
 	   imgui.Text(u8"RR — красная часть цвета, GG — зеленая, BB — синяя, AA — альфа")
 	   imgui.ColorEdit4("", color)
+	   --imgui.SameLine()
+       --imgui.TextQuestion("( ? )", u8"RR — красная часть цвета, GG — зеленая, BB — синяя, AA — альфа")
 	   imgui.SameLine()
 	   imgui.Text("HEX: " ..intToHex(join_argb(color.v[4] * 255, color.v[1] * 255,
 	   color.v[2] * 255, color.v[3] * 255)))
@@ -629,102 +660,218 @@ function imgui.OnDrawFrame()
 	if dialog.chatbinds.v then
 	   imgui.SetNextWindowPos(imgui.ImVec2(sizeX / 6, sizeY / 4),
 	   imgui.Cond.FirstUseEver, imgui.ImVec2(0.5, 0.5))
-	   --imgui.SetNextWindowSize(imgui.ImVec2(490, 510), imgui.Cond.FirstUseEver)
+	   imgui.SetNextWindowSize(imgui.ImVec2(640, 520), imgui.Cond.FirstUseEver)
 	   imgui.Begin(u8"Чат", dialog.chatbinds)
 	   
 	   imgui.Text(u8"Здесь вы можете настроить чат-бинды для мероприятия")
 	   imgui.TextColoredRGB("{00FF00}@ номер игрока - {bababa}заменит id на никнейм игрока")
 	   
+	   -- line 1
+	   imgui.PushItemWidth(70)
+	   imgui.Combo('1', combobox.item1, {u8'мчат', u8'общий'}, 2)
+       imgui.PopItemWidth()
+	   
+	   imgui.SameLine()
 	   if imgui.InputText("##Bind1", textbuffer.bind1) then 
 	   end
 	   
 	   imgui.SameLine()
-	   if imgui.Button(u8"Отправить в мчат [1]") then
-	      u8:decode(textbuffer.bind1.v)
-	      sampSendChat(string.format("/мчат %s", u8:decode(textbuffer.bind1.v)))
+	   if imgui.Button(u8"отправить [1]") then
+	   	  if combobox.item1.v == 0 then
+			 u8:decode(textbuffer.bind1.v)
+	         sampSendChat(string.format("/мчат %s", u8:decode(textbuffer.bind1.v)))
+		  end
+		  if combobox.item1.v == 1 then
+			 u8:decode(textbuffer.bind1.v)
+	         sampSendChat(string.format("* %s", u8:decode(textbuffer.bind1.v)))
+		  end
 	   end
+	   -- line 2
+	   imgui.PushItemWidth(70)
+	   imgui.Combo('2', combobox.item2, {u8'мчат', u8'общий'}, 2)
+       imgui.PopItemWidth()
 	   
+	   imgui.SameLine()
 	   if imgui.InputText("##Bind2", textbuffer.bind2) then 
 	   end
 	   
 	   imgui.SameLine()
-	   if imgui.Button(u8"Отправить в мчат [2]") then
-	      sampSendChat(string.format("/мчат %s", u8:decode(textbuffer.bind2.v)))
+	   if imgui.Button(u8"отправить [2]") then
+	   	  if combobox.item2.v == 0 then
+			 u8:decode(textbuffer.bind2.v)
+	         sampSendChat(string.format("/мчат %s", u8:decode(textbuffer.bind2.v)))
+		  end
+		  if combobox.item2.v == 1 then
+			 u8:decode(textbuffer.bind2.v)
+	         sampSendChat(string.format("* %s", u8:decode(textbuffer.bind2.v)))
+		  end
 	   end
+	   -- line 3
+	   imgui.PushItemWidth(70)
+	   imgui.Combo('3', combobox.item3, {u8'мчат', u8'общий'}, 2)
+       imgui.PopItemWidth()
 	   
+	   imgui.SameLine()
 	   if imgui.InputText("##Bind3", textbuffer.bind3) then 
 	   end
 	   
 	   imgui.SameLine()
-	   if imgui.Button(u8"Отправить в мчат [3]") then
-	      sampSendChat(string.format("/мчат %s", u8:decode(textbuffer.bind3.v)))
+	   if imgui.Button(u8"отправить [3]") then
+	   	  if combobox.item3.v == 0 then
+			 u8:decode(textbuffer.bind3.v)
+	         sampSendChat(string.format("/мчат %s", u8:decode(textbuffer.bind3.v)))
+		  end
+		  if combobox.item3.v == 1 then
+			 u8:decode(textbuffer.bind3.v)
+	         sampSendChat(string.format("* %s", u8:decode(textbuffer.bind3.v)))
+		  end
 	   end
+	   -- line 4
+	   imgui.PushItemWidth(70)
+	   imgui.Combo('4', combobox.item4, {u8'мчат', u8'общий'}, 2)
+       imgui.PopItemWidth()
 	   
+	   imgui.SameLine()
 	   if imgui.InputText("##Bind4", textbuffer.bind4) then 
 	   end
 	   
 	   imgui.SameLine()
-	   if imgui.Button(u8"Отправить в мчат [4]") then
-	      sampSendChat(string.format("/мчат %s", u8:decode(textbuffer.bind4.v)))
+	   if imgui.Button(u8"отправить [4]") then
+	   	  if combobox.item4.v == 0 then
+			 u8:decode(textbuffer.bind4.v)
+	         sampSendChat(string.format("/мчат %s", u8:decode(textbuffer.bind4.v)))
+		  end
+		  if combobox.item4.v == 1 then
+			 u8:decode(textbuffer.bind4.v)
+	         sampSendChat(string.format("* %s", u8:decode(textbuffer.bind4.v)))
+		  end
 	   end
+	   -- line 5
+	   imgui.PushItemWidth(70)
+	   imgui.Combo('5', combobox.item5, {u8'мчат', u8'общий'}, 2)
+       imgui.PopItemWidth()
 	   
+	   imgui.SameLine()
 	   if imgui.InputText("##Bind5", textbuffer.bind5) then 
 	   end
 	   
 	   imgui.SameLine()
-	   if imgui.Button(u8"Отправить в мчат [5]") then
-	      sampSendChat(string.format("/мчат %s", u8:decode(textbuffer.bind5.v)))
+	   if imgui.Button(u8"отправить [5]") then
+	   	  if combobox.item5.v == 0 then
+			 u8:decode(textbuffer.bind5.v)
+	         sampSendChat(string.format("/мчат %s", u8:decode(textbuffer.bind5.v)))
+		  end
+		  if combobox.item5.v == 1 then
+			 u8:decode(textbuffer.bind5.v)
+	         sampSendChat(string.format("* %s", u8:decode(textbuffer.bind5.v)))
+		  end
 	   end
+	   -- line 6
+	   imgui.PushItemWidth(70)
+	   imgui.Combo('6', combobox.item6, {u8'мчат', u8'общий'}, 2)
+       imgui.PopItemWidth()
 	   
+	   imgui.SameLine()
 	   if imgui.InputText("##Bind6", textbuffer.bind6) then 
 	   end
 	   
 	   imgui.SameLine()
-	   if imgui.Button(u8"Отправить в мчат [6]") then
-	      sampSendChat(string.format("/мчат %s", u8:decode(textbuffer.bind6.v)))
+	   if imgui.Button(u8"отправить [6]") then
+	   	  if combobox.item6.v == 0 then
+			 u8:decode(textbuffer.bind6.v)
+	         sampSendChat(string.format("/мчат %s", u8:decode(textbuffer.bind6.v)))
+		  end
+		  if combobox.item6.v == 1 then
+			 u8:decode(textbuffer.bind6.v)
+	         sampSendChat(string.format("* %s", u8:decode(textbuffer.bind6.v)))
+		  end
 	   end
+	   -- line 7
+	   imgui.PushItemWidth(70)
+	   imgui.Combo('7', combobox.item7, {u8'мчат', u8'общий'}, 2)
+       imgui.PopItemWidth()
 	   
+	   imgui.SameLine()
 	   if imgui.InputText("##Bind7", textbuffer.bind7) then 
 	   end
 	   
 	   imgui.SameLine()
-	   if imgui.Button(u8"Отправить в мчат [7]") then
-	      sampSendChat(string.format("/мчат %s", u8:decode(textbuffer.bind7.v)))
+	   if imgui.Button(u8"отправить [7]") then
+	   	  if combobox.item7.v == 0 then
+			 u8:decode(textbuffer.bind7.v)
+	         sampSendChat(string.format("/мчат %s", u8:decode(textbuffer.bind7.v)))
+		  end
+		  if combobox.item7.v == 1 then
+			 u8:decode(textbuffer.bind7.v)
+	         sampSendChat(string.format("* %s", u8:decode(textbuffer.bind7.v)))
+		  end
 	   end
+	   -- line 8
+	   imgui.PushItemWidth(70)
+	   imgui.Combo('8', combobox.item8, {u8'мчат', u8'общий'}, 2)
+       imgui.PopItemWidth()
 	   
+	   imgui.SameLine()
 	   if imgui.InputText("##Bind8", textbuffer.bind8) then 
 	   end
 	   
 	   imgui.SameLine()
-	   if imgui.Button(u8"Отправить в мчат [8]") then
-	      sampSendChat(string.format("/мчат %s", u8:decode(textbuffer.bind8.v)))
+	   if imgui.Button(u8"отправить [8]") then
+	   	  if combobox.item8.v == 0 then
+			 u8:decode(textbuffer.bind8.v)
+	         sampSendChat(string.format("/мчат %s", u8:decode(textbuffer.bind8.v)))
+		  end
+		  if combobox.item8.v == 1 then
+			 u8:decode(textbuffer.bind8.v)
+	         sampSendChat(string.format("* %s", u8:decode(textbuffer.bind8.v)))
+		  end
 	   end
+	   -- line 9
+	   imgui.PushItemWidth(70)
+	   imgui.Combo('9', combobox.item9, {u8'мчат', u8'общий'}, 2)
+       imgui.PopItemWidth()
 	   
+	   imgui.SameLine()
 	   if imgui.InputText("##Bind9", textbuffer.bind9) then 
 	   end
 	   
 	   imgui.SameLine()
-	   if imgui.Button(u8"Отправить в мчат [9]") then
-	      sampSendChat(string.format("/мчат %s", u8:decode(textbuffer.bind9.v)))
+	   if imgui.Button(u8"отправить [9]") then
+	   	  if combobox.item9.v == 0 then
+			 u8:decode(textbuffer.bind9.v)
+	         sampSendChat(string.format("/мчат %s", u8:decode(textbuffer.bind9.v)))
+		  end
+		  if combobox.item9.v == 1 then
+			 u8:decode(textbuffer.bind9.v)
+	         sampSendChat(string.format("* %s", u8:decode(textbuffer.bind9.v)))
+		  end
 	   end
+	   -- last line
+	   imgui.PushItemWidth(70)
+	   imgui.Combo('  ', combobox.itemad, {u8'объявление', u8'общий', u8'мчат'}, 3)
+       imgui.PopItemWidth()
 	   
-	   imgui.Text(" ")
-	   imgui.Text(u8"Объявления")
+	   imgui.SameLine()
 	   if imgui.InputText("##BindAd", textbuffer.bindad) then 
 	   end
 	   
-	   if imgui.Button(u8"Дать объявление в общий чат") then
-	      sampSendChat(string.format("* %s", u8:decode(textbuffer.bindad.v)))
-	   end
-	   
 	   imgui.SameLine()
-	   if imgui.Button(u8"Дать объявление в /об") then
-	      sampSendChat(string.format("/об %s", u8:decode(textbuffer.bindad.v)))
+	   if imgui.Button(u8"объявление") then
+	   	  if combobox.itemad.v == 0 then
+			 sampSendChat(string.format("/об %s", u8:decode(textbuffer.bindad.v)))
+		  end
+		  if combobox.itemad.v == 1 then
+	         sampSendChat(string.format("* %s", u8:decode(textbuffer.bindad.v)))
+		  end
+		  if combobox.itemad.v == 2 then
+	         sampSendChat(string.format("/мчат %s", u8:decode(textbuffer.bindad.v)))
+		  end
 	   end
 	   
 	   imgui.Text(" ")
+	   imgui.Separator()
 	   
-       if imgui.Button(u8("Сохранить")) then
+       if imgui.Button(u8("Сохранить бинды")) then
 	      ini.binds.textbuffer1 = u8:decode(textbuffer.bind1.v)
 	      ini.binds.textbuffer2 = u8:decode(textbuffer.bind2.v)
 	      ini.binds.textbuffer3 = u8:decode(textbuffer.bind3.v)
@@ -740,7 +887,7 @@ function imgui.OnDrawFrame()
        end
 	   
 	   imgui.SameLine()
-	   if imgui.Button(u8("Перегрузить")) then
+	   if imgui.Button(u8("Перегрузить бинды")) then
 	      textbuffer.bind1.v = u8(ini.binds.textbuffer1)
           textbuffer.bind2.v = u8(ini.binds.textbuffer2)
           textbuffer.bind3.v = u8(ini.binds.textbuffer3)
@@ -775,9 +922,25 @@ function imgui.OnDrawFrame()
           memory.write(sampGetChatInfoPtr() + 0x63DA, 1, 1)
 	   end
 	   
-	   if imgui.Button(u8"Скопировать послед сообщение из чата в буффер") then
+	   if imgui.Button(u8"Получить id игроков рядом") then
+	      local pidtable = {}
+		  local resulstring
+		  for k, v in ipairs(getAllChars()) do
+			 local res, id = sampGetPlayerIdByCharHandle(v)
+			 if res then
+			    local nickname = sampGetPlayerNickname(id)
+			    table.insert(pidtable, string.format("%s[%d] ", nickname, id))
+			    resulstring = table.concat(pidtable)
+			    setClipboardText(resulstring)
+				printStringNow("copied to clipboard", 1000)
+			 end
+		  end
+	   end
+	   
+	   imgui.SameLine()
+	   if imgui.Button(u8"Получить послед сообщение из чата в буффер") then
 	       text, prefix, color, pcolor = sampGetChatString(99)
-		   setClipboardText(text)
+		   setClipboardText(encoding.CP1251(text))
 	   end
   	   imgui.SameLine()
        imgui.TextQuestion("( ? )", u8"Копирует последнюю строчку из чата (Только латиница)")
@@ -785,6 +948,44 @@ function imgui.OnDrawFrame()
 	   imgui.End()
 	end
 
+	if dialog.fastanswer.v then
+	   imgui.SetNextWindowPos(imgui.ImVec2(sizeX / 4, sizeY / 4),
+	   imgui.Cond.FirstUseEver, imgui.ImVec2(0.5, 0.5))
+	   imgui.Begin(u8"Быстрые ответы", dialog.fastanswer)
+	   
+	   local nickname = sampGetPlayerNickname(chosenplayer)
+	   local ucolor = sampGetPlayerColor(chosenplayer)
+		  
+	   imgui.TextColoredRGB(string.format("Ответить игроку: {%0.6x} %s[%d]",
+	   bit.band(ucolor,0xffffff), nickname, chosenplayer))
+		  
+	   if imgui.Button(u8"Мир закрыт", imgui.ImVec2(250, 25)) then
+		  sampSendChat("/лс " .. chosenplayer .. " мероприятие уже началось - мир закрыт")
+	   end
+	   if imgui.Button(u8"Пароль от мира", imgui.ImVec2(250, 25)) then
+		  sampSendChat("/лс " .. chosenplayer .. " пароль от мира - 666 заходи")
+	   end
+	   if imgui.Button(u8"Перезайди в мир", imgui.ImVec2(250, 25)) then
+		  sampSendChat("/лс " .. chosenplayer .. " перезайди в мир")
+	   end
+	   if imgui.Button(u8"Не мешай игрокам - кикну", imgui.ImVec2(250, 25)) then
+		  sampSendChat("/лс " .. chosenplayer .. " не мешай игрокам  - кикну")
+	   end
+	   if imgui.Button(u8"Не мешай организаторам мп", imgui.ImVec2(250, 25)) then
+		  sampSendChat("/лс " .. chosenplayer .. " не мешай организаторам мп")
+	   end
+	   if imgui.Button(u8"Займи свободный транспорт", imgui.ImVec2(250, 25)) then
+		  sampSendChat("/лс " .. chosenplayer .. " займи свободный транспорт")
+	   end
+	   if imgui.Button(u8"Садись в машину", imgui.ImVec2(250, 25)) then
+		  sampSendChat("/лс " .. chosenplayer .. " садись в машину")
+	   end
+	   if imgui.Button(u8"Разрешил телепорт и починку", imgui.ImVec2(250, 25)) then
+		  sampSendChat("/лс " .. chosenplayer .. " разрешил телепорт и починку")
+	   end
+	   imgui.End()
+	end
+	
 	if dialog.players.v then
 	   imgui.SetNextWindowPos(imgui.ImVec2(sizeX / 4, sizeY / 4),
 	   imgui.Cond.FirstUseEver, imgui.ImVec2(0.5, 0.5))
@@ -851,7 +1052,56 @@ function imgui.OnDrawFrame()
 	      end
 	   end
 	   
-	   imgui.Text(u8" ")
+	   if chosenplayer then
+		  imgui.Separator()
+	      local nickname = sampGetPlayerNickname(chosenplayer)
+		  local ucolor = sampGetPlayerColor(chosenplayer)
+		  
+		  imgui.TextColoredRGB(string.format("Выбран игрок: {%0.6x} %s[%d]{cdcdcd}  | ",
+		  bit.band(ucolor,0xffffff), nickname, chosenplayer))
+		  imgui.SameLine()
+		  if imgui.Button(u8"статистика") then
+		     sampSendChat("/стат " .. chosenplayer)
+		  end
+		  imgui.SameLine()
+		  if imgui.Button(u8"наблюдать") then
+		     sampSendChat("/набл " .. chosenplayer)
+		  end
+		  imgui.SameLine()
+		  if imgui.Button(u8"меню") then
+		     sampSendChat("/и " .. chosenplayer)
+		  end
+		  imgui.SameLine()
+		  if imgui.Button(u8"тп") then
+		     for k, v in ipairs(getAllChars()) do
+			     local res, id = sampGetPlayerIdByCharHandle(v)
+			     if res then
+				    if id == chosenplayer then
+					   local pposX, pposY, pposZ = getCharCoordinates(v)
+					   sampSendChat(string.format("/ngr %f %f %f", pposX+0.5, pposY+0.5, pposZ), 0x0FFFFFF)
+					end
+			     else
+				    sampAddChatMessage("Доступно только в редакторе карт", 0x0FFFFFF)
+				 end
+		      end
+		  end
+		  imgui.SameLine()
+		  if imgui.Button(u8"ответ") then
+		     dialog.fastanswer.v = not dialog.fastanswer.v
+		  end
+		  imgui.SameLine()
+		  if imgui.Button(u8"ид") then
+		     setClipboardText(chosenplayer)
+			 printStringNow("ID copied to clipboard", 1000)
+		  end
+		  imgui.SameLine()
+		  if imgui.Button(u8"ник") then
+		     setClipboardText(nickname)
+			 printStringNow("Nickname copied to clipboard", 1000)
+		  end
+	   end
+	   
+	   --imgui.Text(u8" ")
 	   imgui.Separator()
 	   imgui.Columns(5)
        imgui.TextQuestion("[ID]", u8"Нажмите на id чтобы скопировать в буффер id игрока")
@@ -884,9 +1134,10 @@ function imgui.OnDrawFrame()
 		  imgui.NextColumn()
 		  imgui.TextColoredRGB(string.format("{%0.6x} %s", bit.band(ucolor,0xffffff), nickname))
 		  if imgui.IsItemClicked() then
-			 sampSendChat(string.format("/и %i", v))
+			 chosenplayer = v
+			 printStringNow("You have chosen a player ".. nickname, 1000)
 		  end
-		  imgui.SetColumnWidth(-1, 200)
+		  imgui.SetColumnWidth(-1, 250)
 		  imgui.NextColumn()
 		  if (score < 20) then
 		     imgui.TextColoredRGB(string.format("{FF0000}%i", score))
@@ -912,6 +1163,26 @@ function imgui.OnDrawFrame()
 	   end
 	
 	   imgui.Text(u8"Всего игроков в таблице: ".. playersTotal)
+	   if imgui.IsItemClicked() then
+	  	  setClipboardText(playersTotal)
+		  printStringNow("copied to clipboard", 1000)
+	   end
+	  
+	   if heavyweaponwarn then
+	      for k, v in ipairs(getAllChars()) do
+			 local res, id = sampGetPlayerIdByCharHandle(v)
+			 if res then
+			    local nick = sampGetPlayerNickname(id)
+				if isCurrentCharWeapon(v, 38) then 
+				   imgui.TextColoredRGB(string.format("{FF0000}Игрок %s[%d] с миниганом!", nick, id))
+				end
+			    if isCurrentCharWeapon(v, 35) then 
+				   imgui.TextColoredRGB(string.format("{FF0000}Игрок %s[%d] с RPG!", nick, id))
+				end
+			 end
+		  end
+	   end
+	   
 	   imgui.End()
 	end
 	
@@ -1350,15 +1621,29 @@ function imgui.OnDrawFrame()
        imgui.SameLine()
        imgui.TextQuestion("( ? )", u8"Скрывает HUD")
 	   
+	   if imgui.Checkbox(u8("Блокировать изменение погоды"), checkbox.lockserverweather) then	      
+		  ini.settings.lockserverweather = not ini.settings.lockserverweather
+		  if ini.settings.lockserverweather then
+			 forceWeatherNow(0)
+			 setTimeOfDay(12, 0)
+			 patch_samp_time_set(true)
+		  else
+  			 patch_samp_time_set(false)
+		  end
+		  save()
+	   end
+       imgui.SameLine()
+       imgui.TextQuestion("( ? )", u8"Блокирует изменение погоды и времени сервером")
+	   
 	   -- Thanks samp++
-	   imgui.Text(u8"Дальность прорисовки:")
+	   imgui.TextColoredRGB("Дальность прорисовки {51484f} (по-умолчанию 450)")
 	   if imgui.SliderInt(u8"##Drawdist", slider.drawdist, 50, 3000) then
 		  ini.settings.drawdist = slider.drawdist.v
 		  save()
 		  memory.setfloat(12044272, ini.settings.drawdist, true)
 	   end
 		
-	   imgui.Text(u8"Дальность тумана:")
+	   imgui.TextColoredRGB("Дальность тумана {51484f} (по-умолчанию 200)")
 	   if imgui.SliderInt(u8"##fog", slider.fog, -390, 390) then
 		  ini.settings.fog = slider.fog.v
 		  save()
@@ -1738,6 +2023,18 @@ function main()
    end
 end
 
+function sampev.onSetWeather(weatherId)
+   if ini.settings.lockserverweather then
+	  forceWeatherNow(0)
+   end
+end
+
+function sampev.onSetPlayerTime(hour, minute)
+   if ini.settings.lockserverweather then
+	  setTimeOfDay(12, 0)
+   end
+end
+
 function sampev.onPlayerQuit(id, reason)
    local nick = sampGetPlayerNickname(id)
    
@@ -1798,6 +2095,7 @@ end
 
 -- END hooks
 
+-- Macros
 function direction()
    if sampIsLocalPlayerSpawned() then
       local angle = math.ceil(getCharHeading(PLAYER_PED))
@@ -1912,6 +2210,17 @@ function hideAllTextureImages()
    show_texture5 = false
 end 
 
+function patch_samp_time_set(enable) -- by hnnssy and FYP
+	if enable and default == nil then
+		default = readMemory(sampGetBase() + 0x9C0A0, 4, true)
+		writeMemory(sampGetBase() + 0x9C0A0, 4, 0x000008C2, true)
+	elseif enable == false and default ~= nil then
+		writeMemory(sampGetBase() + 0x9C0A0, 4, default, true)
+		default = nil
+	end
+end
+
+-- imgui fuctions
 function imgui.TextColoredRGB(text)
     local style = imgui.GetStyle()
     local colors = style.Colors
