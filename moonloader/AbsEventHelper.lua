@@ -4,7 +4,7 @@ script_description("Assistant for mappers and event makers on Absolute DM")
 script_dependencies('imgui', 'lib.samp.events', 'vkeys')
 script_properties("work-in-pause")
 script_url("https://github.com/ins1x/AbsEventHelper")
-script_version("2.2")
+script_version("2.3")
 -- script_moonloader(16) moonloader v.0.26
 
 require 'lib.moonloader'
@@ -84,6 +84,7 @@ local checkbox = {
    autoupdplayerstable = imgui.ImBool(ini.settings.autoupdplayerstable),
    disconnectreminder = imgui.ImBool(ini.settings.disconnectreminder),
    lockserverweather = imgui.ImBool(ini.settings.lockserverweather),
+   showobjectrot = imgui.ImBool(false),
    showobjects = imgui.ImBool(false),
    vehstream = imgui.ImBool(false),
    objectcollision = imgui.ImBool(false)
@@ -158,6 +159,7 @@ local tpposX, tpposY, tpposZ
 local disableObjectCollision = false
 local prepareTeleport = false
 local showobjects = false
+local showobjectrot = false
 local ENBSeries = false
 local disconnectremind = true
 local chosenplayer = nil
@@ -221,29 +223,16 @@ function imgui.OnDrawFrame()
 	  
 	  imgui.SameLine()
 	  if imgui.Button(u8"Скрыть все окна") then
-	     dialog.favorites.v = false
-		 dialog.credits.v = false
-		 dialog.hotkeys.v = false
-		 dialog.settings.v = false
-		 dialog.colors.v = false
-		 dialog.textures.v = false
-	     dialog.worldlimits.v = false
-		 dialog.info.v = false
-		 dialog.chatbinds.v = false
-		 dialog.vehs.v = false
-		 dialog.notepad.v = false
-		 dialog.fonts.v = false
-		 dialog.players.v = false
-		 dialog.playermenu.v = false
-		 dialog.cmds.v = false
-		 dialog.coords.v  = false
-		 dialog.faq.v = false
-		 dialog.fastanswer.v = false
+         hideAllDialogs()
+		 hideAllFontsImages()
+		 hideAllTextureImages()
       end
 	  
 	  imgui.SameLine()
 	  if imgui.Button(u8"Свернуть") then
 		 dialog.main.v = not dialog.main.v 
+		 hideAllFontsImages()
+		 hideAllTextureImages()
       end
       
 	  _, pID = sampGetPlayerIdByCharHandle(playerPed)
@@ -1597,6 +1586,17 @@ function imgui.OnDrawFrame()
 	  imgui.SameLine()
       imgui.TextQuestion("( ? )", u8"Применимо только для объектов в области стрима")
 	  
+	  
+	  if imgui.Checkbox(u8("Показывать координаты объекта при перемещении"), checkbox.showobjectrot) then 
+		 if checkbox.showobjectrot.v  then
+            showobjectrot = true
+         else
+            showobjectrot = false
+         end
+	  end
+	  imgui.SameLine()
+      imgui.TextQuestion("( ? )", u8"Показывает координаты объекта при перемещении в редакторе карт")
+	  
 	  if imgui.Checkbox(u8("Выгружать скрипт на других серверах"), checkbox.noabsunload) then
 	      if checkbox.noabsunload.v then
 	         ini.settings.noabsunload = not ini.settings.noabsunload
@@ -1680,7 +1680,7 @@ function imgui.OnDrawFrame()
 		     sampSendChat("/коорд")
 			 tpposX, tpposY, tpposZ = getCharCoordinates(PLAYER_PED)
 			 setClipboardText(math.floor(tpposX) .. ' ' .. math.floor(tpposY) .. ' ' .. math.floor(tpposZ))
-			 sampAddChatMessage("Координаты сохранены в буфер", 0x0FFFFFF)
+			 printStringNow("Coords copied to clipboard", 1000)
 			 sampAddChatMessage(string.format("Интерьер: %i", getActiveInterior()), 0x0FFFFFF)
 		  end
 	   end
@@ -1738,6 +1738,7 @@ function imgui.OnDrawFrame()
        imgui.Text(u8"FYP - imgui, SAMP lua library")
        imgui.Text(u8"Gorskin - useful code snippets and memory hacks")
        imgui.Text(u8"Pawnokit.ru - specsymbols images")
+       imgui.Text(u8"1NS - create this script")
        imgui.End()
 	end 
 	
@@ -1988,6 +1989,16 @@ function main()
 	  -- Imgui menu
 	  if not ENBSeries then imgui.Process = dialog.main.v end
 	  
+	  -- Hide dialogs o ESC
+	  if isKeyJustPressed(VK_ESCAPE) and not sampIsChatInputActive() 
+	  and not sampIsDialogActive() and not isPauseMenuActive() 
+	  and not isSampfuncsConsoleActive() then 
+	     hideAllDialogs()
+		 hideAllFontsImages()
+		 hideAllTextureImages()
+		 if dialog.main.v then dialog.main.v = false end
+	  end 
+	  
 	  -- ALT+X (Activation combination)
       if isKeyDown(VK_MENU) and isKeyJustPressed(VK_X) and not sampIsChatInputActive() and not    sampIsDialogActive() and not isPauseMenuActive() and not isSampfuncsConsoleActive() then 
          if showobjects then showobjects = false end
@@ -2086,13 +2097,16 @@ function sampev.onScriptTerminate(script, quitGame)
     end
 end
 
--- function sampev.onPlayerChatBubble(id, col, dist, dur, msg)
-   -- if afkremind and msg:find("Отошел") then
-      -- local nick = sampGetPlayerNickname(id)
-	  -- sampAddChatMessage("Игрок " .. nick .. " отошел AFK", 0x00FF00)
-   -- end
--- end
+function sampev.onSendEnterEditObject(type, objectId, model, position)
+   --printStringNow(string.format("modelid: %d - %0.2f, %0.2f, %0.2f", 
+   --model, position.x, position.y, position.z), 1000)
+end 
 
+function sampev.onSendEditObject(playerObject, objectId, response, position, rotation)
+   if showobjectrot then
+      printStringNow(string.format("x:~g~%0.2f, ~w~y:~g~%0.2f, ~w~z:~g~%0.2f~n~ ~w~rx:~g~%0.2f, ~w~ry:~g~%0.2f, ~w~rz:~g~%0.2f", position.x, position.y, position.z, rotation.x, rotation.y, rotation.z), 1000)
+   end
+end
 -- END hooks
 
 -- Macros
@@ -2208,6 +2222,28 @@ function hideAllTextureImages()
    show_texture3 = false
    show_texture4 = false
    show_texture5 = false
+end 
+
+function hideAllDialogs()
+   -- don't hide main dialog
+   dialog.favorites.v = false
+   dialog.credits.v = false
+   dialog.hotkeys.v = false
+   dialog.settings.v = false
+   dialog.colors.v = false
+   dialog.textures.v = false
+   dialog.worldlimits.v = false
+   dialog.info.v = false
+   dialog.chatbinds.v = false
+   dialog.vehs.v = false
+   dialog.notepad.v = false
+   dialog.fonts.v = false
+   dialog.players.v = false
+   dialog.playermenu.v = false
+   dialog.cmds.v = false
+   dialog.coords.v  = false
+   dialog.faq.v = false
+   dialog.fastanswer.v = false
 end 
 
 function patch_samp_time_set(enable) -- by hnnssy and FYP
