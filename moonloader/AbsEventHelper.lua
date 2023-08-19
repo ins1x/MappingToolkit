@@ -4,7 +4,7 @@ script_description("Assistant for mappers and event makers on Absolute DM")
 script_dependencies('imgui', 'lib.samp.events', 'vkeys')
 script_properties("work-in-pause")
 script_url("https://github.com/ins1x/AbsEventHelper")
-script_version("2.3")
+script_version("2.4")
 -- script_moonloader(16) moonloader v.0.26
 
 require 'lib.moonloader'
@@ -433,6 +433,8 @@ function imgui.OnDrawFrame()
 	  if imgui.Button(u8"Эффекты") then tabmenu.objects = 3 end
 	  imgui.SameLine()
 	  if imgui.Button(u8"Освещение") then tabmenu.objects = 4 end
+      imgui.SameLine()
+	  if imgui.Button(u8"Интерьер") then tabmenu.objects = 5 end
 	  
 	  if tabmenu.objects == 1 then
 	     imgui.Text(u8"Большие прозрачные объекты для текста: 19481, 19480, 19482, 19477")
@@ -442,15 +444,16 @@ function imgui.OnDrawFrame()
          imgui.Text(u8"Платформы: тонкая платформа 19552, 19538, решетчатая 18753, 18754")
          imgui.Text(u8"Поверхности: 19531, 4242, 4247, 8171, 5004, 16685")
          imgui.Text(u8"Стены: 19355, 19435(маленькая), 19447(длинная), 19391(дверь), 19408(окно)")
+         imgui.Text(u8"Окружение: темная материя 13656, скайбокс 3933")
 	  elseif tabmenu.objects == 2 then
 		 imgui.Text(u8"Веревка 19087, Веревка длин. 19089")
          imgui.Text(u8"Стекло (Разрушаемое) 3858, стекло от травы 3261, сено 3374")
-         imgui.Text(u8"Факел с черепом 3524, факел 3461, красный фонарь 3877")
-         imgui.Text(u8"Попуг 19079, коровка 19833, восточная лампа 3534")
+         imgui.Text(u8"Факел с черепом 3524, факел 3461,3525")
          imgui.Text(u8"Водяная бочка 1554, ржавая бочка 1217, взрыв. бочка 1225")
-         imgui.Text(u8"Черная бездна 13656, стеклянный блок 18887")
-         imgui.Text(u8"Партикл воды с колизией 19603, большой 19604")
-         imgui.Text(u8"Финиш гонки 18761")
+         imgui.Text(u8"Cтеклянный блок 18887, финиш гонки 18761, большой череп 8483, 6865")
+         imgui.Text(u8"Вертушка на потолок 16780")
+         imgui.Text(u8"Партикл воды с колизией 19603, большой 19604, мал. 9831, круглый 6964")
+         imgui.Text(u8"Фонари(уличные): красный 3877, трицвета 3472, восточный 1568 и 3534")
 	  elseif tabmenu.objects == 3 then
 	     imgui.Text(u8"Огонь большой 18691, средний огонь 18692, пламя+дым (исчезает) 18723")
 	     imgui.Text(u8"Огонь от огнемета 18694, огонь от машины 18690")
@@ -470,6 +473,16 @@ function imgui.OnDrawFrame()
 	     imgui.Text(u8"Свет.шар (моргает медленно) белый 19289, красн. 19290, зел. 19291, син. 19292")
 	     imgui.Text(u8"Свет.шар (моргает медленно) фиолетовый 19293, желтый 19294")
 	     imgui.Text(u8"Свет.шар (большой не моргает) бел. 19295, красн. 19296, зел. 19297, син. 19298")
+      elseif tabmenu.objects == 5 then
+         imgui.Text(u8"Попугай 19079, восточная лампа 3534, свечи: 2868,2869")
+         imgui.Text(u8"Разбросанная одежда: 2843-2846, из борделя 14520-14521, 14863-14864")
+         imgui.Text(u8"Вино: 19820-19824, две бутылки: 3119, стаканы 1667, 19818-19819, 1670")
+         imgui.Text(u8"Сигареты: 19896, 19897, 3044, 1485, 1665")
+         imgui.Text(u8"Книги: 2813, 2816, 2824, 2826, 2827, 2852-2855, стелаж 14455")
+         imgui.Text(u8"Ковры: 2815, 2817, 2818, 2833-2836, 2841, 2842, 2847, 2631-2632")
+         imgui.Text(u8"Чистая посуда: 2822, 2829, 2831, 2832, 2849, 2862-2865")
+         imgui.Text(u8"Грязная посуда: 2812, 2820, 2830, 2848, 2850, 2851")
+         imgui.Text(u8"Картины: 2255-2289, 3962-3964, 14860, 14812, 14737")
 	  end
 	   
 	  imgui.Text(u8"")
@@ -981,7 +994,10 @@ function imgui.OnDrawFrame()
 	   imgui.SetNextWindowSize(imgui.ImVec2(560, 540), imgui.Cond.FirstUseEver)
 	   imgui.Begin(u8"Игроки", dialog.players)
 	   
-	   imgui.Text(u8"Перед началом мероприятия обновите список игроков, и сохраните")
+       if next(playersTable) == nil then -- if playersTable is empty
+	      imgui.Text(u8"Перед началом мероприятия обновите список игроков, и сохраните")
+	      imgui.Text(u8"Чтобы открыть дополнительные ф-ции нажмите на никнейм игрока")
+       end
 	   
 	   if imgui.Button(u8"Обновить список игроков", imgui.ImVec2(250, 25)) then
 		  playersTable = {}		  
@@ -1315,7 +1331,7 @@ function imgui.OnDrawFrame()
        imgui.TextColoredRGB("{00FF00}Клавиша RMB (Правая кл.мыши){FFFFFF}  — скопирует номер модели объекта")
        imgui.TextColoredRGB("{00FF00}Клавиша SHIFT{FFFFFF} — переключение между объектами")
 	   imgui.Text(u8" ")
-	   imgui.Text(u8"Доступны только с SAMP ADDON")
+	   imgui.Text(u8"* Доступны только с SAMP ADDON")
        imgui.End()
 	end
 	
@@ -1346,11 +1362,7 @@ function imgui.OnDrawFrame()
      
 	   elseif tabmenu.cmds == 2 then
           imgui.TextColoredRGB("{00FF00}/abshelper{FFFFFF} — открыть главное меню хелпера")
-		  imgui.TextColoredRGB("{00FF00}/note{FFFFFF} — открыть заметки")
 		  imgui.TextColoredRGB("{00FF00}/chatbinds{FFFFFF} — настройки чат-биндов")
-		  imgui.TextColoredRGB("{00FF00}/players{FFFFFF} — таблица игроков")
-		  imgui.TextColoredRGB("{00FF00}/vehicles{FFFFFF} — таблица транспорта")
-		  imgui.TextColoredRGB("{00FF00}/onjectrender{FFFFFF} — рендер объектов")
 		  imgui.TextColoredRGB("{00FF00}/jump{FFFFFF} — прыгнуть вперед")
 		  imgui.TextColoredRGB("{00FF00}/slap{FFFFFF} — слапнуть(подбросить) себя")
 		  imgui.Text(" ")
@@ -1576,7 +1588,7 @@ function imgui.OnDrawFrame()
       imgui.SameLine()
       imgui.TextQuestion("( ? )", u8"Применимо только для объектов в области стрима")
 
-	  if imgui.Checkbox(u8("Показывать ID объектов"), checkbox.showobjects) then 
+	  if imgui.Checkbox(u8("Показывать modelid объектов"), checkbox.showobjects) then 
 		 if checkbox.showobjects.v  then
             showobjects = true
          else
@@ -1584,7 +1596,7 @@ function imgui.OnDrawFrame()
          end
 	  end
 	  imgui.SameLine()
-      imgui.TextQuestion("( ? )", u8"Применимо только для объектов в области стрима")
+      imgui.TextQuestion("( ? )", u8"Применимо только для объектов в области стрима (CTRL + O)")
 	  
 	  
 	  if imgui.Checkbox(u8("Показывать координаты объекта при перемещении"), checkbox.showobjectrot) then 
@@ -1782,7 +1794,7 @@ function main()
 		    thisScript():unload()
 		 end
 	  else
-	     sampAddChatMessage("{00BFFF}Absolute {FFD700}Events {FFFFFF}Helper. Открыть меню: ALT + X", 0xFFFFFF)
+	     sampAddChatMessage("{00BFFF}Absolute {FFD700}Events {FFFFFF}Helper. Открыть меню: {FFD700}ALT + X", 0xFFFFFF)
 	  end
       
       -- ENB check
@@ -1862,28 +1874,9 @@ function main()
          dialog.main.v = not dialog.main.v 
 	  end)
 	  
-	  sampRegisterChatCommand("note", function ()
-         dialog.main.v = true
-         dialog.notepad.v = not dialog.notepad.v 
-	  end)
-
       sampRegisterChatCommand("chatbinds", function ()
          dialog.main.v = true
          dialog.chatbinds.v = not dialog.chatbinds.v 
-	  end)
-
-      sampRegisterChatCommand("players", function ()
-         dialog.main.v = true
-         dialog.players.v = not dialog.players.v 
-	  end)
-
-      sampRegisterChatCommand("vehicles", function ()
-         dialog.main.v = true
-         dialog.vehs.v = not dialog.vehs.v 
-	  end)
-	  
-	  sampRegisterChatCommand("objectrender", function ()
-         showobjects = not showobjects
 	  end)
       
 	  sampRegisterChatCommand("slap", function ()
@@ -1999,10 +1992,14 @@ function main()
 		 if dialog.main.v then dialog.main.v = false end
 	  end 
 	  
-	  -- ALT+X (Activation combination)
+	  -- ALT+X (MAin menu activation)
       if isKeyDown(VK_MENU) and isKeyJustPressed(VK_X) and not sampIsChatInputActive() and not    sampIsDialogActive() and not isPauseMenuActive() and not isSampfuncsConsoleActive() then 
-         if showobjects then showobjects = false end
 		 dialog.main.v = not dialog.main.v 
+      end
+	  
+	  -- CTRL+O (Objects render activation)
+      if isKeyDown(VK_CONTROL) and isKeyJustPressed(VK_O) and not sampIsChatInputActive() and not isPauseMenuActive() and not isSampfuncsConsoleActive() then 
+		 showobjects = not showobjects
       end
 	  
 	  -- Objects render
@@ -2093,14 +2090,14 @@ function sampev.onScriptTerminate(script, quitGame)
         if not sampIsDialogActive() then
             showCursor(false)
         end
-        sampAddChatMessage("Скрипт аварийно завершил свою работу. Для перезагрузки нажмите CTRL + R.", -1)
+        sampAddChatMessage("Скрипт AbsEventHelper аварийно завершил свою работу. Для перезагрузки нажмите CTRL + R.", -1)
     end
 end
 
-function sampev.onSendEnterEditObject(type, objectId, model, position)
+--function sampev.onSendEnterEditObject(type, objectId, model, position)
    --printStringNow(string.format("modelid: %d - %0.2f, %0.2f, %0.2f", 
    --model, position.x, position.y, position.z), 1000)
-end 
+--end 
 
 function sampev.onSendEditObject(playerObject, objectId, response, position, rotation)
    if showobjectrot then
