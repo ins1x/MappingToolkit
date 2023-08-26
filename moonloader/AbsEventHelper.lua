@@ -4,7 +4,7 @@ script_description("Assistant for mappers and event makers on Absolute DM")
 script_dependencies('imgui', 'lib.samp.events', 'vkeys')
 script_properties("work-in-pause")
 script_url("https://github.com/ins1x/AbsEventHelper")
-script_version("2.5")
+script_version("2.5.1")
 -- script_moonloader(16) moonloader v.0.26
 
 require 'lib.moonloader'
@@ -585,32 +585,44 @@ function imgui.OnDrawFrame()
          imgui.Text(string.format(u8"Объектов в области в стрима: %i", streamedObjects))
       end
       
-     imgui.Text(" ")
-       if imgui.Button(u8"Получить координаты", imgui.ImVec2(250, 25)) then
-          if not sampIsChatInputActive() and not sampIsDialogActive() and not isPauseMenuActive() and not isSampfuncsConsoleActive() then 
-             sampSendChat("/коорд")
-             tpposX, tpposY, tpposZ = getCharCoordinates(PLAYER_PED)
-             setClipboardText(math.floor(tpposX) .. ' ' .. math.floor(tpposY) .. ' ' .. math.floor(tpposZ))
-             printStringNow("Coords copied to clipboard", 1000)
-             sampAddChatMessage(string.format("Интерьер: %i", getActiveInterior()), 0x0FFFFFF)
-          end
-       end
+      imgui.Text(" ")
+      if imgui.Button(u8"Получить координаты", imgui.ImVec2(250, 25)) then
+         if not sampIsChatInputActive() and not sampIsDialogActive() and not isPauseMenuActive() and not isSampfuncsConsoleActive() then 
+            sampSendChat("/коорд")
+            tpposX, tpposY, tpposZ = getCharCoordinates(PLAYER_PED)
+            setClipboardText(math.floor(tpposX) .. ' ' .. math.floor(tpposY) .. ' ' .. math.floor(tpposZ))
+            printStringNow("Coords copied to clipboard", 1000)
+            sampAddChatMessage(string.format("Интерьер: %i", getActiveInterior()), 0x0FFFFFF)
+         end
+      end
       
-       if imgui.Button(u8"Телепорт по кординатам", imgui.ImVec2(250, 25)) then
-          if tpposX then
-             prepareTeleport = true
-             sampSendChat(string.format("/ngr %f %f %f", tpposX, tpposY, tpposZ), 0x0FFFFFF)
-             sampAddChatMessage(string.format("Телепорт на координаты: %.1f %.1f %.1f"
-            ,tpposX, tpposY, tpposZ), 0x0FFFFFF)
-          else
-             prepareTeleport = false
-             sampAddChatMessage("Координаты не были сохранены. Нажмите коорд", 0x0FFFFFF)
-          end
-       end
+      if imgui.Button(u8"Телепорт по кординатам", imgui.ImVec2(250, 25)) then
+         if tpposX then
+            prepareTeleport = true
+            sampSendChat(string.format("/ngr %f %f %f", tpposX, tpposY, tpposZ), 0x0FFFFFF)
+            sampAddChatMessage(string.format("Телепорт на координаты: %.1f %.1f %.1f"
+           ,tpposX, tpposY, tpposZ), 0x0FFFFFF)
+         else
+            prepareTeleport = false
+            sampAddChatMessage("Координаты не были сохранены. Нажмите коорд", 0x0FFFFFF)
+         end
+      end
       
-       if imgui.Button(u8"Прыгнуть вперед", imgui.ImVec2(250, 25)) then
-          if not sampIsChatInputActive() and not sampIsDialogActive() and not isPauseMenuActive() and not isSampfuncsConsoleActive() then sampSendChat("/ghsu") end
-       end
+	  -- Bugged. Server turn you at cheat world
+	  -- if imgui.Button(u8"Рестрим", imgui.ImVec2(250, 25)) then
+         -- tpposX, tpposY, tpposZ = getCharCoordinates(PLAYER_PED)
+		 -- if tpposX then
+		    -- sampSendChat(string.format("/ngr %f %f %f", tpposX, tpposY, tpposZ+1000), 0x0FFFFFF)
+			-- lua_thread.create(function()
+            -- wait(250)
+            -- sampSendChat(string.format("/ngr %f %f %f", tpposX, tpposY, tpposZ+1), 0x0FFFFFF)
+            -- end)
+		 -- end
+      -- end
+	  
+      if imgui.Button(u8"Прыгнуть вперед", imgui.ImVec2(250, 25)) then
+         if not sampIsChatInputActive() and not sampIsDialogActive() and not isPauseMenuActive() and not isSampfuncsConsoleActive() then sampSendChat("/ghsu") end
+      end
 
       if imgui.Button(u8(ini.settings.showhud and 'Скрыть' or 'Показать')..u8" HUD", 
       imgui.ImVec2(250, 25)) then
@@ -1093,7 +1105,9 @@ function imgui.OnDrawFrame()
           end
           imgui.SetColumnWidth(-1, 60)
           imgui.NextColumn()
-          if (health <= 100) then
+		  if health <= 9000 then
+		     imgui.TextColoredRGB("{FF0000}GM")
+          elseif health <= 100 then
              imgui.TextColoredRGB(string.format("%i (%i)", health, armor))
           else
              imgui.TextColoredRGB(string.format("{FF0000}%i (%i)", health, armor))
@@ -1214,12 +1228,14 @@ function imgui.OnDrawFrame()
        if checkbox.vehstream.v then
 
           imgui.Separator()
-          imgui.Columns(3)
+          imgui.Columns(4)
           imgui.TextQuestion("ID", u8"Внутренний ID (/dl)")
           imgui.NextColumn()
-          imgui.SetColumnWidth(-1, 500)
           imgui.Text("Vehicle")
           imgui.NextColumn()
+		  imgui.SetColumnWidth(-1, 350)
+		  imgui.Text("Driver")
+		  imgui.NextColumn()
           imgui.Text("Health")
           imgui.NextColumn()
           imgui.Columns(1)
@@ -1229,14 +1245,35 @@ function imgui.OnDrawFrame()
              local health = getCarHealth(v)
              local carmodel = getCarModel(v)
              local streamed, id = sampGetVehicleIdByCarHandle(v)
-             
-             imgui.Columns(3)
+			 local ped = getDriverOfCar(v)
+             local res, pid = sampGetPlayerIdByCharHandle(ped)
+
+             imgui.Columns(4)
              imgui.TextColoredRGB(string.format("%i", id))
              imgui.SetColumnWidth(-1, 50)
              imgui.NextColumn()
              imgui.TextColoredRGB(string.format("%s", VehicleNames[carmodel-399]))
              imgui.NextColumn()
-             imgui.TextColoredRGB(string.format("%i", health))
+			 if res then 
+			    local ucolor = sampGetPlayerColor(pid)
+			    imgui.TextColoredRGB(string.format("{%0.6x}%s", bit.band(ucolor,0xffffff),sampGetPlayerNickname(pid)))
+				if imgui.IsItemClicked() then
+                   setClipboardText(pid)
+                   printStringNow("ID copied to clipboard", 1000)
+                end
+		     else
+			    imgui.Text(u8"пустой")
+			 end
+			 imgui.NextColumn()
+			 if health > 99999 then
+			    imgui.TextColoredRGB("{ff0000}GM")
+			 elseif health > 1000 then
+			    imgui.TextColoredRGB(string.format("{ff0000}%i", health))
+             elseif health < 450 then
+			    imgui.TextColoredRGB(string.format("{ff8c00}%i", health))
+			 else 
+			    imgui.TextColoredRGB(string.format("%i", health))
+			 end
              imgui.Columns(1)
              imgui.Separator()
           end
