@@ -4,7 +4,7 @@ script_description("Assistant for mappers and event makers on Absolute DM")
 script_dependencies('imgui', 'lib.samp.events', 'vkeys')
 script_properties("work-in-pause")
 script_url("https://github.com/ins1x/AbsEventHelper")
-script_version("2.5.1")
+script_version("2.6")
 -- script_moonloader(16) moonloader v.0.26
 
 require 'lib.moonloader'
@@ -58,7 +58,6 @@ local color = imgui.ImFloat4(1, 0, 0, 1)
 
 local dialog = {
    main = imgui.ImBool(false),
-   notepad = imgui.ImBool(false),
    fastanswer = imgui.ImBool(false)
 }
 
@@ -150,6 +149,7 @@ local ENBSeries = false
 local disconnectremind = true
 local chosenplayer = nil
 local heavyweaponwarn = true
+local lastObjectModelid = nil
 streamedObjects = 0
 
 local fps = 0
@@ -280,6 +280,13 @@ function main()
          print("AbsEventHelper failed import fWingdingsRU.jpg")
       end
       
+	  if doesFileExist(getGameDirectory() .. '\\moonloader\\resource\\abseventhelper\\objects.txt') then
+	     favfile = io.open(getGameDirectory() ..
+		 "//moonloader//resource//abseventhelper//objects.txt", "r")
+	     textbuffer.note.v = favfile:read('*a')
+         favfile:close()
+	  end
+	  
       -- commands section
       sampRegisterChatCommand("abshelper", function ()
          dialog.main.v = not dialog.main.v 
@@ -585,6 +592,14 @@ function imgui.OnDrawFrame()
          imgui.Text(string.format(u8"Объектов в области в стрима: %i", streamedObjects))
       end
       
+	  if lastObjectModelid then
+         imgui.Text(string.format(u8"Последний объект: %i", lastObjectModelid))
+		 if imgui.IsItemClicked() then
+            setClipboardText(lastObjectModelid)
+            printStringNow("modelid copied to clipboard", 1000)
+         end
+      end
+	  
       imgui.Text(" ")
       if imgui.Button(u8"Получить координаты", imgui.ImVec2(250, 25)) then
          if not sampIsChatInputActive() and not sampIsDialogActive() and not isPauseMenuActive() and not isSampfuncsConsoleActive() then 
@@ -639,9 +654,6 @@ function imgui.OnDrawFrame()
 
       imgui.Text(" ")
       imgui.Text(" ")
-      -- if imgui.Button(u8"Заметки", imgui.ImVec2(250, 25)) then
-         -- dialog.notepad.v = not dialog.notepad.v
-      -- end
       
       imgui.Columns(1)
       imgui.Separator()
@@ -953,7 +965,7 @@ function imgui.OnDrawFrame()
           imgui.Text(u8"Чтобы открыть дополнительные ф-ции нажмите на никнейм игрока")
        end
        
-       if imgui.Button(u8"Обновить список игроков", imgui.ImVec2(250, 25)) then
+       if imgui.Button(u8"Обновить", imgui.ImVec2(150, 25)) then
           playersTable = {}       
           playersTotal = 0
           
@@ -967,7 +979,7 @@ function imgui.OnDrawFrame()
        end
        
        imgui.SameLine()
-       if imgui.Button(u8"Сохранить список игроков", imgui.ImVec2(250, 25)) then
+       if imgui.Button(u8"Сохранить", imgui.ImVec2(150, 25)) then
           ptablefile = io.open(getGameDirectory().."/moonloader/resource/abseventhelper/players.txt", "a")
           ptablefile:write("\n")
           ptablefile:write(string.format("%s \n", os.date("%d.%m.%y %H:%M:%S")))
@@ -982,10 +994,13 @@ function imgui.OnDrawFrame()
           printStringNow("Saved. moonloader/resource/abseventhelper/players.txt", 4000)
        end
        
+	   imgui.SameLine()
+	   if imgui.Button(u8"Очистить", imgui.ImVec2(150, 25)) then
+          playersTable = {}       
+          playersTotal = 0
+       end
+	   
        imgui.TextColoredRGB("{FF0000}Красным{CDCDCD} в таблице отмечены подозрительные игроки (малый лвл, большой пинг)")
-      
-       -- if imgui.Checkbox(u8("Показывать информацию о транспорте игрока"), checkbox.vehhealth) then
-       -- end
              
        imgui.Checkbox(u8("Автоообновление списка игроков"), checkbox.autoupdplayerstable)
        
@@ -1146,7 +1161,7 @@ function imgui.OnDrawFrame()
 
       elseif tabmenu.main == 4 then
       imgui.Columns(2, "vehtableheader", false)
-      imgui.SetColumnWidth(-1, 550)
+      imgui.SetColumnWidth(-1, 500)
       -- https://wiki.multitheftauto.com/wiki/Vehicle_IDs
       imgui.Text(u8"Найти ID транспорта по имени:")
        if imgui.InputText("##BindVehs", textbuffer.vehiclename) then 
@@ -1185,16 +1200,6 @@ function imgui.OnDrawFrame()
           imgui.Text(string.format(u8"Цвет %d и %d", getCarColours(carhandle)))
        end
        
-       -- if imgui.Button(u8"Найти ID транспорта по имени", imgui.ImVec2(320, 25)) then
-          -- for k, vehname in ipairs(VehicleNames) do
-             -- if vehname:lower():find(u8:decode(textbuffer.vehiclename.v:lower())) then
-                -- vehinfomodelid = 399+k
-                -- if vehinfomodelid < 611 or vehinfomodelid > 1 and textbuffer.vehiclename.v ~= "" then
-                   -- setClipboardText(vehinfomodelid)
-                -- end
-             -- end 
-          -- end
-       -- end
        imgui.NextColumn()
        if imgui.Button(u8"Заказать машину по имени") then
           if not sampIsChatInputActive() and not sampIsDialogActive() and not isPauseMenuActive() and not  isSampfuncsConsoleActive() then
@@ -1334,6 +1339,28 @@ function imgui.OnDrawFrame()
          imgui.Text(u8"Чистая посуда: 2822, 2829, 2831, 2832, 2849, 2862-2865")
          imgui.Text(u8"Грязная посуда: 2812, 2820, 2830, 2848, 2850, 2851")
          imgui.Text(u8"Картины: 2255-2289, 3962-3964, 14860, 14812, 14737")
+	  elseif tabmenu.objects == 6 then
+	     imgui.Text(u8"Здесь вы можете сохранить ваши объекты в избранное")
+	     imgui.InputTextMultiline('##bufftext', textbuffer.note, imgui.ImVec2(475, 150))
+
+         if imgui.Button(u8"Сохранить в файл", imgui.ImVec2(125, 25)) then
+            favfile = io.open(getGameDirectory() ..
+			"//moonloader//resource//abseventhelper//objects.txt", "a")
+            --favfile:write("\n")
+            --favfile:write(string.format("%s \n", os.date("%d.%m.%y %H:%M:%S")))
+            favfile:write(textbuffer.note.v)
+            favfile:close()
+            printStringNow("Saved moonloader/resource/abseventhelper/objects.txt", 3000)
+         end
+		 
+		 imgui.SameLine()
+		 if imgui.Button(u8"Загрузить из файла", imgui.ImVec2(125, 25)) then
+            favfile = io.open(getGameDirectory() ..
+			"//moonloader//resource//abseventhelper//objects.txt", "r")
+			textbuffer.note.v = favfile:read('*a')
+            favfile:close()
+         end
+		 
       end
 
       imgui.NextColumn()
@@ -1343,6 +1370,7 @@ function imgui.OnDrawFrame()
       if imgui.Button(u8"Эффекты",imgui.ImVec2(200, 25)) then tabmenu.objects = 3 end
       if imgui.Button(u8"Освещение",imgui.ImVec2(200, 25)) then tabmenu.objects = 4 end
       if imgui.Button(u8"Интерьер",imgui.ImVec2(200, 25)) then tabmenu.objects = 5 end
+      if imgui.Button(u8"Избранные",imgui.ImVec2(200, 25)) then tabmenu.objects = 6 end
 
       imgui.Columns(1)
       imgui.Separator()
@@ -1909,35 +1937,6 @@ function imgui.OnDrawFrame()
       imgui.End()
    end
     
-   if dialog.notepad.v then
-      imgui.SetNextWindowPos(imgui.ImVec2(sizeY / 4, sizeY / 2),
-      imgui.Cond.FirstUseEver, imgui.ImVec2(0.5, 0.5))
-      imgui.SetNextWindowSize(imgui.ImVec2(310, 210), imgui.Cond.FirstUseEver)
-      imgui.Begin(u8"Блокнот", dialog.notepad)
-      
-      imgui.InputTextMultiline('##bufftext', textbuffer.note, imgui.ImVec2(285, 125))
-
-      if imgui.Button(u8"Сохранить", imgui.ImVec2(85, 25)) then
-         notefile = io.open(getGameDirectory().."//moonloader//resource//abseventhelper//notes.txt", "a")
-         notefile:write("\n")
-         notefile:write(string.format("%s \n", os.date("%d.%m.%y %H:%M:%S")))
-         notefile:write(textbuffer.note.v)
-         notefile:close()
-         printStringNow("Saved moonloader/resource/abseventhelper/notes.txt", 3000)
-      end
-       
-      imgui.SameLine()
-      if imgui.Button(u8"Очистить", imgui.ImVec2(85, 25)) then
-         textbuffer.note.v = u8" "
-      end
-       
-      imgui.SameLine()
-      if imgui.Button(u8"Скрыть", imgui.ImVec2(85, 25)) then
-         dialog.notepad.v = not dialog.notepad.v
-      end
-      
-      imgui.End()
-    end 
 end
 
 function sampev.onSetWeather(weatherId)
@@ -2003,12 +2002,11 @@ function sampev.onScriptTerminate(script, quitGame)
     end
 end
 
---function sampev.onSendEnterEditObject(type, objectId, model, position)
-   --printStringNow(string.format("modelid: %d - %0.2f, %0.2f, %0.2f", 
-   --model, position.x, position.y, position.z), 1000)
---end 
-
 function sampev.onSendEditObject(playerObject, objectId, response, position, rotation)
+   local object = sampGetObjectHandleBySampId(objectId)
+   local modelId = getObjectModel(object)
+   lastObjectModelid = modelId
+   
    if showobjectrot then
       printStringNow(string.format("x:~g~%0.2f, ~w~y:~g~%0.2f, ~w~z:~g~%0.2f~n~ ~w~rx:~g~%0.2f, ~w~ry:~g~%0.2f, ~w~rz:~g~%0.2f", position.x, position.y, position.z, rotation.x, rotation.y, rotation.z), 1000)
    end
