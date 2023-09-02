@@ -4,7 +4,7 @@ script_description("Assistant for mappers and event makers on Absolute DM")
 script_dependencies('imgui', 'lib.samp.events', 'vkeys')
 script_properties("work-in-pause")
 script_url("https://github.com/ins1x/AbsEventHelper")
-script_version("2.7")
+script_version("2.8")
 -- script_moonloader(16) moonloader v.0.26
 
 require 'lib.moonloader'
@@ -145,6 +145,7 @@ local hostip = "193.84.90.23"
 local tpposX, tpposY, tpposZ
 local disableObjectCollision = false
 local prepareTeleport = false
+local prepareJump = false
 local showobjects = false
 local showobjectrot = false
 local ENBSeries = false
@@ -285,13 +286,13 @@ function main()
          print("AbsEventHelper failed import fWingdingsRU.jpg")
       end
       
-	  if doesFileExist(getGameDirectory() .. '\\moonloader\\resource\\abseventhelper\\objects.txt') then
-	     favfile = io.open(getGameDirectory() ..
-		 "//moonloader//resource//abseventhelper//objects.txt", "r")
-	     textbuffer.note.v = favfile:read('*a')
+      if doesFileExist(getGameDirectory() .. '\\moonloader\\resource\\abseventhelper\\objects.txt') then
+         favfile = io.open(getGameDirectory() ..
+         "//moonloader//resource//abseventhelper//objects.txt", "r")
+         textbuffer.note.v = favfile:read('*a')
          favfile:close()
-	  end
-	  
+      end
+      
       -- commands section
       sampRegisterChatCommand("abshelper", function ()
          dialog.main.v = not dialog.main.v 
@@ -305,30 +306,7 @@ function main()
       end)
       
       sampRegisterChatCommand("jump", function ()
-         if sampIsLocalPlayerSpawned() then
-            local posX, posY, posZ = getCharCoordinates(PLAYER_PED)
-            local angle = math.ceil(getCharHeading(PLAYER_PED))
-            local dist = 2.0
-            if angle then
-               if (angle >= 0 and angle <= 30 or (angle <= 360 and angle >= 330)) then
-                  setCharCoordinates(PLAYER_PED, posX, posY+dist, posZ)
-               elseif (angle > 80 and angle < 100) then
-                  setCharCoordinates(PLAYER_PED, posX-dist, posY+dist, posZ)
-               elseif (angle > 260 and angle < 280) then
-                  setCharCoordinates(PLAYER_PED, posX+dist, posY, posZ)
-               elseif (angle >= 170 and angle <= 190) then
-                  setCharCoordinates(PLAYER_PED, posX-dist, posY-dist, posZ)
-               elseif (angle >= 31 and angle <= 79) then
-                  setCharCoordinates(PLAYER_PED, posX, posY-dist, posZ)             
-               elseif (angle >= 191 and angle <= 259) then
-                  setCharCoordinates(PLAYER_PED, posX+dist, posY-dist, posZ)
-               elseif (angle >= 81 and angle <= 169) then
-                  setCharCoordinates(PLAYER_PED, posX-dist, posY, posZ)
-               elseif (angle >= 259 and angle <= 329) then
-                  setCharCoordinates(PLAYER_PED, posX+dist, posY+dist, posZ)
-               end
-            end
-         end
+         JumpForward()
       end)
       
       -- set drawdist and figdist
@@ -396,23 +374,23 @@ function main()
              (sizeY - imgY) / 2, imgX, imgY, 0, 0xffffffff)
           end
        end
-	  
+      
       -- Imgui menu
       if not ENBSeries then imgui.Process = dialog.main.v end
       
       -- -- Freeze chat
-	  -- local visible = sampIsChatInputActive()
-	  -- if freezeChat ~= visible then
-	     -- freezeChat = visible
-		   -- if not freezeChat then
-		      -- for k, v in ipairs(chatTable) do
-			     -- local color = string.format('%X', v.color)
-				 -- sampAddChatMessage(v.text, tonumber('0x' .. string.sub(color, #color - 8, #color - 2)))
-			  -- end
-		    -- chatTable = {}
-		 -- end
-	  -- end
-	  
+      -- local visible = sampIsChatInputActive()
+      -- if freezeChat ~= visible then
+         -- freezeChat = visible
+           -- if not freezeChat then
+              -- for k, v in ipairs(chatTable) do
+                 -- local color = string.format('%X', v.color)
+                 -- sampAddChatMessage(v.text, tonumber('0x' .. string.sub(color, #color - 8, #color - 2)))
+              -- end
+            -- chatTable = {}
+         -- end
+      -- end
+      
       -- Hide dialogs o ESC
       if isKeyJustPressed(VK_ESCAPE) and not sampIsChatInputActive() 
       and not sampIsDialogActive() and not isPauseMenuActive() 
@@ -600,7 +578,7 @@ function imgui.OnDrawFrame()
       imgui.Text(string.format(u8"Позиция x: %.1f, y: %.1f, z: %.1f",
       positionX, positionY, positionZ))
       
-	  local angle = math.ceil(getCharHeading(PLAYER_PED))
+      local angle = math.ceil(getCharHeading(PLAYER_PED))
       imgui.Text(string.format(u8"Направление: %s  %i°", direction(), angle))
 
       local streamedplayers = sampGetPlayerCount(true) - 1
@@ -611,16 +589,16 @@ function imgui.OnDrawFrame()
          imgui.Text(string.format(u8"Объектов в области в стрима: %i", streamedObjects))
       end
       
-	  if lastObjectModelid then
+      if lastObjectModelid then
          imgui.Text(string.format(u8"Последний объект: %i", lastObjectModelid))
-		 if imgui.IsItemClicked() then
+         if imgui.IsItemClicked() then
             setClipboardText(lastObjectModelid)
             printStringNow("modelid copied to clipboard", 1000)
          end
       end
-	  
-	  --imgui.Text(string.format(u8"Remove buildings: %i", removedBuildings))
-	  
+      
+      --imgui.Text(string.format(u8"Remove buildings: %i", removedBuildings))
+      
       imgui.Text(" ")
       if imgui.Button(u8"Получить координаты", imgui.ImVec2(250, 25)) then
          if not sampIsChatInputActive() and not sampIsDialogActive() and not isPauseMenuActive() and not isSampfuncsConsoleActive() then 
@@ -644,22 +622,47 @@ function imgui.OnDrawFrame()
          end
       end
       
-	  -- Bugged. Server turn you at cheat world
-	  -- if imgui.Button(u8"Рестрим", imgui.ImVec2(250, 25)) then
+      -- Bugged. Server turn you at cheat world
+      -- if imgui.Button(u8"Рестрим", imgui.ImVec2(250, 25)) then
          -- tpposX, tpposY, tpposZ = getCharCoordinates(PLAYER_PED)
-		 -- if tpposX then
-		    -- sampSendChat(string.format("/ngr %f %f %f", tpposX, tpposY, tpposZ+1000), 0x0FFFFFF)
-			-- lua_thread.create(function()
+         -- if tpposX then
+            -- sampSendChat(string.format("/ngr %f %f %f", tpposX, tpposY, tpposZ+1000), 0x0FFFFFF)
+            -- lua_thread.create(function()
             -- wait(250)
             -- sampSendChat(string.format("/ngr %f %f %f", tpposX, tpposY, tpposZ+1), 0x0FFFFFF)
             -- end)
-		 -- end
+         -- end
       -- end
-	  
+      
       if imgui.Button(u8"Прыгнуть вперед", imgui.ImVec2(250, 25)) then
+         prepareJump = true
          if not sampIsChatInputActive() and not sampIsDialogActive() and not isPauseMenuActive() and not isSampfuncsConsoleActive() then sampSendChat("/ghsu") end
       end
 
+	  if imgui.Button(u8"Провалиться под текстуры", imgui.ImVec2(250, 25)) then
+		 if sampIsLocalPlayerSpawned() then
+		    local posX, posY, posZ = getCharCoordinates(PLAYER_PED)
+            setCharCoordinates(PLAYER_PED, posX, posY, posZ-3.0)
+		 end
+      end
+	  
+	  if imgui.Button(u8"Вернуться на поверхность", imgui.ImVec2(250, 25)) then
+         local result, x, y, z = getNearestRoadCoordinates()
+		 local anticheatMaxAllowedDist = 10.0
+         if result then
+            local dist = getDistanceBetweenCoords3d(x, y, z, getCharCoordinates(PLAYER_PED))
+            if dist < anticheatMaxAllowedDist then 
+			   setCharCoordinates(PLAYER_PED, x, y, z + 1)
+			   --sampAddChatMessage(("(%i %i %i)"):format(x,y,z), -1)
+               sampAddChatMessage("Вы телепортированны на ближайшую поверхность", -1)
+			else
+			   sampAddChatMessage(("Ближайшая поверхность слишком далеко (%d m.)"):format(dist), 0x0FF0000)
+			end
+         else
+            sampAddChatMessage("Не нашлось ни одной поверхности рядом", 0x0FF0000)
+         end
+      end
+	  
       if imgui.Button(u8(ini.settings.showhud and 'Скрыть' or 'Показать')..u8" HUD", 
       imgui.ImVec2(250, 25)) then
          ini.settings.showhud = not ini.settings.showhud
@@ -999,57 +1002,58 @@ function imgui.OnDrawFrame()
           printStringNow("Saved. moonloader/resource/abseventhelper/players.txt", 4000)
        end
        
-	   imgui.SameLine()
-	   if imgui.Button(u8"Очистить", imgui.ImVec2(110, 25)) then
+       imgui.SameLine()
+       if imgui.Button(u8"Очистить", imgui.ImVec2(110, 25)) then
           playersTable = {}       
           playersTotal = 0
+          chosenplayer = nil
        end
-	   
-	   imgui.SameLine()
-	   if imgui.Button(u8"...") then
-	      tabmenu.playersopt = not tabmenu.playersopt
+       
+       imgui.SameLine()
+       if imgui.Button(u8"...") then
+          tabmenu.playersopt = not tabmenu.playersopt
        end
-	   
-	   imgui.SameLine()
-	   imgui.Text(u8"Найти в таблице:")
-	   
-	   imgui.SameLine()
-	   imgui.PushItemWidth(170)
-	   if imgui.InputText("##FindPlayer", textbuffer.findplayer) then 
-	      -- for i = 0, sampGetMaxPlayerId(false) do
-		     -- local nickname = sampGetPlayerNickname(i)
+       
+       imgui.SameLine()
+       imgui.Text(u8"Найти в таблице:")
+       
+       imgui.SameLine()
+       imgui.PushItemWidth(170)
+       if imgui.InputText("##FindPlayer", textbuffer.findplayer) then 
+          -- for i = 0, sampGetMaxPlayerId(false) do
+             -- local nickname = sampGetPlayerNickname(i)
              -- if sampIsPlayerConnected(i) and nickname:find(u8:decode(textbuffer.findplayer.v)) then
-			    -- chosenplayer = i
-				-- printStringNow("find", 100)
-			 -- end
+                -- chosenplayer = i
+                -- printStringNow("find", 100)
+             -- end
           -- end
-		  for k, v in pairs(playersTable) do
-		     local nickname = sampGetPlayerNickname(v)
-		     --if nickname:find(u8:decode(textbuffer.findplayer.v)) then
-		     if nickname == u8:decode(textbuffer.findplayer.v) then
-			    printStringNow("finded", 1000)
-				chosenplayer = sampGetPlayerIdByNickname(nickname)
-			 end
-		  end
-		  
-	   end
-	   imgui.PopItemWidth()
-	   
+          for k, v in pairs(playersTable) do
+             local nickname = sampGetPlayerNickname(v)
+             --if nickname:find(u8:decode(textbuffer.findplayer.v)) then
+             if nickname == u8:decode(textbuffer.findplayer.v) then
+                printStringNow("finded", 1000)
+                chosenplayer = sampGetPlayerIdByNickname(nickname)
+             end
+          end
+          
+       end
+       imgui.PopItemWidth()
+       
        imgui.TextColoredRGB("{FF0000}Красным{CDCDCD} в таблице отмечены подозрительные игроки (малый лвл, большой пинг)")
        
-	   if tabmenu.playersopt then 
+       if tabmenu.playersopt then 
           if imgui.Button(u8"Выбрать случайного игрока") then
-		     if next(playersTable) == nil then -- if playersTable is empty
+             if next(playersTable) == nil then -- if playersTable is empty
                 printStringNow("Update players table before", 1000) 
              else
                  local rand = math.random(playersTotal)
-				 chosenplayer = playersTable[rand]
-				 printStringNow("Random player: ".. sampGetPlayerNickname(playersTable[rand]), 1000)
-			 end
+                 chosenplayer = playersTable[rand]
+                 printStringNow("Random player: ".. sampGetPlayerNickname(playersTable[rand]), 1000)
+             end
           end
-		  
-		  imgui.SameLine()
-		  if imgui.Button(u8"Получить id игроков рядом") then
+          
+          imgui.SameLine()
+          if imgui.Button(u8"Получить id игроков рядом") then
              local pidtable = {}
              local resulstring
              for k, v in ipairs(getAllChars()) do
@@ -1063,7 +1067,7 @@ function imgui.OnDrawFrame()
                 end
              end
           end
-		  
+          
           imgui.Checkbox(u8("Автоообновление списка игроков"), checkbox.autoupdplayerstable)
           if checkbox.autoupdplayerstable.v then
              playersTable = {}       
@@ -1086,9 +1090,9 @@ function imgui.OnDrawFrame()
                 disconnectremind = false
              end
           end
-		  
+          
        end 
-	   
+       
        if chosenplayer then
           imgui.Separator()
           local nickname = sampGetPlayerNickname(chosenplayer)
@@ -1183,8 +1187,8 @@ function imgui.OnDrawFrame()
           end
           imgui.SetColumnWidth(-1, 60)
           imgui.NextColumn()
-		  if health >= 9000 then
-		     imgui.TextColoredRGB("{FF0000}GM")
+          if health >= 9000 then
+             imgui.TextColoredRGB("{FF0000}GM")
           elseif health <= 100 then
              imgui.TextColoredRGB(string.format("%i (%i)", health, armor))
           else
@@ -1301,9 +1305,9 @@ function imgui.OnDrawFrame()
           imgui.NextColumn()
           imgui.Text("Vehicle")
           imgui.NextColumn()
-		  imgui.SetColumnWidth(-1, 350)
-		  imgui.Text("Driver")
-		  imgui.NextColumn()
+          imgui.SetColumnWidth(-1, 350)
+          imgui.Text("Driver")
+          imgui.NextColumn()
           imgui.Text("Health")
           imgui.NextColumn()
           imgui.Columns(1)
@@ -1313,7 +1317,7 @@ function imgui.OnDrawFrame()
              local health = getCarHealth(v)
              local carmodel = getCarModel(v)
              local streamed, id = sampGetVehicleIdByCarHandle(v)
-			 local ped = getDriverOfCar(v)
+             local ped = getDriverOfCar(v)
              local res, pid = sampGetPlayerIdByCharHandle(ped)
 
              imgui.Columns(4)
@@ -1322,26 +1326,26 @@ function imgui.OnDrawFrame()
              imgui.NextColumn()
              imgui.TextColoredRGB(string.format("%s", VehicleNames[carmodel-399]))
              imgui.NextColumn()
-			 if res then 
-			    local ucolor = sampGetPlayerColor(pid)
-			    imgui.TextColoredRGB(string.format("{%0.6x}%s", bit.band(ucolor,0xffffff),sampGetPlayerNickname(pid)))
-				if imgui.IsItemClicked() then
+             if res then 
+                local ucolor = sampGetPlayerColor(pid)
+                imgui.TextColoredRGB(string.format("{%0.6x}%s", bit.band(ucolor,0xffffff),sampGetPlayerNickname(pid)))
+                if imgui.IsItemClicked() then
                    setClipboardText(pid)
                    printStringNow("ID copied to clipboard", 1000)
                 end
-		     else
-			    imgui.Text(u8"пустой")
-			 end
-			 imgui.NextColumn()
-			 if health > 99999 then
-			    imgui.TextColoredRGB("{ff0000}GM")
-			 elseif health > 1000 then
-			    imgui.TextColoredRGB(string.format("{ff0000}%i", health))
+             else
+                imgui.Text(u8"пустой")
+             end
+             imgui.NextColumn()
+             if health > 99999 then
+                imgui.TextColoredRGB("{ff0000}GM")
+             elseif health > 1000 then
+                imgui.TextColoredRGB(string.format("{ff0000}%i", health))
              elseif health < 450 then
-			    imgui.TextColoredRGB(string.format("{ff8c00}%i", health))
-			 else 
-			    imgui.TextColoredRGB(string.format("%i", health))
-			 end
+                imgui.TextColoredRGB(string.format("{ff8c00}%i", health))
+             else 
+                imgui.TextColoredRGB(string.format("%i", health))
+             end
              imgui.Columns(1)
              imgui.Separator()
           end
@@ -1402,28 +1406,28 @@ function imgui.OnDrawFrame()
          imgui.Text(u8"Чистая посуда: 2822, 2829, 2831, 2832, 2849, 2862-2865")
          imgui.Text(u8"Грязная посуда: 2812, 2820, 2830, 2848, 2850, 2851")
          imgui.Text(u8"Картины: 2255-2289, 3962-3964, 14860, 14812, 14737")
-	  elseif tabmenu.objects == 6 then
-	     imgui.Text(u8"Здесь вы можете сохранить ваши объекты в избранное")
-	     imgui.InputTextMultiline('##bufftext', textbuffer.note, imgui.ImVec2(475, 150))
+      elseif tabmenu.objects == 6 then
+         imgui.Text(u8"Здесь вы можете сохранить ваши объекты в избранное")
+         imgui.InputTextMultiline('##bufftext', textbuffer.note, imgui.ImVec2(475, 150))
 
          if imgui.Button(u8"Сохранить в файл", imgui.ImVec2(125, 25)) then
             favfile = io.open(getGameDirectory() ..
-			"//moonloader//resource//abseventhelper//objects.txt", "a")
+            "//moonloader//resource//abseventhelper//objects.txt", "a")
             --favfile:write("\n")
             --favfile:write(string.format("%s \n", os.date("%d.%m.%y %H:%M:%S")))
             favfile:write(textbuffer.note.v)
             favfile:close()
             printStringNow("Saved moonloader/resource/abseventhelper/objects.txt", 3000)
          end
-		 
-		 imgui.SameLine()
-		 if imgui.Button(u8"Загрузить из файла", imgui.ImVec2(125, 25)) then
+         
+         imgui.SameLine()
+         if imgui.Button(u8"Загрузить из файла", imgui.ImVec2(125, 25)) then
             favfile = io.open(getGameDirectory() ..
-			"//moonloader//resource//abseventhelper//objects.txt", "r")
-			textbuffer.note.v = favfile:read('*a')
+            "//moonloader//resource//abseventhelper//objects.txt", "r")
+            textbuffer.note.v = favfile:read('*a')
             favfile:close()
          end
-		 
+         
       end
 
       imgui.NextColumn()
@@ -1445,18 +1449,24 @@ function imgui.OnDrawFrame()
          printStringNow("url copied to clipboard", 1000)
       end
       
-	  imgui.TextColoredRGB("Карта объектов которые не видны редакторами карт {007DFF}map.romzes.com")
+      imgui.TextColoredRGB("Карта объектов которые не видны редакторами карт {007DFF}map.romzes.com")
       if imgui.IsItemClicked() then
          setClipboardText("https://map.romzes.com/")
          printStringNow("url copied to clipboard", 1000)
       end
+      
+	  imgui.TextColoredRGB("Список всех разрушаемых объектов на {007DFF}dev.prineside.com/customsearch")
+      if imgui.IsItemClicked() then
+         setClipboardText("https://dev.prineside.com/ru/gtasa_samp_model_id/customsearch/?c%5B%5D=1&s=id-asc&bc=-1&bb=1&bt=-1&ba=-1")
+         printStringNow("url copied to clipboard", 1000)
+      end
 	  
-	  imgui.TextColoredRGB("Список всех текстур GTA:SA {007DFF}textures.xyin.ws")
+      imgui.TextColoredRGB("Список всех текстур GTA:SA {007DFF}textures.xyin.ws")
       if imgui.IsItemClicked() then
          setClipboardText("https://textures.xyin.ws/?page=textures&p=1&limit=100")
          printStringNow("url copied to clipboard", 1000)
       end
-	  
+      
       elseif tabmenu.main == 6 then
       imgui.Columns(2)
       imgui.SetColumnWidth(-1, 600)
@@ -2040,8 +2050,13 @@ function sampev.onServerMessage(color, text)
       -- return false
    -- end
    -- in-game mapeditor errors solutions tips and fix
-   if text:find("У тебя нет прав использовать эту команду") and prepareTeleport then
-      sampAddChatMessage("В мире телепортация отключена", 0x00FF00)
+   
+   if text:find("У тебя нет прав") then
+      if prepareJump then 
+         JumpForward()
+         prepareJump = false
+      end
+      if prepareTeleport then sampAddChatMessage("В мире телепортация отключена", 0x00FF00) end
       return false
    end
    
@@ -2117,6 +2132,33 @@ function direction()
    end
 end
 
+function JumpForward()
+   if sampIsLocalPlayerSpawned() then
+      local posX, posY, posZ = getCharCoordinates(PLAYER_PED)
+      local angle = math.ceil(getCharHeading(PLAYER_PED))
+      local dist = 2.0
+      if angle then
+         if (angle >= 0 and angle <= 30 or (angle <= 360 and angle >= 330)) then
+            setCharCoordinates(PLAYER_PED, posX, posY+dist, posZ)
+         elseif (angle > 80 and angle < 100) then
+            setCharCoordinates(PLAYER_PED, posX-dist, posY+dist, posZ)
+         elseif (angle > 260 and angle < 280) then
+            setCharCoordinates(PLAYER_PED, posX+dist, posY, posZ)
+         elseif (angle >= 170 and angle <= 190) then
+            setCharCoordinates(PLAYER_PED, posX-dist, posY-dist, posZ)
+         elseif (angle >= 31 and angle <= 79) then
+            setCharCoordinates(PLAYER_PED, posX, posY-dist, posZ)             
+         elseif (angle >= 191 and angle <= 259) then
+            setCharCoordinates(PLAYER_PED, posX+dist, posY-dist, posZ)
+         elseif (angle >= 81 and angle <= 169) then
+            setCharCoordinates(PLAYER_PED, posX-dist, posY, posZ)
+         elseif (angle >= 259 and angle <= 329) then
+            setCharCoordinates(PLAYER_PED, posX+dist, posY+dist, posZ)
+         end
+      end
+   end
+end
+
 function getClosestCar()
    -- return 2 values: car handle and car id
    local minDist = 9999
@@ -2153,6 +2195,15 @@ function getObjectsInStream()
     local count = 0
     for _ in pairs(getAllObject()) do count = count + 1 end
     return count
+end
+
+function getNearestRoadCoordinates(radius)
+    local A = { getCharCoordinates(PLAYER_PED) }
+    local B = { getClosestStraightRoad(A[1], A[2], A[3], 0, radius or 600) }
+    if B[1] ~= 0 and B[2] ~= 0 and B[3] ~= 0 then
+        return true, B[1], B[2], B[3]
+    end
+    return false
 end
 
 function sampGetPlayerIdByNickname(nick)
