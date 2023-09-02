@@ -1,6 +1,6 @@
 # Absolute Event Helper
 
-![logo](https://github.com/ins1x/AbsEventHelper/raw/main/moonloader/resource/abseventhelper/demo.png)
+![logo](https://github.com/ins1x/AbsEventHelper/raw/main/moonloader/resource/abseventhelper/demo.gif)
 
 #### ENGLISH
 Lua script Assistant for mappers and event makers on [Absolute Play](https://sa-mp.ru/) servers.   
