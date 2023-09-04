@@ -4,7 +4,7 @@ script_description("Assistant for mappers and event makers on Absolute DM")
 script_dependencies('imgui', 'lib.samp.events', 'vkeys')
 script_properties("work-in-pause")
 script_url("https://github.com/ins1x/AbsEventHelper")
-script_version("2.8")
+script_version("2.9")
 -- script_moonloader(16) moonloader v.0.26
 
 require 'lib.moonloader'
@@ -29,6 +29,7 @@ local ini = inicfg.load({
       lockserverweather = false,
       drawdist = "450",
       fog = "200",
+	  camdist = "1",
    },
    binds =
    {
@@ -75,7 +76,8 @@ local checkbox = {
 
 local slider = {
    fog = imgui.ImInt(ini.settings.fog),
-   drawdist = imgui.ImInt(ini.settings.drawdist)
+   drawdist = imgui.ImInt(ini.settings.drawdist),
+   camdist = imgui.ImInt(ini.settings.camdist)
 }
 
 local tabmenu = {
@@ -147,6 +149,7 @@ local disableObjectCollision = false
 local prepareTeleport = false
 local prepareJump = false
 local showobjects = false
+local countobjects = true
 local showobjectrot = false
 local ENBSeries = false
 local disconnectremind = true
@@ -313,6 +316,11 @@ function main()
       memory.setfloat(12044272, ini.settings.drawdist, true)
       memory.setfloat(13210352, ini.settings.fog, true)
       
+	  if ini.settings.camdist then
+	     setCameraDistanceActivated(1)
+		 setCameraDistance(ini.settings.camdist)
+	  end
+		
       --- END init
       while true do
       wait(0)
@@ -411,16 +419,24 @@ function main()
          showobjects = not showobjects
       end
       
+	  -- Count streamed obkects
+	  if countobjects then
+	     streamedObjects = 0
+	     for _, v in pairs(getAllObjects()) do
+		    if isObjectOnScreen(v) then
+			   streamedObjects = streamedObjects + 1
+			end
+		 end
+	  end
+	  
       -- Objects render
       if showobjects and not isPauseMenuActive() then
-         streamedObjects = 0
          for _, v in pairs(getAllObjects()) do
             if isObjectOnScreen(v) then
                local _, x, y, z = getObjectCoordinates(v)
                local x1, y1 = convert3DCoordsToScreen(x,y,z)
                local model = getObjectModel(v)
                renderFontDrawText(objectsrenderfont, "{80FFFFFF}" .. model, x1, y1, -1)
-               streamedObjects = streamedObjects + 1
             end
          end
       end
@@ -442,7 +458,6 @@ end
 
 function imgui.OnDrawFrame()
    if dialog.main.v then
-      --imgui.SetNextWindowSize(imgui.ImVec2(295, 360), imgui.Cond.FirstUseEver)
       imgui.SetNextWindowPos(imgui.ImVec2(sizeX / 4, sizeY / 4),
       imgui.Cond.FirstUseEver, imgui.ImVec2(0.5, 0.5))
       imgui.Begin("Absolute Events Helper", dialog.main)
@@ -535,21 +550,29 @@ function imgui.OnDrawFrame()
        imgui.SameLine()
        imgui.TextQuestion("( ? )", u8"Блокирует изменение погоды и времени сервером")
        
-       -- Thanks samp++
-       imgui.TextColoredRGB("Дальность прорисовки {51484f} (по-умолчанию 450)")
+       imgui.TextColoredRGB("Дистанция прорисовки {51484f} (по-умолчанию 450)")
        if imgui.SliderInt(u8"##Drawdist", slider.drawdist, 50, 3000) then
           ini.settings.drawdist = slider.drawdist.v
           save()
           memory.setfloat(12044272, ini.settings.drawdist, true)
        end
         
-       imgui.TextColoredRGB("Дальность тумана {51484f} (по-умолчанию 200)")
+       imgui.TextColoredRGB("Дистанция тумана {51484f} (по-умолчанию 200)")
        if imgui.SliderInt(u8"##fog", slider.fog, -390, 390) then
           ini.settings.fog = slider.fog.v
           save()
           memory.setfloat(13210352, ini.settings.fog, true)
        end
        
+	   imgui.TextColoredRGB("Дистанция камеры {51484f} (по-умолчанию 1)")
+	   if imgui.SliderInt(u8"##camdist", slider.camdist, 0, 100) then
+          ini.settings.camdist = slider.camdist.v
+          setCameraDistanceActivated(1)		  
+		  setCameraDistance(ini.settings.camdist)
+          save()
+          memory.setfloat(13210352, ini.settings.camdist, true)
+       end
+	   
        -- if imgui.Button(u8"Перегрузить скрипт", imgui.ImVec2(200, 25)) then
           -- thisScript():reload()
        -- end
@@ -585,7 +608,7 @@ function imgui.OnDrawFrame()
       imgui.Text(string.format(u8"Игроков в области стрима: %i Транспорта: %i",
       streamedplayers, getVehicleInStream()))
       
-      if showobjects then
+      if countobjects then
          imgui.Text(string.format(u8"Объектов в области в стрима: %i", streamedObjects))
       end
       
@@ -657,9 +680,13 @@ function imgui.OnDrawFrame()
                sampAddChatMessage("Вы телепортированны на ближайшую поверхность", -1)
 			else
 			   sampAddChatMessage(("Ближайшая поверхность слишком далеко (%d m.)"):format(dist), 0x0FF0000)
+			   local posX, posY, posZ = getCharCoordinates(PLAYER_PED)
+               setCharCoordinates(PLAYER_PED, posX, posY, posZ+3.0)
 			end
          else
             sampAddChatMessage("Не нашлось ни одной поверхности рядом", 0x0FF0000)
+			local posX, posY, posZ = getCharCoordinates(PLAYER_PED)
+            setCharCoordinates(PLAYER_PED, posX, posY, posZ+3.0)
          end
       end
 	  
@@ -1498,6 +1525,7 @@ function imgui.OnDrawFrame()
          imgui.Text(u8"EvgeN 1137, hnnssy, FYP - Moonloader")
          imgui.Text(u8"FYP - imgui, SAMP lua library")
          imgui.Text(u8"Gorskin - useful code snippets and memory hacks")
+         imgui.Text(u8"KepchiK - camera distance functions")
          imgui.Text(u8"Pawnokit.ru - specsymbols images")
          imgui.Text(u8"1NS - create this lua helper")
 
@@ -2204,6 +2232,18 @@ function getNearestRoadCoordinates(radius)
         return true, B[1], B[2], B[3]
     end
     return false
+end
+
+function setCameraDistanceActivated(activated) --KepchiK
+	memory.setuint8(0xB6F028 + 0x38, activated)
+	memory.setuint8(0xB6F028 + 0x39, activated)
+end
+
+function setCameraDistance(distance) -- KepchiK
+	memory.setfloat(0xB6F028 + 0xD4, distance)
+	memory.setfloat(0xB6F028 + 0xD8, distance)
+	memory.setfloat(0xB6F028 + 0xC0, distance)
+	memory.setfloat(0xB6F028 + 0xC4, distance)
 end
 
 function sampGetPlayerIdByNickname(nick)
