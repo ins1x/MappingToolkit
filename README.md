@@ -65,4 +65,5 @@ LUA ассистент для мапперов и организаторов м�
 * [FYP](https://github.com/THE-FYP) - imgui, SAMP lua библиотеки
 * [Gorskin](https://vk.com/gorskinscripts) - полезные сниппеты и мемхаки
 * [Pawnokit](https://pawnokit.ru/) - [картинки спецсимволов](https://pawnokit.ru/ru/spec_symbols)
+* [KepchiK](https://www.blast.hk/members/229239/) - функции дистанции камеры
   
