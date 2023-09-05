@@ -1,10 +1,10 @@
 script_author("1NS")
 script_name("Absolute Events Helper")
-script_description("Assistant for mappers and event makers on Absolute DM")
+script_description("Assistant for mappers and event makers on Absolute Play")
 script_dependencies('imgui', 'lib.samp.events', 'vkeys')
 script_properties("work-in-pause")
 script_url("https://github.com/ins1x/AbsEventHelper")
-script_version("2.9")
+script_version("2.9.1")
 -- script_moonloader(16) moonloader v.0.26
 
 require 'lib.moonloader'
@@ -156,7 +156,6 @@ local disconnectremind = true
 local chosenplayer = nil
 local heavyweaponwarn = true
 local lastObjectModelid = nil
--- local freezeChat = false
 --local removedBuildings = 0;
 streamedObjects = 0
 
@@ -167,7 +166,6 @@ local vehinfomodelid = 0
 local objectsDel = {}
 local playersTable = {}
 local vehiclesTable = {}
---local chatTable = {}
 vehiclesTotal = 0
 playersTotal = 0
 
@@ -315,11 +313,6 @@ function main()
       -- set drawdist and figdist
       memory.setfloat(12044272, ini.settings.drawdist, true)
       memory.setfloat(13210352, ini.settings.fog, true)
-      
-	  if ini.settings.camdist then
-	     setCameraDistanceActivated(1)
-		 setCameraDistance(ini.settings.camdist)
-	  end
 		
       --- END init
       while true do
@@ -386,18 +379,11 @@ function main()
       -- Imgui menu
       if not ENBSeries then imgui.Process = dialog.main.v end
       
-      -- -- Freeze chat
-      -- local visible = sampIsChatInputActive()
-      -- if freezeChat ~= visible then
-         -- freezeChat = visible
-           -- if not freezeChat then
-              -- for k, v in ipairs(chatTable) do
-                 -- local color = string.format('%X', v.color)
-                 -- sampAddChatMessage(v.text, tonumber('0x' .. string.sub(color, #color - 8, #color - 2)))
-              -- end
-            -- chatTable = {}
-         -- end
-      -- end
+	  -- Camera distantion set
+	  if ini.settings.camdist then
+	     setCameraDistanceActivated(1)
+		 setCameraDistance(ini.settings.camdist)
+	  end
       
       -- Hide dialogs o ESC
       if isKeyJustPressed(VK_ESCAPE) and not sampIsChatInputActive() 
@@ -2072,13 +2058,7 @@ function sampev.onPlayerQuit(id, reason)
    
 end
 
-function sampev.onServerMessage(color, text)
-   -- if freezeChat then
-      -- table.insert(chatTable, {color = color, text = text})
-      -- return false
-   -- end
-   -- in-game mapeditor errors solutions tips and fix
-   
+function sampev.onServerMessage(color, text)   
    if text:find("У тебя нет прав") then
       if prepareJump then 
          JumpForward()
