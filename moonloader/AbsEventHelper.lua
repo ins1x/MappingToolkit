@@ -4,7 +4,7 @@ script_description("Assistant for mappers and event makers on Absolute Play")
 script_dependencies('imgui', 'lib.samp.events', 'vkeys')
 script_properties("work-in-pause")
 script_url("https://github.com/ins1x/AbsEventHelper")
-script_version("2.9.1")
+script_version("2.9.2")
 -- script_moonloader(16) moonloader v.0.26
 
 require 'lib.moonloader'
@@ -68,9 +68,11 @@ local checkbox = {
    autoupdplayerstable = imgui.ImBool(ini.settings.autoupdplayerstable),
    disconnectreminder = imgui.ImBool(ini.settings.disconnectreminder),
    lockserverweather = imgui.ImBool(ini.settings.lockserverweather),
+   radarblips = imgui.ImBool(false),
    showobjectrot = imgui.ImBool(false),
    showobjects = imgui.ImBool(false),
    vehstream = imgui.ImBool(true),
+   heavyweaponwarn = imgui.ImBool(true),
    objectcollision = imgui.ImBool(false)
 }
 
@@ -144,6 +146,7 @@ textbuffer.bindad.v = u8(ini.binds.adtextbuffer)
 
 -- If the server changes IP, change it here
 local hostip = "193.84.90.23"
+local isAbsolutePlay = false
 local tpposX, tpposY, tpposZ
 local disableObjectCollision = false
 local prepareTeleport = false
@@ -156,6 +159,7 @@ local disconnectremind = true
 local chosenplayer = nil
 local heavyweaponwarn = true
 local lastObjectModelid = nil
+local showAlphaRadarBlips = false
 --local removedBuildings = 0;
 streamedObjects = 0
 
@@ -208,10 +212,12 @@ function main()
       while not isSampAvailable() do wait(100) end
       local ip, port = sampGetCurrentServerAddress()
       if not ip:find(hostip) then
+	     isAbsolutePlay = false
          if ini.settings.noabsunload then
             thisScript():unload()
          end
       else
+	     isAbsolutePlay = true
          sampAddChatMessage("{00BFFF}Absolute {FFD700}Events {FFFFFF}Helper. Открыть меню: {FFD700}ALT + X", 0xFFFFFF)
       end
       
@@ -551,7 +557,7 @@ function imgui.OnDrawFrame()
        end
        
 	   imgui.TextColoredRGB("Дистанция камеры {51484f} (по-умолчанию 1)")
-	   if imgui.SliderInt(u8"##camdist", slider.camdist, 0, 100) then
+	   if imgui.SliderInt(u8"##camdist", slider.camdist, -50, 100) then
           ini.settings.camdist = slider.camdist.v
           setCameraDistanceActivated(1)		  
 		  setCameraDistance(ini.settings.camdist)
@@ -611,24 +617,29 @@ function imgui.OnDrawFrame()
       imgui.Text(" ")
       if imgui.Button(u8"Получить координаты", imgui.ImVec2(250, 25)) then
          if not sampIsChatInputActive() and not sampIsDialogActive() and not isPauseMenuActive() and not isSampfuncsConsoleActive() then 
-            sampSendChat("/коорд")
+            -- if isAbsolutePlay then sampSendChat("/коорд") end
             tpposX, tpposY, tpposZ = getCharCoordinates(PLAYER_PED)
-            setClipboardText(math.floor(tpposX) .. ' ' .. math.floor(tpposY) .. ' ' .. math.floor(tpposZ))
+            setClipboardText(string.format("%.1f %.1f %.1f", tpposX, tpposY, tpposZ))
             printStringNow("Coords copied to clipboard", 1000)
-            sampAddChatMessage(string.format("Интерьер: %i", getActiveInterior()), 0x0FFFFFF)
+            sampAddChatMessage(string.format("Интерьер: %i Координаты: %.1f %.1f %.1f",
+			getActiveInterior(), tpposX, tpposY, tpposZ), 0x0FFFFFF)
          end
       end
       
       if imgui.Button(u8"Телепорт по кординатам", imgui.ImVec2(250, 25)) then
-         if tpposX then
-            prepareTeleport = true
-            sampSendChat(string.format("/ngr %f %f %f", tpposX, tpposY, tpposZ), 0x0FFFFFF)
-            sampAddChatMessage(string.format("Телепорт на координаты: %.1f %.1f %.1f"
-           ,tpposX, tpposY, tpposZ), 0x0FFFFFF)
-         else
-            prepareTeleport = false
-            sampAddChatMessage("Координаты не были сохранены. Нажмите коорд", 0x0FFFFFF)
-         end
+	     if isAbsolutePlay then 
+            if tpposX then
+               prepareTeleport = true
+               sampSendChat(string.format("/ngr %f %f %f", tpposX, tpposY, tpposZ), 0x0FFFFFF)
+               sampAddChatMessage(string.format("Телепорт на координаты: %.1f %.1f %.1f",
+               tpposX, tpposY, tpposZ), 0x0FFFFFF)
+            else
+               prepareTeleport = false
+               sampAddChatMessage("Координаты не были сохранены. Нажмите коорд", 0x0FFFFFF)
+            end
+		 else
+		    sampAddChatMessage("Данная функция легально работает только на серверах Absolute Play", 0x0FF0000)
+		 end
       end
       
       -- Bugged. Server turn you at cheat world
@@ -645,7 +656,15 @@ function imgui.OnDrawFrame()
       
       if imgui.Button(u8"Прыгнуть вперед", imgui.ImVec2(250, 25)) then
          prepareJump = true
-         if not sampIsChatInputActive() and not sampIsDialogActive() and not isPauseMenuActive() and not isSampfuncsConsoleActive() then sampSendChat("/ghsu") end
+		 if isAbsolutePlay then 
+            if not sampIsChatInputActive() and not sampIsDialogActive() 
+			and not isPauseMenuActive() and not isSampfuncsConsoleActive() then 
+			sampSendChat("/ghsu") end
+		 else
+		    if sampIsLocalPlayerSpawned() then
+		       JumpForward()
+ 		    end
+		 end
       end
 
 	  if imgui.Button(u8"Провалиться под текстуры", imgui.ImVec2(250, 25)) then
@@ -1033,16 +1052,8 @@ function imgui.OnDrawFrame()
        imgui.SameLine()
        imgui.PushItemWidth(170)
        if imgui.InputText("##FindPlayer", textbuffer.findplayer) then 
-          -- for i = 0, sampGetMaxPlayerId(false) do
-             -- local nickname = sampGetPlayerNickname(i)
-             -- if sampIsPlayerConnected(i) and nickname:find(u8:decode(textbuffer.findplayer.v)) then
-                -- chosenplayer = i
-                -- printStringNow("find", 100)
-             -- end
-          -- end
           for k, v in pairs(playersTable) do
              local nickname = sampGetPlayerNickname(v)
-             --if nickname:find(u8:decode(textbuffer.findplayer.v)) then
              if nickname == u8:decode(textbuffer.findplayer.v) then
                 printStringNow("finded", 1000)
                 chosenplayer = sampGetPlayerIdByNickname(nickname)
@@ -1101,6 +1112,24 @@ function imgui.OnDrawFrame()
                 disconnectremind = true
              else
                 disconnectremind = false
+             end
+          end
+		  
+		  -- imgui.SameLine()
+          -- if imgui.Checkbox(u8("Уведомлять о тяжелом оружии"), checkbox.heavyweaponwarn) then
+             -- if checkbox.heavyweaponwarn.v then
+                -- heavyweaponwarn = true
+             -- else
+                -- heavyweaponwarn = false
+             -- end
+          -- end
+		  
+		  imgui.SameLine()
+          if imgui.Checkbox(u8("Показать скрытые клисты"), checkbox.radarblips) then
+             if checkbox.radarblips.v then
+                showAlphaRadarBlips = true
+             else
+                showAlphaRadarBlips = false
              end
           end
           
@@ -2103,6 +2132,21 @@ function sampev.onSendEditObject(playerObject, objectId, response, position, rot
    end
 end
 
+function sampev.onPlayerStreamIn(id, team, model, position, rotation, color, fight)
+   if showAlphaRadarBlips then
+	  local ucolor = sampGetPlayerColor(id)
+	  local aa, rr, gg, bb = explode_argb(ucolor)
+      newcolor = join_argb(0, rr, gg, bb)
+	  return {id, team, model, position, rotation, newcolor, fight}
+   end
+   
+   -- Show white gm players clists at radar
+   -- if color == -33752043 then
+      -- newclist = join_rgba(0xFF, 0xFF, 0xFF, 255)
+      -- return {id, team, model, position, rotation, newclist , fight}
+   -- end
+end
+
 -- function sampev.onRemoveBuilding(modelId, position, radius)
    -- removedBuildings = removedBuildings + 1;
 -- end
@@ -2259,6 +2303,14 @@ function join_argb(a, r, g, b)
     return argb
 end
 
+function explode_argb(argb)
+   local a = bit.band(bit.rshift(argb, 24), 0xFF)
+   local r = bit.band(bit.rshift(argb, 16), 0xFF)
+   local g = bit.band(bit.rshift(argb, 8), 0xFF)
+   local b = bit.band(argb, 0xFF)
+   return a, r, g, b
+end
+	
 function intToHex(int)
     return '{'..string.sub(bit.tohex(int), 3, 8)..'}'
 end
@@ -2294,14 +2346,6 @@ function imgui.TextColoredRGB(text)
     local style = imgui.GetStyle()
     local colors = style.Colors
     local ImVec4 = imgui.ImVec4
-
-    local explode_argb = function(argb)
-        local a = bit.band(bit.rshift(argb, 24), 0xFF)
-        local r = bit.band(bit.rshift(argb, 16), 0xFF)
-        local g = bit.band(bit.rshift(argb, 8), 0xFF)
-        local b = bit.band(argb, 0xFF)
-        return a, r, g, b
-    end
 
     local getcolor = function(color)
         if color:sub(1, 6):upper() == 'SSSSSS' then
