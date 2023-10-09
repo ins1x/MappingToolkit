@@ -4,7 +4,7 @@ script_description("Assistant for mappers and event makers on Absolute Play")
 script_dependencies('imgui', 'lib.samp.events', 'vkeys')
 script_properties("work-in-pause")
 script_url("https://github.com/ins1x/AbsEventHelper")
-script_version("2.9.2")
+script_version("2.10")
 -- script_moonloader(16) moonloader v.0.26
 
 require 'lib.moonloader'
@@ -160,6 +160,9 @@ local chosenplayer = nil
 local heavyweaponwarn = true
 local lastObjectModelid = nil
 local showAlphaRadarBlips = false
+local hide3dtexts = false
+local nameTag = true
+--local hideTextdraws = true
 --local removedBuildings = 0;
 streamedObjects = 0
 
@@ -481,8 +484,8 @@ function imgui.OnDrawFrame()
       end
       imgui.Columns(1)
 
-      -- Child form
-      imgui.BeginChild('##main',imgui.ImVec2(740,450),true)
+      -- Child form (Change main window size here)
+      imgui.BeginChild('##main',imgui.ImVec2(740,480),true)
       
       if tabmenu.main == 1 then
 
@@ -626,7 +629,7 @@ function imgui.OnDrawFrame()
          end
       end
       
-      if imgui.Button(u8"Телепорт по кординатам", imgui.ImVec2(250, 25)) then
+      if imgui.Button(u8"Телепорт по координатам", imgui.ImVec2(250, 25)) then
 	     if isAbsolutePlay then 
             if tpposX then
                prepareTeleport = true
@@ -707,8 +710,22 @@ function imgui.OnDrawFrame()
             memory.setint8(0xBA676C, 2)
          end
       end
-
-      imgui.Text(" ")
+      
+	  if imgui.Button(u8(hide3dtexts and 'Показать' or 'Скрыть')..u8" 3D тексты", 
+      imgui.ImVec2(250, 25)) then
+         hide3dtexts = not hide3dtexts
+		 sampAddChatMessage("Изменения видны после респавна либо обновления зоны стрима", -1)
+      end
+	  
+	  if imgui.Button(u8(nameTag and 'Скрыть' or 'Показать')..u8" NameTags", 
+      imgui.ImVec2(250, 25)) then
+         if nameTag then
+            nameTagOff()
+         else
+            nameTagOn()
+         end
+      end
+	  
       imgui.Text(" ")
       
       imgui.Columns(1)
@@ -1144,15 +1161,25 @@ function imgui.OnDrawFrame()
           bit.band(ucolor,0xffffff), nickname, chosenplayer))
           imgui.SameLine()
           if imgui.Button(u8"статистика") then
-             sampSendChat("/стат " .. chosenplayer)
+		     if isAbsolutePlay then
+                sampSendChat("/стат " .. chosenplayer)
+		     else
+			    sampSendChat("/stats " .. chosenplayer)
+			 end
           end
           imgui.SameLine()
           if imgui.Button(u8"наблюдать") then
-             sampSendChat("/набл " .. chosenplayer)
+		     if isAbsolutePlay then
+                sampSendChat("/набл " .. chosenplayer)
+			 else
+			    sampSendChat("/spec " .. chosenplayer)
+			 end
           end
           imgui.SameLine()
           if imgui.Button(u8"меню") then
-             sampSendChat("/и " .. chosenplayer)
+		     if isAbsolutePlay then
+                sampSendChat("/и " .. chosenplayer)
+			 end
           end
           imgui.SameLine()
           if imgui.Button(u8"тп") then
@@ -1161,7 +1188,12 @@ function imgui.OnDrawFrame()
                  if res then
                     if id == chosenplayer then
                        local pposX, pposY, pposZ = getCharCoordinates(v)
-                       sampSendChat(string.format("/ngr %f %f %f", pposX+0.5, pposY+0.5, pposZ), 0x0FFFFFF)
+					   if isAbsolutePlay then
+                          sampSendChat(string.format("/ngr %f %f %f",
+					      pposX+0.5, pposY+0.5, pposZ), 0x0FFFFFF)
+					   else
+					      setCharCoordinates(PLAYER_PED, posX+0.5, posY+0.5, posZ)
+					   end
                     end
                  else
                     sampAddChatMessage("Доступно только в редакторе карт", 0x0FFFFFF)
@@ -1317,13 +1349,20 @@ function imgui.OnDrawFrame()
                    vehinfomodelid = 399+k
                 end 
              end
-             sampSendChat(string.format(u8"/vfibye2 %i", vehinfomodelid))
+             if isAbsolutePlay then 
+			    sampSendChat(string.format(u8"/vfibye2 %i", vehinfomodelid))
+			 else
+                sampSendChat(string.format(u8"/v %i", vehinfomodelid))
+			 end
           end
        end
        
-       if imgui.Button(u8"Заказать машину из списка") then
-          if not sampIsChatInputActive() and not sampIsDialogActive() and not isPauseMenuActive() and not isSampfuncsConsoleActive() then sampSendChat("/vfibye2") end
-       end
+	   if isAbsolutePlay then
+          if imgui.Button(u8"Заказать машину из списка") then
+             if not sampIsChatInputActive() and not sampIsDialogActive() and not isPauseMenuActive() and not isSampfuncsConsoleActive() then sampSendChat("/vfibye2") end
+          end
+	   end
+	   
        imgui.Columns(1)
 
        if imgui.Checkbox(u8("Показать список транспорта в стриме"), checkbox.vehstream) then
@@ -1361,7 +1400,7 @@ function imgui.OnDrawFrame()
              local streamed, id = sampGetVehicleIdByCarHandle(v)
              local ped = getDriverOfCar(v)
              local res, pid = sampGetPlayerIdByCharHandle(ped)
-
+             
              imgui.Columns(4)
              imgui.TextColoredRGB(string.format("%i", id))
              imgui.SetColumnWidth(-1, 50)
@@ -2147,9 +2186,27 @@ function sampev.onPlayerStreamIn(id, team, model, position, rotation, color, fig
    -- end
 end
 
+function sampev.onCreate3DText(id, color, position, distance, testLOS,
+attachedPlayerId, attachedVehicleId, text)
+   if hide3dtexts then 
+      return { id, color, position, 0.5, testLOS, attachedPlayerId, attachedVehicleId, text }
+   else
+      return { id, color, position, distance, testLOS, attachedPlayerId, attachedVehicleId, text }
+   end
+end
+
+-- function sampev.onShowTextDraw(id, data)
+   -- if hideTextdraws then
+       -- return false
+   -- else
+       -- return {id, data}
+   -- end
+-- end
+
 -- function sampev.onRemoveBuilding(modelId, position, radius)
    -- removedBuildings = removedBuildings + 1;
 -- end
+
 -- END hooks
 
 -- Macros
@@ -2330,6 +2387,25 @@ function hideAllTextureImages()
    show_texture4 = false
    show_texture5 = false
 end 
+
+function nameTagOn()
+    local pStSet = sampGetServerSettingsPtr();
+    NTdist = memory.getfloat(pStSet + 39)
+    NTwalls = memory.getint8(pStSet + 47)
+    NTshow = memory.getint8(pStSet + 56)
+    memory.setfloat(pStSet + 39, 1488.0)
+    memory.setint8(pStSet + 47, 0)
+    memory.setint8(pStSet + 56, 1)
+    nameTag = true
+end
+
+function nameTagOff()
+    local pStSet = sampGetServerSettingsPtr();
+    memory.setfloat(pStSet + 39, NTdist)
+    memory.setint8(pStSet + 47, NTwalls)
+    memory.setint8(pStSet + 56, NTshow)
+    nameTag = false
+end
 
 function patch_samp_time_set(enable) -- by hnnssy and FYP
     if enable and default == nil then
