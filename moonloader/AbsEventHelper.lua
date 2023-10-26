@@ -4,7 +4,7 @@ script_description("Assistant for mappers and event makers on Absolute Play")
 script_dependencies('imgui', 'lib.samp.events', 'vkeys')
 script_properties("work-in-pause")
 script_url("https://github.com/ins1x/AbsEventHelper")
-script_version("2.10")
+script_version("2.11")
 -- script_moonloader(16) moonloader v.0.26
 
 require 'lib.moonloader'
@@ -27,6 +27,7 @@ local ini = inicfg.load({
       autoupdplayerstable = false,
       disconnectreminder = true,
       lockserverweather = false,
+      usecustomcamdist = false,
       drawdist = "450",
       fog = "200",
 	  camdist = "1",
@@ -68,6 +69,7 @@ local checkbox = {
    autoupdplayerstable = imgui.ImBool(ini.settings.autoupdplayerstable),
    disconnectreminder = imgui.ImBool(ini.settings.disconnectreminder),
    lockserverweather = imgui.ImBool(ini.settings.lockserverweather),
+   usecustomcamdist = imgui.ImBool(ini.settings.usecustomcamdist),
    radarblips = imgui.ImBool(false),
    showobjectrot = imgui.ImBool(false),
    showobjects = imgui.ImBool(false),
@@ -218,10 +220,14 @@ function main()
 	     isAbsolutePlay = false
          if ini.settings.noabsunload then
             thisScript():unload()
-         end
+         else
+		    sampAddChatMessage("{00BFFF}Absolute {FFD700}Events {FFFFFF}Helper.\
+		    Открыть меню: {FFD700}ALT + X", 0xFFFFFF)
+		 end
       else
 	     isAbsolutePlay = true
-         sampAddChatMessage("{00BFFF}Absolute {FFD700}Events {FFFFFF}Helper. Открыть меню: {FFD700}ALT + X", 0xFFFFFF)
+         sampAddChatMessage("{00BFFF}Absolute {FFD700}Events {FFFFFF}Helper.\
+		 Открыть меню: {FFD700}ALT + X", 0xFFFFFF)
       end
       
       -- ENB check
@@ -389,7 +395,7 @@ function main()
       if not ENBSeries then imgui.Process = dialog.main.v end
       
 	  -- Camera distantion set
-	  if ini.settings.camdist then
+	  if ini.settings.usecustomcamdist then
 	     setCameraDistanceActivated(1)
 		 setCameraDistance(ini.settings.camdist)
 	  end
@@ -404,7 +410,7 @@ function main()
          if dialog.fastanswer.v then dialog.fastanswer.v = false end
       end 
       
-      -- ALT+X (MAin menu activation)
+      -- ALT+X (Main menu activation)
       if isKeyDown(VK_MENU) and isKeyJustPressed(VK_X) and not sampIsChatInputActive() and not    sampIsDialogActive() and not isPauseMenuActive() and not isSampfuncsConsoleActive() then 
          dialog.main.v = not dialog.main.v 
       end
@@ -545,6 +551,21 @@ function imgui.OnDrawFrame()
        imgui.SameLine()
        imgui.TextQuestion("( ? )", u8"Блокирует изменение погоды и времени сервером")
        
+	   
+	   if imgui.Checkbox(u8("Разблокировать изменение дистанции камеры"), checkbox.usecustomcamdist) then 
+		  ini.settings.usecustomcamdist = not ini.settings.usecustomcamdist
+          if ini.settings.usecustomcamdist then
+		     setCameraDistanceActivated(1)
+			 setCameraDistance(ini.settings.camdist)
+		  else
+	         setCameraDistanceActivated(0)
+			 setCameraDistance(0)
+		  end
+		  save()
+	   end
+	   imgui.SameLine()
+       imgui.TextQuestion("( ? )", u8"Разблокирует изменение положения камеры на произвольные значеня")
+	   
        imgui.TextColoredRGB("Дистанция прорисовки {51484f} (по-умолчанию 450)")
        if imgui.SliderInt(u8"##Drawdist", slider.drawdist, 50, 3000) then
           ini.settings.drawdist = slider.drawdist.v
@@ -559,14 +580,16 @@ function imgui.OnDrawFrame()
           memory.setfloat(13210352, ini.settings.fog, true)
        end
        
-	   imgui.TextColoredRGB("Дистанция камеры {51484f} (по-умолчанию 1)")
-	   if imgui.SliderInt(u8"##camdist", slider.camdist, -50, 100) then
-          ini.settings.camdist = slider.camdist.v
-          setCameraDistanceActivated(1)		  
-		  setCameraDistance(ini.settings.camdist)
-          save()
-          memory.setfloat(13210352, ini.settings.camdist, true)
-       end
+	   if ini.settings.usecustomcamdist then
+	      imgui.TextColoredRGB("Дистанция камеры {51484f} (по-умолчанию 1)")
+	      if imgui.SliderInt(u8"##camdist", slider.camdist, -50, 100) then
+             ini.settings.camdist = slider.camdist.v
+             setCameraDistanceActivated(1)		  
+		     setCameraDistance(ini.settings.camdist)
+             save()
+             memory.setfloat(13210352, ini.settings.camdist, true)
+          end
+	   end
 	   
        -- if imgui.Button(u8"Перегрузить скрипт", imgui.ImVec2(200, 25)) then
           -- thisScript():reload()
@@ -1469,6 +1492,8 @@ function imgui.OnDrawFrame()
          imgui.Text(u8"Фонтан 18739, гидрант 18740, водопад 19841, вода 19842")
          imgui.Text(u8"Искры 18717, горящие дрова 19632")
          imgui.Text(u8"Сигнальный огонь 18728, лазер 18643, нитро 18702, флейм 18693")
+         imgui.Text(u8"Кровь от ранения 18668, лужа крови 19836")
+         imgui.Text(u8"Мухи от мешка с мусором 1265")
       elseif tabmenu.objects == 4 then
          imgui.Text(u8"Неон красный 18647, синий 18648, зеленый 18649")
          imgui.Text(u8"Неон желтый 18650, розовый 18651, белый 18652")
@@ -1526,7 +1551,7 @@ function imgui.OnDrawFrame()
       imgui.Text(u8"")
       imgui.TextColoredRGB("Не нашли нужный объект? посмотрите на {007DFF}dev.prineside.com")
       if imgui.IsItemClicked() then
-         setClipboardText("dev.prineside.com")
+         setClipboardText("https://dev.prineside.com")
          printStringNow("url copied to clipboard", 1000)
       end
       
@@ -1548,14 +1573,28 @@ function imgui.OnDrawFrame()
          printStringNow("url copied to clipboard", 1000)
       end
       
+	  imgui.TextColoredRGB("Браузер спрайтов {007DFF}pawnokit.ru")
+      if imgui.IsItemClicked() then
+         setClipboardText("https://pawnokit.ru/ru/txmngr")
+         printStringNow("url copied to clipboard", 1000)
+      end
+	  
       elseif tabmenu.main == 6 then
       imgui.Columns(2)
       imgui.SetColumnWidth(-1, 600)
       
       if tabmenu.info == 1 then
          imgui.Text(u8"Absolute Events Helper v".. thisScript().version)
-         imgui.Text(u8"Помошник для мапперов и организаторов мероприятий на Absolute DM")
+         imgui.Text(u8"LUA ассистент для мапперов и организаторов мероприятий на серверах Absolute Play.")
+         imgui.Text(u8"Основная задача данного скрипта - сделать процесс маппинга в внутриигровом редакторе карт")
+         imgui.Text(u8"максимально приятным, и дать больше возможностей организаторам мероприятий.")
+		 imgui.TextColoredRGB("Больше информации по маппингу на сервере {007DFF}forum.gta-samp.ru")
+         if imgui.IsItemClicked() then
+            setClipboardText("https://forum.gta-samp.ru/index.php?/topic/1016832-миры-описание-работы-редактора-карт/")
+            printStringNow("Url copied to clipboard", 1000)
+         end
          imgui.Text(u8"Скрипт распостраняется только с открытым исходным кодом")
+         imgui.Text(u8"Категорически не рекомендуется использовать этот скрипт вне редактора карт!")
          imgui.Text(u8"")
 
          imgui.TextColoredRGB("Homepage: {007DFF}github.com/ins1x/AbsEventHelper")
@@ -1573,15 +1612,19 @@ function imgui.OnDrawFrame()
             setClipboardText("dsc.gg/absdm")
             printStringNow("Url copied to clipboard", 1000)
          end
+		 imgui.TextColoredRGB("Форум Absolute Play DM: {007DFF}forum.gta-samp.ru")
+         if imgui.IsItemClicked() then
+            setClipboardText("https://forum.gta-samp.ru/")
+            printStringNow("Url copied to clipboard", 1000)
+         end
+		 -- {FFFFFF}R{4682b4}S{FF0000}C 
+		 imgui.TextColoredRGB("Russian Sawn-off Community: {007DFF}dsc.gg/sawncommunity")
+         if imgui.IsItemClicked() then
+            setClipboardText("dsc.gg/sawncommunity")
+            printStringNow("Url copied to clipboard", 1000)
+         end
          --imgui.Text(u8"Disclaimer: Автор не является частью команды проекта Absolute Play")
          imgui.Text(" ")
-         imgui.Text(u8"Credits:")
-         imgui.Text(u8"EvgeN 1137, hnnssy, FYP - Moonloader")
-         imgui.Text(u8"FYP - imgui, SAMP lua library")
-         imgui.Text(u8"Gorskin - useful code snippets and memory hacks")
-         imgui.Text(u8"KepchiK - camera distance functions")
-         imgui.Text(u8"Pawnokit.ru - specsymbols images")
-         imgui.Text(u8"1NS - create this lua helper")
 
       elseif tabmenu.info == 2 then
          imgui.Text(u8"Каждый игрок от 20 уровня может при наличии свободных слотов создать мир.")
@@ -1763,7 +1806,12 @@ function imgui.OnDrawFrame()
       elseif tabmenu.info == 4 then
       
          imgui.Text(u8"Текстуры:")
-
+		 imgui.SameLine(300)
+         if imgui.Button(u8"Скрыть все", imgui.ImVec2(200, 25)) then
+            hideAllTextureImages()
+            hideAllFontsImages()
+         end
+		 
          if imgui.Button(u8"1-60", imgui.ImVec2(200, 25)) then
             hideAllTextureImages()
             show_texture1 = not show_texture1
@@ -1788,8 +1836,13 @@ function imgui.OnDrawFrame()
             hideAllTextureImages()
             show_texture5 = not show_texture5
          end
-      
-
+		 
+		 imgui.TextColoredRGB("Список всех текстур GTA:SA {007DFF}textures.xyin.ws")
+         if imgui.IsItemClicked() then
+            setClipboardText("https://textures.xyin.ws/?page=textures&p=1&limit=100")
+            printStringNow("url copied to clipboard", 1000)
+         end
+		 
          imgui.Text(u8"Шрифты:")
 
          if imgui.Button(u8"GTAWeapon3", imgui.ImVec2(200, 25)) then
@@ -1816,11 +1869,11 @@ function imgui.OnDrawFrame()
             hideAllFontsImages()
             show_fontsimg5 = not show_fontsimg5
          end
-      
-         imgui.Text(u8" ")
-         if imgui.Button(u8"Скрыть все", imgui.ImVec2(200, 25)) then
-            hideAllTextureImages()
-            hideAllFontsImages()
+
+		 imgui.TextColoredRGB("Список всех спецсимволов {007DFF}pawnokit.ru")
+         if imgui.IsItemClicked() then
+            setClipboardText("https://pawnokit.ru/ru/spec_symbols")
+            printStringNow("url copied to clipboard", 1000)
          end
 
       -- elseif tabmenu.info == 5 then
