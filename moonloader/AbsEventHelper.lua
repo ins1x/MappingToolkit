@@ -491,7 +491,7 @@ function imgui.OnDrawFrame()
       imgui.Columns(1)
 
       -- Child form (Change main window size here)
-      imgui.BeginChild('##main',imgui.ImVec2(740,480),true)
+      imgui.BeginChild('##main',imgui.ImVec2(740,500),true)
       
       if tabmenu.main == 1 then
 
@@ -622,10 +622,12 @@ function imgui.OnDrawFrame()
       local angle = math.ceil(getCharHeading(PLAYER_PED))
       imgui.Text(string.format(u8"Направление: %s  %i°", direction(), angle))
 
-      local streamedplayers = sampGetPlayerCount(true) - 1
-      imgui.Text(string.format(u8"Игроков в области стрима: %i Транспорта: %i",
-      streamedplayers, getVehicleInStream()))
+      imgui.Text(string.format(u8"Игроков в области стрима: %i",
+      sampGetPlayerCount(true) - 1))
       
+      imgui.Text(string.format(u8"Транспорта в области стрима: %i",
+      getVehicleInStream()))
+	  
       if countobjects then
          imgui.Text(string.format(u8"Объектов в области в стрима: %i", streamedObjects))
       end
@@ -639,7 +641,7 @@ function imgui.OnDrawFrame()
       end
       
       --imgui.Text(string.format(u8"Remove buildings: %i", removedBuildings))
-      
+
       imgui.Text(" ")
       if imgui.Button(u8"Получить координаты", imgui.ImVec2(250, 25)) then
          if not sampIsChatInputActive() and not sampIsDialogActive() and not isPauseMenuActive() and not isSampfuncsConsoleActive() then 
@@ -1487,13 +1489,12 @@ function imgui.OnDrawFrame()
          imgui.Text(u8"Пар от вентиляции 18736, дым от сигареты 18673, дым с фабрики 18748")
          imgui.Text(u8"Белый дым 18725, черный дым 18726, большой серый дым 18727")
          imgui.Text(u8"Большой взрыв 18682, средний взрыв 18683, маленький взрыв 18686")
-         imgui.Text(u8"Спрей 18729, кровь 18668, огнетушитель 18687, слезоточивый 18732")
+         imgui.Text(u8"Спрей 18729, огнетушитель 18687, слезоточивый 18732")
          imgui.Text(u8"Рябь на воде 18741, брызги воды 18744")
          imgui.Text(u8"Фонтан 18739, гидрант 18740, водопад 19841, вода 19842")
          imgui.Text(u8"Искры 18717, горящие дрова 19632")
          imgui.Text(u8"Сигнальный огонь 18728, лазер 18643, нитро 18702, флейм 18693")
          imgui.Text(u8"Кровь от ранения 18668, лужа крови 19836")
-         imgui.Text(u8"Мухи от мешка с мусором 1265")
       elseif tabmenu.objects == 4 then
          imgui.Text(u8"Неон красный 18647, синий 18648, зеленый 18649")
          imgui.Text(u8"Неон желтый 18650, розовый 18651, белый 18652")
