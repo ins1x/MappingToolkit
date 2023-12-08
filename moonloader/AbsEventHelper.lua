@@ -4,7 +4,7 @@ script_description("Assistant for mappers and event makers on Absolute Play")
 script_dependencies('imgui', 'lib.samp.events', 'vkeys')
 script_properties("work-in-pause")
 script_url("https://github.com/ins1x/AbsEventHelper")
-script_version("2.11")
+script_version("2.12")
 -- script_moonloader(16) moonloader v.0.26
 
 require 'lib.moonloader'
@@ -75,6 +75,7 @@ local checkbox = {
    showobjects = imgui.ImBool(false),
    vehstream = imgui.ImBool(true),
    heavyweaponwarn = imgui.ImBool(true),
+   nametagwh = imgui.ImBool(false),
    objectcollision = imgui.ImBool(false)
 }
 
@@ -164,6 +165,7 @@ local lastObjectModelid = nil
 local showAlphaRadarBlips = false
 local hide3dtexts = false
 local nameTag = true
+local nameTagWh = false
 --local hideTextdraws = true
 --local removedBuildings = 0;
 streamedObjects = 0
@@ -551,7 +553,6 @@ function imgui.OnDrawFrame()
        imgui.SameLine()
        imgui.TextQuestion("( ? )", u8"Блокирует изменение погоды и времени сервером")
        
-	   
 	   if imgui.Checkbox(u8("Разблокировать изменение дистанции камеры"), checkbox.usecustomcamdist) then 
 		  ini.settings.usecustomcamdist = not ini.settings.usecustomcamdist
           if ini.settings.usecustomcamdist then
@@ -565,6 +566,19 @@ function imgui.OnDrawFrame()
 	   end
 	   imgui.SameLine()
        imgui.TextQuestion("( ? )", u8"Разблокирует изменение положения камеры на произвольные значеня")
+	   
+	   
+	   if imgui.Checkbox(u8(nameTagWh and 'Вернуть' or 'Увеличить')..u8" прорисовку NameTags", checkbox.nametagwh) then 
+          if nameTagWh then
+			 nameTagWh = false
+             nameTagOn()
+          else
+			 nameTagWh = true
+             nameTagOn()
+          end
+	   end
+	   imgui.SameLine()
+       imgui.TextQuestion("( ? )", u8"Увеличит дальность прорисовки nameTag над игроком")
 	   
        imgui.TextColoredRGB("Дистанция прорисовки {51484f} (по-умолчанию 450)")
        if imgui.SliderInt(u8"##Drawdist", slider.drawdist, 50, 3000) then
@@ -1473,7 +1487,8 @@ function imgui.OnDrawFrame()
          imgui.Text(u8"Платформы: тонкая платформа 19552, 19538, решетчатая 18753, 18754")
          imgui.Text(u8"Поверхности: 19531, 4242, 4247, 8171, 5004, 16685")
          imgui.Text(u8"Стены: 19353, 19426(маленькая), 19445(длинная), 19383(дверь), 19399(окно)")
-         imgui.Text(u8"Окружение: темная материя 13656, скайбокс 3933")
+         imgui.Text(u8"Окружение: темная материя 13656, скайбокс 3933, плейрум 3924")
+         imgui.Text(u8"Покрытие: грязь 11385, растения 19790")
       elseif tabmenu.objects == 2 then
          imgui.Text(u8"Веревка 19087, Веревка длин. 19089")
          imgui.Text(u8"Стекло (Разрушаемое) 3858, стекло от травы 3261, сено 3374")
@@ -2206,11 +2221,21 @@ function sampev.onServerMessage(color, text)
    
 end
 
+function onExitScript()
+	if nameTagWh then
+	   nameTagWh = false
+	   nameTagOn()
+	end
+	if not sampIsDialogActive() then
+	   showCursor(false)
+	end
+	setCameraDistanceActivated(0)
+	setCameraDistance(0)
+	patch_samp_time_set(false)
+end
+
 function sampev.onScriptTerminate(script, quitGame)
     if script == thisScript() then
-        if not sampIsDialogActive() then
-            showCursor(false)
-        end
         sampAddChatMessage("Скрипт AbsEventHelper аварийно завершил свою работу. Для перезагрузки нажмите CTRL + R.", -1)
     end
 end
@@ -2447,8 +2472,12 @@ function nameTagOn()
     NTdist = memory.getfloat(pStSet + 39)
     NTwalls = memory.getint8(pStSet + 47)
     NTshow = memory.getint8(pStSet + 56)
-    memory.setfloat(pStSet + 39, 1488.0)
-    memory.setint8(pStSet + 47, 0)
+	if nameTagWh then
+		memory.setfloat(pStSet + 39, 1488.0)
+		memory.setint8(pStSet + 47, 0)
+	else 
+		memory.setfloat(pStSet + 39, 70.0)
+	end
     memory.setint8(pStSet + 56, 1)
     nameTag = true
 end
