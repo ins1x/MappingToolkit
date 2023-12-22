@@ -4,7 +4,7 @@ script_description("Assistant for mappers and event makers on Absolute Play")
 script_dependencies('imgui', 'lib.samp.events', 'vkeys')
 script_properties("work-in-pause")
 script_url("https://github.com/ins1x/AbsEventHelper")
-script_version("2.12")
+script_version("2.13")
 -- script_moonloader(16) moonloader v.0.26
 
 require 'lib.moonloader'
@@ -722,7 +722,7 @@ function imgui.OnDrawFrame()
          if result then
             local dist = getDistanceBetweenCoords3d(x, y, z, getCharCoordinates(PLAYER_PED))
             if dist < anticheatMaxAllowedDist then 
-			   setCharCoordinates(PLAYER_PED, x, y, z + 1)
+			   setCharCoordinates(PLAYER_PED, x, y, z + 3.0)
 			   --sampAddChatMessage(("(%i %i %i)"):format(x,y,z), -1)
                sampAddChatMessage("Вы телепортированны на ближайшую поверхность", -1)
 			else
@@ -770,12 +770,22 @@ function imgui.OnDrawFrame()
       imgui.Columns(1)
       imgui.Separator()
 
-       if imgui.Button(u8"Выгрузить скрипт", imgui.ImVec2(200, 25)) then
-          sampAddChatMessage("AbsEventHelper успешно выгружен.", -1)
-          sampAddChatMessage("Для запуска используйте комбинацию клавиш CTRL + R.", -1)
-          thisScript():unload()
-       end
-      
+	  if imgui.Button(u8"Реконнект (5 сек)", imgui.ImVec2(170, 25)) then
+		 lua_thread.create(function()
+		 sampDisconnectWithReason(quit)
+	     wait(5000)
+		 local ip, port = sampGetCurrentServerAddress()
+         sampConnectToServer(ip, port) 
+		 end)
+	  end
+	  
+	  imgui.SameLine()
+      if imgui.Button(u8"Выгрузить скрипт", imgui.ImVec2(170, 25)) then
+         sampAddChatMessage("AbsEventHelper успешно выгружен.", -1)
+         sampAddChatMessage("Для запуска используйте комбинацию клавиш CTRL + R.", -1)
+         thisScript():unload()
+      end
+	  
       imgui.SameLine()
       if imgui.Checkbox(u8("Выгружать скрипт на других серверах"), checkbox.noabsunload) then
           if checkbox.noabsunload.v then
@@ -1444,7 +1454,15 @@ function imgui.OnDrawFrame()
              imgui.TextColoredRGB(string.format("%i", id))
              imgui.SetColumnWidth(-1, 50)
              imgui.NextColumn()
-             imgui.TextColoredRGB(string.format("%s", VehicleNames[carmodel-399]))
+			 if carmodel == 447 or carmodel == 425 or carmodel == 432 or carmodel == 520 then
+                imgui.TextColoredRGB(string.format("{FF0000}%s", VehicleNames[carmodel-399]))
+			 elseif carmodel == 476 or carmodel == 430 or carmodel == 406 or carmodel == 592 then
+			    imgui.TextColoredRGB(string.format("{FF8C00}%s", VehicleNames[carmodel-399]))
+			 elseif carmodel == 601 or carmodel == 407 then
+			    imgui.TextColoredRGB(string.format("{1E90FF}%s", VehicleNames[carmodel-399]))
+			 else
+			    imgui.TextColoredRGB(string.format("%s", VehicleNames[carmodel-399]))
+			 end
              imgui.NextColumn()
              if res then 
                 local ucolor = sampGetPlayerColor(pid)
@@ -1602,6 +1620,10 @@ function imgui.OnDrawFrame()
       if tabmenu.info == 1 then
          imgui.Text(u8"Absolute Events Helper v".. thisScript().version)
          imgui.Text(u8"LUA ассистент для мапперов и организаторов мероприятий на серверах Absolute Play.")
+		 if imgui.IsItemClicked() then
+            setClipboardText(hostip)
+            printStringNow("Server IP copied to clipboard", 1000)
+         end
          imgui.Text(u8"Основная задача данного скрипта - сделать процесс маппинга в внутриигровом редакторе карт")
          imgui.Text(u8"максимально приятным, и дать больше возможностей организаторам мероприятий.")
 		 imgui.TextColoredRGB("Больше информации по маппингу на сервере {007DFF}forum.gta-samp.ru")
@@ -1611,6 +1633,7 @@ function imgui.OnDrawFrame()
          end
          imgui.Text(u8"Скрипт распостраняется только с открытым исходным кодом")
          imgui.Text(u8"Категорически не рекомендуется использовать этот скрипт вне редактора карт!")
+		 imgui.Text(u8"Протестировать скрипт можно на Absolute DM Play в мире №10 (/мир 10)")
          imgui.Text(u8"")
 
          imgui.TextColoredRGB("Homepage: {007DFF}github.com/ins1x/AbsEventHelper")
