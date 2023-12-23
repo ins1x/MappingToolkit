@@ -4,8 +4,12 @@ script_description("Assistant for mappers and event makers on Absolute Play")
 script_dependencies('imgui', 'lib.samp.events', 'vkeys')
 script_properties("work-in-pause")
 script_url("https://github.com/ins1x/AbsEventHelper")
-script_version("2.13")
+script_version("2.14")
 -- script_moonloader(16) moonloader v.0.26
+
+-- Activaton: ALT + X (show main menu)
+-- Lot of functions only work on Absolute Play servers
+-- script designed for Absolute Play and RSC server
 
 require 'lib.moonloader'
 local keys = require 'vkeys'
@@ -57,6 +61,7 @@ objectsrenderfont = renderCreateFont("Arial", 8, 5)
 local sizeX, sizeY = getScreenResolution()
 local v = nil
 local color = imgui.ImFloat4(1, 0, 0, 1)
+local hideobjectid = imgui.ImInt(650)
 
 local dialog = {
    main = imgui.ImBool(false),
@@ -76,6 +81,7 @@ local checkbox = {
    vehstream = imgui.ImBool(true),
    heavyweaponwarn = imgui.ImBool(true),
    nametagwh = imgui.ImBool(false),
+   hideobject = imgui.ImBool(false),
    objectcollision = imgui.ImBool(false)
 }
 
@@ -174,9 +180,10 @@ local fps = 0
 local fps_counter = 0
 local vehinfomodelid = 0 
 
-local objectsDel = {}
+local objectsCollisionDel = {}
 local playersTable = {}
 local vehiclesTable = {}
+local hiddenObjects = {}
 vehiclesTotal = 0
 playersTotal = 0
 
@@ -437,9 +444,11 @@ function main()
          for _, v in pairs(getAllObjects()) do
             if isObjectOnScreen(v) then
                local _, x, y, z = getObjectCoordinates(v)
-               local x1, y1 = convert3DCoordsToScreen(x,y,z)
-               local model = getObjectModel(v)
-               renderFontDrawText(objectsrenderfont, "{80FFFFFF}" .. model, x1, y1, -1)
+			   local px, py, pz = getCharCoordinates(PLAYER_PED)
+			   if getDistanceBetweenCoords3d(px, py, pz, x, y, z) >= 2 then
+			      local x1, y1 = convert3DCoordsToScreen(x,y,z)
+                  renderFontDrawText(objectsrenderfont, "{80FFFFFF}" .. getObjectModel(v), x1, y1, -1)
+			   end
             end
          end
       end
@@ -450,7 +459,7 @@ function main()
          result, objectHandle = findAllRandomObjectsInSphere(find_obj_x, find_obj_y, find_obj_z, 25, true)
          if result then
             setObjectCollision(objectHandle, false)
-            table.insert(objectsDel, objectHandle, objectHandle)            
+            table.insert(objectsCollisionDel, objectHandle, objectHandle)            
             --setObjectCollisionDamageEffect(objectHandle, false)
          end
       end
@@ -529,7 +538,7 @@ function imgui.OnDrawFrame()
             find_obj_x, find_obj_y, find_obj_z = getCharCoordinates(PLAYER_PED)
             result, objectHandle = findAllRandomObjectsInSphere(find_obj_x, find_obj_y, find_obj_z, 25, true)
             if result then
-               for k, v in pairs(objectsDel) do
+               for k, v in pairs(objectsCollisionDel) do
                   if doesObjectExist(v) then setObjectCollision(v, true) end
                end
             end
@@ -580,6 +589,42 @@ function imgui.OnDrawFrame()
 	   imgui.SameLine()
        imgui.TextQuestion("( ? )", u8"Увеличит дальность прорисовки nameTag над игроком")
 	   
+	   if imgui.Checkbox(u8("Скрыть объекты по ID модели"), checkbox.hideobject) then 
+	      if not checkbox.hideobject.v then
+		    if hiddenObjects[1] ~= nil then
+                for i = 1, #hiddenObjects do
+                   table.remove(hiddenObjects, i)
+				end
+             end
+		  end
+	   end
+	   imgui.SameLine()
+       imgui.TextQuestion("( ? )", u8"Скроет объект по ID модели (modelid). Действует при обновлении зоны стрима")
+	   
+	   if checkbox.hideobject.v then
+	      imgui.Text(u8"modelid объекта: ")
+          imgui.SameLine()
+          imgui.PushItemWidth(55)
+          imgui.InputInt('##INPUT_HIDEOBJECT_ID', hideobjectid, 0)
+		  imgui.PopItemWidth()
+		  imgui.SameLine()
+		  if imgui.Button(u8"Скрыть объект", imgui.ImVec2(110, 25)) then 
+		     if string.len(hideobjectid.v) > 0 then 
+                if(tonumber(hideobjectid.v) < 615 or tonumber(hideobjectid.v) > 19521) then
+					sampAddChatMessage("Объект не был добавлен, так как вы ввели некорректный id!", -1)
+				else
+			       table.insert(hiddenObjects, tonumber(hideobjectid.v))
+				   sampAddChatMessage(string.format("Вы скрыли все объекты с modelid: %i",
+                   tonumber(hideobjectid.v)), -1)
+                end
+    		 else
+				sampAddChatMessage("Объект не был добавлен, так как вы не ввели id!", -1)
+			 end
+		  end
+          imgui.SameLine()
+          imgui.TextQuestion("( ? )", u8"Введите modelid от 615-18300 [GTASA], 18632-19521 [SAMP]")
+	   end
+	   
        imgui.TextColoredRGB("Дистанция прорисовки {51484f} (по-умолчанию 450)")
        if imgui.SliderInt(u8"##Drawdist", slider.drawdist, 50, 3000) then
           ini.settings.drawdist = slider.drawdist.v
@@ -596,7 +641,7 @@ function imgui.OnDrawFrame()
        
 	   if ini.settings.usecustomcamdist then
 	      imgui.TextColoredRGB("Дистанция камеры {51484f} (по-умолчанию 1)")
-	      if imgui.SliderInt(u8"##camdist", slider.camdist, -50, 100) then
+	      if imgui.SliderInt(u8"##camdist", slider.camdist, -100, 250) then
              ini.settings.camdist = slider.camdist.v
              setCameraDistanceActivated(1)		  
 		     setCameraDistance(ini.settings.camdist)
@@ -1408,7 +1453,10 @@ function imgui.OnDrawFrame()
        
 	   if isAbsolutePlay then
           if imgui.Button(u8"Заказать машину из списка") then
-             if not sampIsChatInputActive() and not sampIsDialogActive() and not isPauseMenuActive() and not isSampfuncsConsoleActive() then sampSendChat("/vfibye2") end
+             if not sampIsChatInputActive() and not sampIsDialogActive() and not isPauseMenuActive() and not isSampfuncsConsoleActive() then 
+			     sampSendChat("/vfibye2")
+				 dialog.main.v = not dialog.main.v
+		     end
           end
 	   end
 	   
@@ -2260,6 +2308,14 @@ end
 function sampev.onScriptTerminate(script, quitGame)
     if script == thisScript() then
         sampAddChatMessage("Скрипт AbsEventHelper аварийно завершил свою работу. Для перезагрузки нажмите CTRL + R.", -1)
+    end
+end
+
+function sampev.onCreateObject(objectId, data) 
+    if hiddenObjects[1] ~= nil then
+        for i = 1, #hiddenObjects do
+            if data.modelId == hiddenObjects[i] then return false end
+        end
     end
 end
 
