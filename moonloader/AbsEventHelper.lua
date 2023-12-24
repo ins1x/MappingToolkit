@@ -4,7 +4,7 @@ script_description("Assistant for mappers and event makers on Absolute Play")
 script_dependencies('imgui', 'lib.samp.events', 'vkeys')
 script_properties("work-in-pause")
 script_url("https://github.com/ins1x/AbsEventHelper")
-script_version("2.14")
+script_version("2.15")
 -- script_moonloader(16) moonloader v.0.26
 
 -- Activaton: ALT + X (show main menu)
@@ -112,6 +112,7 @@ local textbuffer = {
    bind9 = imgui.ImBuffer(256),
    bindad = imgui.ImBuffer(256),
    findplayer = imgui.ImBuffer(32),
+   ckeckplayer = imgui.ImBuffer(32),
    rgb = imgui.ImBuffer(256),
    note = imgui.ImBuffer(1024)
 }
@@ -492,7 +493,7 @@ function imgui.OnDrawFrame()
       imgui.NextColumn()
       
       imgui.SameLine()
-      imgui.Text("                     ")
+      imgui.Text("                                          ")
       imgui.SameLine()
       if imgui.Button(u8"Свернуть") then
          dialog.main.v = not dialog.main.v 
@@ -1170,7 +1171,6 @@ function imgui.OnDrawFrame()
                 chosenplayer = sampGetPlayerIdByNickname(nickname)
              end
           end
-          
        end
        imgui.PopItemWidth()
        
@@ -1353,7 +1353,7 @@ function imgui.OnDrawFrame()
           else 
              imgui.TextColoredRGB(string.format("%i", score))
           end
-          imgui.SetColumnWidth(-1, 60)
+          imgui.SetColumnWidth(-1, 70)
           imgui.NextColumn()
           if health >= 9000 then
              imgui.TextColoredRGB("{FF0000}GM")
@@ -1692,16 +1692,6 @@ function imgui.OnDrawFrame()
          imgui.TextColoredRGB("Сайт Absolute Play: {007DFF}gta-samp.ru")
          if imgui.IsItemClicked() then
             setClipboardText("gta-samp.ru")
-            printStringNow("Url copied to clipboard", 1000)
-         end
-         imgui.TextColoredRGB("Чат Absolute Play DM: {007DFF}dsc.gg/absdm")
-         if imgui.IsItemClicked() then
-            setClipboardText("dsc.gg/absdm")
-            printStringNow("Url copied to clipboard", 1000)
-         end
-		 imgui.TextColoredRGB("Форум Absolute Play DM: {007DFF}forum.gta-samp.ru")
-         if imgui.IsItemClicked() then
-            setClipboardText("https://forum.gta-samp.ru/")
             printStringNow("Url copied to clipboard", 1000)
          end
 		 -- {FFFFFF}R{4682b4}S{FF0000}C 
@@ -2149,7 +2139,7 @@ function imgui.OnDrawFrame()
          setClipboardText("https://forum.sa-mp.ru/index.php?/topic/1016828-миры-редактор-карт-faq/")
          printStringNow("url copied to clipboard", 1000)
        end
-
+		 
       elseif tabmenu.info == 8 then
          imgui.Text(u8"Горячие клавиши")
          imgui.TextColoredRGB("{00FF00}Клавиша N{FFFFFF} — меню редактора карт (в полете)")
@@ -2167,9 +2157,107 @@ function imgui.OnDrawFrame()
          imgui.TextColoredRGB("{00FF00}Клавиша RMB (Правая кл.мыши){FFFFFF}  — скопирует номер модели объекта")
          imgui.TextColoredRGB("{00FF00}Клавиша SHIFT{FFFFFF} — переключение между объектами")
          imgui.Text(u8" ")
-         imgui.Text(u8"* Доступны только с SAMP ADDON")
+         imgui.Text(u8"* Горячие клавиши доступны только с SAMP ADDON")
+		 
+      elseif tabmenu.info == 9 then
+		 
+	     imgui.Text(u8"Интерфейс взаимодействия с сайтом Absolute Play DM. (Все действия редиректит в браузер)")
+		 if imgui.Button(u8"Логи действий администрации",imgui.ImVec2(250, 25)) then
+		    os.execute('explorer https://gta-samp.ru/adminhistory-deathmatch')
+		 end
+         
+		 if imgui.Button(u8"Логи смены никнеймов",imgui.ImVec2(250, 25)) then
+		    os.execute('explorer https://gta-samp.ru/nickchange-deathmatch')
+		 end 
+		 
+		 if imgui.Button(u8"История регистрации аккаунтов",imgui.ImVec2(250, 25)) then
+		    os.execute('explorer https://gta-samp.ru/reg-deathmatch')
+		 end
+		 
+		 if imgui.Button(u8"Полный список правил",imgui.ImVec2(250, 25)) then
+		    os.execute('explorer https://forum.sa-mp.ru/index.php?/topic/802952-%D0%BF%D1%80%D0%B0%D0%B2%D0%B8%D0%BB%D0%B0-dm-%D1%81%D0%B5%D1%80%D0%B2%D0%B5%D1%80%D0%B0/')
+		 end
+		 
+		 imgui.Text(" ")
+		 imgui.PushItemWidth(150)
+		 imgui.Text(u8"Узнать историю аккаунта по нику:")
+		 if imgui.InputText("##CheckPlayer", textbuffer.ckeckplayer) then
+		    for k, v in ipairs(getAllChars()) do
+               local res, id = sampGetPlayerIdByCharHandle(v)
+               if res then
+                  local nickname = sampGetPlayerNickname(id)
+                  if nickname == u8:decode(textbuffer.ckeckplayer.v) then
+                     --printStringNow("player online " ..id, 1000)
+                     chosenplayer = sampGetPlayerIdByNickname(nickname)
+				  end
+			   end
+            end
+         end
+		 imgui.PopItemWidth()
+		 imgui.SameLine()
+		 if imgui.Button(u8"Пробить",imgui.ImVec2(70, 25)) then
+			if string.len(textbuffer.ckeckplayer.v) > 0 then
+               local link = 'explorer "https://gta-samp.ru/server-deathmatch?Nick='..u8:decode(textbuffer.ckeckplayer.v)..'"'
+			   os.execute(link)
+			end
+		 end 
+		 
+		 if chosenplayer then
+            local nickname = sampGetPlayerNickname(chosenplayer)
+            local ucolor = sampGetPlayerColor(chosenplayer)
+          
+            imgui.TextColoredRGB(string.format("Игрок в сети: {%0.6x} %s[%d]{cdcdcd}",
+            bit.band(ucolor,0xffffff), nickname, chosenplayer))
+			-- imgui.SameLine()
+			-- if imgui.Button(u8"/стат") then
+			   -- if isAbsolutePlay then
+                  -- sampSendChat("/стат " .. chosenplayer)
+		       -- else
+			      -- sampSendChat("/stats " .. chosenplayer)
+			   -- end
+ 			-- end
+		 end
+		 
+		 imgui.Text(u8"Стандартные логи:")
+		 
+		 if imgui.Button(u8"moonloader.log",imgui.ImVec2(150, 25)) then
+		    local file = getGameDirectory().. "\\moonloader\\moonloader.log"
+		    if doesFileExist(file) then
+               os.execute('explorer '.. file)
+			end
+		 end
+		 
+		 if imgui.Button(u8"modloader.log",imgui.ImVec2(150, 25)) then
+		    local file = getGameDirectory().. "\\modloader\\modloader.log"
+		    if doesFileExist(file) then
+               os.execute('explorer '.. file)
+			end
+		 end
+		 
+		 if imgui.Button(u8"sampfuncs.log",imgui.ImVec2(150, 25)) then
+		    local file = getGameDirectory().. "\\SAMPFUNCS\\SAMPFUNCS.log"
+		    if doesFileExist(file) then
+               os.execute('explorer '.. file)
+			end
+		 end
+		 
+		 if imgui.Button(u8"chatlog.txt",imgui.ImVec2(150, 25)) then
+		    os.execute('explorer '..getFolderPath(5) ..'\\GTA San Andreas User Files\\SAMP\\chatlog.txt')
+		    -- if doesFileExist(getFolderPath(5) ..'\\GTA San Andreas User Files\\SAMP\\chatlog.txt') then
+			   -- local file = assert(io.open(getFolderPath(5) ..'\\GTA San Andreas User Files\\SAMP\\chatlog.txt', "r"))
+               -- textbuffer.logsbuff.v = u8:decode(file:read('*a'))
+               -- file:close()
+			-- end
+		 end
+		 
+		 imgui.Text(" ")
+		 imgui.TextColoredRGB("Форум Absolute Play DM: {007DFF}forum.gta-samp.ru")
+         if imgui.IsItemClicked() then
+            setClipboardText("https://forum.gta-samp.ru/")
+            printStringNow("Url copied to clipboard", 1000)
+         end
       end -- end tabmenu.info
-
+		 
       imgui.NextColumn()
 
       if imgui.Button(u8"Лимиты", imgui.ImVec2(100,25)) then tabmenu.info = 2 end
@@ -2179,6 +2267,7 @@ function imgui.OnDrawFrame()
       if imgui.Button(u8"Команды", imgui.ImVec2(100,25)) then tabmenu.info = 6 end
       if imgui.Button(u8"FAQ", imgui.ImVec2(100,25)) then tabmenu.info = 7 end
       if imgui.Button(u8"Hotkeys", imgui.ImVec2(100,25)) then tabmenu.info = 8 end
+      if imgui.Button(u8"Логи", imgui.ImVec2(100,25)) then tabmenu.info = 9 end
       if imgui.Button(u8"About", imgui.ImVec2(100, 25)) then tabmenu.info = 1 end
 
       imgui.Columns(1)
