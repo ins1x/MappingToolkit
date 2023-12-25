@@ -4,7 +4,7 @@ script_description("Assistant for mappers and event makers on Absolute Play")
 script_dependencies('imgui', 'lib.samp.events', 'vkeys')
 script_properties("work-in-pause")
 script_url("https://github.com/ins1x/AbsEventHelper")
-script_version("2.15")
+script_version("2.16")
 -- script_moonloader(16) moonloader v.0.26
 
 -- Activaton: ALT + X (show main menu)
@@ -47,6 +47,7 @@ local ini = inicfg.load({
       textbuffer7 = " ",
       textbuffer8 = " ",
       textbuffer9 = " ",
+      textbuffer10 = " ",
       adtextbuffer = " "
    }
 }, configIni)
@@ -62,6 +63,7 @@ local sizeX, sizeY = getScreenResolution()
 local v = nil
 local color = imgui.ImFloat4(1, 0, 0, 1)
 local hideobjectid = imgui.ImInt(650)
+local selected_item = imgui.ImInt(0)
 
 local dialog = {
    main = imgui.ImBool(false),
@@ -110,6 +112,7 @@ local textbuffer = {
    bind7 = imgui.ImBuffer(256),
    bind8 = imgui.ImBuffer(256),
    bind9 = imgui.ImBuffer(256),
+   bind10 = imgui.ImBuffer(256),
    bindad = imgui.ImBuffer(256),
    findplayer = imgui.ImBuffer(32),
    ckeckplayer = imgui.ImBuffer(32),
@@ -140,19 +143,20 @@ local combobox = {
    item7 = imgui.ImInt(0),
    item8 = imgui.ImInt(0),
    item9 = imgui.ImInt(0),
+   item10 = imgui.ImInt(0),
    itemad = imgui.ImInt(0)
 }
 
-textbuffer.bind1.v = u8(ini.binds.textbuffer1)
-textbuffer.bind2.v = u8(ini.binds.textbuffer2)
-textbuffer.bind3.v = u8(ini.binds.textbuffer3)
-textbuffer.bind4.v = u8(ini.binds.textbuffer4)
-textbuffer.bind5.v = u8(ini.binds.textbuffer5)
-textbuffer.bind6.v = u8(ini.binds.textbuffer6)
-textbuffer.bind7.v = u8(ini.binds.textbuffer7)
-textbuffer.bind8.v = u8(ini.binds.textbuffer8)
-textbuffer.bind9.v = u8(ini.binds.textbuffer9)
-textbuffer.bindad.v = u8(ini.binds.adtextbuffer)
+-- textbuffer.bind1.v = u8(ini.binds.textbuffer1)
+-- textbuffer.bind2.v = u8(ini.binds.textbuffer2)
+-- textbuffer.bind3.v = u8(ini.binds.textbuffer3)
+-- textbuffer.bind4.v = u8(ini.binds.textbuffer4)
+-- textbuffer.bind5.v = u8(ini.binds.textbuffer5)
+-- textbuffer.bind6.v = u8(ini.binds.textbuffer6)
+-- textbuffer.bind7.v = u8(ini.binds.textbuffer7)
+-- textbuffer.bind8.v = u8(ini.binds.textbuffer8)
+-- textbuffer.bind9.v = u8(ini.binds.textbuffer9)
+-- textbuffer.bindad.v = u8(ini.binds.adtextbuffer)
 
 -- If the server changes IP, change it here
 local hostip = "193.84.90.23"
@@ -240,6 +244,9 @@ function main()
 		 Открыть меню: {FFD700}ALT + X", 0xFFFFFF)
       end
       
+	  -- Load chat binds
+	  reloadBindsFromConfig()
+	  
       -- ENB check
       if doesFileExist(getGameDirectory() .. "\\enbseries.asi") or 
       doesFileExist(getGameDirectory() .. "\\d3d9.dll") then
@@ -844,11 +851,65 @@ function imgui.OnDrawFrame()
 
       elseif tabmenu.main == 2 then
 
-      imgui.TextColoredRGB("Здесь вы можете настроить чат-бинды для мероприятия. {00FF00}@ номер игрока - {bababa}заменит id на никнейм игрока")
-       
+      imgui.Text(u8"Здесь вы можете настроить чат-бинды для мероприятия.     ")
+	  imgui.SameLine()
+	  imgui.Text(u8"Профиль: ")
+	  imgui.SameLine()
+	  imgui.PushItemWidth(100)
+	  if imgui.Combo(u8'##ComboBoxProfiles', selected_item, 
+	  {'Default', 'Race', 'Survival', 'TDM'}, 4) then
+         if selected_item.v == 0 then
+		    reloadBindsFromConfig()
+		    sampAddChatMessage('Загружен профиль Default из конфига', -1)
+         end
+         if selected_item.v == 1 then
+		    textbuffer.bind1.v = u8("Разрешено использовать починку транспорта")
+            textbuffer.bind2.v = u8("Разрешено в случае смерти продолжить игру начиная от спавна")
+            textbuffer.bind3.v = u8("Разрешено в случае вылета за границы трассы, продолжить игру начиная от места вылета")
+            textbuffer.bind4.v = u8("Разрешено при поломке транспорта и невозможноcти починки, заказать его еще раз")
+            textbuffer.bind5.v = u8("Разрешено на данном мероприятии играть без samp addon и последней версии клиента")
+            textbuffer.bind6.v = u8("Запрещено находиться в афк после начала мероприятия")
+            textbuffer.bind7.v = u8("Запрещено использовать телепорт и текстурные баги")
+            textbuffer.bind8.v = u8("За первое место приз - , за второе - , за третье -")
+            textbuffer.bind9.v = u8(" ")
+			textbuffer.bind10.v = u8(" ")
+            textbuffer.bindad.v = u8("Заходите на МП '' в мир , приз ")
+			sampAddChatMessage('Загружен профиль Race', -1)
+         end
+         if selected_item.v == 2 then
+		    textbuffer.bind1.v = u8("Запрещено создавать помеху игрокам при помощи багов и недоработок игры")
+            textbuffer.bind2.v = u8("Запрещены объединения более 2-х игроков")
+            textbuffer.bind3.v = u8("Не мешаем другим игрокам, ждем начала")
+            textbuffer.bind4.v = u8("")
+            textbuffer.bind5.v = u8("Запрещено находиться в афк после начала мероприятия")
+            textbuffer.bind6.v = u8("Начали! Желаю удачи всем игрокам")
+            textbuffer.bind7.v = u8("Разрешены объеденения - не больше двух игроков")
+            textbuffer.bind8.v = u8("Приз не может быть разделен при обоюдном согласии двух оставшихся команд")
+            textbuffer.bind9.v = u8(" ")
+			textbuffer.bind10.v = u8(" ")
+            textbuffer.bindad.v = u8("Заходите на МП 'Выживание' в мир , приз ")
+            sampAddChatMessage('Загружен профиль Survival', -1)
+         end
+         if selected_item.v == 3 then
+		    textbuffer.bind1.v = u8("Запрещено создавать помеху игрокам при помощи багов и недоработок игры")
+            textbuffer.bind2.v = u8("За попытку обмана организатора - ЧС мероприятий")
+            textbuffer.bind3.v = u8("Увидели лагера или нарушителя пишите в лс")
+            textbuffer.bind4.v = u8("Не мешаем другим игрокам, ждем начала")
+            textbuffer.bind5.v = u8("Запрещено находиться в афк после начала мероприятия")
+            textbuffer.bind6.v = u8("Начали! Желаю удачи всем игрокам")
+            textbuffer.bind7.v = u8("Всем вернуться на спавн!")
+            textbuffer.bind8.v = u8("Приз выдается в равном размере каждому участнику победившей команды")
+            textbuffer.bind9.v = u8("Победившая команда - не выходите с мира, дождитесь выдачи призовых!")
+            textbuffer.bind10.v = u8(" ")
+            textbuffer.bindad.v = u8("Заходите на МП TDM в мир , приз ")
+            sampAddChatMessage('Загружен профиль TDM', -1)
+         end
+      end
+	  imgui.PopItemWidth()
+	   
        -- line 1
        imgui.PushItemWidth(70)
-       imgui.Combo('1', combobox.item1, {u8'мчат', u8'общий'}, 2)
+       imgui.Combo('  1', combobox.item1, {u8'мчат', u8'общий'}, 2)
        imgui.PopItemWidth()
        
        imgui.SameLine()
@@ -856,7 +917,7 @@ function imgui.OnDrawFrame()
        end
        
        imgui.SameLine()
-       if imgui.Button(u8"отправить [1]") then
+       if imgui.Button(u8"отправить  [1]") then
           if combobox.item1.v == 0 then
              u8:decode(textbuffer.bind1.v)
              sampSendChat(string.format("/мчат %s", u8:decode(textbuffer.bind1.v)))
@@ -868,7 +929,7 @@ function imgui.OnDrawFrame()
        end
        -- line 2
        imgui.PushItemWidth(70)
-       imgui.Combo('2', combobox.item2, {u8'мчат', u8'общий'}, 2)
+       imgui.Combo('  2', combobox.item2, {u8'мчат', u8'общий'}, 2)
        imgui.PopItemWidth()
        
        imgui.SameLine()
@@ -876,7 +937,7 @@ function imgui.OnDrawFrame()
        end
        
        imgui.SameLine()
-       if imgui.Button(u8"отправить [2]") then
+       if imgui.Button(u8"отправить  [2]") then
           if combobox.item2.v == 0 then
              u8:decode(textbuffer.bind2.v)
              sampSendChat(string.format("/мчат %s", u8:decode(textbuffer.bind2.v)))
@@ -888,7 +949,7 @@ function imgui.OnDrawFrame()
        end
        -- line 3
        imgui.PushItemWidth(70)
-       imgui.Combo('3', combobox.item3, {u8'мчат', u8'общий'}, 2)
+       imgui.Combo('  3', combobox.item3, {u8'мчат', u8'общий'}, 2)
        imgui.PopItemWidth()
        
        imgui.SameLine()
@@ -896,7 +957,7 @@ function imgui.OnDrawFrame()
        end
        
        imgui.SameLine()
-       if imgui.Button(u8"отправить [3]") then
+       if imgui.Button(u8"отправить  [3]") then
           if combobox.item3.v == 0 then
              u8:decode(textbuffer.bind3.v)
              sampSendChat(string.format("/мчат %s", u8:decode(textbuffer.bind3.v)))
@@ -908,7 +969,7 @@ function imgui.OnDrawFrame()
        end
        -- line 4
        imgui.PushItemWidth(70)
-       imgui.Combo('4', combobox.item4, {u8'мчат', u8'общий'}, 2)
+       imgui.Combo('  4', combobox.item4, {u8'мчат', u8'общий'}, 2)
        imgui.PopItemWidth()
        
        imgui.SameLine()
@@ -916,7 +977,7 @@ function imgui.OnDrawFrame()
        end
        
        imgui.SameLine()
-       if imgui.Button(u8"отправить [4]") then
+       if imgui.Button(u8"отправить  [4]") then
           if combobox.item4.v == 0 then
              u8:decode(textbuffer.bind4.v)
              sampSendChat(string.format("/мчат %s", u8:decode(textbuffer.bind4.v)))
@@ -928,7 +989,7 @@ function imgui.OnDrawFrame()
        end
        -- line 5
        imgui.PushItemWidth(70)
-       imgui.Combo('5', combobox.item5, {u8'мчат', u8'общий'}, 2)
+       imgui.Combo('  5', combobox.item5, {u8'мчат', u8'общий'}, 2)
        imgui.PopItemWidth()
        
        imgui.SameLine()
@@ -936,7 +997,7 @@ function imgui.OnDrawFrame()
        end
        
        imgui.SameLine()
-       if imgui.Button(u8"отправить [5]") then
+       if imgui.Button(u8"отправить  [5]") then
           if combobox.item5.v == 0 then
              u8:decode(textbuffer.bind5.v)
              sampSendChat(string.format("/мчат %s", u8:decode(textbuffer.bind5.v)))
@@ -948,7 +1009,7 @@ function imgui.OnDrawFrame()
        end
        -- line 6
        imgui.PushItemWidth(70)
-       imgui.Combo('6', combobox.item6, {u8'мчат', u8'общий'}, 2)
+       imgui.Combo('  6', combobox.item6, {u8'мчат', u8'общий'}, 2)
        imgui.PopItemWidth()
        
        imgui.SameLine()
@@ -956,7 +1017,7 @@ function imgui.OnDrawFrame()
        end
        
        imgui.SameLine()
-       if imgui.Button(u8"отправить [6]") then
+       if imgui.Button(u8"отправить  [6]") then
           if combobox.item6.v == 0 then
              u8:decode(textbuffer.bind6.v)
              sampSendChat(string.format("/мчат %s", u8:decode(textbuffer.bind6.v)))
@@ -968,7 +1029,7 @@ function imgui.OnDrawFrame()
        end
        -- line 7
        imgui.PushItemWidth(70)
-       imgui.Combo('7', combobox.item7, {u8'мчат', u8'общий'}, 2)
+       imgui.Combo('  7', combobox.item7, {u8'мчат', u8'общий'}, 2)
        imgui.PopItemWidth()
        
        imgui.SameLine()
@@ -976,7 +1037,7 @@ function imgui.OnDrawFrame()
        end
        
        imgui.SameLine()
-       if imgui.Button(u8"отправить [7]") then
+       if imgui.Button(u8"отправить  [7]") then
           if combobox.item7.v == 0 then
              u8:decode(textbuffer.bind7.v)
              sampSendChat(string.format("/мчат %s", u8:decode(textbuffer.bind7.v)))
@@ -988,7 +1049,7 @@ function imgui.OnDrawFrame()
        end
        -- line 8
        imgui.PushItemWidth(70)
-       imgui.Combo('8', combobox.item8, {u8'мчат', u8'общий'}, 2)
+       imgui.Combo('  8', combobox.item8, {u8'мчат', u8'общий'}, 2)
        imgui.PopItemWidth()
        
        imgui.SameLine()
@@ -996,7 +1057,7 @@ function imgui.OnDrawFrame()
        end
        
        imgui.SameLine()
-       if imgui.Button(u8"отправить [8]") then
+       if imgui.Button(u8"отправить  [8]") then
           if combobox.item8.v == 0 then
              u8:decode(textbuffer.bind8.v)
              sampSendChat(string.format("/мчат %s", u8:decode(textbuffer.bind8.v)))
@@ -1008,7 +1069,7 @@ function imgui.OnDrawFrame()
        end
        -- line 9
        imgui.PushItemWidth(70)
-       imgui.Combo('9', combobox.item9, {u8'мчат', u8'общий'}, 2)
+       imgui.Combo('  9', combobox.item9, {u8'мчат', u8'общий'}, 2)
        imgui.PopItemWidth()
        
        imgui.SameLine()
@@ -1016,7 +1077,7 @@ function imgui.OnDrawFrame()
        end
        
        imgui.SameLine()
-       if imgui.Button(u8"отправить [9]") then
+       if imgui.Button(u8"отправить  [9]") then
           if combobox.item9.v == 0 then
              u8:decode(textbuffer.bind9.v)
              sampSendChat(string.format("/мчат %s", u8:decode(textbuffer.bind9.v)))
@@ -1026,9 +1087,29 @@ function imgui.OnDrawFrame()
              sampSendChat(string.format("* %s", u8:decode(textbuffer.bind9.v)))
           end
        end
+	   -- line 10
+       imgui.PushItemWidth(70)
+       imgui.Combo('10', combobox.item10, {u8'мчат', u8'общий'}, 2)
+       imgui.PopItemWidth()
+       
+       imgui.SameLine()
+       if imgui.InputText("##Bind10", textbuffer.bind9) then 
+       end
+       
+       imgui.SameLine()
+       if imgui.Button(u8"отправить [10]") then
+          if combobox.item10.v == 0 then
+             u8:decode(textbuffer.bind10.v)
+             sampSendChat(string.format("/мчат %s", u8:decode(textbuffer.bind10.v)))
+          end
+          if combobox.item10.v == 1 then
+             u8:decode(textbuffer.bind10.v)
+             sampSendChat(string.format("* %s", u8:decode(textbuffer.bind10.v)))
+          end
+       end
        -- last line
        imgui.PushItemWidth(70)
-       imgui.Combo('  ', combobox.itemad, {u8'объявление', u8'общий', u8'мчат'}, 3)
+       imgui.Combo('    ', combobox.itemad, {u8'объявление', u8'общий', u8'мчат'}, 3)
        imgui.PopItemWidth()
        
        imgui.SameLine()
@@ -1036,7 +1117,7 @@ function imgui.OnDrawFrame()
        end
        
        imgui.SameLine()
-       if imgui.Button(u8"объявление") then
+       if imgui.Button(u8"объявление    ") then
           if combobox.itemad.v == 0 then
              sampSendChat(string.format("/об %s", u8:decode(textbuffer.bindad.v)))
           end
@@ -1048,10 +1129,10 @@ function imgui.OnDrawFrame()
           end
        end
        
-       imgui.Text(" ")
+	   imgui.TextColoredRGB("* {00FF00}@ номер игрока - {bababa}заменит id на никнейм игрока.")
        imgui.Separator()
        
-       if imgui.Button(u8("Сохранить бинды")) then
+       if imgui.Button(u8(" Сохранить бинды ")) then
           ini.binds.textbuffer1 = u8:decode(textbuffer.bind1.v)
           ini.binds.textbuffer2 = u8:decode(textbuffer.bind2.v)
           ini.binds.textbuffer3 = u8:decode(textbuffer.bind3.v)
@@ -1061,28 +1142,20 @@ function imgui.OnDrawFrame()
           ini.binds.textbuffer7 = u8:decode(textbuffer.bind7.v)
           ini.binds.textbuffer8 = u8:decode(textbuffer.bind8.v)
           ini.binds.textbuffer9 = u8:decode(textbuffer.bind9.v)
+          ini.binds.textbuffer10 = u8:decode(textbuffer.bind10.v)
           ini.binds.adtextbuffer = u8:decode(textbuffer.bindad.v)
           save()          
           printStringNow("Saved", 1000)
        end
        
        imgui.SameLine()
-       if imgui.Button(u8("Перегрузить бинды")) then
-          textbuffer.bind1.v = u8(ini.binds.textbuffer1)
-          textbuffer.bind2.v = u8(ini.binds.textbuffer2)
-          textbuffer.bind3.v = u8(ini.binds.textbuffer3)
-          textbuffer.bind4.v = u8(ini.binds.textbuffer4)
-          textbuffer.bind5.v = u8(ini.binds.textbuffer5)
-          textbuffer.bind6.v = u8(ini.binds.textbuffer6)
-          textbuffer.bind7.v = u8(ini.binds.textbuffer7)
-          textbuffer.bind8.v = u8(ini.binds.textbuffer8)
-          textbuffer.bind9.v = u8(ini.binds.textbuffer9)
-          textbuffer.bindad.v = u8(ini.binds.adtextbuffer)        
+       if imgui.Button(u8(" Перегрузить бинды ")) then
+          reloadBindsFromConfig()        
           printStringNow("Reloaded", 1000)
        end
        
        imgui.SameLine()
-       if imgui.Button(u8"Очистить все бинды") then
+       if imgui.Button(u8" Очистить все бинды ") then
           textbuffer.bind1.v = " "
           textbuffer.bind2.v = " "
           textbuffer.bind3.v = " "
@@ -1092,16 +1165,24 @@ function imgui.OnDrawFrame()
           textbuffer.bind7.v = " "
           textbuffer.bind8.v = " "
           textbuffer.bind9.v = " "
+          textbuffer.bind10.v = " "
           textbuffer.bindad.v = " "
        end
        
+	   imgui.SameLine()
+	   imgui.Text("         ")
+	   
        imgui.SameLine()
-       if imgui.Button(u8"Очистить себе чат") then
+       if imgui.Button(u8" Очистить себе чат ") then
           memory.fill(sampGetChatInfoPtr() + 306, 0x0, 25200)
           memory.write(sampGetChatInfoPtr() + 306, 25562, 4, 0x0)
           memory.write(sampGetChatInfoPtr() + 0x63DA, 1, 1)
        end
-       
+
+	   imgui.SameLine()
+	   if imgui.Button(u8" chatlog.txt ") then
+		  os.execute('explorer '..getFolderPath(5) ..'\\GTA San Andreas User Files\\SAMP\\chatlog.txt')
+	   end
        -- imgui.SameLine()
        -- if imgui.Button(u8"Получить послед сообщение из чата в буффер") then
            -- text, prefix, color, pcolor = sampGetChatString(99)
@@ -1324,7 +1405,7 @@ function imgui.OnDrawFrame()
        imgui.Text("Ping")
        imgui.Columns(1)
        imgui.Separator()
-          
+	   
        for k, v in pairs(playersTable) do
           local health = sampGetPlayerHealth(v)
           local armor = sampGetPlayerArmor(v)
@@ -1332,7 +1413,7 @@ function imgui.OnDrawFrame()
           local nickname = sampGetPlayerNickname(v)
           local score = sampGetPlayerScore(v)
           local ucolor = sampGetPlayerColor(v)
-          
+		  
           imgui.Columns(5)
           imgui.TextColoredRGB(string.format("[%d]", v ))
           if imgui.IsItemClicked() then
@@ -2162,10 +2243,11 @@ function imgui.OnDrawFrame()
       elseif tabmenu.info == 9 then
 		 
 	     imgui.Text(u8"Интерфейс взаимодействия с сайтом Absolute Play DM. (Все действия редиректит в браузер)")
+		 
 		 if imgui.Button(u8"Логи действий администрации",imgui.ImVec2(250, 25)) then
 		    os.execute('explorer https://gta-samp.ru/adminhistory-deathmatch')
 		 end
-         
+         imgui.SameLine()
 		 if imgui.Button(u8"Логи смены никнеймов",imgui.ImVec2(250, 25)) then
 		    os.execute('explorer https://gta-samp.ru/nickchange-deathmatch')
 		 end 
@@ -2173,12 +2255,11 @@ function imgui.OnDrawFrame()
 		 if imgui.Button(u8"История регистрации аккаунтов",imgui.ImVec2(250, 25)) then
 		    os.execute('explorer https://gta-samp.ru/reg-deathmatch')
 		 end
-		 
+		 imgui.SameLine()
 		 if imgui.Button(u8"Полный список правил",imgui.ImVec2(250, 25)) then
 		    os.execute('explorer https://forum.sa-mp.ru/index.php?/topic/802952-%D0%BF%D1%80%D0%B0%D0%B2%D0%B8%D0%BB%D0%B0-dm-%D1%81%D0%B5%D1%80%D0%B2%D0%B5%D1%80%D0%B0/')
 		 end
 		 
-		 imgui.Text(" ")
 		 imgui.PushItemWidth(150)
 		 imgui.Text(u8"Узнать историю аккаунта по нику:")
 		 if imgui.InputText("##CheckPlayer", textbuffer.ckeckplayer) then
@@ -2205,19 +2286,26 @@ function imgui.OnDrawFrame()
 		 if chosenplayer then
             local nickname = sampGetPlayerNickname(chosenplayer)
             local ucolor = sampGetPlayerColor(chosenplayer)
-          
+            
+			imgui.SameLine()
             imgui.TextColoredRGB(string.format("Игрок в сети: {%0.6x} %s[%d]{cdcdcd}",
             bit.band(ucolor,0xffffff), nickname, chosenplayer))
-			-- imgui.SameLine()
-			-- if imgui.Button(u8"/стат") then
-			   -- if isAbsolutePlay then
-                  -- sampSendChat("/стат " .. chosenplayer)
-		       -- else
-			      -- sampSendChat("/stats " .. chosenplayer)
-			   -- end
- 			-- end
+			imgui.SameLine()
+			if imgui.Button(u8"/стат", imgui.ImVec2(70, 25)) then
+			  if isAbsolutePlay then
+                  sampSendChat("/стат " .. chosenplayer)
+		       else
+			      sampSendChat("/stats " .. chosenplayer)
+			   end
+ 			end
+			imgui.SameLine()
+			if imgui.Button(u8"меню", imgui.ImVec2(70, 25)) then
+			   if isAbsolutePlay then
+                  sampSendChat("/и " .. chosenplayer)
+			   end
+ 			end
 		 end
-		 
+		 imgui.Text(" ")
 		 imgui.Text(u8"Стандартные логи:")
 		 
 		 if imgui.Button(u8"moonloader.log",imgui.ImVec2(150, 25)) then
@@ -2226,14 +2314,14 @@ function imgui.OnDrawFrame()
                os.execute('explorer '.. file)
 			end
 		 end
-		 
+		 imgui.SameLine()
 		 if imgui.Button(u8"modloader.log",imgui.ImVec2(150, 25)) then
 		    local file = getGameDirectory().. "\\modloader\\modloader.log"
 		    if doesFileExist(file) then
                os.execute('explorer '.. file)
 			end
 		 end
-		 
+		 imgui.SameLine()
 		 if imgui.Button(u8"sampfuncs.log",imgui.ImVec2(150, 25)) then
 		    local file = getGameDirectory().. "\\SAMPFUNCS\\SAMPFUNCS.log"
 		    if doesFileExist(file) then
@@ -2503,7 +2591,7 @@ function JumpForward()
          elseif (angle >= 170 and angle <= 190) then
             setCharCoordinates(PLAYER_PED, posX-dist, posY-dist, posZ)
          elseif (angle >= 31 and angle <= 79) then
-            setCharCoordinates(PLAYER_PED, posX, posY-dist, posZ)             
+            setCharCoordinates(PLAYER_PED, posX, posY-dist, posZ) 
          elseif (angle >= 191 and angle <= 259) then
             setCharCoordinates(PLAYER_PED, posX+dist, posY-dist, posZ)
          elseif (angle >= 81 and angle <= 169) then
@@ -2634,6 +2722,20 @@ function hideAllTextureImages()
    show_texture4 = false
    show_texture5 = false
 end 
+
+function reloadBindsFromConfig()
+   textbuffer.bind1.v = u8(ini.binds.textbuffer1)
+   textbuffer.bind2.v = u8(ini.binds.textbuffer2)
+   textbuffer.bind3.v = u8(ini.binds.textbuffer3)
+   textbuffer.bind4.v = u8(ini.binds.textbuffer4)
+   textbuffer.bind5.v = u8(ini.binds.textbuffer5)
+   textbuffer.bind6.v = u8(ini.binds.textbuffer6)
+   textbuffer.bind7.v = u8(ini.binds.textbuffer7)
+   textbuffer.bind8.v = u8(ini.binds.textbuffer8)
+   textbuffer.bind9.v = u8(ini.binds.textbuffer9)
+   textbuffer.bind10.v = u8(ini.binds.textbuffer10)
+   textbuffer.bindad.v = u8(ini.binds.adtextbuffer)
+end
 
 function nameTagOn()
     local pStSet = sampGetServerSettingsPtr();
