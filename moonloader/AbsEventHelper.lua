@@ -4,7 +4,7 @@ script_description("Assistant for mappers and event makers on Absolute Play")
 script_dependencies('imgui', 'lib.samp.events', 'vkeys')
 script_properties("work-in-pause")
 script_url("https://github.com/ins1x/AbsEventHelper")
-script_version("2.16")
+script_version("2.17")
 -- script_moonloader(16) moonloader v.0.26
 
 -- Activaton: ALT + X (show main menu)
@@ -1781,9 +1781,11 @@ function imgui.OnDrawFrame()
             setClipboardText("dsc.gg/sawncommunity")
             printStringNow("Url copied to clipboard", 1000)
          end
-         --imgui.Text(u8"Disclaimer: Автор не является частью команды проекта Absolute Play")
+		 if imgui.Button(u8"Check updates",imgui.ImVec2(150, 25)) then
+		    os.execute('explorer https://github.com/ins1x/AbsEventHelper/releases')
+		 end
          imgui.Text(" ")
-
+		--imgui.Text(u8"Disclaimer: Автор не является частью команды проекта Absolute Play")
       elseif tabmenu.info == 2 then
          imgui.Text(u8"Каждый игрок от 20 уровня может при наличии свободных слотов создать мир.")
          imgui.TextColoredRGB("Для создания мира необходимо иметь {00FF00}100 ОА (Очков апгрейда) и 1.000.000$.{FFFFFF}")
@@ -2244,24 +2246,25 @@ function imgui.OnDrawFrame()
 		 
 	     imgui.Text(u8"Интерфейс взаимодействия с сайтом Absolute Play DM. (Все действия редиректит в браузер)")
 		 
-		 if imgui.Button(u8"Логи действий администрации",imgui.ImVec2(250, 25)) then
+		 if imgui.Button(u8"Логи действий администрации",imgui.ImVec2(230, 25)) then
 		    os.execute('explorer https://gta-samp.ru/adminhistory-deathmatch')
 		 end
          imgui.SameLine()
-		 if imgui.Button(u8"Логи смены никнеймов",imgui.ImVec2(250, 25)) then
+		 if imgui.Button(u8"Логи смены никнеймов",imgui.ImVec2(230, 25)) then
 		    os.execute('explorer https://gta-samp.ru/nickchange-deathmatch')
 		 end 
 		 
-		 if imgui.Button(u8"История регистрации аккаунтов",imgui.ImVec2(250, 25)) then
+		 if imgui.Button(u8"История регистрации аккаунтов",imgui.ImVec2(230, 25)) then
 		    os.execute('explorer https://gta-samp.ru/reg-deathmatch')
 		 end
 		 imgui.SameLine()
-		 if imgui.Button(u8"Полный список правил",imgui.ImVec2(250, 25)) then
+		 if imgui.Button(u8"Полный список правил",imgui.ImVec2(230, 25)) then
 		    os.execute('explorer https://forum.sa-mp.ru/index.php?/topic/802952-%D0%BF%D1%80%D0%B0%D0%B2%D0%B8%D0%BB%D0%B0-dm-%D1%81%D0%B5%D1%80%D0%B2%D0%B5%D1%80%D0%B0/')
 		 end
 		 
+		 imgui.Text(" ")
+		 imgui.Text(u8"Узнать историю аккаунта:")
 		 imgui.PushItemWidth(150)
-		 imgui.Text(u8"Узнать историю аккаунта по нику:")
 		 if imgui.InputText("##CheckPlayer", textbuffer.ckeckplayer) then
 		    for k, v in ipairs(getAllChars()) do
                local res, id = sampGetPlayerIdByCharHandle(v)
@@ -2276,9 +2279,16 @@ function imgui.OnDrawFrame()
          end
 		 imgui.PopItemWidth()
 		 imgui.SameLine()
-		 if imgui.Button(u8"Пробить",imgui.ImVec2(70, 25)) then
+		 if imgui.Button(u8"по никнейму",imgui.ImVec2(150, 25)) then
 			if string.len(textbuffer.ckeckplayer.v) > 0 then
                local link = 'explorer "https://gta-samp.ru/server-deathmatch?Nick='..u8:decode(textbuffer.ckeckplayer.v)..'"'
+			   os.execute(link)
+			end
+		 end 
+		 imgui.SameLine()
+		 if imgui.Button(u8"по номеру аккаунта",imgui.ImVec2(150, 25)) then
+			if string.len(textbuffer.ckeckplayer.v) > 0 and tonumber(textbuffer.ckeckplayer.v) then
+               local link = 'explorer "https://gta-samp.ru/server-deathmatch?Accid='..u8:decode(textbuffer.ckeckplayer.v)..'"'
 			   os.execute(link)
 			end
 		 end 
