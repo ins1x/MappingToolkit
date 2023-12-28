@@ -4,7 +4,7 @@ script_description("Assistant for mappers and event makers on Absolute Play")
 script_dependencies('imgui', 'lib.samp.events', 'vkeys')
 script_properties("work-in-pause")
 script_url("https://github.com/ins1x/AbsEventHelper")
-script_version("2.17")
+script_version("2.18")
 -- script_moonloader(16) moonloader v.0.26
 
 -- Activaton: ALT + X (show main menu)
@@ -116,6 +116,7 @@ local textbuffer = {
    bindad = imgui.ImBuffer(256),
    findplayer = imgui.ImBuffer(32),
    ckeckplayer = imgui.ImBuffer(32),
+   objectid = imgui.ImBuffer(6),
    rgb = imgui.ImBuffer(256),
    note = imgui.ImBuffer(1024)
 }
@@ -685,6 +686,10 @@ function imgui.OnDrawFrame()
       local positionX, positionY, positionZ = getCharCoordinates(PLAYER_PED)
       imgui.Text(string.format(u8"Позиция x: %.1f, y: %.1f, z: %.1f",
       positionX, positionY, positionZ))
+	  if imgui.IsItemClicked() then
+         setClipboardText(string.format(u8"%.1f, %.1f, %.1f", positionX, positionY, positionZ))
+         printStringNow("position copied to clipboard", 1000)
+      end
       
       local angle = math.ceil(getCharHeading(PLAYER_PED))
       imgui.Text(string.format(u8"Направление: %s  %i°", direction(), angle))
@@ -1624,10 +1629,11 @@ function imgui.OnDrawFrame()
       
       elseif tabmenu.main == 5 then
       imgui.Columns(2)
-      imgui.SetColumnWidth(-1, 500)
+      imgui.SetColumnWidth(-1, 550)
       
       if tabmenu.objects == 1 then
          imgui.Text(u8"Большие прозрачные объекты для текста: 19481, 19480, 19482, 19477")
+         --imgui.Selectable(u8"Большие прозрачные объекты для текста: 19481, 19480, 19482, 19477")
          imgui.Text(u8"Маленькие объекты для текста: 19475, 19476, 2662")
          imgui.Text(u8"Бетонные блоки: 18766, 18765, 18764, 18763, 18762")
          imgui.Text(u8"Горы: вулкан 18752, песочница 18751, песочные горы ландшафт 19548")
@@ -1677,9 +1683,9 @@ function imgui.OnDrawFrame()
          imgui.Text(u8"Картины: 2255-2289, 3962-3964, 14860, 14812, 14737")
       elseif tabmenu.objects == 6 then
          imgui.Text(u8"Здесь вы можете сохранить ваши объекты в избранное")
-         imgui.InputTextMultiline('##bufftext', textbuffer.note, imgui.ImVec2(475, 150))
+         imgui.InputTextMultiline('##bufftext', textbuffer.note, imgui.ImVec2(515, 150))
 
-         if imgui.Button(u8"Сохранить в файл", imgui.ImVec2(125, 25)) then
+         if imgui.Button(u8"Сохранить избранные в файл", imgui.ImVec2(200, 25)) then
             favfile = io.open(getGameDirectory() ..
             "//moonloader//resource//abseventhelper//objects.txt", "a")
             --favfile:write("\n")
@@ -1690,56 +1696,90 @@ function imgui.OnDrawFrame()
          end
          
          imgui.SameLine()
-         if imgui.Button(u8"Загрузить из файла", imgui.ImVec2(125, 25)) then
+         if imgui.Button(u8"Загрузить избранные из файла", imgui.ImVec2(200, 25)) then
             favfile = io.open(getGameDirectory() ..
             "//moonloader//resource//abseventhelper//objects.txt", "r")
             textbuffer.note.v = favfile:read('*a')
             favfile:close()
          end
-         
+      elseif tabmenu.objects == 7 then
+	     imgui.TextColoredRGB("Инструменты {007DFF}Prineside DevTools (Online)")
+	     imgui.Text(u8"Все запросы перенаправляет в ваш браузер")
+		 imgui.Text("")
+		 imgui.Text(u8"Введите ключевое слово, ID или название модели:")
+	     imgui.PushItemWidth(220)
+	     if imgui.InputText("##CheckObject", textbuffer.objectid) then
+         end
+         imgui.PopItemWidth()
+		 
+		 imgui.SameLine()
+	     if imgui.Button(u8"Найти",imgui.ImVec2(65, 25)) then
+		    if string.len(textbuffer.objectid.v) > 3 then
+               local link = 'explorer "https://dev.prineside.com/ru/gtasa_samp_model_id/search/?q='.. u8:decode(textbuffer.objectid.v)..'"'
+		       os.execute(link)
+		    end
+	     end 
+	  
+	     if imgui.Button(u8"Найти объекты рядом по текущей позиции",imgui.ImVec2(300, 25)) then
+		    if sampIsLocalPlayerSpawned() then
+               local posX, posY, posZ = getCharCoordinates(PLAYER_PED)
+               local link = string.format('explorer "https://dev.prineside.com/ru/gtasa_samp_model_id/mapsearch/?x=%i&y=%i', posX, posY)
+		       os.execute(link)
+		    end
+	     end
+		 
+		 if lastObjectModelid then
+		    if imgui.Button(u8"Вставить последний объект id: "..lastObjectModelid, imgui.ImVec2(300, 25)) then
+	           textbuffer.objectid.v = tostring(lastObjectModelid)
+		    end
+	     end
+		 
+		 imgui.Text("")
+		 imgui.TextColoredRGB("Список всех разрушаемых объектов на {007DFF}dev.prineside.com/customsearch")
+         if imgui.IsItemClicked() then
+			 os.execute('explorer "https://dev.prineside.com/ru/gtasa_samp_model_id/customsearch/?c%5B%5D=1&s=id-asc&bc=-1&bb=1&bt=-1&ba=-1"')
+         end
       end
 
       imgui.NextColumn()
 
-      if imgui.Button(u8"Основные",imgui.ImVec2(200, 25)) then tabmenu.objects = 1 end 
-      if imgui.Button(u8"Специальные",imgui.ImVec2(200, 25)) then tabmenu.objects = 2 end
-      if imgui.Button(u8"Эффекты",imgui.ImVec2(200, 25)) then tabmenu.objects = 3 end
-      if imgui.Button(u8"Освещение",imgui.ImVec2(200, 25)) then tabmenu.objects = 4 end
-      if imgui.Button(u8"Интерьер",imgui.ImVec2(200, 25)) then tabmenu.objects = 5 end
-      if imgui.Button(u8"Избранные",imgui.ImVec2(200, 25)) then tabmenu.objects = 6 end
+      if imgui.Button(u8"Основные",imgui.ImVec2(150, 25)) then tabmenu.objects = 1 end 
+      if imgui.Button(u8"Специальные",imgui.ImVec2(150, 25)) then tabmenu.objects = 2 end
+      if imgui.Button(u8"Эффекты",imgui.ImVec2(150, 25)) then tabmenu.objects = 3 end
+      if imgui.Button(u8"Освещение",imgui.ImVec2(150, 25)) then tabmenu.objects = 4 end
+      if imgui.Button(u8"Интерьер",imgui.ImVec2(150, 25)) then tabmenu.objects = 5 end
+      if imgui.Button(u8"Избранные",imgui.ImVec2(150, 25)) then tabmenu.objects = 6 end
+      if imgui.Button(u8"Поиск (Онлайн)",imgui.ImVec2(150, 25)) then tabmenu.objects = 7 end
 
       imgui.Columns(1)
       imgui.Separator()
-
+		 
       imgui.Text(u8"")
+	  if isAbsolutePlay then
+ 	     imgui.TextColoredRGB("Описание работы редактора карт на {007DFF}forum.gta-samp.ru")
+         if imgui.IsItemClicked() then
+            os.execute('explorer "https://forum.gta-samp.ru/index.php?/topic/1016832-миры-описание-работы-редактора-карт/"')
+		 end
+      end
+		 
       imgui.TextColoredRGB("Не нашли нужный объект? посмотрите на {007DFF}dev.prineside.com")
       if imgui.IsItemClicked() then
-         setClipboardText("https://dev.prineside.com")
-         printStringNow("url copied to clipboard", 1000)
+         os.execute('explorer "https://dev.prineside.com/ru/gtasa_samp_model_id/"')
       end
       
       imgui.TextColoredRGB("Карта объектов которые не видны редакторами карт {007DFF}map.romzes.com")
       if imgui.IsItemClicked() then
-         setClipboardText("https://map.romzes.com/")
-         printStringNow("url copied to clipboard", 1000)
-      end
-      
-	  imgui.TextColoredRGB("Список всех разрушаемых объектов на {007DFF}dev.prineside.com/customsearch")
-      if imgui.IsItemClicked() then
-         setClipboardText("https://dev.prineside.com/ru/gtasa_samp_model_id/customsearch/?c%5B%5D=1&s=id-asc&bc=-1&bb=1&bt=-1&ba=-1")
-         printStringNow("url copied to clipboard", 1000)
+         os.execute('explorer "https://map.romzes.com/"')
       end
 	  
       imgui.TextColoredRGB("Список всех текстур GTA:SA {007DFF}textures.xyin.ws")
       if imgui.IsItemClicked() then
-         setClipboardText("https://textures.xyin.ws/?page=textures&p=1&limit=100")
-         printStringNow("url copied to clipboard", 1000)
+         os.execute('explorer https://textures.xyin.ws/?page=textures&p=1&limit=100"')
       end
       
 	  imgui.TextColoredRGB("Браузер спрайтов {007DFF}pawnokit.ru")
       if imgui.IsItemClicked() then
-         setClipboardText("https://pawnokit.ru/ru/txmngr")
-         printStringNow("url copied to clipboard", 1000)
+         os.execute('explorer "https://pawnokit.ru/ru/txmngr"')
       end
 	  
       elseif tabmenu.main == 6 then
@@ -1755,11 +1795,6 @@ function imgui.OnDrawFrame()
          end
          imgui.Text(u8"Основная задача данного скрипта - сделать процесс маппинга в внутриигровом редакторе карт")
          imgui.Text(u8"максимально приятным, и дать больше возможностей организаторам мероприятий.")
-		 imgui.TextColoredRGB("Больше информации по маппингу на сервере {007DFF}forum.gta-samp.ru")
-         if imgui.IsItemClicked() then
-            setClipboardText("https://forum.gta-samp.ru/index.php?/topic/1016832-миры-описание-работы-редактора-карт/")
-            printStringNow("Url copied to clipboard", 1000)
-         end
          imgui.Text(u8"Скрипт распостраняется только с открытым исходным кодом")
          imgui.Text(u8"Категорически не рекомендуется использовать этот скрипт вне редактора карт!")
 		 imgui.Text(u8"Протестировать скрипт можно на Absolute DM Play в мире №10 (/мир 10)")
@@ -1767,19 +1802,16 @@ function imgui.OnDrawFrame()
 
          imgui.TextColoredRGB("Homepage: {007DFF}github.com/ins1x/AbsEventHelper")
          if imgui.IsItemClicked() then
-           setClipboardText("github.com/ins1x/AbsEventHelper")
-           printStringNow("Url copied to clipboard", 1000)
+            os.execute('explorer "https://github.com/ins1x/AbsEventHelper"')
          end
          imgui.TextColoredRGB("Сайт Absolute Play: {007DFF}gta-samp.ru")
          if imgui.IsItemClicked() then
-            setClipboardText("gta-samp.ru")
-            printStringNow("Url copied to clipboard", 1000)
+            os.execute('explorer "https://gta-samp.ru"')
          end
 		 -- {FFFFFF}R{4682b4}S{FF0000}C 
 		 imgui.TextColoredRGB("Russian Sawn-off Community: {007DFF}dsc.gg/sawncommunity")
          if imgui.IsItemClicked() then
-            setClipboardText("dsc.gg/sawncommunity")
-            printStringNow("Url copied to clipboard", 1000)
+            os.execute('explorer "https://dsc.gg/sawncommunity"')
          end
 		 if imgui.Button(u8"Check updates",imgui.ImVec2(150, 25)) then
 		    os.execute('explorer https://github.com/ins1x/AbsEventHelper/releases')
@@ -1944,8 +1976,7 @@ function imgui.OnDrawFrame()
        
          imgui.TextColoredRGB("Другие цвета {007DFF}https://encycolorpedia.ru/websafe")
          if imgui.IsItemClicked() then
-            setClipboardText("https://encycolorpedia.ru/websafe")
-            printStringNow("Url copied to clipboard", 1000)
+            os.execute('explorer "https://encycolorpedia.ru/websafe"')
          end
       
          imgui.Text(u8"RR — красная часть цвета, GG — зеленая, BB — синяя, AA — альфа")
@@ -1999,8 +2030,7 @@ function imgui.OnDrawFrame()
 		 
 		 imgui.TextColoredRGB("Список всех текстур GTA:SA {007DFF}textures.xyin.ws")
          if imgui.IsItemClicked() then
-            setClipboardText("https://textures.xyin.ws/?page=textures&p=1&limit=100")
-            printStringNow("url copied to clipboard", 1000)
+            os.execute('explorer "https://textures.xyin.ws/?page=textures&p=1&limit=100"')
          end
 		 
          imgui.Text(u8"Шрифты:")
@@ -2032,8 +2062,7 @@ function imgui.OnDrawFrame()
 
 		 imgui.TextColoredRGB("Список всех спецсимволов {007DFF}pawnokit.ru")
          if imgui.IsItemClicked() then
-            setClipboardText("https://pawnokit.ru/ru/spec_symbols")
-            printStringNow("url copied to clipboard", 1000)
+            os.execute('explorer "https://pawnokit.ru/ru/spec_symbols"')
          end
 
       -- elseif tabmenu.info == 5 then
@@ -2219,8 +2248,7 @@ function imgui.OnDrawFrame()
        imgui.Text(u8"Оригинал темы посмотрите на форуме")
        imgui.TextColoredRGB("{007DFF}https://forum.sa-mp.ru/index.php?/topic/1016828-миры-редактор-карт-faq/")
        if imgui.IsItemClicked() then
-         setClipboardText("https://forum.sa-mp.ru/index.php?/topic/1016828-миры-редактор-карт-faq/")
-         printStringNow("url copied to clipboard", 1000)
+          os.execute('explorer "https://forum.sa-mp.ru/index.php?/topic/1016828-миры-редактор-карт-faq/"')
        end
 		 
       elseif tabmenu.info == 8 then
@@ -2351,8 +2379,7 @@ function imgui.OnDrawFrame()
 		 imgui.Text(" ")
 		 imgui.TextColoredRGB("Форум Absolute Play DM: {007DFF}forum.gta-samp.ru")
          if imgui.IsItemClicked() then
-            setClipboardText("https://forum.gta-samp.ru/")
-            printStringNow("Url copied to clipboard", 1000)
+            os.execute('explorer "https://forum.gta-samp.ru/"')
          end
       end -- end tabmenu.info
 		 
@@ -2477,6 +2504,9 @@ function sampev.onServerMessage(color, text)
       return false
    end
    
+   if text:find("Это не твой мир, редактировать его ты не можешь") then
+      return false
+   end
 end
 
 function onExitScript()
