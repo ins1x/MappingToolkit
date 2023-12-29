@@ -4,7 +4,7 @@ script_description("Assistant for mappers and event makers on Absolute Play")
 script_dependencies('imgui', 'lib.samp.events', 'vkeys')
 script_properties("work-in-pause")
 script_url("https://github.com/ins1x/AbsEventHelper")
-script_version("2.18")
+script_version("2.19")
 -- script_moonloader(16) moonloader v.0.26
 
 -- Activaton: ALT + X (show main menu)
@@ -115,6 +115,7 @@ local textbuffer = {
    bind10 = imgui.ImBuffer(256),
    bindad = imgui.ImBuffer(256),
    findplayer = imgui.ImBuffer(32),
+   findlog = imgui.ImBuffer(128),
    ckeckplayer = imgui.ImBuffer(32),
    objectid = imgui.ImBuffer(6),
    rgb = imgui.ImBuffer(256),
@@ -1229,7 +1230,7 @@ function imgui.OnDrawFrame()
           end
           ptablefile:write(string.format("Total: %d \n", counter))
           ptablefile:close()
-          printStringNow("Saved. moonloader/resource/abseventhelper/players.txt", 4000)
+          sampAddChatMessage("Saved. moonloader/resource/abseventhelper/players.txt", 4000)
        end
        
        imgui.SameLine()
@@ -1482,7 +1483,7 @@ function imgui.OnDrawFrame()
 
       elseif tabmenu.main == 4 then
       imgui.Columns(2, "vehtableheader", false)
-      imgui.SetColumnWidth(-1, 500)
+      imgui.SetColumnWidth(-1, 320)
       -- https://wiki.multitheftauto.com/wiki/Vehicle_IDs
       imgui.Text(u8"Найти ID транспорта по имени:")
        if imgui.InputText("##BindVehs", textbuffer.vehiclename) then 
@@ -1522,7 +1523,7 @@ function imgui.OnDrawFrame()
        end
        
        imgui.NextColumn()
-       if imgui.Button(u8"Заказать машину по имени") then
+       if imgui.Button(u8"Заказать машину по имени", imgui.ImVec2(190, 25)) then
           if not sampIsChatInputActive() and not sampIsDialogActive() and not isPauseMenuActive() and not  isSampfuncsConsoleActive() then
              for k, vehname in ipairs(VehicleNames) do
                 if vehname:lower():find(u8:decode(textbuffer.vehiclename.v:lower())) then
@@ -1536,14 +1537,21 @@ function imgui.OnDrawFrame()
 			 end
           end
        end
-       
-	   if isAbsolutePlay then
-          if imgui.Button(u8"Заказать машину из списка") then
+	   imgui.SameLine()
+	   if imgui.Button(u8"Найти ID траспорта онлайн", imgui.ImVec2(190, 25)) then
+	      os.execute('explorer "https://wiki.multitheftauto.com/wiki/Vehicle_IDs"')
+	   end
+	   if imgui.Button(u8"Заказать машину из списка", imgui.ImVec2(190, 25)) then
+	      if isAbsolutePlay then
              if not sampIsChatInputActive() and not sampIsDialogActive() and not isPauseMenuActive() and not isSampfuncsConsoleActive() then 
 			     sampSendChat("/vfibye2")
 				 dialog.main.v = not dialog.main.v
 		     end
           end
+	   end
+	   imgui.SameLine()
+	   if imgui.Button(u8"Handling.cfg (онлайн)", imgui.ImVec2(190, 25)) then
+	      os.execute('explorer "https://github.com/ins1x/useful-samp-stuff/blob/main/docs/server/VehicleHandling.txt"')
 	   end
 	   
        imgui.Columns(1)
@@ -1692,7 +1700,7 @@ function imgui.OnDrawFrame()
             --favfile:write(string.format("%s \n", os.date("%d.%m.%y %H:%M:%S")))
             favfile:write(textbuffer.note.v)
             favfile:close()
-            printStringNow("Saved moonloader/resource/abseventhelper/objects.txt", 3000)
+            sampAddChatMessage("Saved moonloader/resource/abseventhelper/objects.txt", -1)
          end
          
          imgui.SameLine()
@@ -2290,7 +2298,32 @@ function imgui.OnDrawFrame()
 		    os.execute('explorer https://forum.sa-mp.ru/index.php?/topic/802952-%D0%BF%D1%80%D0%B0%D0%B2%D0%B8%D0%BB%D0%B0-dm-%D1%81%D0%B5%D1%80%D0%B2%D0%B5%D1%80%D0%B0/')
 		 end
 		 
-		 imgui.Text(" ")
+		 if imgui.Button(u8"Администрация онлайн",imgui.ImVec2(230, 25)) then
+		    sampSendChat("/admin")
+			dialog.main.v = not dialog.main.v 
+		 end
+		 imgui.SameLine()
+		 if imgui.Button(u8"Список администрации на сайте",imgui.ImVec2(230, 25)) then
+		    os.execute('explorer "https://forum.gta-samp.ru/index.php?/topic/655150-%D1%81%D0%BF%D0%B8%D1%81%D0%BE%D0%BA-%D0%B0%D0%B4%D0%BC%D0%B8%D0%BD%D0%BE%D0%B2/"') 
+		 end
+		 
+		 imgui.Text("")
+		 imgui.Text(u8"Поиск в логе действий администрации по ключевому слову:")
+		 imgui.PushItemWidth(385)
+		 if imgui.InputText("##FindLogs", textbuffer.findlog) then
+         end
+		 imgui.PopItemWidth()
+		 imgui.SameLine()
+		 if imgui.Button(u8"Найти",imgui.ImVec2(70, 25)) then
+     	    if string.len(textbuffer.findlog.v) > 0 then
+               local link = string.format('explorer "https://gta-samp.ru/adminhistory-deathmatch?year=%i&month=%i&searchtext=%s"',
+			   os.date('%Y'),os.date('%m'), u8:decode(textbuffer.findlog.v))
+			   os.execute(link)
+			   print(link)
+			end
+		 end
+		 --imgui.Text(os.date('%H:%M:%S'))
+		 
 		 imgui.Text(u8"Узнать историю аккаунта:")
 		 imgui.PushItemWidth(150)
 		 if imgui.InputText("##CheckPlayer", textbuffer.ckeckplayer) then
@@ -2325,7 +2358,7 @@ function imgui.OnDrawFrame()
             local nickname = sampGetPlayerNickname(chosenplayer)
             local ucolor = sampGetPlayerColor(chosenplayer)
             
-			imgui.SameLine()
+			--imgui.SameLine()
             imgui.TextColoredRGB(string.format("Игрок в сети: {%0.6x} %s[%d]{cdcdcd}",
             bit.band(ucolor,0xffffff), nickname, chosenplayer))
 			imgui.SameLine()
