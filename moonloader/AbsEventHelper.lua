@@ -4,12 +4,11 @@ script_description("Assistant for mappers and event makers on Absolute Play")
 script_dependencies('imgui', 'lib.samp.events', 'vkeys')
 script_properties("work-in-pause")
 script_url("https://github.com/ins1x/AbsEventHelper")
-script_version("2.19")
+script_version("2.2.0")
 -- script_moonloader(16) moonloader v.0.26
 
 -- Activaton: ALT + X (show main menu)
 -- Lot of functions only work on Absolute Play servers
--- script designed for Absolute Play and RSC server
 
 require 'lib.moonloader'
 local keys = require 'vkeys'
@@ -148,17 +147,6 @@ local combobox = {
    item10 = imgui.ImInt(0),
    itemad = imgui.ImInt(0)
 }
-
--- textbuffer.bind1.v = u8(ini.binds.textbuffer1)
--- textbuffer.bind2.v = u8(ini.binds.textbuffer2)
--- textbuffer.bind3.v = u8(ini.binds.textbuffer3)
--- textbuffer.bind4.v = u8(ini.binds.textbuffer4)
--- textbuffer.bind5.v = u8(ini.binds.textbuffer5)
--- textbuffer.bind6.v = u8(ini.binds.textbuffer6)
--- textbuffer.bind7.v = u8(ini.binds.textbuffer7)
--- textbuffer.bind8.v = u8(ini.binds.textbuffer8)
--- textbuffer.bind9.v = u8(ini.binds.textbuffer9)
--- textbuffer.bindad.v = u8(ini.binds.adtextbuffer)
 
 -- If the server changes IP, change it here
 local hostip = "193.84.90.23"
@@ -418,7 +406,7 @@ function main()
 	     setCameraDistanceActivated(1)
 		 setCameraDistance(ini.settings.camdist)
 	  end
-      
+		  
       -- Hide dialogs o ESC
       if isKeyJustPressed(VK_ESCAPE) and not sampIsChatInputActive() 
       and not sampIsDialogActive() and not isPauseMenuActive() 
@@ -509,6 +497,10 @@ function imgui.OnDrawFrame()
          hideAllFontsImages()
          hideAllTextureImages()
       end
+	  imgui.SameLine()
+	  if imgui.Button(u8"*") then
+	     os.execute('explorer "https://github.com/ins1x/AbsEventHelper"')
+	  end
       imgui.Columns(1)
 
       -- Child form (Change main window size here)
@@ -1506,7 +1498,7 @@ function imgui.OnDrawFrame()
        local closestcarhandle, closestcarid = getClosestCar()
        if closestcarhandle then
           local closestcarmodel = getCarModel(closestcarhandle)
-          imgui.Text(string.format(u8"Ближайший транспорт: %s [id: %i] (%i)",
+          imgui.Text(string.format(u8"Ближайший т/с: %s [id: %i] (%i)",
           VehicleNames[closestcarmodel-399], closestcarmodel, closestcarid))
           imgui.SameLine()
           imgui.TextQuestion("( ? )", u8"В скобках указан внутренний ID (/dl)")
@@ -1519,7 +1511,6 @@ function imgui.OnDrawFrame()
           local carmodel = getCarModel(carhandle)
           imgui.Text(string.format(u8"Вы в транспорте: %s(%i)  хп: %i",
           VehicleNames[carmodel-399], carmodel, getCarHealth(carhandle)))
-          imgui.Text(string.format(u8"Цвет %d и %d", getCarColours(carhandle)))
        end
        
        imgui.NextColumn()
@@ -1982,11 +1973,6 @@ function imgui.OnDrawFrame()
             printStringNow("Text copied to clipboard", 1000)
          end
        
-         imgui.TextColoredRGB("Другие цвета {007DFF}https://encycolorpedia.ru/websafe")
-         if imgui.IsItemClicked() then
-            os.execute('explorer "https://encycolorpedia.ru/websafe"')
-         end
-      
          imgui.Text(u8"RR — красная часть цвета, GG — зеленая, BB — синяя, AA — альфа")
          imgui.ColorEdit4("", color)
        --imgui.SameLine()
@@ -2001,7 +1987,20 @@ function imgui.OnDrawFrame()
          end
          imgui.SameLine()
          imgui.TextQuestion("( ? )", u8"Нажмите чтобы скопировать цвет в буффер обмена")
-
+		 
+		 if isCharInAnyCar(PLAYER_PED) then 
+            local carhandle = storeCarCharIsInNoSave(PLAYER_PED)
+            imgui.TextColoredRGB(string.format("Цвет текущего т/с %d и %d", getCarColours(carhandle)))
+         end
+		 imgui.TextColoredRGB("Цвета транспорта {007DFF}https://www.open.mp/docs/scripting/resources/vehiclecolorid")
+         if imgui.IsItemClicked() then
+		    os.execute('explorer "https://www.open.mp/docs/scripting/resources/vehiclecolorid"')
+		 end
+		 
+		 imgui.TextColoredRGB("Другие цвета {007DFF}https://encycolorpedia.ru/websafe")
+         if imgui.IsItemClicked() then
+            os.execute('explorer "https://encycolorpedia.ru/websafe"')
+         end
       elseif tabmenu.info == 4 then
       
          imgui.Text(u8"Текстуры:")
