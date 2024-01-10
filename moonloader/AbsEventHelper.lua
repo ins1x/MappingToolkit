@@ -4,7 +4,7 @@ script_description("Assistant for mappers and event makers on Absolute Play")
 script_dependencies('imgui', 'lib.samp.events', 'vkeys')
 script_properties("work-in-pause")
 script_url("https://github.com/ins1x/AbsEventHelper")
-script_version("2.2.0")
+script_version("2.3.0")
 -- script_moonloader(16) moonloader v.0.26
 
 -- Activaton: ALT + X (show main menu)
@@ -83,18 +83,24 @@ local checkbox = {
    heavyweaponwarn = imgui.ImBool(true),
    nametagwh = imgui.ImBool(false),
    hideobject = imgui.ImBool(false),
+   lockfps = imgui.ImBool(false),
+   changefov = imgui.ImBool(false),
    objectcollision = imgui.ImBool(false)
 }
 
 local slider = {
    fog = imgui.ImInt(ini.settings.fog),
    drawdist = imgui.ImInt(ini.settings.drawdist),
+   weather = imgui.ImInt(0),
+   time = imgui.ImInt(12),
+   fov = imgui.ImInt(0),
    camdist = imgui.ImInt(ini.settings.camdist)
 }
 
 local tabmenu = {
    main = 1,
    objects = 1,
+   settings = 1,
    info = 1,
    playersopt = nil,
    cmds = 1
@@ -151,6 +157,7 @@ local combobox = {
 -- If the server changes IP, change it here
 local hostip = "193.84.90.23"
 local isAbsolutePlay = false
+local isPlayerSpectating = false
 local tpposX, tpposY, tpposZ
 local disableObjectCollision = false
 local prepareTeleport = false
@@ -174,6 +181,7 @@ streamedObjects = 0
 local fps = 0
 local fps_counter = 0
 local vehinfomodelid = 0 
+local originalfov = 0
 
 local objectsCollisionDel = {}
 local playersTable = {}
@@ -332,6 +340,10 @@ function main()
          JumpForward()
       end)
       
+	  -- get FOV
+	  originalfov = getCameraFov()
+	  slider.fov.v = originalfov
+	  
       -- set drawdist and figdist
       memory.setfloat(12044272, ini.settings.drawdist, true)
       memory.setfloat(13210352, ini.settings.fog, true)
@@ -406,7 +418,13 @@ function main()
 	     setCameraDistanceActivated(1)
 		 setCameraDistance(ini.settings.camdist)
 	  end
-		  
+	  
+	  -- preset time and weather
+	  if ini.settings.lockserverweather then
+	     setTime(slider.time.v)
+         setWeather(slider.weather.v)
+	  end
+	  
       -- Hide dialogs o ESC
       if isKeyJustPressed(VK_ESCAPE) and not sampIsChatInputActive() 
       and not sampIsDialogActive() and not isPauseMenuActive() 
@@ -462,6 +480,9 @@ function main()
          end
       end
       
+	  if checkbox.changefov.v then
+	     cameraSetLerpFov(slider.fov.v, slider.fov.v, 999988888, true)
+	  end
       -- END main
    end
 end
@@ -471,7 +492,6 @@ function imgui.OnDrawFrame()
       imgui.SetNextWindowPos(imgui.ImVec2(sizeX / 4, sizeY / 4),
       imgui.Cond.FirstUseEver, imgui.ImVec2(0.5, 0.5))
       imgui.Begin("Absolute Events Helper", dialog.main)
-      
       
       imgui.Columns(2, "mainmenucolumns", false)
       imgui.SetColumnWidth(-1, 480)
@@ -490,224 +510,44 @@ function imgui.OnDrawFrame()
       imgui.NextColumn()
       
       imgui.SameLine()
-      imgui.Text("                                          ")
-      imgui.SameLine()
+      imgui.Text("                                  ")
+	  imgui.SameLine()
+      imgui.Text(string.format("FPS: %i", fps))
+	  imgui.SameLine()
       if imgui.Button(u8"Свернуть") then
          dialog.main.v = not dialog.main.v 
          hideAllFontsImages()
          hideAllTextureImages()
       end
-	  imgui.SameLine()
-	  if imgui.Button(u8"*") then
-	     os.execute('explorer "https://github.com/ins1x/AbsEventHelper"')
-	  end
       imgui.Columns(1)
 
       -- Child form (Change main window size here)
-      imgui.BeginChild('##main',imgui.ImVec2(740,500),true)
+      imgui.BeginChild('##main',imgui.ImVec2(725, 460),true)
       
       if tabmenu.main == 1 then
 
       imgui.Columns(2)
-      imgui.SetColumnWidth(-1, 450)
+      imgui.SetColumnWidth(-1, 550)
 
-      if imgui.Checkbox(u8("Показывать modelid объектов"), checkbox.showobjects) then 
-         if checkbox.showobjects.v  then
-            showobjects = true
-         else
-            showobjects = false
+      if tabmenu.settings == 1 then
+
+         local positionX, positionY, positionZ = getCharCoordinates(PLAYER_PED)
+         imgui.Text(string.format(u8"Ваша позиция на карте x: %.1f, y: %.1f, z: %.1f",
+         positionX, positionY, positionZ))
+	     if imgui.IsItemClicked() then
+            setClipboardText(string.format(u8"%.1f, %.1f, %.1f", positionX, positionY, positionZ))
+            printStringNow("position copied to clipboard", 1000)
          end
-      end
-      imgui.SameLine()
-      imgui.TextQuestion("( ? )", u8"Применимо только для объектов в области стрима (CTRL + O)")
-      
-      
-      if imgui.Checkbox(u8("Показывать координаты объекта при перемещении"), checkbox.showobjectrot) then 
-         if checkbox.showobjectrot.v  then
-            showobjectrot = true
-         else
-            showobjectrot = false
-         end
-      end
-      imgui.SameLine()
-      imgui.TextQuestion("( ? )", u8"Показывает координаты объекта при перемещении в редакторе карт")
-      
-      if imgui.Checkbox(u8("Отключить коллизию у объектов"), checkbox.objectcollision) then 
-         if checkbox.objectcollision.v then
-            disableObjectCollision = true
-         else
-            disableObjectCollision = false
-            find_obj_x, find_obj_y, find_obj_z = getCharCoordinates(PLAYER_PED)
-            result, objectHandle = findAllRandomObjectsInSphere(find_obj_x, find_obj_y, find_obj_z, 25, true)
-            if result then
-               for k, v in pairs(objectsCollisionDel) do
-                  if doesObjectExist(v) then setObjectCollision(v, true) end
-               end
-            end
-         end
-      end
-      
-      imgui.SameLine()
-      imgui.TextQuestion("( ? )", u8"Применимо только для объектов в области стрима")
+	     
+		 local bTargetResult, bX, bY, bZ = getTargetBlipCoordinates()
+		 if bTargetResult then
+		    imgui.Text(string.format(u8"Позиция метки на карте x: %.1f, y: %.1f, z: %.1f",
+            bX, bY, bZ))
+		 end 
+		 
+         local angle = math.ceil(getCharHeading(PLAYER_PED))
+         imgui.Text(string.format(u8"Направление: %s  %i°", direction(), angle))
 
-      if imgui.Checkbox(u8("Блокировать изменение погоды"), checkbox.lockserverweather) then          
-          ini.settings.lockserverweather = not ini.settings.lockserverweather
-          if ini.settings.lockserverweather then
-             forceWeatherNow(0)
-             setTimeOfDay(12, 0)
-             patch_samp_time_set(true)
-          else
-             patch_samp_time_set(false)
-          end
-          save()
-       end
-       imgui.SameLine()
-       imgui.TextQuestion("( ? )", u8"Блокирует изменение погоды и времени сервером")
-       
-	   if imgui.Checkbox(u8("Разблокировать изменение дистанции камеры"), checkbox.usecustomcamdist) then 
-		  ini.settings.usecustomcamdist = not ini.settings.usecustomcamdist
-          if ini.settings.usecustomcamdist then
-		     setCameraDistanceActivated(1)
-			 setCameraDistance(ini.settings.camdist)
-		  else
-	         setCameraDistanceActivated(0)
-			 setCameraDistance(0)
-		  end
-		  save()
-	   end
-	   imgui.SameLine()
-       imgui.TextQuestion("( ? )", u8"Разблокирует изменение положения камеры на произвольные значеня")
-	   
-	   
-	   if imgui.Checkbox(u8(nameTagWh and 'Вернуть' or 'Увеличить')..u8" прорисовку NameTags", checkbox.nametagwh) then 
-          if nameTagWh then
-			 nameTagWh = false
-             nameTagOn()
-          else
-			 nameTagWh = true
-             nameTagOn()
-          end
-	   end
-	   imgui.SameLine()
-       imgui.TextQuestion("( ? )", u8"Увеличит дальность прорисовки nameTag над игроком")
-	   
-	   if imgui.Checkbox(u8("Скрыть объекты по ID модели"), checkbox.hideobject) then 
-	      if not checkbox.hideobject.v then
-		    if hiddenObjects[1] ~= nil then
-                for i = 1, #hiddenObjects do
-                   table.remove(hiddenObjects, i)
-				end
-             end
-		  end
-	   end
-	   imgui.SameLine()
-       imgui.TextQuestion("( ? )", u8"Скроет объект по ID модели (modelid). Действует при обновлении зоны стрима")
-	   
-	   if checkbox.hideobject.v then
-	      imgui.Text(u8"modelid объекта: ")
-          imgui.SameLine()
-          imgui.PushItemWidth(55)
-          imgui.InputInt('##INPUT_HIDEOBJECT_ID', hideobjectid, 0)
-		  imgui.PopItemWidth()
-		  imgui.SameLine()
-		  if imgui.Button(u8"Скрыть объект", imgui.ImVec2(110, 25)) then 
-		     if string.len(hideobjectid.v) > 0 then 
-                if(tonumber(hideobjectid.v) < 615 or tonumber(hideobjectid.v) > 19521) then
-					sampAddChatMessage("Объект не был добавлен, так как вы ввели некорректный id!", -1)
-				else
-			       table.insert(hiddenObjects, tonumber(hideobjectid.v))
-				   sampAddChatMessage(string.format("Вы скрыли все объекты с modelid: %i",
-                   tonumber(hideobjectid.v)), -1)
-                end
-    		 else
-				sampAddChatMessage("Объект не был добавлен, так как вы не ввели id!", -1)
-			 end
-		  end
-          imgui.SameLine()
-          imgui.TextQuestion("( ? )", u8"Введите modelid от 615-18300 [GTASA], 18632-19521 [SAMP]")
-	   end
-	   
-       imgui.TextColoredRGB("Дистанция прорисовки {51484f} (по-умолчанию 450)")
-       if imgui.SliderInt(u8"##Drawdist", slider.drawdist, 50, 3000) then
-          ini.settings.drawdist = slider.drawdist.v
-          save()
-          memory.setfloat(12044272, ini.settings.drawdist, true)
-       end
-        
-       imgui.TextColoredRGB("Дистанция тумана {51484f} (по-умолчанию 200)")
-       if imgui.SliderInt(u8"##fog", slider.fog, -390, 390) then
-          ini.settings.fog = slider.fog.v
-          save()
-          memory.setfloat(13210352, ini.settings.fog, true)
-       end
-       
-	   if ini.settings.usecustomcamdist then
-	      imgui.TextColoredRGB("Дистанция камеры {51484f} (по-умолчанию 1)")
-	      if imgui.SliderInt(u8"##camdist", slider.camdist, -100, 250) then
-             ini.settings.camdist = slider.camdist.v
-             setCameraDistanceActivated(1)		  
-		     setCameraDistance(ini.settings.camdist)
-             save()
-             memory.setfloat(13210352, ini.settings.camdist, true)
-          end
-	   end
-	   
-       -- if imgui.Button(u8"Перегрузить скрипт", imgui.ImVec2(200, 25)) then
-          -- thisScript():reload()
-       -- end
-
-      imgui.NextColumn()
-
-      _, pID = sampGetPlayerIdByCharHandle(playerPed)
-      local name = sampGetPlayerNickname(pID)
-      local ucolor = sampGetPlayerColor(pID)
-
-      imgui.TextColoredRGB(string.format("Логин: {%0.6x}%s (%d)",
-      bit.band(ucolor,0xffffff), name, pID))
-      if imgui.IsItemClicked() then
-         setClipboardText(pID)
-         printStringNow("ID copied to clipboard", 1000)
-      end
-      
-      imgui.SameLine()
-      imgui.Text(string.format("FPS: %i", fps))
-      if imgui.IsItemClicked() then
-         setClipboardText(string.format("FPS: %i", fps))
-         printStringNow("FPS copied to clipboard", 1000)
-      end
-
-      local positionX, positionY, positionZ = getCharCoordinates(PLAYER_PED)
-      imgui.Text(string.format(u8"Позиция x: %.1f, y: %.1f, z: %.1f",
-      positionX, positionY, positionZ))
-	  if imgui.IsItemClicked() then
-         setClipboardText(string.format(u8"%.1f, %.1f, %.1f", positionX, positionY, positionZ))
-         printStringNow("position copied to clipboard", 1000)
-      end
-      
-      local angle = math.ceil(getCharHeading(PLAYER_PED))
-      imgui.Text(string.format(u8"Направление: %s  %i°", direction(), angle))
-
-      imgui.Text(string.format(u8"Игроков в области стрима: %i",
-      sampGetPlayerCount(true) - 1))
-      
-      imgui.Text(string.format(u8"Транспорта в области стрима: %i",
-      getVehicleInStream()))
-	  
-      if countobjects then
-         imgui.Text(string.format(u8"Объектов в области в стрима: %i", streamedObjects))
-      end
-      
-      if lastObjectModelid then
-         imgui.Text(string.format(u8"Последний объект: %i", lastObjectModelid))
-         if imgui.IsItemClicked() then
-            setClipboardText(lastObjectModelid)
-            printStringNow("modelid copied to clipboard", 1000)
-         end
-      end
-      
-      --imgui.Text(string.format(u8"Remove buildings: %i", removedBuildings))
-
-      imgui.Text(" ")
       if imgui.Button(u8"Получить координаты", imgui.ImVec2(250, 25)) then
          if not sampIsChatInputActive() and not sampIsDialogActive() and not isPauseMenuActive() and not isSampfuncsConsoleActive() then 
             -- if isAbsolutePlay then sampSendChat("/коорд") end
@@ -734,18 +574,6 @@ function imgui.OnDrawFrame()
 		    sampAddChatMessage("Данная функция легально работает только на серверах Absolute Play", 0x0FF0000)
 		 end
       end
-      
-      -- Bugged. Server turn you at cheat world
-      -- if imgui.Button(u8"Рестрим", imgui.ImVec2(250, 25)) then
-         -- tpposX, tpposY, tpposZ = getCharCoordinates(PLAYER_PED)
-         -- if tpposX then
-            -- sampSendChat(string.format("/ngr %f %f %f", tpposX, tpposY, tpposZ+1000), 0x0FFFFFF)
-            -- lua_thread.create(function()
-            -- wait(250)
-            -- sampSendChat(string.format("/ngr %f %f %f", tpposX, tpposY, tpposZ+1), 0x0FFFFFF)
-            -- end)
-         -- end
-      -- end
       
       if imgui.Button(u8"Прыгнуть вперед", imgui.ImVec2(250, 25)) then
          prepareJump = true
@@ -788,7 +616,232 @@ function imgui.OnDrawFrame()
          end
       end
 	  
-      if imgui.Button(u8(ini.settings.showhud and 'Скрыть' or 'Показать')..u8" HUD", 
+	  elseif tabmenu.settings == 2 then
+	  
+	     if countobjects then
+            imgui.Text(string.format(u8"Объектов в области в стрима: %i", streamedObjects))
+         end
+      
+         if lastObjectModelid then
+            imgui.Text(string.format(u8"Последний объект: %i", lastObjectModelid))
+            if imgui.IsItemClicked() then
+               setClipboardText(lastObjectModelid)
+               printStringNow("modelid copied to clipboard", 1000)
+            end
+		 else 
+		    imgui.Text(u8"Последний объект: не выбран")
+         end
+	  
+	   if imgui.Checkbox(u8("Скрыть объекты по ID модели"), checkbox.hideobject) then 
+	      if not checkbox.hideobject.v then
+		    if hiddenObjects[1] ~= nil then
+                for i = 1, #hiddenObjects do
+                   table.remove(hiddenObjects, i)
+				end
+             end
+		  end
+	   end
+	   imgui.SameLine()
+       imgui.TextQuestion("( ? )", u8"Скроет объект по ID модели (modelid). Действует при обновлении зоны стрима")
+	   
+	   
+	   
+      if imgui.Checkbox(u8("Показывать modelid объектов"), checkbox.showobjects) then 
+         if checkbox.showobjects.v  then
+            showobjects = true
+         else
+            showobjects = false
+         end
+      end
+      imgui.SameLine()
+      imgui.TextQuestion("( ? )", u8"Применимо только для объектов в области стрима (CTRL + O)")
+      
+      
+      if imgui.Checkbox(u8("Показывать координаты объекта при перемещении"), checkbox.showobjectrot) then 
+         if checkbox.showobjectrot.v  then
+            showobjectrot = true
+         else
+            showobjectrot = false
+         end
+      end
+      imgui.SameLine()
+      imgui.TextQuestion("( ? )", u8"Показывает координаты объекта при перемещении в редакторе карт")
+      
+      if imgui.Checkbox(u8("Отключить коллизию у объектов"), checkbox.objectcollision) then 
+         if checkbox.objectcollision.v then
+            disableObjectCollision = true
+         else
+            disableObjectCollision = false
+            find_obj_x, find_obj_y, find_obj_z = getCharCoordinates(PLAYER_PED)
+            result, objectHandle = findAllRandomObjectsInSphere(find_obj_x, find_obj_y, find_obj_z, 25, true)
+            if result then
+               for k, v in pairs(objectsCollisionDel) do
+                  if doesObjectExist(v) then setObjectCollision(v, true) end
+               end
+            end
+         end
+      end
+      
+      imgui.SameLine()
+      imgui.TextQuestion("( ? )", u8"Применимо только для объектов в области стрима")
+	  
+	   if checkbox.hideobject.v then
+	      imgui.Text(u8"modelid объекта: ")
+          imgui.SameLine()
+          imgui.PushItemWidth(55)
+          imgui.InputInt('##INPUT_HIDEOBJECT_ID', hideobjectid, 0)
+		  imgui.PopItemWidth()
+		  imgui.SameLine()
+		  if imgui.Button(u8"Скрыть объект", imgui.ImVec2(110, 25)) then 
+		     if string.len(hideobjectid.v) > 0 then 
+                if(tonumber(hideobjectid.v) < 615 or tonumber(hideobjectid.v) > 19521) then
+					sampAddChatMessage("Объект не был добавлен, так как вы ввели некорректный id!", -1)
+				else
+			       table.insert(hiddenObjects, tonumber(hideobjectid.v))
+				   sampAddChatMessage(string.format("Вы скрыли все объекты с modelid: %i",
+                   tonumber(hideobjectid.v)), -1)
+                end
+    		 else
+				sampAddChatMessage("Объект не был добавлен, так как вы не ввели id!", -1)
+			 end
+		  end
+          imgui.SameLine()
+          imgui.TextQuestion("( ? )", u8"Введите modelid от 615-18300 [GTASA], 18632-19521 [SAMP]")
+	   end
+	  
+	  elseif tabmenu.settings == 3 then
+	     local camX, camY, camZ = getActiveCameraCoordinates()
+		 imgui.Text(string.format(u8"Камера x: %.1f, y: %.1f, z: %.1f",
+         camX, camY, camZ))
+		 
+		 if imgui.Checkbox(u8("Разблокировать изменение дистанции камеры"), checkbox.usecustomcamdist) then 
+		 ini.settings.usecustomcamdist = not ini.settings.usecustomcamdist
+            if ini.settings.usecustomcamdist then
+		       setCameraDistanceActivated(1)
+			   setCameraDistance(ini.settings.camdist)
+		    else
+	           setCameraDistanceActivated(0)
+			   setCameraDistance(0)
+		    end
+		    save()
+	     end
+	     imgui.SameLine()
+         imgui.TextQuestion("( ? )", u8"Разблокирует изменение положения камеры на произвольные значеня")
+	   
+	  	 if ini.settings.usecustomcamdist then
+	        imgui.TextColoredRGB("Дистанция камеры {51484f} (по-умолчанию 1)")
+	        if imgui.SliderInt(u8"##camdist", slider.camdist, -100, 250) then
+               ini.settings.camdist = slider.camdist.v
+               setCameraDistanceActivated(1)		  
+		       setCameraDistance(ini.settings.camdist)
+               save()
+               memory.setfloat(13210352, ini.settings.camdist, true)
+            end
+	     end
+		 
+		 if imgui.Checkbox(u8("Разблокировать изменение FOV"), checkbox.changefov) then 
+		    if not checkbox.changefov.v then slider.fov.v = 70 end
+			cameraSetLerpFov(slider.fov.v, slider.fov.v, 999988888, true)
+		 end 
+		 imgui.SameLine()
+         imgui.TextQuestion("( ? )", u8"Рвзблокирует изменения значение поля зрения(FOV).")
+		 
+		 if checkbox.changefov.v then
+		    imgui.TextColoredRGB("FOV {51484f} (по-умолчанию 70)")
+		    if imgui.SliderInt(u8"##fovslider", slider.fov, 1, 179) then
+               cameraSetLerpFov(slider.fov.v, slider.fov.v, 999988888, true)
+            end
+		 end
+		 
+	  elseif tabmenu.settings == 4 then
+	  
+	     if countobjects then
+            imgui.Text(string.format(u8"Объектов в области в стрима: %i", streamedObjects))
+         end
+         imgui.Text(string.format(u8"Игроков в области стрима: %i",
+         sampGetPlayerCount(true) - 1))
+      
+         imgui.Text(string.format(u8"Транспорта в области стрима: %i",
+         getVehicleInStream()))
+	  
+	     imgui.Spacing()
+	     imgui.TextColoredRGB("Дистанция прорисовки {51484f} (по-умолчанию 450)")
+         if imgui.SliderInt(u8"##Drawdist", slider.drawdist, 50, 3000) then
+            ini.settings.drawdist = slider.drawdist.v
+            save()
+            memory.setfloat(12044272, ini.settings.drawdist, true)
+         end
+        
+         imgui.TextColoredRGB("Дистанция тумана {51484f} (по-умолчанию 200)")
+         if imgui.SliderInt(u8"##fog", slider.fog, -390, 390) then
+            ini.settings.fog = slider.fog.v
+            save()
+            memory.setfloat(13210352, ini.settings.fog, true)
+         end
+         -- if imgui.Button(u8"Рестрим", imgui.ImVec2(250, 25)) then
+		    -- if not isAbsolutePlay then
+               -- tpposX, tpposY, tpposZ = getCharCoordinates(PLAYER_PED)
+               -- if tpposX then
+                  -- sampSendChat(string.format("/ngr %f %f %f", tpposX, tpposY, tpposZ+1000), 0x0FFFFFF)
+                  -- lua_thread.create(function()
+                  -- wait(250)
+                  -- sampSendChat(string.format("/ngr %f %f %f", tpposX, tpposY, tpposZ+1), 0x0FFFFFF)
+               -- end)
+			-- -- else
+			   -- -- sampAddChatMessage("Недоступно для Absolute Play", -1)
+            -- end
+         -- end
+	  elseif tabmenu.settings == 5 then
+	  
+	  if imgui.Checkbox(u8("Блокировать изменение погоды и времени"), checkbox.lockserverweather) then          
+          ini.settings.lockserverweather = not ini.settings.lockserverweather
+          if ini.settings.lockserverweather then
+             setTime(slider.time.v)
+             setWeather(slider.weather.v)
+             patch_samp_time_set(true)
+          else
+             patch_samp_time_set(false)
+          end
+          save()
+       end
+       imgui.SameLine()
+       imgui.TextQuestion("( ? )", u8"Блокирует изменение погоды и времени сервером")
+	   
+	    imgui.PushItemWidth(320)
+        imgui.Text(u8'Время:')
+        if imgui.SliderInt('##slider.time', slider.time, 0, 24) then 
+           setTime(slider.time.v) 
+        end
+        imgui.Spacing()
+        imgui.Text(u8'Погода')
+        if imgui.SliderInt('##slider.weather', slider.weather, 0, 45) then 
+           setWeather(slider.weather.v) 
+        end
+        imgui.PopItemWidth()
+
+        imgui.Spacing()
+	    imgui.TextColoredRGB("Галлерея погоды на {007DFF}dev.prineside.com")
+        if imgui.IsItemClicked() then
+           os.execute('explorer "https://dev.prineside.com/ru/gtasa_weather_id/"')
+        end
+		imgui.SameLine()
+        imgui.TextQuestion("( ? )", u8"Данная галерея содержит снимки из игры GTA San Andreas, сделанные при разной погоде и времени суток. ")
+		
+	  elseif tabmenu.settings == 6 then
+	         
+	   if imgui.Checkbox(u8(nameTagWh and 'Вернуть' or 'Увеличить')..u8" прорисовку NameTags", checkbox.nametagwh) then 
+          if nameTagWh then
+			 nameTagWh = false
+             nameTagOn()
+          else
+			 nameTagWh = true
+             nameTagOn()
+          end
+	   end
+	   imgui.SameLine()
+       imgui.TextQuestion("( ? )", u8"Увеличит дальность прорисовки nameTag над игроком")
+	   
+	   if imgui.Button(u8(ini.settings.showhud and 'Скрыть' or 'Показать')..u8" HUD", 
       imgui.ImVec2(250, 25)) then
          ini.settings.showhud = not ini.settings.showhud
          save()
@@ -816,11 +869,7 @@ function imgui.OnDrawFrame()
          end
       end
 	  
-      imgui.Text(" ")
-      
-      imgui.Columns(1)
-      imgui.Separator()
-
+	  imgui.Spacing()
 	  if imgui.Button(u8"Реконнект (5 сек)", imgui.ImVec2(170, 25)) then
 		 lua_thread.create(function()
 		 sampDisconnectWithReason(quit)
@@ -830,7 +879,7 @@ function imgui.OnDrawFrame()
 		 end)
 	  end
 	  
-	  imgui.SameLine()
+	  imgui.Spacing()
       if imgui.Button(u8"Выгрузить скрипт", imgui.ImVec2(170, 25)) then
          sampAddChatMessage("AbsEventHelper успешно выгружен.", -1)
          sampAddChatMessage("Для запуска используйте комбинацию клавиш CTRL + R.", -1)
@@ -846,6 +895,36 @@ function imgui.OnDrawFrame()
        end
        imgui.SameLine()
        imgui.TextQuestion("( ? )", u8"Выгружает скрипт при подключении не на Absolute Play")
+	  
+      end -- end tabmenu.settings
+      imgui.NextColumn()
+
+      _, pID = sampGetPlayerIdByCharHandle(playerPed)
+      local name = sampGetPlayerNickname(pID)
+      local ucolor = sampGetPlayerColor(pID)
+
+      imgui.TextColoredRGB(string.format("Логин: {%0.6x}%s (%d)",
+      bit.band(ucolor,0xffffff), name, pID))
+      if imgui.IsItemClicked() then
+         setClipboardText(pID)
+         printStringNow("ID copied to clipboard", 1000)
+      end
+      
+      --imgui.Text(string.format(u8"Remove buildings: %i", removedBuildings))
+
+      imgui.Text(" ")
+	  
+	  if imgui.Button(u8"Координаты",imgui.ImVec2(150, 25)) then tabmenu.settings = 1 end 
+	  if imgui.Button(u8"Объекты",imgui.ImVec2(150, 25)) then tabmenu.settings = 2 end 
+	  if imgui.Button(u8"Камера",imgui.ImVec2(150, 25)) then tabmenu.settings = 3 end 
+	  if imgui.Button(u8"Стрим",imgui.ImVec2(150, 25)) then tabmenu.settings = 4 end 
+	  if imgui.Button(u8"Погода",imgui.ImVec2(150, 25)) then tabmenu.settings = 5 end 
+	  if imgui.Button(u8"Прочее",imgui.ImVec2(150, 25)) then tabmenu.settings = 6 end 
+	  
+      imgui.Text(" ")
+      
+      imgui.Columns(1)
+      imgui.Separator()
 
       elseif tabmenu.main == 2 then
 
@@ -2483,13 +2562,13 @@ end
 
 function sampev.onSetWeather(weatherId)
    if ini.settings.lockserverweather then
-      forceWeatherNow(0)
+      forceWeatherNow(slider.weather.v)
    end
 end
 
 function sampev.onSetPlayerTime(hour, minute)
    if ini.settings.lockserverweather then
-      setTimeOfDay(12, 0)
+      setTimeOfDay(slider.time.v, 0)
    end
 end
 
@@ -2602,6 +2681,9 @@ attachedPlayerId, attachedVehicleId, text)
    end
 end
 
+function sampev.onTogglePlayerSpectating(state)
+   isPlayerSpectating = state
+end
 -- function sampev.onShowTextDraw(id, data)
    -- if hideTextdraws then
        -- return false
@@ -2840,6 +2922,16 @@ function patch_samp_time_set(enable) -- by hnnssy and FYP
         writeMemory(sampGetBase() + 0x9C0A0, 4, default, true)
         default = nil
     end
+end
+
+function setTime(time)
+    patch_samp_time_set(false)
+    memory.write(0xB70153, time, 1, false)
+    patch_samp_time_set(true)
+end
+
+function setWeather(weatherId)
+    memory.write(0xC81320, weatherId, 2, false)
 end
 
 -- imgui fuctions
