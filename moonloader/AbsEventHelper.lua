@@ -4,7 +4,7 @@ script_description("Assistant for mappers and event makers on Absolute Play")
 script_dependencies('imgui', 'lib.samp.events', 'vkeys')
 script_properties("work-in-pause")
 script_url("https://github.com/ins1x/AbsEventHelper")
-script_version("2.3.0")
+script_version("2.3.0 beta")
 -- script_moonloader(16) moonloader v.0.26
 
 -- Activaton: ALT + X (show main menu)
@@ -62,6 +62,7 @@ local sizeX, sizeY = getScreenResolution()
 local v = nil
 local color = imgui.ImFloat4(1, 0, 0, 1)
 local hideobjectid = imgui.ImInt(650)
+local closestobjectmodel= imgui.ImInt(0)
 local selected_item = imgui.ImInt(0)
 
 local dialog = {
@@ -79,6 +80,7 @@ local checkbox = {
    radarblips = imgui.ImBool(false),
    showobjectrot = imgui.ImBool(false),
    showobjects = imgui.ImBool(false),
+   showclosestobjects = imgui.ImBool(false),
    vehstream = imgui.ImBool(true),
    heavyweaponwarn = imgui.ImBool(true),
    nametagwh = imgui.ImBool(false),
@@ -494,7 +496,7 @@ function imgui.OnDrawFrame()
       imgui.Begin("Absolute Events Helper", dialog.main)
       
       imgui.Columns(2, "mainmenucolumns", false)
-      imgui.SetColumnWidth(-1, 480)
+      imgui.SetColumnWidth(-1, 460)
       if imgui.Button(u8"Основное") then tabmenu.main = 1 end
       imgui.SameLine()
       if imgui.Button(u8"Чат-Бинд") then tabmenu.main = 2 end
@@ -510,7 +512,7 @@ function imgui.OnDrawFrame()
       imgui.NextColumn()
       
       imgui.SameLine()
-      imgui.Text("                                  ")
+      imgui.Text("        ")
 	  imgui.SameLine()
       imgui.Text(string.format("FPS: %i", fps))
 	  imgui.SameLine()
@@ -522,12 +524,12 @@ function imgui.OnDrawFrame()
       imgui.Columns(1)
 
       -- Child form (Change main window size here)
-      imgui.BeginChild('##main',imgui.ImVec2(725, 460),true)
+      imgui.BeginChild('##main',imgui.ImVec2(640, 460),true)
       
       if tabmenu.main == 1 then
 
       imgui.Columns(2)
-      imgui.SetColumnWidth(-1, 550)
+      imgui.SetColumnWidth(-1, 460)
 
       if tabmenu.settings == 1 then
 
@@ -631,20 +633,6 @@ function imgui.OnDrawFrame()
 		 else 
 		    imgui.Text(u8"Последний объект: не выбран")
          end
-	  
-	   if imgui.Checkbox(u8("Скрыть объекты по ID модели"), checkbox.hideobject) then 
-	      if not checkbox.hideobject.v then
-		    if hiddenObjects[1] ~= nil then
-                for i = 1, #hiddenObjects do
-                   table.remove(hiddenObjects, i)
-				end
-             end
-		  end
-	   end
-	   imgui.SameLine()
-       imgui.TextQuestion("( ? )", u8"Скроет объект по ID модели (modelid). Действует при обновлении зоны стрима")
-	   
-	   
 	   
       if imgui.Checkbox(u8("Показывать modelid объектов"), checkbox.showobjects) then 
          if checkbox.showobjects.v  then
@@ -685,6 +673,18 @@ function imgui.OnDrawFrame()
       imgui.SameLine()
       imgui.TextQuestion("( ? )", u8"Применимо только для объектов в области стрима")
 	  
+	 	if imgui.Checkbox(u8("Скрыть объекты по ID модели"), checkbox.hideobject) then 
+	      if not checkbox.hideobject.v then
+		    if hiddenObjects[1] ~= nil then
+                for i = 1, #hiddenObjects do
+                   table.remove(hiddenObjects, i)
+				end
+             end
+		  end
+	   end
+	   imgui.SameLine()
+       imgui.TextQuestion("( ? )", u8"Скроет объект по ID модели (modelid). Действует при обновлении зоны стрима")
+	   
 	   if checkbox.hideobject.v then
 	      imgui.Text(u8"modelid объекта: ")
           imgui.SameLine()
@@ -708,6 +708,25 @@ function imgui.OnDrawFrame()
           imgui.SameLine()
           imgui.TextQuestion("( ? )", u8"Введите modelid от 615-18300 [GTASA], 18632-19521 [SAMP]")
 	   end
+	  
+	    if imgui.Checkbox(u8("Найти ближайший объект по ID модели"), checkbox.showclosestobjects) then
+	    end
+	    imgui.SameLine()
+        imgui.TextQuestion("( ? )", u8"Найдет ближайший объект по ID модели")
+		
+		if checkbox.showclosestobjects.v then
+           imgui.Text(u8"modelid объекта: ")
+		   imgui.SameLine()
+		   imgui.PushItemWidth(55)
+	       imgui.InputInt('##INPUT_CLOOBJECTID', closestobjectmodel, 0)
+           imgui.PopItemWidth()
+		   if string.len(closestobjectmodel.v) > 0 then
+              local result, distance, x, y, z = GetNearestObject(closestobjectmodel.v)
+              if result then 
+			     imgui.Text(string.format(u8'Объект находится на расстоянии %.2f метров от вас', distance), -1)
+			  end	 
+		   end
+		end
 	  
 	  elseif tabmenu.settings == 3 then
 	     local camX, camY, camZ = getActiveCameraCoordinates()
@@ -751,6 +770,18 @@ function imgui.OnDrawFrame()
 		    if imgui.SliderInt(u8"##fovslider", slider.fov, 1, 179) then
                cameraSetLerpFov(slider.fov.v, slider.fov.v, 999988888, true)
             end
+		 end
+		 
+		 if imgui.Button(u8"Вернуть камеру", imgui.ImVec2(250, 25)) then
+		    restoreCamera()
+		 end
+		 
+		 if imgui.Button(u8"Закрепить камеру позади игрока", imgui.ImVec2(250, 25)) then
+		    setCameraBehindPlayer()
+		 end
+		 
+		 if imgui.Button(u8"Закрепить камеру перед игроком", imgui.ImVec2(250, 25)) then
+		    setCameraInFrontOfChar(PLAYER_PED)
 		 end
 		 
 	  elseif tabmenu.settings == 4 then
@@ -870,7 +901,7 @@ function imgui.OnDrawFrame()
       end
 	  
 	  imgui.Spacing()
-	  if imgui.Button(u8"Реконнект (5 сек)", imgui.ImVec2(170, 25)) then
+	  if imgui.Button(u8"Реконнект (5 сек)", imgui.ImVec2(150, 25)) then
 		 lua_thread.create(function()
 		 sampDisconnectWithReason(quit)
 	     wait(5000)
@@ -880,7 +911,7 @@ function imgui.OnDrawFrame()
 	  end
 	  
 	  imgui.Spacing()
-      if imgui.Button(u8"Выгрузить скрипт", imgui.ImVec2(170, 25)) then
+      if imgui.Button(u8"Выгрузить скрипт", imgui.ImVec2(150, 25)) then
          sampAddChatMessage("AbsEventHelper успешно выгружен.", -1)
          sampAddChatMessage("Для запуска используйте комбинацию клавиш CTRL + R.", -1)
          thisScript():unload()
@@ -899,20 +930,20 @@ function imgui.OnDrawFrame()
       end -- end tabmenu.settings
       imgui.NextColumn()
 
-      _, pID = sampGetPlayerIdByCharHandle(playerPed)
-      local name = sampGetPlayerNickname(pID)
-      local ucolor = sampGetPlayerColor(pID)
+      -- _, pID = sampGetPlayerIdByCharHandle(playerPed)
+      -- local name = sampGetPlayerNickname(pID)
+      -- local ucolor = sampGetPlayerColor(pID)
 
-      imgui.TextColoredRGB(string.format("Логин: {%0.6x}%s (%d)",
-      bit.band(ucolor,0xffffff), name, pID))
-      if imgui.IsItemClicked() then
-         setClipboardText(pID)
-         printStringNow("ID copied to clipboard", 1000)
-      end
+      -- imgui.TextColoredRGB(string.format("Логин: {%0.6x}%s (%d)",
+      -- bit.band(ucolor,0xffffff), name, pID))
+      -- if imgui.IsItemClicked() then
+         -- setClipboardText(pID)
+         -- printStringNow("ID copied to clipboard", 1000)
+      -- end
       
       --imgui.Text(string.format(u8"Remove buildings: %i", removedBuildings))
 
-      imgui.Text(" ")
+      --imgui.Text(" ")
 	  
 	  if imgui.Button(u8"Координаты",imgui.ImVec2(150, 25)) then tabmenu.settings = 1 end 
 	  if imgui.Button(u8"Объекты",imgui.ImVec2(150, 25)) then tabmenu.settings = 2 end 
@@ -928,8 +959,8 @@ function imgui.OnDrawFrame()
 
       elseif tabmenu.main == 2 then
 
-      imgui.Text(u8"Здесь вы можете настроить чат-бинды для мероприятия.     ")
-	  imgui.SameLine()
+      --imgui.Text(u8"Здесь вы можете настроить чат-бинды для мероприятия.     ")
+	  
 	  imgui.Text(u8"Профиль: ")
 	  imgui.SameLine()
 	  imgui.PushItemWidth(100)
@@ -984,6 +1015,18 @@ function imgui.OnDrawFrame()
       end
 	  imgui.PopItemWidth()
 	   
+	  imgui.SameLine()
+      if imgui.Button(u8" Очистить себе чат ") then
+         memory.fill(sampGetChatInfoPtr() + 306, 0x0, 25200)
+         memory.write(sampGetChatInfoPtr() + 306, 25562, 4, 0x0)
+         memory.write(sampGetChatInfoPtr() + 0x63DA, 1, 1)
+      end
+
+	  imgui.SameLine()
+	  if imgui.Button(u8" chatlog.txt ") then
+	     os.execute('explorer '..getFolderPath(5) ..'\\GTA San Andreas User Files\\SAMP\\chatlog.txt')
+	  end
+	   
        -- line 1
        imgui.PushItemWidth(70)
        imgui.Combo('  1', combobox.item1, {u8'мчат', u8'общий'}, 2)
@@ -994,7 +1037,7 @@ function imgui.OnDrawFrame()
        end
        
        imgui.SameLine()
-       if imgui.Button(u8"отправить  [1]") then
+       if imgui.Button(u8"[>]##SendchatBind1") then
           if combobox.item1.v == 0 then
              u8:decode(textbuffer.bind1.v)
              sampSendChat(string.format("/мчат %s", u8:decode(textbuffer.bind1.v)))
@@ -1014,7 +1057,7 @@ function imgui.OnDrawFrame()
        end
        
        imgui.SameLine()
-       if imgui.Button(u8"отправить  [2]") then
+       if imgui.Button(u8"[>]##SendchatBind2") then
           if combobox.item2.v == 0 then
              u8:decode(textbuffer.bind2.v)
              sampSendChat(string.format("/мчат %s", u8:decode(textbuffer.bind2.v)))
@@ -1034,7 +1077,7 @@ function imgui.OnDrawFrame()
        end
        
        imgui.SameLine()
-       if imgui.Button(u8"отправить  [3]") then
+       if imgui.Button(u8"[>]##SendchatBind3") then
           if combobox.item3.v == 0 then
              u8:decode(textbuffer.bind3.v)
              sampSendChat(string.format("/мчат %s", u8:decode(textbuffer.bind3.v)))
@@ -1054,7 +1097,7 @@ function imgui.OnDrawFrame()
        end
        
        imgui.SameLine()
-       if imgui.Button(u8"отправить  [4]") then
+       if imgui.Button(u8"[>]##SendchatBind4") then
           if combobox.item4.v == 0 then
              u8:decode(textbuffer.bind4.v)
              sampSendChat(string.format("/мчат %s", u8:decode(textbuffer.bind4.v)))
@@ -1074,7 +1117,7 @@ function imgui.OnDrawFrame()
        end
        
        imgui.SameLine()
-       if imgui.Button(u8"отправить  [5]") then
+       if imgui.Button(u8"[>]##SendchatBind5") then
           if combobox.item5.v == 0 then
              u8:decode(textbuffer.bind5.v)
              sampSendChat(string.format("/мчат %s", u8:decode(textbuffer.bind5.v)))
@@ -1094,7 +1137,7 @@ function imgui.OnDrawFrame()
        end
        
        imgui.SameLine()
-       if imgui.Button(u8"отправить  [6]") then
+       if imgui.Button(u8"[>]##SendchatBind6") then
           if combobox.item6.v == 0 then
              u8:decode(textbuffer.bind6.v)
              sampSendChat(string.format("/мчат %s", u8:decode(textbuffer.bind6.v)))
@@ -1114,7 +1157,7 @@ function imgui.OnDrawFrame()
        end
        
        imgui.SameLine()
-       if imgui.Button(u8"отправить  [7]") then
+       if imgui.Button(u8"[>]##SendchatBind7") then
           if combobox.item7.v == 0 then
              u8:decode(textbuffer.bind7.v)
              sampSendChat(string.format("/мчат %s", u8:decode(textbuffer.bind7.v)))
@@ -1134,7 +1177,7 @@ function imgui.OnDrawFrame()
        end
        
        imgui.SameLine()
-       if imgui.Button(u8"отправить  [8]") then
+       if imgui.Button(u8"[>]##SendchatBind8") then
           if combobox.item8.v == 0 then
              u8:decode(textbuffer.bind8.v)
              sampSendChat(string.format("/мчат %s", u8:decode(textbuffer.bind8.v)))
@@ -1154,7 +1197,7 @@ function imgui.OnDrawFrame()
        end
        
        imgui.SameLine()
-       if imgui.Button(u8"отправить  [9]") then
+       if imgui.Button(u8"[>]##SendchatBind9") then
           if combobox.item9.v == 0 then
              u8:decode(textbuffer.bind9.v)
              sampSendChat(string.format("/мчат %s", u8:decode(textbuffer.bind9.v)))
@@ -1174,7 +1217,7 @@ function imgui.OnDrawFrame()
        end
        
        imgui.SameLine()
-       if imgui.Button(u8"отправить [10]") then
+       if imgui.Button(u8"[>]##SendchatBind10") then
           if combobox.item10.v == 0 then
              u8:decode(textbuffer.bind10.v)
              sampSendChat(string.format("/мчат %s", u8:decode(textbuffer.bind10.v)))
@@ -1194,7 +1237,7 @@ function imgui.OnDrawFrame()
        end
        
        imgui.SameLine()
-       if imgui.Button(u8"объявление    ") then
+       if imgui.Button(u8"[>]##SendchatBindAd") then
           if combobox.itemad.v == 0 then
              sampSendChat(string.format("/об %s", u8:decode(textbuffer.bindad.v)))
           end
@@ -1246,20 +1289,7 @@ function imgui.OnDrawFrame()
           textbuffer.bindad.v = " "
        end
        
-	   imgui.SameLine()
-	   imgui.Text("         ")
 	   
-       imgui.SameLine()
-       if imgui.Button(u8" Очистить себе чат ") then
-          memory.fill(sampGetChatInfoPtr() + 306, 0x0, 25200)
-          memory.write(sampGetChatInfoPtr() + 306, 25562, 4, 0x0)
-          memory.write(sampGetChatInfoPtr() + 0x63DA, 1, 1)
-       end
-
-	   imgui.SameLine()
-	   if imgui.Button(u8" chatlog.txt ") then
-		  os.execute('explorer '..getFolderPath(5) ..'\\GTA San Andreas User Files\\SAMP\\chatlog.txt')
-	   end
        -- imgui.SameLine()
        -- if imgui.Button(u8"Получить послед сообщение из чата в буффер") then
            -- text, prefix, color, pcolor = sampGetChatString(99)
@@ -1607,10 +1637,10 @@ function imgui.OnDrawFrame()
 			 end
           end
        end
-	   imgui.SameLine()
-	   if imgui.Button(u8"Найти ID траспорта онлайн", imgui.ImVec2(190, 25)) then
-	      os.execute('explorer "https://wiki.multitheftauto.com/wiki/Vehicle_IDs"')
-	   end
+	   -- imgui.SameLine()
+	   -- if imgui.Button(u8"Найти ID траспорта онлайн", imgui.ImVec2(190, 25)) then
+	      -- os.execute('explorer "https://wiki.multitheftauto.com/wiki/Vehicle_IDs"')
+	   -- end
 	   if imgui.Button(u8"Заказать машину из списка", imgui.ImVec2(190, 25)) then
 	      if isAbsolutePlay then
              if not sampIsChatInputActive() and not sampIsDialogActive() and not isPauseMenuActive() and not isSampfuncsConsoleActive() then 
@@ -1619,10 +1649,10 @@ function imgui.OnDrawFrame()
 		     end
           end
 	   end
-	   imgui.SameLine()
-	   if imgui.Button(u8"Handling.cfg (онлайн)", imgui.ImVec2(190, 25)) then
-	      os.execute('explorer "https://github.com/ins1x/useful-samp-stuff/blob/main/docs/server/VehicleHandling.txt"')
-	   end
+	   -- imgui.SameLine()
+	   -- if imgui.Button(u8"Handling.cfg (онлайн)", imgui.ImVec2(190, 25)) then
+	      -- os.execute('explorer "https://github.com/ins1x/useful-samp-stuff/blob/main/docs/server/VehicleHandling.txt"')
+	   -- end
 	   
        imgui.Columns(1)
 
@@ -1707,7 +1737,7 @@ function imgui.OnDrawFrame()
       
       elseif tabmenu.main == 5 then
       imgui.Columns(2)
-      imgui.SetColumnWidth(-1, 550)
+      imgui.SetColumnWidth(-1, 460)
       
       if tabmenu.objects == 1 then
          imgui.Text(u8"Большие прозрачные объекты для текста: 19481, 19480, 19482, 19477")
@@ -1862,7 +1892,7 @@ function imgui.OnDrawFrame()
 	  
       elseif tabmenu.main == 6 then
       imgui.Columns(2)
-      imgui.SetColumnWidth(-1, 600)
+      imgui.SetColumnWidth(-1, 520)
       
       if tabmenu.info == 1 then
          imgui.Text(u8"Absolute Events Helper v".. thisScript().version)
@@ -1871,8 +1901,8 @@ function imgui.OnDrawFrame()
             setClipboardText(hostip)
             printStringNow("Server IP copied to clipboard", 1000)
          end
-         imgui.Text(u8"Основная задача данного скрипта - сделать процесс маппинга в внутриигровом редакторе карт")
-         imgui.Text(u8"максимально приятным, и дать больше возможностей организаторам мероприятий.")
+         imgui.Text(u8"Скрипт позволит сделать процесс маппинга в внутриигровом редакторе карт")
+         imgui.Text(u8"максимально приятным, и даст больше возможностей организаторам мероприятий.")
          imgui.Text(u8"Скрипт распостраняется только с открытым исходным кодом")
          imgui.Text(u8"Категорически не рекомендуется использовать этот скрипт вне редактора карт!")
 		 imgui.Text(u8"Протестировать скрипт можно на Absolute DM Play в мире №10 (/мир 10)")
@@ -2793,6 +2823,20 @@ function getObjectsInStream()
     local count = 0
     for _ in pairs(getAllObject()) do count = count + 1 end
     return count
+end
+
+function GetNearestObject(modelid)
+    local objects = {}
+    local x, y, z = getCharCoordinates(playerPed)
+    for i, obj in ipairs(getAllObjects()) do
+        if getObjectModel(obj) == modelid then
+            local result, ox, oy, oz = getObjectCoordinates(obj)
+            table.insert(objects, {getDistanceBetweenCoords3d(ox, oy, oz, x, y, z), ox, oy, oz})
+        end
+    end
+    if #objects <= 0 then return false end
+    table.sort(objects, function(a, b) return a[1] < b[1] end)
+    return true, unpack(objects[1])
 end
 
 function getNearestRoadCoordinates(radius)
