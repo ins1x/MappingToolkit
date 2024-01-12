@@ -4,7 +4,7 @@ script_description("Assistant for mappers and event makers on Absolute Play")
 script_dependencies('imgui', 'lib.samp.events', 'vkeys')
 script_properties("work-in-pause")
 script_url("https://github.com/ins1x/AbsEventHelper")
-script_version("2.3.0 beta")
+script_version("2.3.0")
 -- script_moonloader(16) moonloader v.0.26
 
 -- Activaton: ALT + X (show main menu)
@@ -193,37 +193,37 @@ vehiclesTotal = 0
 playersTotal = 0
 
 VehicleNames = {
-    "Landstalker", "Bravura", "Buffalo", "Linerunner", "Pereniel", "Sentinel", "Dumper",
-    "Firetruck", "Trashmaster", "Stretch", "Manana", "Infernus", "Voodoo", "Pony",
-    "Mule", "Cheetah", "Ambulance", "Leviathan", "Moonbeam", "Esperanto", "Taxi",
-    "Washington", "Bobcat", "Mr Whoopee", "BF Injection", "Hunter", "Premier", "Enforcer",
-    "Securicar", "Banshee", "Predator", "Bus", "Rhino", "Barracks", "Hotknife", "Trailer",
-    "Previon", "Coach", "Cabbie", "Stallion", "Rumpo", "RC Bandit","Romero",
-    "Packer", "Monster Truck", "Admiral", "Squalo", "Seasparrow","Pizzaboy",
-    "Tram", "Trailer", "Turismo", "Speeder", "Reefer", "Tropic","Flatbed", "Yankee",
-    "Caddy", "Solair", "Berkley's RC Van", "Skimmer", "PCJ-600", "Faggio", "Freeway",
-    "RC Baron", "RC Raider", "Glendale", "Oceanic", "Sanchez", "Sparrow", "Patriot",
-    "Quad", "Coastguard", "Dinghy", "Hermes", "Sabre", "Rustler", "ZR-350", "Walton",
-    "Regina", "Comet", "BMX", "Burrito", "Camper", "Marquis", "Baggage", "Dozer",
-    "Maverick", "News Chopper", "Rancher", "FBI Rancher", "Virgo", "Greenwood", "Jetmax",
-    "Hotring", "Sandking", "Blista Compact", "Police Maverick", "Boxville",
-    "Benson", "Mesa", "RC Goblin", "Hotring Racer", "Hotring Racer", "Bloodring Banger",
-    "Rancher", "Super GT", "Elegant", "Journey", "Bike", "Mountain Bike", "Beagle",
-    "Cropdust", "Stunt", "Tanker", "RoadTrain", "Nebula", "Majestic", "Buccaneer",
-    "Shamal", "Hydra", "FCR-900", "NRG-500", "HPV1000", "Cement Truck", "Tow Truck",
-    "Fortune", "Cadrona", "FBI Truck", "Willard", "Forklift", "Tractor", "Combine",
-    "Feltzer", "Remington", "Slamvan", "Blade", "Freight", "Streak", "Vortex",
-    "Vincent", "Bullet", "Clover", "Sadler", "Firetruck", "Hustler", "Intruder",
-    "Primo", "Cargobob", "Tampa", "Sunrise", "Merit", "Utility", "Nevada",
-    "Yosemite", "Windsor", "Monster Truck", "Monster Truck", "Uranus", "Jester",
-    "Sultan", "Stratum", "Elegy", "Raindance", "RC Tiger", "Flash", "Tahoma",
-    "Savanna", "Bandito", "Freight", "Trailer", "Kart", "Mower", "Duneride",
-    "Sweeper", "Broadway", "Tornado", "AT-400", "DFT-30", "Huntley", "Stafford","BF-400",
-    "Newsvan", "Tug", "Trailer", "Emperor", "Wayfarer", "Euros", "Hotdog", "Club",
-    "Trailer", "Trailer", "Andromada", "Dodo", "RC Cam", "Launch", "Police Car (LS)",
-    "Police Car (SF)", "Police Car (LV)", "Police Ranger", "Picador", "S.W.A.T. Van",
-    "Alpha", "Phoenix", "Glendale", "Sadler", "Luggage Trailer", "Luggage Trailer",
-    "Stair Trailer", "Boxville", "Farm Plow", "Utility Trailer"
+   "Landstalker", "Bravura", "Buffalo", "Linerunner", "Pereniel", "Sentinel", "Dumper",
+   "Firetruck", "Trashmaster", "Stretch", "Manana", "Infernus", "Voodoo", "Pony",
+   "Mule", "Cheetah", "Ambulance", "Leviathan", "Moonbeam", "Esperanto", "Taxi",
+   "Washington", "Bobcat", "Mr Whoopee", "BF Injection", "Hunter", "Premier", "Enforcer",
+   "Securicar", "Banshee", "Predator", "Bus", "Rhino", "Barracks", "Hotknife", "Trailer",
+   "Previon", "Coach", "Cabbie", "Stallion", "Rumpo", "RC Bandit","Romero",
+   "Packer", "Monster Truck", "Admiral", "Squalo", "Seasparrow","Pizzaboy",
+   "Tram", "Trailer", "Turismo", "Speeder", "Reefer", "Tropic","Flatbed", "Yankee",
+   "Caddy", "Solair", "Berkley's RC Van", "Skimmer", "PCJ-600", "Faggio", "Freeway",
+   "RC Baron", "RC Raider", "Glendale", "Oceanic", "Sanchez", "Sparrow", "Patriot",
+   "Quad", "Coastguard", "Dinghy", "Hermes", "Sabre", "Rustler", "ZR-350", "Walton",
+   "Regina", "Comet", "BMX", "Burrito", "Camper", "Marquis", "Baggage", "Dozer",
+   "Maverick", "News Chopper", "Rancher", "FBI Rancher", "Virgo", "Greenwood", "Jetmax",
+   "Hotring", "Sandking", "Blista Compact", "Police Maverick", "Boxville",
+   "Benson", "Mesa", "RC Goblin", "Hotring Racer", "Hotring Racer", "Bloodring Banger",
+   "Rancher", "Super GT", "Elegant", "Journey", "Bike", "Mountain Bike", "Beagle",
+   "Cropdust", "Stunt", "Tanker", "RoadTrain", "Nebula", "Majestic", "Buccaneer",
+   "Shamal", "Hydra", "FCR-900", "NRG-500", "HPV1000", "Cement Truck", "Tow Truck",
+   "Fortune", "Cadrona", "FBI Truck", "Willard", "Forklift", "Tractor", "Combine",
+   "Feltzer", "Remington", "Slamvan", "Blade", "Freight", "Streak", "Vortex",
+   "Vincent", "Bullet", "Clover", "Sadler", "Firetruck", "Hustler", "Intruder",
+   "Primo", "Cargobob", "Tampa", "Sunrise", "Merit", "Utility", "Nevada",
+   "Yosemite", "Windsor", "Monster Truck", "Monster Truck", "Uranus", "Jester",
+   "Sultan", "Stratum", "Elegy", "Raindance", "RC Tiger", "Flash", "Tahoma",
+   "Savanna", "Bandito", "Freight", "Trailer", "Kart", "Mower", "Duneride",
+   "Sweeper", "Broadway", "Tornado", "AT-400", "DFT-30", "Huntley", "Stafford","BF-400",
+   "Newsvan", "Tug", "Trailer", "Emperor", "Wayfarer", "Euros", "Hotdog", "Club",
+   "Trailer", "Trailer", "Andromada", "Dodo", "RC Cam", "Launch", "Police Car (LS)",
+   "Police Car (SF)", "Police Car (LV)", "Police Ranger", "Picador", "S.W.A.T. Van",
+   "Alpha", "Phoenix", "Glendale", "Sadler", "Luggage Trailer", "Luggage Trailer",
+   "Stair Trailer", "Boxville", "Farm Plow", "Utility Trailer"
 }
 
 function main()
@@ -496,7 +496,7 @@ function imgui.OnDrawFrame()
       imgui.Begin("Absolute Events Helper", dialog.main)
       
       imgui.Columns(2, "mainmenucolumns", false)
-      imgui.SetColumnWidth(-1, 460)
+      imgui.SetColumnWidth(-1, 480)
       if imgui.Button(u8"Основное") then tabmenu.main = 1 end
       imgui.SameLine()
       if imgui.Button(u8"Чат-Бинд") then tabmenu.main = 2 end
@@ -528,96 +528,96 @@ function imgui.OnDrawFrame()
       
       if tabmenu.main == 1 then
 
-      imgui.Columns(2)
-      imgui.SetColumnWidth(-1, 460)
+         imgui.Columns(2)
+         imgui.SetColumnWidth(-1, 460)
 
-      if tabmenu.settings == 1 then
-
-         local positionX, positionY, positionZ = getCharCoordinates(PLAYER_PED)
-         imgui.Text(string.format(u8"Ваша позиция на карте x: %.1f, y: %.1f, z: %.1f",
-         positionX, positionY, positionZ))
-	     if imgui.IsItemClicked() then
-            setClipboardText(string.format(u8"%.1f, %.1f, %.1f", positionX, positionY, positionZ))
-            printStringNow("position copied to clipboard", 1000)
-         end
-	     
-		 local bTargetResult, bX, bY, bZ = getTargetBlipCoordinates()
-		 if bTargetResult then
-		    imgui.Text(string.format(u8"Позиция метки на карте x: %.1f, y: %.1f, z: %.1f",
-            bX, bY, bZ))
-		 end 
-		 
-         local angle = math.ceil(getCharHeading(PLAYER_PED))
-         imgui.Text(string.format(u8"Направление: %s  %i°", direction(), angle))
-
-      if imgui.Button(u8"Получить координаты", imgui.ImVec2(250, 25)) then
-         if not sampIsChatInputActive() and not sampIsDialogActive() and not isPauseMenuActive() and not isSampfuncsConsoleActive() then 
-            -- if isAbsolutePlay then sampSendChat("/коорд") end
-            tpposX, tpposY, tpposZ = getCharCoordinates(PLAYER_PED)
-            setClipboardText(string.format("%.1f %.1f %.1f", tpposX, tpposY, tpposZ))
-            printStringNow("Coords copied to clipboard", 1000)
-            sampAddChatMessage(string.format("Интерьер: %i Координаты: %.1f %.1f %.1f",
-			getActiveInterior(), tpposX, tpposY, tpposZ), 0x0FFFFFF)
-         end
-      end
-      
-      if imgui.Button(u8"Телепорт по координатам", imgui.ImVec2(250, 25)) then
-	     if isAbsolutePlay then 
-            if tpposX then
-               prepareTeleport = true
-               sampSendChat(string.format("/ngr %f %f %f", tpposX, tpposY, tpposZ), 0x0FFFFFF)
-               sampAddChatMessage(string.format("Телепорт на координаты: %.1f %.1f %.1f",
-               tpposX, tpposY, tpposZ), 0x0FFFFFF)
-            else
-               prepareTeleport = false
-               sampAddChatMessage("Координаты не были сохранены. Нажмите коорд", 0x0FFFFFF)
+         if tabmenu.settings == 1 then
+         
+		    local positionX, positionY, positionZ = getCharCoordinates(PLAYER_PED)
+            imgui.Text(string.format(u8"Ваша позиция на карте x: %.1f, y: %.1f, z: %.1f",
+            positionX, positionY, positionZ))
+	        if imgui.IsItemClicked() then
+               setClipboardText(string.format(u8"%.1f, %.1f, %.1f", positionX, positionY, positionZ))
+               printStringNow("position copied to clipboard", 1000)
             end
-		 else
-		    sampAddChatMessage("Данная функция легально работает только на серверах Absolute Play", 0x0FF0000)
-		 end
-      end
-      
-      if imgui.Button(u8"Прыгнуть вперед", imgui.ImVec2(250, 25)) then
-         prepareJump = true
-		 if isAbsolutePlay then 
+	     
+		    local bTargetResult, bX, bY, bZ = getTargetBlipCoordinates()
+		    if bTargetResult then
+		       imgui.Text(string.format(u8"Позиция метки на карте x: %.1f, y: %.1f, z: %.1f",
+               bX, bY, bZ))
+		    end 
+		 
+            local angle = math.ceil(getCharHeading(PLAYER_PED))
+            imgui.Text(string.format(u8"Направление: %s  %i°", direction(), angle))
+
+            if imgui.Button(u8"Получить координаты", imgui.ImVec2(250, 25)) then
             if not sampIsChatInputActive() and not sampIsDialogActive() 
 			and not isPauseMenuActive() and not isSampfuncsConsoleActive() then 
-			sampSendChat("/ghsu") end
-		 else
-		    if sampIsLocalPlayerSpawned() then
-		       JumpForward()
- 		    end
-		 end
-      end
+               -- if isAbsolutePlay then sampSendChat("/коорд") end
+               tpposX, tpposY, tpposZ = getCharCoordinates(PLAYER_PED)
+               setClipboardText(string.format("%.1f %.1f %.1f", tpposX, tpposY, tpposZ))
+               printStringNow("Coords copied to clipboard", 1000)
+               sampAddChatMessage(string.format("Интерьер: %i Координаты: %.1f %.1f %.1f",
+			   getActiveInterior(), tpposX, tpposY, tpposZ), 0x0FFFFFF)
+            end
+         end
+      
+         if imgui.Button(u8"Телепорт по координатам", imgui.ImVec2(250, 25)) then
+	        if isAbsolutePlay then 
+               if tpposX then
+                  prepareTeleport = true
+                  sampSendChat(string.format("/ngr %f %f %f", tpposX, tpposY, tpposZ), 0x0FFFFFF)
+                  sampAddChatMessage(string.format("Телепорт на координаты: %.1f %.1f %.1f",
+                  tpposX, tpposY, tpposZ), 0x0FFFFFF)
+               else
+                  prepareTeleport = false
+                  sampAddChatMessage("Координаты не были сохранены. Нажмите коорд", 0x0FFFFFF)
+               end
+		    else
+		       sampAddChatMessage("Данная функция легально работает только на серверах Absolute Play", 0x0FF0000)
+		    end
+         end
+      
+         if imgui.Button(u8"Прыгнуть вперед", imgui.ImVec2(250, 25)) then
+            prepareJump = true
+		    if isAbsolutePlay then 
+               if not sampIsChatInputActive() and not sampIsDialogActive() 
+			   and not isPauseMenuActive() and not isSampfuncsConsoleActive() then 
+			      sampSendChat("/ghsu") end
+		    else
+		       if sampIsLocalPlayerSpawned() then
+		          JumpForward()
+ 		       end
+		    end
+         end
 
-	  if imgui.Button(u8"Провалиться под текстуры", imgui.ImVec2(250, 25)) then
-		 if sampIsLocalPlayerSpawned() then
-		    local posX, posY, posZ = getCharCoordinates(PLAYER_PED)
-            setCharCoordinates(PLAYER_PED, posX, posY, posZ-3.0)
-		 end
-      end
+	     if imgui.Button(u8"Провалиться под текстуры", imgui.ImVec2(250, 25)) then
+		    if sampIsLocalPlayerSpawned() then
+		       local posX, posY, posZ = getCharCoordinates(PLAYER_PED)
+               setCharCoordinates(PLAYER_PED, posX, posY, posZ-3.0)
+		    end
+         end
 	  
-	  if imgui.Button(u8"Вернуться на поверхность", imgui.ImVec2(250, 25)) then
-         local result, x, y, z = getNearestRoadCoordinates()
-		 local anticheatMaxAllowedDist = 10.0
-         if result then
-            local dist = getDistanceBetweenCoords3d(x, y, z, getCharCoordinates(PLAYER_PED))
-            if dist < anticheatMaxAllowedDist then 
-			   setCharCoordinates(PLAYER_PED, x, y, z + 3.0)
-			   --sampAddChatMessage(("(%i %i %i)"):format(x,y,z), -1)
-               sampAddChatMessage("Вы телепортированны на ближайшую поверхность", -1)
-			else
-			   sampAddChatMessage(("Ближайшая поверхность слишком далеко (%d m.)"):format(dist), 0x0FF0000)
+	     if imgui.Button(u8"Вернуться на поверхность", imgui.ImVec2(250, 25)) then
+            local result, x, y, z = getNearestRoadCoordinates()
+		    local anticheatMaxAllowedDist = 10.0
+            if result then
+               local dist = getDistanceBetweenCoords3d(x, y, z, getCharCoordinates(PLAYER_PED))
+               if dist < anticheatMaxAllowedDist then 
+			      setCharCoordinates(PLAYER_PED, x, y, z + 3.0)
+			      --sampAddChatMessage(("(%i %i %i)"):format(x,y,z), -1)
+                  sampAddChatMessage("Вы телепортированны на ближайшую поверхность", -1)
+			   else
+			      sampAddChatMessage(("Ближайшая поверхность слишком далеко (%d m.)"):format(dist), 0x0FF0000)
+			      local posX, posY, posZ = getCharCoordinates(PLAYER_PED)
+                  setCharCoordinates(PLAYER_PED, posX, posY, posZ+3.0)
+			   end
+            else
+               sampAddChatMessage("Не нашлось ни одной поверхности рядом", 0x0FF0000)
 			   local posX, posY, posZ = getCharCoordinates(PLAYER_PED)
                setCharCoordinates(PLAYER_PED, posX, posY, posZ+3.0)
-			end
-         else
-            sampAddChatMessage("Не нашлось ни одной поверхности рядом", 0x0FF0000)
-			local posX, posY, posZ = getCharCoordinates(PLAYER_PED)
-            setCharCoordinates(PLAYER_PED, posX, posY, posZ+3.0)
-         end
-      end
-	  
+            end
+         end		 
 	  elseif tabmenu.settings == 2 then
 	  
 	     if countobjects then
@@ -634,80 +634,82 @@ function imgui.OnDrawFrame()
 		    imgui.Text(u8"Последний объект: не выбран")
          end
 	   
-      if imgui.Checkbox(u8("Показывать modelid объектов"), checkbox.showobjects) then 
-         if checkbox.showobjects.v  then
-            showobjects = true
-         else
-            showobjects = false
-         end
-      end
-      imgui.SameLine()
-      imgui.TextQuestion("( ? )", u8"Применимо только для объектов в области стрима (CTRL + O)")
-      
-      
-      if imgui.Checkbox(u8("Показывать координаты объекта при перемещении"), checkbox.showobjectrot) then 
-         if checkbox.showobjectrot.v  then
-            showobjectrot = true
-         else
-            showobjectrot = false
-         end
-      end
-      imgui.SameLine()
-      imgui.TextQuestion("( ? )", u8"Показывает координаты объекта при перемещении в редакторе карт")
-      
-      if imgui.Checkbox(u8("Отключить коллизию у объектов"), checkbox.objectcollision) then 
-         if checkbox.objectcollision.v then
-            disableObjectCollision = true
-         else
-            disableObjectCollision = false
-            find_obj_x, find_obj_y, find_obj_z = getCharCoordinates(PLAYER_PED)
-            result, objectHandle = findAllRandomObjectsInSphere(find_obj_x, find_obj_y, find_obj_z, 25, true)
-            if result then
-               for k, v in pairs(objectsCollisionDel) do
-                  if doesObjectExist(v) then setObjectCollision(v, true) end
-               end
+         if imgui.Checkbox(u8("Показывать modelid объектов"), checkbox.showobjects) then 
+            if checkbox.showobjects.v  then
+               showobjects = true
+            else
+               showobjects = false
             end
          end
-      end
+         imgui.SameLine()
+         imgui.TextQuestion("( ? )", u8"Применимо только для объектов в области стрима (CTRL + O)")
       
-      imgui.SameLine()
-      imgui.TextQuestion("( ? )", u8"Применимо только для объектов в области стрима")
+      
+        if imgui.Checkbox(u8("Показывать координаты объекта при перемещении"), checkbox.showobjectrot) then 
+           if checkbox.showobjectrot.v  then
+              showobjectrot = true
+           else
+              showobjectrot = false
+           end
+        end
+        imgui.SameLine()
+        imgui.TextQuestion("( ? )", u8"Показывает координаты объекта при перемещении в редакторе карт")
+      
+        if imgui.Checkbox(u8("Отключить коллизию у объектов"), checkbox.objectcollision) then 
+           if checkbox.objectcollision.v then
+           disableObjectCollision = true
+        else
+           disableObjectCollision = false
+           find_obj_x, find_obj_y, find_obj_z = getCharCoordinates(PLAYER_PED)
+           result, objectHandle = findAllRandomObjectsInSphere(find_obj_x, find_obj_y, find_obj_z, 25, true)
+           if result then
+              for k, v in pairs(objectsCollisionDel) do
+                 if doesObjectExist(v) then 
+				    setObjectCollision(v, true)
+					end
+                 end
+              end
+           end		
+        end
+      
+        imgui.SameLine()
+        imgui.TextQuestion("( ? )", u8"Применимо только для объектов в области стрима")
 	  
 	 	if imgui.Checkbox(u8("Скрыть объекты по ID модели"), checkbox.hideobject) then 
-	      if not checkbox.hideobject.v then
-		    if hiddenObjects[1] ~= nil then
-                for i = 1, #hiddenObjects do
-                   table.remove(hiddenObjects, i)
-				end
-             end
-		  end
-	   end
-	   imgui.SameLine()
-       imgui.TextQuestion("( ? )", u8"Скроет объект по ID модели (modelid). Действует при обновлении зоны стрима")
+	       if not checkbox.hideobject.v then
+		      if hiddenObjects[1] ~= nil then
+                 for i = 1, #hiddenObjects do
+                    table.remove(hiddenObjects, i)
+				 end
+              end
+		   end
+	    end
+	    imgui.SameLine()
+        imgui.TextQuestion("( ? )", u8"Скроет объект по ID модели (modelid). Действует при обновлении зоны стрима")
 	   
-	   if checkbox.hideobject.v then
-	      imgui.Text(u8"modelid объекта: ")
-          imgui.SameLine()
-          imgui.PushItemWidth(55)
-          imgui.InputInt('##INPUT_HIDEOBJECT_ID', hideobjectid, 0)
-		  imgui.PopItemWidth()
-		  imgui.SameLine()
-		  if imgui.Button(u8"Скрыть объект", imgui.ImVec2(110, 25)) then 
-		     if string.len(hideobjectid.v) > 0 then 
-                if(tonumber(hideobjectid.v) < 615 or tonumber(hideobjectid.v) > 19521) then
-					sampAddChatMessage("Объект не был добавлен, так как вы ввели некорректный id!", -1)
-				else
-			       table.insert(hiddenObjects, tonumber(hideobjectid.v))
-				   sampAddChatMessage(string.format("Вы скрыли все объекты с modelid: %i",
-                   tonumber(hideobjectid.v)), -1)
-                end
-    		 else
-				sampAddChatMessage("Объект не был добавлен, так как вы не ввели id!", -1)
-			 end
-		  end
-          imgui.SameLine()
-          imgui.TextQuestion("( ? )", u8"Введите modelid от 615-18300 [GTASA], 18632-19521 [SAMP]")
-	   end
+	    if checkbox.hideobject.v then
+	       imgui.Text(u8"modelid объекта: ")
+           imgui.SameLine()
+           imgui.PushItemWidth(55)
+           imgui.InputInt('##INPUT_HIDEOBJECT_ID', hideobjectid, 0)
+		   imgui.PopItemWidth()
+		   imgui.SameLine()
+		   if imgui.Button(u8"Скрыть объект", imgui.ImVec2(110, 25)) then 
+		      if string.len(hideobjectid.v) > 0 then 
+                 if(tonumber(hideobjectid.v) < 615 or tonumber(hideobjectid.v) > 19521) then
+			 	    sampAddChatMessage("Объект не был добавлен, так как вы ввели некорректный id!", -1)
+				 else
+			        table.insert(hiddenObjects, tonumber(hideobjectid.v))
+				    sampAddChatMessage(string.format("Вы скрыли все объекты с modelid: %i",
+                    tonumber(hideobjectid.v)), -1)
+                 end
+    		  else
+			     sampAddChatMessage("Объект не был добавлен, так как вы не ввели id!", -1)
+			  end
+		   end
+           imgui.SameLine()
+           imgui.TextQuestion("( ? )", u8"Введите modelid от 615-18300 [GTASA], 18632-19521 [SAMP]")
+	    end
 	  
 	    if imgui.Checkbox(u8("Найти ближайший объект по ID модели"), checkbox.showclosestobjects) then
 	    end
@@ -809,123 +811,134 @@ function imgui.OnDrawFrame()
             save()
             memory.setfloat(13210352, ini.settings.fog, true)
          end
-         -- if imgui.Button(u8"Рестрим", imgui.ImVec2(250, 25)) then
-		    -- if not isAbsolutePlay then
-               -- tpposX, tpposY, tpposZ = getCharCoordinates(PLAYER_PED)
-               -- if tpposX then
-                  -- sampSendChat(string.format("/ngr %f %f %f", tpposX, tpposY, tpposZ+1000), 0x0FFFFFF)
-                  -- lua_thread.create(function()
-                  -- wait(250)
-                  -- sampSendChat(string.format("/ngr %f %f %f", tpposX, tpposY, tpposZ+1), 0x0FFFFFF)
-               -- end)
-			-- -- else
-			   -- -- sampAddChatMessage("Недоступно для Absolute Play", -1)
-            -- end
-         -- end
+		 
+         if imgui.Button(u8"Рестрим", imgui.ImVec2(250, 25)) then
+		    lua_thread.create(function()
+			sampAddChatMessage('Начинается процесс рестрима', -1)
+			local tpposX, tpposY, tpposZ = getCharCoordinates(PLAYER_PED)
+			if isAbsolutePlay then
+               sampSendChat(string.format("/ngr %f %f %f",
+			   tpposX, tpposY, tpposZ+1000.0), 0x0FFFFFF)
+			else
+			   setCharCoordinates(PLAYER_PED, tpposX, tpposY, tpposZ+1000.0)
+			end
+			wait(5000)
+			if isAbsolutePlay then
+               sampSendChat(string.format("/ngr %f %f %f",
+			   tpposX, tpposY, tpposZ), 0x0FFFFFF)
+			else
+			   setCharCoordinates(PLAYER_PED, tpposX, tpposY, tpposZ)
+			end
+			sampAddChatMessage('рестрим завершен', -1)
+			end)
+		 end
+		 imgui.SameLine()
+         imgui.TextQuestion("( ? )", u8"Обновить зону стрима путем выхода из зоны стрима, и возврата через 5 сек")
+		 
 	  elseif tabmenu.settings == 5 then
 	  
-	  if imgui.Checkbox(u8("Блокировать изменение погоды и времени"), checkbox.lockserverweather) then          
-          ini.settings.lockserverweather = not ini.settings.lockserverweather
-          if ini.settings.lockserverweather then
-             setTime(slider.time.v)
-             setWeather(slider.weather.v)
-             patch_samp_time_set(true)
-          else
-             patch_samp_time_set(false)
-          end
-          save()
-       end
-       imgui.SameLine()
-       imgui.TextQuestion("( ? )", u8"Блокирует изменение погоды и времени сервером")
+	     if imgui.Checkbox(u8("Блокировать изменение погоды и времени"), checkbox.lockserverweather) then          
+            ini.settings.lockserverweather = not ini.settings.lockserverweather
+            if ini.settings.lockserverweather then
+               setTime(slider.time.v)
+               setWeather(slider.weather.v)
+               patch_samp_time_set(true)
+            else
+               patch_samp_time_set(false)
+            end
+            save()
+         end
+         imgui.SameLine()
+         imgui.TextQuestion("( ? )", u8"Блокирует изменение погоды и времени сервером")
 	   
-	    imgui.PushItemWidth(320)
-        imgui.Text(u8'Время:')
-        if imgui.SliderInt('##slider.time', slider.time, 0, 24) then 
-           setTime(slider.time.v) 
-        end
-        imgui.Spacing()
-        imgui.Text(u8'Погода')
-        if imgui.SliderInt('##slider.weather', slider.weather, 0, 45) then 
-           setWeather(slider.weather.v) 
-        end
-        imgui.PopItemWidth()
+	     imgui.PushItemWidth(320)
+         imgui.Text(u8'Время:')
+         if imgui.SliderInt('##slider.time', slider.time, 0, 24) then 
+            setTime(slider.time.v) 
+         end
+         imgui.Spacing()
+         imgui.Text(u8'Погода')
+         if imgui.SliderInt('##slider.weather', slider.weather, 0, 45) then 
+            setWeather(slider.weather.v) 
+         end
+         imgui.PopItemWidth()
 
-        imgui.Spacing()
-	    imgui.TextColoredRGB("Галлерея погоды на {007DFF}dev.prineside.com")
-        if imgui.IsItemClicked() then
-           os.execute('explorer "https://dev.prineside.com/ru/gtasa_weather_id/"')
-        end
-		imgui.SameLine()
-        imgui.TextQuestion("( ? )", u8"Данная галерея содержит снимки из игры GTA San Andreas, сделанные при разной погоде и времени суток. ")
+         imgui.Spacing()
+	     imgui.TextColoredRGB("Галлерея погоды на {007DFF}dev.prineside.com")
+         if imgui.IsItemClicked() then
+            os.execute('explorer "https://dev.prineside.com/ru/gtasa_weather_id/"')
+         end
+		 imgui.SameLine()
+         imgui.TextQuestion("( ? )", u8"Данная галерея содержит снимки из игры GTA San Andreas, сделанные при разной погоде и времени суток. ")
 		
 	  elseif tabmenu.settings == 6 then
 	         
-	   if imgui.Checkbox(u8(nameTagWh and 'Вернуть' or 'Увеличить')..u8" прорисовку NameTags", checkbox.nametagwh) then 
-          if nameTagWh then
-			 nameTagWh = false
-             nameTagOn()
-          else
-			 nameTagWh = true
-             nameTagOn()
-          end
-	   end
-	   imgui.SameLine()
-       imgui.TextQuestion("( ? )", u8"Увеличит дальность прорисовки nameTag над игроком")
+	     if imgui.Checkbox(u8(nameTagWh and 'Вернуть' or 'Увеличить')..u8" прорисовку NameTags", checkbox.nametagwh) then 
+            if nameTagWh then
+			   nameTagWh = false
+               nameTagOn()
+            else
+			   nameTagWh = true
+               nameTagOn()
+            end
+	     end
+	     imgui.SameLine()
+         imgui.TextQuestion("( ? )", u8"Увеличит дальность прорисовки nameTag над игроком")
 	   
-	   if imgui.Button(u8(ini.settings.showhud and 'Скрыть' or 'Показать')..u8" HUD", 
-      imgui.ImVec2(250, 25)) then
-         ini.settings.showhud = not ini.settings.showhud
-         save()
-         if ini.settings.showhud then
-            displayHud(true)
-            memory.setint8(0xBA676C, 0)
-         else
-            displayHud(false)
-            memory.setint8(0xBA676C, 2)
+	     if imgui.Button(u8(ini.settings.showhud and 'Скрыть' or 'Показать')..u8" HUD", 
+         imgui.ImVec2(250, 25)) then
+            ini.settings.showhud = not ini.settings.showhud
+            save()
+            if ini.settings.showhud then
+               displayHud(true)
+               memory.setint8(0xBA676C, 0)
+            else
+               displayHud(false)
+               memory.setint8(0xBA676C, 2)
+            end
          end
-      end
       
-	  if imgui.Button(u8(hide3dtexts and 'Показать' or 'Скрыть')..u8" 3D тексты", 
-      imgui.ImVec2(250, 25)) then
-         hide3dtexts = not hide3dtexts
-		 sampAddChatMessage("Изменения видны после респавна либо обновления зоны стрима", -1)
-      end
-	  
-	  if imgui.Button(u8(nameTag and 'Скрыть' or 'Показать')..u8" NameTags", 
-      imgui.ImVec2(250, 25)) then
-         if nameTag then
-            nameTagOff()
-         else
-            nameTagOn()
+	     if imgui.Button(u8(hide3dtexts and 'Показать' or 'Скрыть')..u8" 3D тексты", 
+         imgui.ImVec2(250, 25)) then
+            hide3dtexts = not hide3dtexts
+		    sampAddChatMessage("Изменения видны после респавна либо обновления зоны стрима", -1)
          end
-      end
 	  
-	  imgui.Spacing()
-	  if imgui.Button(u8"Реконнект (5 сек)", imgui.ImVec2(150, 25)) then
-		 lua_thread.create(function()
-		 sampDisconnectWithReason(quit)
-	     wait(5000)
-		 local ip, port = sampGetCurrentServerAddress()
-         sampConnectToServer(ip, port) 
-		 end)
-	  end
+	     if imgui.Button(u8(nameTag and 'Скрыть' or 'Показать')..u8" NameTags", 
+         imgui.ImVec2(250, 25)) then
+            if nameTag then
+               nameTagOff()
+            else
+               nameTagOn()
+            end
+         end
 	  
-	  imgui.Spacing()
-      if imgui.Button(u8"Выгрузить скрипт", imgui.ImVec2(150, 25)) then
-         sampAddChatMessage("AbsEventHelper успешно выгружен.", -1)
-         sampAddChatMessage("Для запуска используйте комбинацию клавиш CTRL + R.", -1)
-         thisScript():unload()
-      end
+	     imgui.Spacing()
+	     if imgui.Button(u8"Реконнект (5 сек)", imgui.ImVec2(150, 25)) then
+		   lua_thread.create(function()
+		   sampDisconnectWithReason(quit)
+	       wait(5000)
+		   local ip, port = sampGetCurrentServerAddress()
+           sampConnectToServer(ip, port) 
+		   end)
+	     end
 	  
-      imgui.SameLine()
-      if imgui.Checkbox(u8("Выгружать скрипт на других серверах"), checkbox.noabsunload) then
-          if checkbox.noabsunload.v then
-             ini.settings.noabsunload = not ini.settings.noabsunload
-             save()
-          end
-       end
-       imgui.SameLine()
-       imgui.TextQuestion("( ? )", u8"Выгружает скрипт при подключении не на Absolute Play")
+	     imgui.Spacing()
+         if imgui.Button(u8"Выгрузить скрипт", imgui.ImVec2(150, 25)) then
+            sampAddChatMessage("AbsEventHelper успешно выгружен.", -1)
+            sampAddChatMessage("Для запуска используйте комбинацию клавиш CTRL + R.", -1)
+            thisScript():unload()
+         end
+	  
+         imgui.SameLine()
+         if imgui.Checkbox(u8("Выгружать скрипт на других серверах"), checkbox.noabsunload) then
+            if checkbox.noabsunload.v then
+               ini.settings.noabsunload = not ini.settings.noabsunload
+               save()
+            end
+         end
+         imgui.SameLine()
+         imgui.TextQuestion("( ? )", u8"Выгружает скрипт при подключении не на Absolute Play")
 	  
       end -- end tabmenu.settings
       imgui.NextColumn()
@@ -2388,7 +2401,8 @@ function imgui.OnDrawFrame()
 		 
       elseif tabmenu.info == 9 then
 		 
-	     imgui.Text(u8"Интерфейс взаимодействия с сайтом Absolute Play DM. (Все действия редиректит в браузер)")
+	     imgui.Text(u8"Интерфейс взаимодействия с сайтом Absolute Play DM.")
+	     imgui.Text(u8"(Все действия редиректит в браузер)")
 		 
 		 if imgui.Button(u8"Логи действий администрации",imgui.ImVec2(230, 25)) then
 		    os.execute('explorer https://gta-samp.ru/adminhistory-deathmatch')
