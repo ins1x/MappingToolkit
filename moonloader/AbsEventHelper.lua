@@ -4,7 +4,7 @@ script_description("Assistant for mappers and event makers on Absolute Play")
 script_dependencies('imgui', 'lib.samp.events', 'vkeys')
 script_properties("work-in-pause")
 script_url("https://github.com/ins1x/AbsEventHelper")
-script_version("2.3.0")
+script_version("2.3.1")
 -- script_moonloader(16) moonloader v.0.26
 
 -- Activaton: ALT + X (show main menu)
@@ -63,7 +63,7 @@ local v = nil
 local color = imgui.ImFloat4(1, 0, 0, 1)
 local hideobjectid = imgui.ImInt(650)
 local closestobjectmodel= imgui.ImInt(0)
-local selected_item = imgui.ImInt(0)
+--local selected_item = imgui.ImInt(0)
 
 local dialog = {
    main = imgui.ImBool(false),
@@ -153,6 +153,8 @@ local combobox = {
    item8 = imgui.ImInt(0),
    item9 = imgui.ImInt(0),
    item10 = imgui.ImInt(0),
+   profiles = imgui.ImInt(0),
+   objects = imgui.ImInt(6),
    itemad = imgui.ImInt(0)
 }
 
@@ -177,7 +179,7 @@ local hide3dtexts = false
 local nameTag = true
 local nameTagWh = false
 --local hideTextdraws = true
---local removedBuildings = 0;
+local removedBuildings = 0;
 streamedObjects = 0
 
 local fps = 0
@@ -496,7 +498,7 @@ function imgui.OnDrawFrame()
       imgui.Begin("Absolute Events Helper", dialog.main)
       
       imgui.Columns(2, "mainmenucolumns", false)
-      imgui.SetColumnWidth(-1, 480)
+      imgui.SetColumnWidth(-1, 440)
       if imgui.Button(u8"Основное") then tabmenu.main = 1 end
       imgui.SameLine()
       if imgui.Button(u8"Чат-Бинд") then tabmenu.main = 2 end
@@ -505,14 +507,12 @@ function imgui.OnDrawFrame()
       imgui.SameLine()
       if imgui.Button(u8"Транспорт") then tabmenu.main = 4 end
       imgui.SameLine()
-      if imgui.Button(u8"Объекты") then tabmenu.main = 5 end
-      imgui.SameLine()
-      if imgui.Button(u8"Информация") then tabmenu.main = 6 end
+      if imgui.Button(u8"Информация") then tabmenu.main = 5 end
 
       imgui.NextColumn()
       
       imgui.SameLine()
-      imgui.Text("        ")
+      imgui.Text("                     ")
 	  imgui.SameLine()
       imgui.Text(string.format("FPS: %i", fps))
 	  imgui.SameLine()
@@ -623,7 +623,7 @@ function imgui.OnDrawFrame()
 	     if countobjects then
             imgui.Text(string.format(u8"Объектов в области в стрима: %i", streamedObjects))
          end
-      
+		 
          if lastObjectModelid then
             imgui.Text(string.format(u8"Последний объект: %i", lastObjectModelid))
             if imgui.IsItemClicked() then
@@ -633,7 +633,9 @@ function imgui.OnDrawFrame()
 		 else 
 		    imgui.Text(u8"Последний объект: не выбран")
          end
-	   
+	     
+		 imgui.Text(string.format(u8"Удаленные стандартные объекты (removeBuilding): %i", removedBuildings))
+		 
          if imgui.Checkbox(u8("Показывать modelid объектов"), checkbox.showobjects) then 
             if checkbox.showobjects.v  then
                showobjects = true
@@ -953,8 +955,6 @@ function imgui.OnDrawFrame()
          -- setClipboardText(pID)
          -- printStringNow("ID copied to clipboard", 1000)
       -- end
-      
-      --imgui.Text(string.format(u8"Remove buildings: %i", removedBuildings))
 
       --imgui.Text(" ")
 	  
@@ -977,13 +977,13 @@ function imgui.OnDrawFrame()
 	  imgui.Text(u8"Профиль: ")
 	  imgui.SameLine()
 	  imgui.PushItemWidth(100)
-	  if imgui.Combo(u8'##ComboBoxProfiles', selected_item, 
+	  if imgui.Combo(u8'##ComboBoxProfiles', combobox.profiles, 
 	  {'Default', 'Race', 'Survival', 'TDM'}, 4) then
-         if selected_item.v == 0 then
+         if combobox.profiles.v == 0 then
 		    reloadBindsFromConfig()
 		    sampAddChatMessage('Загружен профиль Default из конфига', -1)
          end
-         if selected_item.v == 1 then
+         if combobox.profiles.v == 1 then
 		    textbuffer.bind1.v = u8("Разрешено использовать починку транспорта")
             textbuffer.bind2.v = u8("Разрешено в случае смерти продолжить игру начиная от спавна")
             textbuffer.bind3.v = u8("Разрешено в случае вылета за границы трассы, продолжить игру начиная от места вылета")
@@ -997,7 +997,7 @@ function imgui.OnDrawFrame()
             textbuffer.bindad.v = u8("Заходите на МП '' в мир , приз ")
 			sampAddChatMessage('Загружен профиль Race', -1)
          end
-         if selected_item.v == 2 then
+         if combobox.profiles.v == 2 then
 		    textbuffer.bind1.v = u8("Запрещено создавать помеху игрокам при помощи багов и недоработок игры")
             textbuffer.bind2.v = u8("Запрещены объединения более 2-х игроков")
             textbuffer.bind3.v = u8("Не мешаем другим игрокам, ждем начала")
@@ -1011,7 +1011,7 @@ function imgui.OnDrawFrame()
             textbuffer.bindad.v = u8("Заходите на МП 'Выживание' в мир , приз ")
             sampAddChatMessage('Загружен профиль Survival', -1)
          end
-         if selected_item.v == 3 then
+         if combobox.profiles.v == 3 then
 		    textbuffer.bind1.v = u8("Запрещено создавать помеху игрокам при помощи багов и недоработок игры")
             textbuffer.bind2.v = u8("За попытку обмана организатора - ЧС мероприятий")
             textbuffer.bind3.v = u8("Увидели лагера или нарушителя пишите в лс")
@@ -1747,163 +1747,8 @@ function imgui.OnDrawFrame()
              imgui.Text(u8"Всего транспорта в таблице: ".. vehiclesTotal)
           end
        end
-      
+
       elseif tabmenu.main == 5 then
-      imgui.Columns(2)
-      imgui.SetColumnWidth(-1, 460)
-      
-      if tabmenu.objects == 1 then
-         imgui.Text(u8"Большие прозрачные объекты для текста: 19481, 19480, 19482, 19477")
-         --imgui.Selectable(u8"Большие прозрачные объекты для текста: 19481, 19480, 19482, 19477")
-         imgui.Text(u8"Маленькие объекты для текста: 19475, 19476, 2662")
-         imgui.Text(u8"Бетонные блоки: 18766, 18765, 18764, 18763, 18762")
-         imgui.Text(u8"Горы: вулкан 18752, песочница 18751, песочные горы ландшафт 19548")
-         imgui.Text(u8"Платформы: тонкая платформа 19552, 19538, решетчатая 18753, 18754")
-         imgui.Text(u8"Поверхности: 19531, 4242, 4247, 8171, 5004, 16685")
-         imgui.Text(u8"Стены: 19353, 19426(маленькая), 19445(длинная), 19383(дверь), 19399(окно)")
-         imgui.Text(u8"Окружение: темная материя 13656, скайбокс 3933, плейрум 3924")
-         imgui.Text(u8"Покрытие: грязь 11385, растения 19790")
-      elseif tabmenu.objects == 2 then
-         imgui.Text(u8"Веревка 19087, Веревка длин. 19089")
-         imgui.Text(u8"Стекло (Разрушаемое) 3858, стекло от травы 3261, сено 3374")
-         imgui.Text(u8"Факел с черепом 3524, факел 3461,3525")
-         imgui.Text(u8"Водяная бочка 1554, ржавая бочка 1217, взрыв. бочка 1225")
-         imgui.Text(u8"Cтеклянный блок 18887, финиш гонки 18761, большой череп 8483, 6865")
-         imgui.Text(u8"Вертушка на потолок 16780")
-         imgui.Text(u8"Партикл воды с колизией 19603, большой 19604, мал. 9831, круглый 6964")
-         imgui.Text(u8"Фонари(уличные): красный 3877, трицвета 3472, восточный 1568 и 3534")
-      elseif tabmenu.objects == 3 then
-         imgui.Text(u8"Огонь большой 18691, средний огонь 18692, пламя+дым (исчезает) 18723")
-         imgui.Text(u8"Огонь от огнемета 18694, огонь от машины 18690")
-         imgui.Text(u8"Пар от вентиляции 18736, дым от сигареты 18673, дым с фабрики 18748")
-         imgui.Text(u8"Белый дым 18725, черный дым 18726, большой серый дым 18727")
-         imgui.Text(u8"Большой взрыв 18682, средний взрыв 18683, маленький взрыв 18686")
-         imgui.Text(u8"Спрей 18729, огнетушитель 18687, слезоточивый 18732")
-         imgui.Text(u8"Рябь на воде 18741, брызги воды 18744")
-         imgui.Text(u8"Фонтан 18739, гидрант 18740, водопад 19841, вода 19842")
-         imgui.Text(u8"Искры 18717, горящие дрова 19632")
-         imgui.Text(u8"Сигнальный огонь 18728, лазер 18643, нитро 18702, флейм 18693")
-         imgui.Text(u8"Кровь от ранения 18668, лужа крови 19836")
-      elseif tabmenu.objects == 4 then
-         imgui.Text(u8"Неон красный 18647, синий 18648, зеленый 18649")
-         imgui.Text(u8"Неон желтый 18650, розовый 18651, белый 18652")
-         imgui.Text(u8"Свет.шар (не моргает) белый 19281, красн. 19282, зел. 19283, синий 19284")
-         imgui.Text(u8"Свет.шар (моргает быстро) белый 19285, красн. 19286, зел. 19287, син. 19288")
-         imgui.Text(u8"Свет.шар (моргает медленно) белый 19289, красн. 19290, зел. 19291, син. 19292")
-         imgui.Text(u8"Свет.шар (моргает медленно) фиолетовый 19293, желтый 19294")
-         imgui.Text(u8"Свет.шар (большой не моргает) бел. 19295, красн. 19296, зел. 19297, син. 19298")
-      elseif tabmenu.objects == 5 then
-         imgui.Text(u8"Попугай 19079, восточная лампа 3534, свечи: 2868,2869")
-         imgui.Text(u8"Разбросанная одежда: 2843-2846, из борделя 14520-14521, 14863-14864")
-         imgui.Text(u8"Вино: 19820-19824, две бутылки: 3119, стаканы 1667, 19818-19819, 1670")
-         imgui.Text(u8"Сигареты: 19896, 19897, 3044, 1485, 1665")
-         imgui.Text(u8"Книги: 2813, 2816, 2824, 2826, 2827, 2852-2855, стелаж 14455")
-         imgui.Text(u8"Ковры: 2815, 2817, 2818, 2833-2836, 2841, 2842, 2847, 2631-2632")
-         imgui.Text(u8"Чистая посуда: 2822, 2829, 2831, 2832, 2849, 2862-2865")
-         imgui.Text(u8"Грязная посуда: 2812, 2820, 2830, 2848, 2850, 2851")
-         imgui.Text(u8"Картины: 2255-2289, 3962-3964, 14860, 14812, 14737")
-      elseif tabmenu.objects == 6 then
-         imgui.Text(u8"Здесь вы можете сохранить ваши объекты в избранное")
-         imgui.InputTextMultiline('##bufftext', textbuffer.note, imgui.ImVec2(515, 150))
-
-         if imgui.Button(u8"Сохранить избранные в файл", imgui.ImVec2(200, 25)) then
-            favfile = io.open(getGameDirectory() ..
-            "//moonloader//resource//abseventhelper//objects.txt", "a")
-            --favfile:write("\n")
-            --favfile:write(string.format("%s \n", os.date("%d.%m.%y %H:%M:%S")))
-            favfile:write(textbuffer.note.v)
-            favfile:close()
-            sampAddChatMessage("Saved moonloader/resource/abseventhelper/objects.txt", -1)
-         end
-         
-         imgui.SameLine()
-         if imgui.Button(u8"Загрузить избранные из файла", imgui.ImVec2(200, 25)) then
-            favfile = io.open(getGameDirectory() ..
-            "//moonloader//resource//abseventhelper//objects.txt", "r")
-            textbuffer.note.v = favfile:read('*a')
-            favfile:close()
-         end
-      elseif tabmenu.objects == 7 then
-	     imgui.TextColoredRGB("Инструменты {007DFF}Prineside DevTools (Online)")
-	     imgui.Text(u8"Все запросы перенаправляет в ваш браузер")
-		 imgui.Text("")
-		 imgui.Text(u8"Введите ключевое слово, ID или название модели:")
-	     imgui.PushItemWidth(220)
-	     if imgui.InputText("##CheckObject", textbuffer.objectid) then
-         end
-         imgui.PopItemWidth()
-		 
-		 imgui.SameLine()
-	     if imgui.Button(u8"Найти",imgui.ImVec2(65, 25)) then
-		    if string.len(textbuffer.objectid.v) > 3 then
-               local link = 'explorer "https://dev.prineside.com/ru/gtasa_samp_model_id/search/?q='.. u8:decode(textbuffer.objectid.v)..'"'
-		       os.execute(link)
-		    end
-	     end 
-	  
-	     if imgui.Button(u8"Найти объекты рядом по текущей позиции",imgui.ImVec2(300, 25)) then
-		    if sampIsLocalPlayerSpawned() then
-               local posX, posY, posZ = getCharCoordinates(PLAYER_PED)
-               local link = string.format('explorer "https://dev.prineside.com/ru/gtasa_samp_model_id/mapsearch/?x=%i&y=%i', posX, posY)
-		       os.execute(link)
-		    end
-	     end
-		 
-		 if lastObjectModelid then
-		    if imgui.Button(u8"Вставить последний объект id: "..lastObjectModelid, imgui.ImVec2(300, 25)) then
-	           textbuffer.objectid.v = tostring(lastObjectModelid)
-		    end
-	     end
-		 
-		 imgui.Text("")
-		 imgui.TextColoredRGB("Список всех разрушаемых объектов на {007DFF}dev.prineside.com/customsearch")
-         if imgui.IsItemClicked() then
-			 os.execute('explorer "https://dev.prineside.com/ru/gtasa_samp_model_id/customsearch/?c%5B%5D=1&s=id-asc&bc=-1&bb=1&bt=-1&ba=-1"')
-         end
-      end
-
-      imgui.NextColumn()
-
-      if imgui.Button(u8"Основные",imgui.ImVec2(150, 25)) then tabmenu.objects = 1 end 
-      if imgui.Button(u8"Специальные",imgui.ImVec2(150, 25)) then tabmenu.objects = 2 end
-      if imgui.Button(u8"Эффекты",imgui.ImVec2(150, 25)) then tabmenu.objects = 3 end
-      if imgui.Button(u8"Освещение",imgui.ImVec2(150, 25)) then tabmenu.objects = 4 end
-      if imgui.Button(u8"Интерьер",imgui.ImVec2(150, 25)) then tabmenu.objects = 5 end
-      if imgui.Button(u8"Избранные",imgui.ImVec2(150, 25)) then tabmenu.objects = 6 end
-      if imgui.Button(u8"Поиск (Онлайн)",imgui.ImVec2(150, 25)) then tabmenu.objects = 7 end
-
-      imgui.Columns(1)
-      imgui.Separator()
-		 
-      imgui.Text(u8"")
-	  if isAbsolutePlay then
- 	     imgui.TextColoredRGB("Описание работы редактора карт на {007DFF}forum.gta-samp.ru")
-         if imgui.IsItemClicked() then
-            os.execute('explorer "https://forum.gta-samp.ru/index.php?/topic/1016832-миры-описание-работы-редактора-карт/"')
-		 end
-      end
-		 
-      imgui.TextColoredRGB("Не нашли нужный объект? посмотрите на {007DFF}dev.prineside.com")
-      if imgui.IsItemClicked() then
-         os.execute('explorer "https://dev.prineside.com/ru/gtasa_samp_model_id/"')
-      end
-      
-      imgui.TextColoredRGB("Карта объектов которые не видны редакторами карт {007DFF}map.romzes.com")
-      if imgui.IsItemClicked() then
-         os.execute('explorer "https://map.romzes.com/"')
-      end
-	  
-      imgui.TextColoredRGB("Список всех текстур GTA:SA {007DFF}textures.xyin.ws")
-      if imgui.IsItemClicked() then
-         os.execute('explorer https://textures.xyin.ws/?page=textures&p=1&limit=100"')
-      end
-      
-	  imgui.TextColoredRGB("Браузер спрайтов {007DFF}pawnokit.ru")
-      if imgui.IsItemClicked() then
-         os.execute('explorer "https://pawnokit.ru/ru/txmngr"')
-      end
-	  
-      elseif tabmenu.main == 6 then
       imgui.Columns(2)
       imgui.SetColumnWidth(-1, 520)
       
@@ -2194,8 +2039,157 @@ function imgui.OnDrawFrame()
             os.execute('explorer "https://pawnokit.ru/ru/spec_symbols"')
          end
 
-      -- elseif tabmenu.info == 5 then
+      elseif tabmenu.info == 5 then
+         
+		 imgui.Text(u8"Выберите категорию: ")
+		 imgui.SameLine()
+         if imgui.Combo(u8'##ComboBoxObjects', combobox.objects, 
+	     {u8'Основные', u8'Специальные', u8'Эффекты', u8'Освещение',
+		 u8'Интерьер', u8'Избранные', u8'Поиск (Онлайн)'}, 7) then
+		 end
+		 
+		 imgui.Text(u8" ")
+		 
+         if combobox.objects.v == 0 then
+            imgui.Text(u8"Большие прозрачные объекты для текста: 19481, 19480, 19482, 19477")
+            --imgui.Selectable(u8"Большие прозрачные объекты для текста: 19481, 19480, 19482, 19477")
+            imgui.Text(u8"Маленькие объекты для текста: 19475, 19476, 2662")
+            imgui.Text(u8"Бетонные блоки: 18766, 18765, 18764, 18763, 18762")
+            imgui.Text(u8"Горы: вулкан 18752, песочница 18751, песочные горы ландшафт 19548")
+            imgui.Text(u8"Платформы: тонкая платформа 19552, 19538, решетчатая 18753, 18754")
+            imgui.Text(u8"Поверхности: 19531, 4242, 4247, 8171, 5004, 16685")
+            imgui.Text(u8"Стены: 19353, 19426(маленькая), 19445(длинная), 19383(дверь), 19399(окно)")
+            imgui.Text(u8"Окружение: темная материя 13656, скайбокс 3933, плейрум 3924")
+            imgui.Text(u8"Покрытие: грязь 11385, растения 19790")
+         elseif combobox.objects.v == 1 then
+            imgui.Text(u8"Веревка 19087, Веревка длин. 19089")
+            imgui.Text(u8"Стекло (Разрушаемое) 3858, стекло от травы 3261, сено 3374")
+            imgui.Text(u8"Факел с черепом 3524, факел 3461,3525")
+            imgui.Text(u8"Водяная бочка 1554, ржавая бочка 1217, взрыв. бочка 1225")
+            imgui.Text(u8"Cтеклянный блок 18887, финиш гонки 18761, большой череп 8483, 6865")
+            imgui.Text(u8"Вертушка на потолок 16780")
+            imgui.Text(u8"Партикл воды с колизией 19603, большой 19604, мал. 9831, круглый 6964")
+            imgui.Text(u8"Фонари(уличные): красный 3877, трицвета 3472, восточный 1568 и 3534")
+         elseif combobox.objects.v == 2 then
+            imgui.Text(u8"Огонь большой 18691, средний огонь 18692, пламя+дым (исчезает) 18723")
+            imgui.Text(u8"Огонь от огнемета 18694, огонь от машины 18690")
+            imgui.Text(u8"Пар от вентиляции 18736, дым от сигареты 18673, дым с фабрики 18748")
+            imgui.Text(u8"Белый дым 18725, черный дым 18726, большой серый дым 18727")
+            imgui.Text(u8"Большой взрыв 18682, средний взрыв 18683, маленький взрыв 18686")
+            imgui.Text(u8"Спрей 18729, огнетушитель 18687, слезоточивый 18732")
+            imgui.Text(u8"Рябь на воде 18741, брызги воды 18744")
+            imgui.Text(u8"Фонтан 18739, гидрант 18740, водопад 19841, вода 19842")
+            imgui.Text(u8"Искры 18717, горящие дрова 19632")
+            imgui.Text(u8"Сигнальный огонь 18728, лазер 18643, нитро 18702, флейм 18693")
+            imgui.Text(u8"Кровь от ранения 18668, лужа крови 19836")
+         elseif combobox.objects.v == 3 then
+            imgui.Text(u8"Неон красный 18647, синий 18648, зеленый 18649")
+            imgui.Text(u8"Неон желтый 18650, розовый 18651, белый 18652")
+            imgui.Text(u8"Свет.шар (не моргает) белый 19281, красн. 19282, зел. 19283, синий 19284")
+            imgui.Text(u8"Свет.шар (моргает быстро) белый 19285, красн. 19286, зел. 19287, син. 19288")
+            imgui.Text(u8"Свет.шар (моргает медленно) белый 19289, красн. 19290, зел. 19291, син. 19292")
+            imgui.Text(u8"Свет.шар (моргает медленно) фиолетовый 19293, желтый 19294")
+            imgui.Text(u8"Свет.шар (большой не моргает) бел. 19295, красн. 19296, зел. 19297, син. 19298")
+         elseif combobox.objects.v == 4 then
+            imgui.Text(u8"Попугай 19079, восточная лампа 3534, свечи: 2868,2869")
+            imgui.Text(u8"Разбросанная одежда: 2843-2846, из борделя 14520-14521, 14863-14864")
+            imgui.Text(u8"Вино: 19820-19824, две бутылки: 3119, стаканы 1667, 19818-19819, 1670")
+            imgui.Text(u8"Сигареты: 19896, 19897, 3044, 1485, 1665")
+            imgui.Text(u8"Книги: 2813, 2816, 2824, 2826, 2827, 2852-2855, стелаж 14455")
+            imgui.Text(u8"Ковры: 2815, 2817, 2818, 2833-2836, 2841, 2842, 2847, 2631-2632")
+            imgui.Text(u8"Чистая посуда: 2822, 2829, 2831, 2832, 2849, 2862-2865")
+            imgui.Text(u8"Грязная посуда: 2812, 2820, 2830, 2848, 2850, 2851")
+            imgui.Text(u8"Картины: 2255-2289, 3962-3964, 14860, 14812, 14737")
+         elseif combobox.objects.v == 5 then
+            imgui.Text(u8"Здесь вы можете сохранить ваши объекты в избранное")
+            imgui.InputTextMultiline('##bufftext', textbuffer.note, imgui.ImVec2(515, 150))
 
+            if imgui.Button(u8"Сохранить избранные в файл", imgui.ImVec2(200, 25)) then
+               favfile = io.open(getGameDirectory() ..
+               "//moonloader//resource//abseventhelper//objects.txt", "a")
+               --favfile:write("\n")
+               --favfile:write(string.format("%s \n", os.date("%d.%m.%y %H:%M:%S")))
+               favfile:write(textbuffer.note.v)
+               favfile:close()
+               sampAddChatMessage("Saved moonloader/resource/abseventhelper/objects.txt", -1)
+            end
+         
+            imgui.SameLine()
+            if imgui.Button(u8"Загрузить избранные из файла", imgui.ImVec2(200, 25)) then
+               favfile = io.open(getGameDirectory() ..
+               "//moonloader//resource//abseventhelper//objects.txt", "r")
+               textbuffer.note.v = favfile:read('*a')
+               favfile:close()
+            end
+         elseif combobox.objects.v == 6 then
+	        imgui.TextColoredRGB("Инструменты {007DFF}Prineside DevTools (Online)")
+	        imgui.Text(u8"Все запросы перенаправляет в ваш браузер")
+		    imgui.Text("")
+		    imgui.Text(u8"Введите ключевое слово, ID или название модели:")
+	        imgui.PushItemWidth(220)
+	        if imgui.InputText("##CheckObject", textbuffer.objectid) then
+            end
+            imgui.PopItemWidth()
+		 
+		    imgui.SameLine()
+	        if imgui.Button(u8"Найти",imgui.ImVec2(65, 25)) then
+		       if string.len(textbuffer.objectid.v) > 3 then
+                  local link = 'explorer "https://dev.prineside.com/ru/gtasa_samp_model_id/search/?q='.. u8:decode(textbuffer.objectid.v)..'"'
+		          os.execute(link)
+		       end
+	        end 
+	  
+	        if imgui.Button(u8"Найти объекты рядом по текущей позиции",imgui.ImVec2(300, 25)) then
+		       if sampIsLocalPlayerSpawned() then
+                  local posX, posY, posZ = getCharCoordinates(PLAYER_PED)
+                  local link = string.format('explorer "https://dev.prineside.com/ru/gtasa_samp_model_id/mapsearch/?x=%i&y=%i', posX, posY)
+		          os.execute(link)
+		       end
+	        end
+		 
+		    if lastObjectModelid then
+		       if imgui.Button(u8"Вставить последний объект id: "..lastObjectModelid, imgui.ImVec2(300, 25)) then
+	              textbuffer.objectid.v = tostring(lastObjectModelid)
+		       end
+	        end
+		 
+		    imgui.Text("")
+		    imgui.TextColoredRGB("Список всех разрушаемых объектов на {007DFF}dev.prineside.com/customsearch")
+            if imgui.IsItemClicked() then
+			    os.execute('explorer "https://dev.prineside.com/ru/gtasa_samp_model_id/customsearch/?c%5B%5D=1&s=id-asc&bc=-1&bb=1&bt=-1&ba=-1"')
+            end
+         end
+		 
+         --imgui.Separator()
+		 
+         imgui.Text(u8"")
+	     if isAbsolutePlay then
+ 	        imgui.TextColoredRGB("Описание работы редактора карт на {007DFF}forum.gta-samp.ru")
+            if imgui.IsItemClicked() then
+               os.execute('explorer "https://forum.gta-samp.ru/index.php?/topic/1016832-миры-описание-работы-редактора-карт/"')
+		    end
+         end
+		 
+         imgui.TextColoredRGB("Не нашли нужный объект? посмотрите на {007DFF}dev.prineside.com")
+         if imgui.IsItemClicked() then
+            os.execute('explorer "https://dev.prineside.com/ru/gtasa_samp_model_id/"')
+         end
+      
+         imgui.TextColoredRGB("Карта объектов которые не видны редакторами карт {007DFF}map.romzes.com")
+         if imgui.IsItemClicked() then
+            os.execute('explorer "https://map.romzes.com/"')
+         end
+	  
+         imgui.TextColoredRGB("Список всех текстур GTA:SA {007DFF}textures.xyin.ws")
+         if imgui.IsItemClicked() then
+            os.execute('explorer https://textures.xyin.ws/?page=textures&p=1&limit=100"')
+         end
+      
+	     imgui.TextColoredRGB("Браузер спрайтов {007DFF}pawnokit.ru")
+         if imgui.IsItemClicked() then
+            os.execute('explorer "https://pawnokit.ru/ru/txmngr"')
+         end
+	  
       elseif tabmenu.info == 6 then
          imgui.Text(u8"Серверные команды:") 
        
@@ -2540,6 +2534,7 @@ function imgui.OnDrawFrame()
 		 
       imgui.NextColumn()
 
+      if imgui.Button(u8"Объекты", imgui.ImVec2(100,25)) then tabmenu.info = 5 end
       if imgui.Button(u8"Лимиты", imgui.ImVec2(100,25)) then tabmenu.info = 2 end
       if imgui.Button(u8"Цвета", imgui.ImVec2(100,25)) then tabmenu.info = 3 end
       if imgui.Button(u8"Текстуры", imgui.ImVec2(100,25)) then tabmenu.info = 4 end
@@ -2736,10 +2731,12 @@ end
    -- end
 -- end
 
--- function sampev.onRemoveBuilding(modelId, position, radius)
-   -- removedBuildings = removedBuildings + 1;
--- end
+function sampev.onRemoveBuilding(modelId, position, radius)
+   removedBuildings = removedBuildings + 1;
+end
 
+-- function sampev.onEnterSelectObject()
+-- end
 -- END hooks
 
 -- Macros
