@@ -4,7 +4,7 @@ script_description("Assistant for mappers and event makers on Absolute Play")
 script_dependencies('imgui', 'lib.samp.events', 'vkeys')
 script_properties("work-in-pause")
 script_url("https://github.com/ins1x/AbsEventHelper")
-script_version("2.3.3")
+script_version("2.3.4")
 -- script_moonloader(16) moonloader v.0.26
 
 -- Activaton: ALT + X (show main menu)
@@ -73,6 +73,7 @@ local dialog = {
    main = imgui.ImBool(false),
    textures = imgui.ImBool(false),
    playerstat = imgui.ImBool(false),
+   extendedtab = imgui.ImBool(false),
    fastanswer = imgui.ImBool(false)
 }
 
@@ -88,6 +89,7 @@ local checkbox = {
    showobjects = imgui.ImBool(false),
    showclosestobjects = imgui.ImBool(false),
    vehstream = imgui.ImBool(true),
+   noempyvehstream = imgui.ImBool(true),
    heavyweaponwarn = imgui.ImBool(true),
    nametagwh = imgui.ImBool(false),
    hideobject = imgui.ImBool(false),
@@ -114,7 +116,6 @@ local tabmenu = {
    objects = 1,
    settings = 1,
    info = 1,
-   playersopt = nil,
    cmds = 1
 }
 
@@ -167,6 +168,7 @@ local combobox = {
    item9 = imgui.ImInt(0),
    item10 = imgui.ImInt(0),
    profiles = imgui.ImInt(0),
+   selecttable = imgui.ImInt(0),
    objects = imgui.ImInt(6),
    itemad = imgui.ImInt(0)
 }
@@ -199,7 +201,7 @@ streamedObjects = 0
 local fps = 0
 local fps_counter = 0
 local vehinfomodelid = 0 
-local originalfov = 0
+local originalfov
 
 local objectsCollisionDel = {}
 local playersTable = {}
@@ -364,8 +366,8 @@ function main()
       end)
       
 	  -- get FOV
-	  originalfov = getCameraFov()
-	  slider.fov.v = originalfov
+	  -- originalfov = getCameraFov()
+	  slider.fov.v = getCameraFov()
 	  
       -- set drawdist and figdist
       memory.setfloat(12044272, ini.settings.drawdist, true)
@@ -458,6 +460,7 @@ function main()
          if dialog.fastanswer.v then dialog.fastanswer.v = false end
          if dialog.textures.v then dialog.textures.v = false end
          if dialog.playerstat.v then dialog.playerstat.v = false end
+         if dialog.extendedtab.v then dialog.extendedtab.v = false end
       end 
       
       -- ALT+X (Main menu activation)
@@ -477,7 +480,7 @@ function main()
 	  -- Open last chosen player dialog (only if samp addon not installed)
 	  if not isSampAddonInstalled and isKeyJustPressed(VK_B)
 	  and not sampIsChatInputActive() and not isPauseMenuActive()
-	  and not isSampfuncsConsoleActive() then 
+	  and not sampIsDialogActive() and not isSampfuncsConsoleActive() then 
 		 if chosenplayer then
 		 if not dialog.main.v then dialog.main.v = true end
 		 dialog.playerstat.v = not dialog.playerstat.v
@@ -554,11 +557,9 @@ function imgui.OnDrawFrame()
       imgui.SameLine()
       if imgui.Button(u8"Чат-Бинд") then tabmenu.main = 2 end
       imgui.SameLine()
-      if imgui.Button(u8"Игроки") then tabmenu.main = 3 end
+      if imgui.Button(u8"Мероприятие") then tabmenu.main = 3 end
       imgui.SameLine()
-      if imgui.Button(u8"Транспорт") then tabmenu.main = 4 end
-      imgui.SameLine()
-      if imgui.Button(u8"Информация") then tabmenu.main = 5 end
+      if imgui.Button(u8"Информация") then tabmenu.main = 4 end
 
       imgui.NextColumn()
       
@@ -1234,7 +1235,8 @@ function imgui.OnDrawFrame()
 	  imgui.SameLine()
 	  imgui.PushItemWidth(100)
 	  if imgui.Combo(u8'##ComboBoxProfiles', combobox.profiles, 
-	  {'Default', 'Race', 'Survival', 'TDM'}, 4) then
+	  {'Default', 'Race', 'Derby', 'Survival', 'PvP', 'Death-Roof', 'TDM', 'Hide-n-Seek', 'Quiz'}, 9) then
+         if combobox.profiles.v then cleanBindsForm() end
          if combobox.profiles.v == 0 then
 		    reloadBindsFromConfig()
 		    sampAddChatMessage('Загружен профиль Default из конфига', -1)
@@ -1248,12 +1250,19 @@ function imgui.OnDrawFrame()
             textbuffer.bind6.v = u8("Запрещено находиться в афк после начала мероприятия")
             textbuffer.bind7.v = u8("Запрещено использовать телепорт и текстурные баги")
             textbuffer.bind8.v = u8("За первое место приз - , за второе - , за третье -")
-            textbuffer.bind9.v = u8(" ")
-			textbuffer.bind10.v = u8(" ")
             textbuffer.bindad.v = u8("Заходите на МП '' в мир , приз ")
 			sampAddChatMessage('Загружен профиль Race', -1)
          end
          if combobox.profiles.v == 2 then
+		    textbuffer.bind1.v = u8("Запрещено использовать текстурные баги")
+		    textbuffer.bind2.v = u8("Запрещено покидать транспорт - дисквалификация")
+		    textbuffer.bind3.v = u8("Вы выбываете с игры в случае вылета за пределы арены")
+		    textbuffer.bind4.v = u8("Вы выбываете с игры в случае уничтожения транспорта")
+		    textbuffer.bind5.v = u8("Победит последний выживший игрок")
+            textbuffer.bindad.v = u8("Заходите на МП 'Дерби' в мир , приз ")
+			sampAddChatMessage('Загружен профиль Derby', -1)
+		 end
+         if combobox.profiles.v == 3 then
 		    textbuffer.bind1.v = u8("Запрещено создавать помеху игрокам при помощи багов и недоработок игры")
             textbuffer.bind2.v = u8("Запрещены объединения более 2-х игроков")
             textbuffer.bind3.v = u8("Не мешаем другим игрокам, ждем начала")
@@ -1262,12 +1271,30 @@ function imgui.OnDrawFrame()
             textbuffer.bind6.v = u8("Начали! Желаю удачи всем игрокам")
             textbuffer.bind7.v = u8("Разрешены объеденения - не больше двух игроков")
             textbuffer.bind8.v = u8("Приз не может быть разделен при обоюдном согласии двух оставшихся команд")
-            textbuffer.bind9.v = u8(" ")
-			textbuffer.bind10.v = u8(" ")
             textbuffer.bindad.v = u8("Заходите на МП 'Выживание' в мир , приз ")
             sampAddChatMessage('Загружен профиль Survival', -1)
          end
-         if combobox.profiles.v == 3 then
+         if combobox.profiles.v == 4 then
+		    textbuffer.bind1.v = u8("Запрещено создавать помеху игрокам при помощи багов и недоработок игры")
+		    textbuffer.bind2.v = u8("После получения оружия ждем отсчета")
+		    textbuffer.bind3.v = u8("Начинаем только после окончания отсчета!")
+		    textbuffer.bind4.v = u8("Если вы выстрелили раньше отсчета - дисквалификация")
+		    textbuffer.bind5.v = u8("Если вы прошли во второй тур и находитесь афк - дисквалификация")
+		    textbuffer.bind6.v = u8("Обман организатора - черный список МП")
+		    textbuffer.bindad.v = u8("Заходите на МП 'Кемпа' в мир , приз ")
+		    sampAddChatMessage('Загружен профиль PvP', -1)
+		 end
+		 if combobox.profiles.v == 5 then
+		    textbuffer.bind1.v = u8("Запрещено создавать помеху игрокам при помощи багов и недоработок игры")
+		    textbuffer.bind2.v = u8("Игроки которые упали с крыши - выбывают")
+		    textbuffer.bind3.v = u8("Использование анимок и спец.действий запрещено!")
+		    textbuffer.bind4.v = u8("Кто хочет быть пилотом?")
+		    textbuffer.bind5.v = u8("Кто хочет быть водилой поливалки?")
+		    textbuffer.bind6.v = u8("Запрещено запрыгивать на транспорт организаторов")
+		    textbuffer.bindad.v = u8("Заходите на МП 'Смертельная крыша' в мир , приз ")
+		    sampAddChatMessage('Загружен профиль Death-Roof', -1)
+		 end
+         if combobox.profiles.v == 6 then
 		    textbuffer.bind1.v = u8("Запрещено создавать помеху игрокам при помощи багов и недоработок игры")
             textbuffer.bind2.v = u8("За попытку обмана организатора - ЧС мероприятий")
             textbuffer.bind3.v = u8("Увидели лагера или нарушителя пишите в лс")
@@ -1281,6 +1308,30 @@ function imgui.OnDrawFrame()
             textbuffer.bindad.v = u8("Заходите на МП TDM в мир , приз ")
             sampAddChatMessage('Загружен профиль TDM', -1)
          end
+		 if combobox.profiles.v == 7 then
+		    textbuffer.bind1.v = u8("Запрещено прятаться в текстурах и объектах")
+		    textbuffer.bind2.v = u8("Запрещено использовать баги и недоработки игры для победы")
+			textbuffer.bind3.v = u8("Увидели нарушителя пишите в лс организатору")
+			textbuffer.bind4.v = u8("Не мешаем другим игрокам, ждем начала")
+            textbuffer.bind5.v = u8("Запрещено находиться в афк после начала мероприятия")
+            textbuffer.bind6.v = u8("Все спрятались?")
+            textbuffer.bind7.v = u8("Начали! Желаю удачи всем игрокам")
+			textbuffer.bind8.v = u8("Всем вернуться на спавн!")
+			textbuffer.bind9.v = u8("Победитель может быть только - один!")
+		    textbuffer.bindad.v = u8("Заходите на МП Прятки в мир , приз ")
+            sampAddChatMessage('Загружен профиль Hide-n-Seek', -1)
+		 end
+		 if combobox.profiles.v == 8 then
+		    textbuffer.bind1.v = u8("Правила: организатор задает вопрос, а вы должны дать ответ быстрее всех")
+		    textbuffer.bind2.v = u8("Кто первый ответ на заданный вопрос, получает балл")
+		    textbuffer.bind3.v = u8("Игра продолжается пока кто-либо не наберет 3 балла")
+		    textbuffer.bind4.v = u8("Не рекомендуется флудить и спамить в чат")
+		    textbuffer.bind5.v = u8("Вопросы будут на тему ")
+		    textbuffer.bind6.v = u8("Гугол, Яндекс и ChatGPT вам не помошники, вопросы специфические =)")
+		    textbuffer.bind10.v = u8("Все готовы?")
+		    textbuffer.bindad.v = u8("Проходит МП 'Викторина' на тему , приз ")
+            sampAddChatMessage('Загружен профиль Quiz', -1)
+		 end
       end
 	  imgui.PopItemWidth()
 	   
@@ -1482,7 +1533,7 @@ function imgui.OnDrawFrame()
        imgui.PopItemWidth()
        
        imgui.SameLine()
-       if imgui.InputText("##Bind10", textbuffer.bind9) then 
+       if imgui.InputText("##Bind10", textbuffer.bind10) then 
        end
        
        imgui.SameLine()
@@ -1545,17 +1596,7 @@ function imgui.OnDrawFrame()
        
        imgui.SameLine()
        if imgui.Button(u8" Очистить все бинды ") then
-          textbuffer.bind1.v = " "
-          textbuffer.bind2.v = " "
-          textbuffer.bind3.v = " "
-          textbuffer.bind4.v = " "
-          textbuffer.bind5.v = " "
-          textbuffer.bind6.v = " "
-          textbuffer.bind7.v = " "
-          textbuffer.bind8.v = " "
-          textbuffer.bind9.v = " "
-          textbuffer.bind10.v = " "
-          textbuffer.bindad.v = " "
+          cleanBindsForm()
        end
        
 	   
@@ -1569,77 +1610,35 @@ function imgui.OnDrawFrame()
 
 
       elseif tabmenu.main == 3 then
-
-       if next(playersTable) == nil then -- if playersTable is empty
-          imgui.Text(u8"Перед началом мероприятия обновите список игроков, и сохраните")
-       end
        
-       if imgui.Button(u8"Обновить", imgui.ImVec2(100, 25)) then
-          playersTable = {}       
-          playersTotal = 0
-          
-          for k, v in ipairs(getAllChars()) do
-             local res, id = sampGetPlayerIdByCharHandle(v)
-             if res then
-                table.insert(playersTable, id)
-                playersTotal = playersTotal + 1
-             end
+	   if dialog.extendedtab.v then
+	      if imgui.Button("[ >> ]") then
+	         dialog.extendedtab.v = not dialog.extendedtab.v
+	      end
+	   else
+	      if imgui.Button("[ << ]") then
+	         dialog.extendedtab.v = not dialog.extendedtab.v
+	      end
+       end	   
+	   imgui.SameLine()
+	   --imgui.TextQuestion("( ? )", u8"Открыть расширенные настройки")
+	   --imgui.SameLine()
+	   imgui.Text(u8"Выберите таблицу:")
+	   imgui.SameLine()
+	   imgui.PushItemWidth(120)
+	   imgui.Combo(u8'##ComboBoxSelecttable', combobox.selecttable, 
+	   {u8'Игроки', u8'Транспорт'}, 2)
+	   imgui.PopItemWidth()
+	   
+	   if combobox.selecttable.v == 0 then
+          if next(playersTable) == nil then -- if playersTable is empty
+             imgui.Text(u8"Перед началом мероприятия обновите список игроков, и сохраните")
           end
-       end
        
-       imgui.SameLine()
-       if imgui.Button(u8"Сохранить", imgui.ImVec2(100, 25)) then
-          ptablefile = io.open(getGameDirectory().."/moonloader/resource/abseventhelper/players.txt", "a")
-          ptablefile:write("\n")
-          ptablefile:write(string.format("%s \n", os.date("%d.%m.%y %H:%M:%S")))
-          local counter = 0
-          for k, v in pairs(playersTable) do
-             ptablefile:write(string.format("%d [id:%d] %s lvl: %i \n",
-             counter + 1, v, sampGetPlayerNickname(v), sampGetPlayerScore(v)))
-             counter = counter + 1
-          end
-          ptablefile:write(string.format("Total: %d \n", counter))
-          ptablefile:close()
-          sampAddChatMessage("Saved. moonloader/resource/abseventhelper/players.txt", -1)
-       end
-       
-       imgui.SameLine()
-       if imgui.Button(u8"Очистить", imgui.ImVec2(100, 25)) then
-          playersTable = {}       
-          playersTotal = 0
-          chosenplayer = nil
-       end
-       
-       imgui.SameLine()
-       if imgui.Button(u8"...") then
-          tabmenu.playersopt = not tabmenu.playersopt
-       end
-       
-       imgui.SameLine()
-       imgui.Text(u8"Найти в таблице:")
-       
-       imgui.SameLine()
-       imgui.PushItemWidth(170)
-       if imgui.InputText("##FindPlayer", textbuffer.findplayer) then 
-          for k, v in pairs(playersTable) do
-             local nickname = sampGetPlayerNickname(v)
-             if nickname == u8:decode(textbuffer.findplayer.v) then
-                printStringNow("finded", 1000)
-                chosenplayer = sampGetPlayerIdByNickname(nickname)
-             end
-          end
-       end
-       imgui.PopItemWidth()
-       
-       imgui.TextColoredRGB("{FF0000}Красным{CDCDCD} в таблице отмечены подозрительные игроки (малый лвл, большой пинг)")
-       
-       if tabmenu.playersopt then 
-          
-          imgui.Checkbox(u8("Автоообновление списка игроков"), checkbox.autoupdplayerstable)
-          if checkbox.autoupdplayerstable.v then
+          if imgui.Button(u8"Обновить", imgui.ImVec2(100, 25)) then
              playersTable = {}       
              playersTotal = 0
-          
+             
              for k, v in ipairs(getAllChars()) do
                 local res, id = sampGetPlayerIdByCharHandle(v)
                 if res then
@@ -1648,309 +1647,310 @@ function imgui.OnDrawFrame()
                 end
              end
           end
+       
           imgui.SameLine()
-		  if imgui.Button(u8"Выбрать случайного игрока") then
-             if next(playersTable) == nil then -- if playersTable is empty
-                printStringNow("Update players table before", 1000) 
-             else
-                 local rand = math.random(playersTotal)
-                 chosenplayer = playersTable[rand]
-                 printStringNow("Random player: ".. sampGetPlayerNickname(playersTable[rand]), 1000)
+          if imgui.Button(u8"Сохранить", imgui.ImVec2(100, 25)) then
+             ptablefile = io.open(getGameDirectory().."/moonloader/resource/abseventhelper/players.txt", "a")
+             ptablefile:write("\n")
+             ptablefile:write(string.format("%s \n", os.date("%d.%m.%y %H:%M:%S")))
+             local counter = 0
+             for k, v in pairs(playersTable) do
+                ptablefile:write(string.format("%d [id:%d] %s lvl: %i \n",
+                counter + 1, v, sampGetPlayerNickname(v), sampGetPlayerScore(v)))
+                counter = counter + 1
              end
+             ptablefile:write(string.format("Total: %d \n", counter))
+             ptablefile:close()
+             sampAddChatMessage("Saved. moonloader/resource/abseventhelper/players.txt", -1)
           end
-		  
           
-          if imgui.Checkbox(u8("Уведомлять о дисконнекте игрока"), checkbox.disconnectreminder) then
-             if checkbox.disconnectreminder.v then
-                disconnectremind = true
-             else
-                disconnectremind = false
-             end
+          imgui.SameLine()
+          if imgui.Button(u8"Очистить", imgui.ImVec2(100, 25)) then
+             playersTable = {}       
+             playersTotal = 0
+             chosenplayer = nil
           end
-		  imgui.SameLine()
-		  if imgui.Button(u8"Получить id игроков рядом") then
-             local pidtable = {}
-             local resulstring
-             for k, v in ipairs(getAllChars()) do
-                local res, id = sampGetPlayerIdByCharHandle(v)
-                if res then
-                   local nickname = sampGetPlayerNickname(id)
-                   table.insert(pidtable, string.format("%s[%d] ", nickname, id))
-                   resulstring = table.concat(pidtable)
-                   setClipboardText(resulstring)
-                   sampAddChatMessage("Ид игроков рядом скопированы в буфер обмена", -1)
+          imgui.SameLine()
+          imgui.Text(u8"Найти в таблице:")
+       
+          imgui.SameLine()
+          imgui.PushItemWidth(170)
+          if imgui.InputText("##FindPlayer", textbuffer.findplayer) then 
+             for k, v in pairs(playersTable) do
+                local nickname = sampGetPlayerNickname(v)
+                if nickname == u8:decode(textbuffer.findplayer.v) then
+                   printStringNow("finded", 1000)
+                   chosenplayer = sampGetPlayerIdByNickname(nickname)
                 end
              end
           end
-		  -- imgui.SameLine()
-          -- if imgui.Checkbox(u8("Уведомлять о тяжелом оружии"), checkbox.heavyweaponwarn) then
-             -- if checkbox.heavyweaponwarn.v then
-                -- heavyweaponwarn = true
-             -- else
-                -- heavyweaponwarn = false
-             -- end
-          -- end
-		  
-		  
-          if imgui.Checkbox(u8("Показать скрытые клисты"), checkbox.radarblips) then
-             if checkbox.radarblips.v then
-                showAlphaRadarBlips = true
-             else
-                showAlphaRadarBlips = false
-             end
-          end
-          
-       end 
+          imgui.PopItemWidth()
        
-       -- if chosenplayer then
-          -- imgui.Separator()
-          -- local nickname = sampGetPlayerNickname(chosenplayer)
-          -- local ucolor = sampGetPlayerColor(chosenplayer)
-          
-          -- imgui.TextColoredRGB(string.format("Выбран игрок: {%0.6x} %s[%d]{cdcdcd}  | ",
-          -- bit.band(ucolor,0xffffff), nickname, chosenplayer))
-       -- end
+          if chosenplayer then
+             local nickname = sampGetPlayerNickname(chosenplayer)
+             local ucolor = sampGetPlayerColor(chosenplayer)
+             imgui.TextColoredRGB(string.format("Найден игрок: {%0.6x} %s[%d]",
+             bit.band(ucolor,0xffffff), nickname, chosenplayer))
+          else
+		     imgui.TextColoredRGB("{FF0000}Красным{CDCDCD} в таблице отмечены подозрительные игроки (малый лвл, большой пинг)")
+		  end
        
-       --imgui.Text(u8" ")
-       imgui.Separator()
-       imgui.Columns(5)
-       imgui.TextQuestion("[ID]", u8"Нажмите на id чтобы скопировать в буффер id игрока")
-       imgui.NextColumn()
-       imgui.TextQuestion("Nickname", u8"Нажмите на никнейм чтобы открыть меню игрока")
-       imgui.NextColumn()
-       imgui.Text("Score")
-       imgui.NextColumn()
-       imgui.Text("HP (Armour)")
-       imgui.NextColumn()
-       imgui.Text("Ping")
-       imgui.Columns(1)
-       imgui.Separator()
-	   
-       for k, v in pairs(playersTable) do
-          local health = sampGetPlayerHealth(v)
-          local armor = sampGetPlayerArmor(v)
-          local ping = sampGetPlayerPing(v)
-          local nickname = sampGetPlayerNickname(v)
-          local score = sampGetPlayerScore(v)
-          local ucolor = sampGetPlayerColor(v)
-		  
+          --imgui.Text(u8" ")
+          imgui.Separator()
           imgui.Columns(5)
-          imgui.TextColoredRGB(string.format("[%d]", v ))
-          if imgui.IsItemClicked() then
-             setClipboardText(v)
-             sampAddChatMessage("Скопирован в буфер обмена", -1)
-          end
-          imgui.SetColumnWidth(-1, 50)
+          imgui.TextQuestion("[ID]", u8"Нажмите на id чтобы скопировать в буффер id игрока")
           imgui.NextColumn()
-		  if sampIsPlayerPaused(v) then
-	         imgui.TextColoredRGB("{FF0000}[AFK]")
-	         imgui.SameLine()
-	      end
-          --imgui.TextColoredRGB(string.format("{%0.6x} %s", bit.band(ucolor,0xffffff), nickname))
-          imgui.Selectable(string.format("%s", nickname))
-          if imgui.IsItemClicked() then
-             chosenplayer = v
-             printStringNow("You have chosen a player ".. nickname, 1000)
-			 if not dialog.playerstat.v then dialog.playerstat.v = true end
-          end
-          imgui.SetColumnWidth(-1, 250)
+          imgui.TextQuestion("Nickname", u8"Нажмите на никнейм чтобы открыть меню игрока")
           imgui.NextColumn()
-          if (score < 20) then
-             imgui.TextColoredRGB(string.format("{FF0000}%i", score))
-          else 
-             imgui.TextColoredRGB(string.format("%i", score))
-          end
-          imgui.SetColumnWidth(-1, 70)
+          imgui.Text("Score")
           imgui.NextColumn()
-          if health >= 9000 then
-             imgui.TextColoredRGB("{FF0000}GM")
-          elseif health <= 100 then
-             imgui.TextColoredRGB(string.format("%i (%i)", health, armor))
-          else
-             imgui.TextColoredRGB(string.format("{FF0000}%i (%i)", health, armor))
-          end
+          imgui.Text("HP (Armour)")
           imgui.NextColumn()
-          if (ping > 90) then
-             imgui.TextColoredRGB(string.format("{FF0000}%i", ping))
-          else
-             imgui.TextColoredRGB(string.format("%i", ping))
-          end
-          imgui.NextColumn()
+          imgui.Text("Ping")
           imgui.Columns(1)
           imgui.Separator()
-       end
-    
-       imgui.Text(u8"Всего игроков в таблице: ".. playersTotal)
-      
-       if heavyweaponwarn then
-          for k, v in ipairs(getAllChars()) do
-             local res, id = sampGetPlayerIdByCharHandle(v)
-             if res then
-                local nick = sampGetPlayerNickname(id)
-                if isCurrentCharWeapon(v, 38) then 
-                   imgui.TextColoredRGB(string.format("{FF0000}Игрок %s[%d] с миниганом!", nick, id))
-                end
-                if isCurrentCharWeapon(v, 35) then 
-                   imgui.TextColoredRGB(string.format("{FF0000}Игрок %s[%d] с RPG!", nick, id))
-                end
-             end
-          end
-       end
-
-      elseif tabmenu.main == 4 then
-      imgui.Columns(2, "vehtableheader", false)
-      imgui.SetColumnWidth(-1, 320)
-      -- https://wiki.multitheftauto.com/wiki/Vehicle_IDs
-      imgui.Text(u8"Найти ID транспорта по имени:")
-       if imgui.InputText("##BindVehs", textbuffer.vehiclename) then 
-          for k, vehname in ipairs(VehicleNames) do
-             if vehname:lower():find(u8:decode(textbuffer.vehiclename.v:lower())) then
-                vehinfomodelid = 399+k
-             end
-          end
-       end 
-       
-       imgui.SameLine()
-       if textbuffer.vehiclename.v == "" then
-          imgui.Text(u8" ")
-       else
-          imgui.Text(string.format(u8"ID: %i", vehinfomodelid))
-       end
-       imgui.SameLine()
-       imgui.TextQuestion("( ? )", u8"Введите имя транспорта, например Infernus")
-       
-       local closestcarhandle, closestcarid = getClosestCar()
-       if closestcarhandle then
-          local closestcarmodel = getCarModel(closestcarhandle)
-          imgui.Text(string.format(u8"Ближайший т/с: %s [id: %i] (%i)",
-          VehicleNames[closestcarmodel-399], closestcarmodel, closestcarid))
-          imgui.SameLine()
-          imgui.TextQuestion("( ? )", u8"В скобках указан внутренний ID (/dl)")
-       else
-          imgui.Text(u8"Нет транспорта в зоне стрима")
-       end
-       
-       if isCharInAnyCar(PLAYER_PED) then 
-          local carhandle = storeCarCharIsInNoSave(PLAYER_PED)
-          local carmodel = getCarModel(carhandle)
-          imgui.Text(string.format(u8"Вы в транспорте: %s(%i)  хп: %i",
-          VehicleNames[carmodel-399], carmodel, getCarHealth(carhandle)))
-       end
-       
-       imgui.NextColumn()
-       if imgui.Button(u8"Заказать машину по имени", imgui.ImVec2(190, 25)) then
-          if not sampIsChatInputActive() and not sampIsDialogActive() and not isPauseMenuActive() and not  isSampfuncsConsoleActive() then
-             for k, vehname in ipairs(VehicleNames) do
-                if vehname:lower():find(u8:decode(textbuffer.vehiclename.v:lower())) then
-                   vehinfomodelid = 399+k
-                end 
-             end
-             if isAbsolutePlay then 
-			    sampSendChat(string.format(u8"/vfibye2 %i", vehinfomodelid))
-			 else
-                sampSendChat(string.format(u8"/v %i", vehinfomodelid))
-			 end
-          end
-       end
-	   -- imgui.SameLine()
-	   -- if imgui.Button(u8"Найти ID траспорта онлайн", imgui.ImVec2(190, 25)) then
-	      -- os.execute('explorer "https://wiki.multitheftauto.com/wiki/Vehicle_IDs"')
-	   -- end
-	   if imgui.Button(u8"Заказать машину из списка", imgui.ImVec2(190, 25)) then
-	      if isAbsolutePlay then
-             if not sampIsChatInputActive() and not sampIsDialogActive() and not isPauseMenuActive() and not isSampfuncsConsoleActive() then 
-			     sampSendChat("/vfibye2")
-				 dialog.main.v = not dialog.main.v
-		     end
-          end
-	   end
-	   -- imgui.SameLine()
-	   -- if imgui.Button(u8"Handling.cfg (онлайн)", imgui.ImVec2(190, 25)) then
-	      -- os.execute('explorer "https://github.com/ins1x/useful-samp-stuff/blob/main/docs/server/VehicleHandling.txt"')
-	   -- end
 	   
-       imgui.Columns(1)
-
-       if imgui.Checkbox(u8("Показать список транспорта в стриме"), checkbox.vehstream) then
-          vehiclesTable = {}
-          vehiclesTotal = 0
-          
-          for k, v in ipairs(getAllVehicles()) do
-             local streamed, id = sampGetVehicleIdByCarHandle(v)
-             if streamed then
-				table.insert(vehiclesTable, v)
-                vehiclesTotal = vehiclesTotal + 1
+          for k, v in pairs(playersTable) do
+             local health = sampGetPlayerHealth(v)
+             local armor = sampGetPlayerArmor(v)
+             local ping = sampGetPlayerPing(v)
+             local nickname = sampGetPlayerNickname(v)
+             local score = sampGetPlayerScore(v)
+             local ucolor = sampGetPlayerColor(v)
+		  
+             imgui.Columns(5)
+             imgui.TextColoredRGB(string.format("[%d]", v ))
+             if imgui.IsItemClicked() then
+                setClipboardText(v)
+                sampAddChatMessage("Скопирован в буфер обмена", -1)
              end
-          end
-       end
-	   
-       if checkbox.vehstream.v then
-
-          imgui.Separator()
-          imgui.Columns(4)
-          imgui.TextQuestion("ID", u8"Внутренний ID (/dl)")
-          imgui.NextColumn()
-          imgui.Text("Vehicle")
-          imgui.NextColumn()
-          imgui.SetColumnWidth(-1, 350)
-          imgui.Text("Driver")
-          imgui.NextColumn()
-          imgui.Text("Health")
-          imgui.NextColumn()
-          imgui.Columns(1)
-          imgui.Separator()
-          
-          for k, v in ipairs(getAllVehicles()) do
-             local health = getCarHealth(v)
-             local carmodel = getCarModel(v)
-             local streamed, id = sampGetVehicleIdByCarHandle(v)
-             local ped = getDriverOfCar(v)
-             local res, pid = sampGetPlayerIdByCharHandle(ped)
-			 
-             imgui.Columns(4)
-             imgui.TextColoredRGB(string.format("%i", id))
              imgui.SetColumnWidth(-1, 50)
              imgui.NextColumn()
-			 if carmodel == 447 or carmodel == 425 or carmodel == 432 or carmodel == 520 then
-                imgui.TextColoredRGB(string.format("{FF0000}%s", VehicleNames[carmodel-399]))
-			 elseif carmodel == 476 or carmodel == 430 or carmodel == 406 or carmodel == 592 then
-			    imgui.TextColoredRGB(string.format("{FF8C00}%s", VehicleNames[carmodel-399]))
-			 elseif carmodel == 601 or carmodel == 407 then
-			    imgui.TextColoredRGB(string.format("{1E90FF}%s", VehicleNames[carmodel-399]))
-			 else
-			    imgui.TextColoredRGB(string.format("%s", VehicleNames[carmodel-399]))
-			 end
-             imgui.NextColumn()
-             if res then 
-                local ucolor = sampGetPlayerColor(pid)
-                imgui.TextColoredRGB(string.format("{%0.6x}%s", bit.band(ucolor,0xffffff),sampGetPlayerNickname(pid)))
-                if imgui.IsItemClicked() then
-                   setClipboardText(pid)
-                   sampAddChatMessage("ID скопирован в буфер обмена", -1)
-                end
-             else
-                imgui.Text(u8"пустой")
+		     if sampIsPlayerPaused(v) then
+	            imgui.TextColoredRGB("{FF0000}[AFK]")
+	            imgui.SameLine()
+	         end
+             --imgui.TextColoredRGB(string.format("{%0.6x} %s", bit.band(ucolor,0xffffff), nickname))
+             imgui.Selectable(string.format("%s", nickname))
+             if imgui.IsItemClicked() then
+                chosenplayer = v
+                printStringNow("You have chosen a player ".. nickname, 1000)
+			    if not dialog.playerstat.v then dialog.playerstat.v = true end
              end
+             imgui.SetColumnWidth(-1, 250)
              imgui.NextColumn()
-             if health > 99999 then
-                imgui.TextColoredRGB("{ff0000}GM")
-             elseif health > 1000 then
-                imgui.TextColoredRGB(string.format("{ff0000}%i", health))
-             elseif health < 450 then
-                imgui.TextColoredRGB(string.format("{ff8c00}%i", health))
+             if (score < 20) then
+                imgui.TextColoredRGB(string.format("{FF0000}%i", score))
              else 
-                imgui.TextColoredRGB(string.format("%i", health))
+                imgui.TextColoredRGB(string.format("%i", score))
              end
+             imgui.SetColumnWidth(-1, 70)
+             imgui.NextColumn()
+             if health >= 9000 then
+             imgui.TextColoredRGB("{FF0000}Бессмертный")
+             elseif health <= 100 then
+                imgui.TextColoredRGB(string.format("%i (%i)", health, armor))
+             else
+                imgui.TextColoredRGB(string.format("{FF0000}%i (%i)", health, armor))
+             end
+			 imgui.SetColumnWidth(-1, 100)
+             imgui.NextColumn()
+             if (ping > 90) then
+                imgui.TextColoredRGB(string.format("{FF0000}%i", ping))
+             else
+                imgui.TextColoredRGB(string.format("%i", ping))
+             end
+             imgui.NextColumn()
              imgui.Columns(1)
              imgui.Separator()
           end
-          
-          if checkbox.vehstream.v then
-             imgui.Text(u8"Всего транспорта в таблице: ".. vehiclesTotal)
+    
+          imgui.Text(u8"Всего игроков в таблице: ".. playersTotal)
+      
+          if heavyweaponwarn then
+             for k, v in ipairs(getAllChars()) do
+                local res, id = sampGetPlayerIdByCharHandle(v)
+                if res then
+                   local nick = sampGetPlayerNickname(id)
+                   if isCurrentCharWeapon(v, 38) then 
+                      imgui.TextColoredRGB(string.format("{FF0000}Игрок %s[%d] с миниганом!", nick, id))
+                   end
+                   if isCurrentCharWeapon(v, 35) then 
+                      imgui.TextColoredRGB(string.format("{FF0000}Игрок %s[%d] с RPG!", nick, id))
+                   end
+                end
+             end
           end
-       end
+      
+	  elseif combobox.selecttable.v == 1 then
+         --elseif tabmenu.main == 4 then
+         imgui.Columns(2, "vehtableheader", false)
+         imgui.SetColumnWidth(-1, 320)
+         -- https://wiki.multitheftauto.com/wiki/Vehicle_IDs
+         imgui.Text(u8"Найти ID транспорта по имени:")
+         if imgui.InputText("##BindVehs", textbuffer.vehiclename) then 
+            for k, vehname in ipairs(VehicleNames) do
+               if vehname:lower():find(u8:decode(textbuffer.vehiclename.v:lower())) then
+                  vehinfomodelid = 399+k
+               end
+            end
+         end 
+       
+         imgui.SameLine()
+         if textbuffer.vehiclename.v == "" then
+            imgui.Text(u8" ")
+         else
+            imgui.Text(string.format(u8"ID: %i", vehinfomodelid))
+         end
+         imgui.SameLine()
+         imgui.TextQuestion("( ? )", u8"Введите имя транспорта, например Infernus")
+       
+         local closestcarhandle, closestcarid = getClosestCar()
+         if closestcarhandle then
+            local closestcarmodel = getCarModel(closestcarhandle)
+            imgui.Text(string.format(u8"Ближайший т/с: %s [id: %i] (%i)",
+            VehicleNames[closestcarmodel-399], closestcarmodel, closestcarid))
+            imgui.SameLine()
+            imgui.TextQuestion("( ? )", u8"В скобках указан внутренний ID (/dl)")
+         else
+            imgui.Text(u8"Нет транспорта в зоне стрима")
+         end
+       
+         if isCharInAnyCar(PLAYER_PED) then 
+            local carhandle = storeCarCharIsInNoSave(PLAYER_PED)
+            local carmodel = getCarModel(carhandle)
+            imgui.Text(string.format(u8"Вы в транспорте: %s(%i)  хп: %i",
+            VehicleNames[carmodel-399], carmodel, getCarHealth(carhandle)))
+         end
+       
+         imgui.NextColumn()
+         if imgui.Button(u8"Заказать машину по имени", imgui.ImVec2(200, 25)) then
+            if not sampIsChatInputActive() and not sampIsDialogActive() and not isPauseMenuActive() and not  isSampfuncsConsoleActive() then
+               for k, vehname in ipairs(VehicleNames) do
+                  if vehname:lower():find(u8:decode(textbuffer.vehiclename.v:lower())) then
+                     vehinfomodelid = 399+k
+                  end 
+               end
+               if isAbsolutePlay then 
+			      sampSendChat(string.format(u8"/vfibye2 %i", vehinfomodelid))
+			   else
+                  sampSendChat(string.format(u8"/v %i", vehinfomodelid))
+			   end
+            end
+         end
+	     -- imgui.SameLine()
+	     -- if imgui.Button(u8"Найти ID траспорта онлайн", imgui.ImVec2(190, 25)) then
+	        -- os.execute('explorer "https://wiki.multitheftauto.com/wiki/Vehicle_IDs"')
+	     -- end
+	     if imgui.Button(u8"Заказать машину из списка", imgui.ImVec2(200, 25)) then
+	        if isAbsolutePlay then
+               if not sampIsChatInputActive() and not sampIsDialogActive() and not isPauseMenuActive() and not isSampfuncsConsoleActive() then 
+			       sampSendChat("/vfibye2")
+				   dialog.main.v = not dialog.main.v
+		       end
+            end
+	     end
+		 
+		 if imgui.Button(u8"Информация о модели (онлайн)", imgui.ImVec2(200, 25)) then
+		    if vehinfomodelid then
+	           os.execute(string.format('explorer "http://gta.rockstarvision.com/vehicleviewer/#sa/%d"', vehinfomodelid))
+			end
+	     end
+	     -- imgui.SameLine()
+	     -- if imgui.Button(u8"Handling.cfg (онлайн)", imgui.ImVec2(190, 25)) then
+	     -- os.execute('explorer "https://github.com/ins1x/useful-samp-stuff/blob/main/docs/server/VehicleHandling.txt"')
+	     -- end
+	   
+         imgui.Columns(1)
+         imgui.Checkbox(u8("Показать список транспорта в стриме"), checkbox.vehstream)
+         --imgui.Checkbox(u8("Скрывать пустой транспорт"), checkbox.noempyvehstream)
+         if checkbox.vehstream.v then
+            
+			vehiclesTable = {}
+            vehiclesTotal = 0
+          
+            for k, v in ipairs(getAllVehicles()) do
+               local streamed, id = sampGetVehicleIdByCarHandle(v)
+               if streamed then
+			  	  table.insert(vehiclesTable, v)
+                  vehiclesTotal = vehiclesTotal + 1
+               end
+            end
+			
+            imgui.Separator()
+            imgui.Columns(4)
+            imgui.TextQuestion("ID", u8"Внутренний ID (/dl)")
+            imgui.NextColumn()
+            imgui.Text("Vehicle")
+            imgui.NextColumn()
+            imgui.SetColumnWidth(-1, 350)
+            imgui.Text("Driver")
+            imgui.NextColumn()
+            imgui.Text("Health")
+            imgui.NextColumn()
+            imgui.Columns(1)
+            imgui.Separator()
+          
+            for k, v in ipairs(getAllVehicles()) do
+               local health = getCarHealth(v)
+               local carmodel = getCarModel(v)
+               local streamed, id = sampGetVehicleIdByCarHandle(v)
+               local ped = getDriverOfCar(v)
+               local res, pid = sampGetPlayerIdByCharHandle(ped)
+			   local vehmodelname = nil
+			   
+               imgui.Columns(4)
+               imgui.TextColoredRGB(string.format("%i", id))
+               imgui.SetColumnWidth(-1, 50)
+               imgui.NextColumn()
+			   if carmodel == 447 or carmodel == 425 or carmodel == 432 or carmodel == 520 then
+                  vehmodelname = string.format("{FF0000}%s", VehicleNames[carmodel-399])
+			   elseif carmodel == 476 or carmodel == 430 or carmodel == 406 or carmodel == 592 then
+			      vehmodelname = string.format("{FF8C00}%s", VehicleNames[carmodel-399])
+			   elseif carmodel == 601 or carmodel == 407 then
+			      vehmodelname = string.format("{1E90FF}%s", VehicleNames[carmodel-399])
+			   else
+			      vehmodelname = string.format("%s", VehicleNames[carmodel-399])
+			   end
+			   
+			   imgui.TextColoredRGB(vehmodelname)
+			   if imgui.IsItemClicked() then 
+				  textbuffer.vehiclename.v = tostring(VehicleNames[carmodel-399])
+				  vehinfomodelid = carmodel
+			   end
+			   
+               imgui.NextColumn()
+               if res then 
+				  imgui.Selectable(string.format("%s", sampGetPlayerNickname(pid)))
+                  if imgui.IsItemClicked() then
+                     chosenplayer = pid
+                     printStringNow("You have chosen a player ".. sampGetPlayerNickname(pid), 1000)
+			         if not dialog.playerstat.v then dialog.playerstat.v = true end
+                  end
+               else
+                  imgui.Text(u8"пустой")
+               end
+               imgui.NextColumn()
+               if health > 10000 then
+                  imgui.TextColoredRGB("{ff0000}GM")
+               elseif health > 1000 then
+                  imgui.TextColoredRGB(string.format("{ff0000}%i", health))
+               elseif health < 450 then
+                  imgui.TextColoredRGB(string.format("{ff8c00}%i", health))
+               else 
+                  imgui.TextColoredRGB(string.format("%i", health))
+               end
+               imgui.Columns(1)
+               imgui.Separator()
+            end
+          
+            if checkbox.vehstream.v then
+               imgui.Text(u8"Всего транспорта в таблице: ".. vehiclesTotal)
+            end
+         end
+	  end
 
-      elseif tabmenu.main == 5 then
+      elseif tabmenu.main == 4 then
       imgui.Columns(2)
       imgui.SetColumnWidth(-1, 520)
       
@@ -1968,18 +1968,21 @@ function imgui.OnDrawFrame()
 		 imgui.Text(u8"Протестировать скрипт можно на Absolute DM Play в мире №10 (/мир 10)")
          imgui.Text(u8"")
 
-         imgui.TextColoredRGB("Homepage: {007DFF}github.com/ins1x/AbsEventHelper")
+         imgui.TextColoredRGB("Homepage: {007DFF}ins1x/AbsEventHelper")
          if imgui.IsItemClicked() then
             os.execute('explorer "https://github.com/ins1x/AbsEventHelper"')
          end
+		 -- imgui.TextColoredRGB("Blasthk: {007DFF}1NS")
+         -- if imgui.IsItemClicked() then
+            -- os.execute('explorer "https://www.blast.hk/threads/200619/"')
+         -- end
          imgui.TextColoredRGB("Сайт Absolute Play: {007DFF}gta-samp.ru")
          if imgui.IsItemClicked() then
             os.execute('explorer "https://gta-samp.ru"')
          end
-		 -- {FFFFFF}R{4682b4}S{FF0000}C 
-		 imgui.TextColoredRGB("Russian Sawn-off Community: {007DFF}dsc.gg/sawncommunity")
+		 imgui.TextColoredRGB("YouTube: {007DFF}1nsanemapping")
          if imgui.IsItemClicked() then
-            os.execute('explorer "https://dsc.gg/sawncommunity"')
+            os.execute('explorer "https://www.youtube.com/@1nsanemapping"')
          end
 		 if imgui.Button(u8"Check updates",imgui.ImVec2(150, 25)) then
 		    os.execute('explorer https://github.com/ins1x/AbsEventHelper/releases')
@@ -2626,6 +2629,16 @@ function imgui.OnDrawFrame()
 		 --imgui.Text(os.date('%H:%M:%S'))
 		 
 		 imgui.Text(u8"Узнать историю аккаунта:")
+		 if chosenplayer then
+            local nickname = sampGetPlayerNickname(chosenplayer)
+            local ucolor = sampGetPlayerColor(chosenplayer)
+            
+			imgui.SameLine()
+            imgui.Selectable(string.format(u8"Игрок в сети: %s[%d]", nickname, chosenplayer))
+			if imgui.IsItemClicked() then
+			   if not dialog.playerstat.v then dialog.playerstat.v = true end
+			end
+		 end
 		 imgui.PushItemWidth(150)
 		 if imgui.InputText("##CheckPlayer", textbuffer.ckeckplayer) then
 		    for k, v in ipairs(getAllChars()) do
@@ -2633,7 +2646,6 @@ function imgui.OnDrawFrame()
                if res then
                   local nickname = sampGetPlayerNickname(id)
                   if nickname == u8:decode(textbuffer.ckeckplayer.v) then
-                     --printStringNow("player online " ..id, 1000)
                      chosenplayer = sampGetPlayerIdByNickname(nickname)
 				  end
 			   end
@@ -2655,28 +2667,6 @@ function imgui.OnDrawFrame()
 			end
 		 end 
 		 
-		 if chosenplayer then
-            local nickname = sampGetPlayerNickname(chosenplayer)
-            local ucolor = sampGetPlayerColor(chosenplayer)
-            
-			--imgui.SameLine()
-            imgui.TextColoredRGB(string.format("Игрок в сети: {%0.6x} %s[%d]{cdcdcd}",
-            bit.band(ucolor,0xffffff), nickname, chosenplayer))
-			imgui.SameLine()
-			if imgui.Button(u8"/стат", imgui.ImVec2(70, 25)) then
-			  if isAbsolutePlay then
-                  sampSendChat("/стат " .. chosenplayer)
-		       else
-			      sampSendChat("/stats " .. chosenplayer)
-			   end
- 			end
-			imgui.SameLine()
-			if imgui.Button(u8"меню", imgui.ImVec2(70, 25)) then
-			   if isAbsolutePlay then
-                  sampSendChat("/и " .. chosenplayer)
-			   end
- 			end
-		 end
 		 imgui.Text(" ")
 		 imgui.Text(u8"Стандартные логи:")
 		 
@@ -2787,7 +2777,7 @@ function imgui.OnDrawFrame()
    if dialog.playerstat.v then
       imgui.SetNextWindowPos(imgui.ImVec2(sizeX / 1.25, sizeY / 4),
       imgui.Cond.FirstUseEver, imgui.ImVec2(0.5, 0.5))
-      imgui.Begin(u8"Меню игрока", dialog.playerstat)
+      imgui.Begin(u8"Статистика игрока", dialog.playerstat)
 	  
 	  local nickname = sampGetPlayerNickname(chosenplayer)
       local ucolor = sampGetPlayerColor(chosenplayer)
@@ -2796,6 +2786,7 @@ function imgui.OnDrawFrame()
       local ping = sampGetPlayerPing(chosenplayer)
 	  local weapon, ammo, skin
 	  local	pX, pY, pZ, distance
+	  local zone = nil
 	  
 	  for k, handle in ipairs(getAllChars()) do
          local res, id = sampGetPlayerIdByCharHandle(handle)
@@ -2805,6 +2796,7 @@ function imgui.OnDrawFrame()
 				skinid = getCharModel(handle)
 				weapon = getCurrentCharWeapon(handle)
 				ammo = getAmmoInCharWeapon(handle, weapon)
+				zone = getZoneName(pX, pY, pZ)
 		    end
 		 end
       end
@@ -2861,6 +2853,10 @@ function imgui.OnDrawFrame()
 	  distance = getDistanceBetweenCoords3d(posX, posY, posZ, pX, pY, pZ)
 	  imgui.TextColoredRGB(string.format("Дистанция: %.1f m.", distance))
 	  
+	  if zone then 
+	     imgui.Text(string.format(u8"Район: %s", zone))
+	  end
+	  
       if imgui.Button(u8"статистика", imgui.ImVec2(150, 25)) then
 		 if isAbsolutePlay then
             sampSendChat("/стат " .. chosenplayer)
@@ -2908,6 +2904,80 @@ function imgui.OnDrawFrame()
           dialog.fastanswer.v = not dialog.fastanswer.v
        end
 	 imgui.End()
+   end
+
+   if dialog.extendedtab.v then
+      imgui.SetNextWindowPos(imgui.ImVec2(sizeX / 15, sizeY / 4),
+      imgui.Cond.FirstUseEver, imgui.ImVec2(0.5, 0.5))
+      imgui.Begin(u8"Расширенные настройки", dialog.extendedtab)
+	  	  
+	  imgui.Checkbox(u8("Автоообновление списка игроков"), checkbox.autoupdplayerstable)
+	  if checkbox.autoupdplayerstable.v then
+	 	 playersTable = {}       
+	 	 playersTotal = 0
+	  
+		for k, v in ipairs(getAllChars()) do
+		   local res, id = sampGetPlayerIdByCharHandle(v)
+		   if res then
+		 	   table.insert(playersTable, id)
+		 	   playersTotal = playersTotal + 1
+		    end
+	 	 end
+	  end
+	 
+	  if imgui.Checkbox(u8("Уведомлять о дисконнекте игрока"), checkbox.disconnectreminder) then
+	 	 if checkbox.disconnectreminder.v then
+		    disconnectremind = true
+			sampAddChatMessage("При вылете игроков с сервера будет выводить уведомление", -1)
+		 else
+		    disconnectremind = false
+			sampAddChatMessage("Отключены уведомления о вылете игроков с сервера", -1)
+		 end
+	  end
+	 
+	  if imgui.Checkbox(u8("Показать скрытые клисты"), checkbox.radarblips) then
+		 if checkbox.radarblips.v then
+		    showAlphaRadarBlips = true
+		 else
+		    showAlphaRadarBlips = false
+		 end
+ 	  end
+	 
+	 if imgui.Checkbox(u8("Уведомлять о тяжелом оружии"), checkbox.heavyweaponwarn) then
+	    if checkbox.heavyweaponwarn.v then
+		   heavyweaponwarn = true
+		else
+		   heavyweaponwarn = false
+	     end
+	  end
+	  
+	  if imgui.Button(u8"Получить id игроков рядом", imgui.ImVec2(200, 25)) then
+		 local pidtable = {}
+		 local resulstring
+		 for k, v in ipairs(getAllChars()) do
+		    local res, id = sampGetPlayerIdByCharHandle(v)
+		    if res then
+			   local nickname = sampGetPlayerNickname(id)
+			   table.insert(pidtable, string.format("%s[%d] ", nickname, id))
+			   resulstring = table.concat(pidtable)
+			   setClipboardText(resulstring)
+			   sampAddChatMessage("Ид и ники игроков рядом скопированы в буфер обмена", -1)
+		    end
+		 end
+	  end
+	  
+	  if imgui.Button(u8"Выбрать случайного игрока", imgui.ImVec2(200, 25)) then
+	 	 if next(playersTable) == nil then -- if playersTable is empty
+		    printStringNow("Update players table before", 1000) 
+		    sampAddChatMessage("Сперва обнови список игроков!", -1) 
+		 else
+		    local rand = math.random(playersTotal)
+		    chosenplayer = playersTable[rand]                
+		    sampAddChatMessage("Случайный игрок: ".. sampGetPlayerNickname(playersTable[rand]), -1)
+		 end
+	  end
+  
+	  imgui.End()
    end
    
    if dialog.textures.v then
@@ -3337,6 +3407,20 @@ function hideAllTextureImages()
    show_texture4 = false
    show_texture5 = false
 end 
+
+function cleanBindsForm()
+   textbuffer.bind1.v = " "
+   textbuffer.bind2.v = " "
+   textbuffer.bind3.v = " "
+   textbuffer.bind4.v = " "
+   textbuffer.bind5.v = " "
+   textbuffer.bind6.v = " "
+   textbuffer.bind7.v = " "
+   textbuffer.bind8.v = " "
+   textbuffer.bind9.v = " "
+   textbuffer.bind10.v = " "
+   textbuffer.bindad.v = " "
+end
 
 function reloadBindsFromConfig()
    textbuffer.bind1.v = u8(ini.binds.textbuffer1)
