@@ -108,6 +108,6 @@ LUA ассистент для мапперов и организаторов м�
 
 ---------------------------------------------
 
-blasthk: https://www.blast.hk/threads/200619/
-git: https://github.com/ins1x/AbsEventHelper/
-forum: https://forum.gta-samp.ru/index.php?/topic/1101593-absolute-event-helper/
+blasthk: https://www.blast.hk/threads/200619/  
+git: https://github.com/ins1x/AbsEventHelper/  
+forum: https://forum.gta-samp.ru/index.php?/topic/1101593-absolute-event-helper/  
