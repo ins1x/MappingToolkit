@@ -202,7 +202,6 @@ streamedObjects = 0
 local fps = 0
 local fps_counter = 0
 local vehinfomodelid = 0 
-local originalfov
 
 local objectsCollisionDel = {}
 local playersTable = {}
@@ -371,7 +370,6 @@ function main()
       end)
       
 	  -- get FOV
-	  -- originalfov = getCameraFov()
 	  slider.fov.v = getCameraFov()
 	  
       -- set drawdist and figdist
@@ -535,7 +533,9 @@ function main()
       end
       
 	  if checkbox.changefov.v then
-	     cameraSetLerpFov(slider.fov.v, slider.fov.v, 999988888, true)
+	     if slider.fov.v >= 1 and slider.fov.v <= 179 then 
+	        cameraSetLerpFov(slider.fov.v, slider.fov.v, 999988888, true)
+	     end
 	  end
 	  
 	  -- Show TD index
@@ -1690,7 +1690,8 @@ function imgui.OnDrawFrame()
           if imgui.Button(u8"Очистить", imgui.ImVec2(100, 25)) then
              playersTable = {}       
              playersTotal = 0
-             chosenplayer = nil
+			 if dialog.playerstat.v then dialog.playerstat.v = false end
+			 chosenplayer = nil
           end
           imgui.SameLine()
           imgui.Text(u8"Найти в таблице:")
@@ -1978,7 +1979,7 @@ function imgui.OnDrawFrame()
       
       if tabmenu.info == 1 then
          imgui.Text(u8"Absolute Events Helper v".. thisScript().version)
-         imgui.Text(u8"LUA ассистент для мапперов и организаторов мероприятий на серверах Absolute Play.")
+         imgui.TextColoredRGB("Ассистент для мапперов и организаторов мероприятий на серверах {007DFF}Absolute Play.")
 		 if imgui.IsItemClicked() then
             setClipboardText(hostip)
 			sampAddChatMessage("IP скопирован в буфер обмена", -1)
@@ -1986,8 +1987,13 @@ function imgui.OnDrawFrame()
          imgui.Text(u8"Скрипт позволит сделать процесс маппинга в внутриигровом редакторе карт")
          imgui.Text(u8"максимально приятным, и даст больше возможностей организаторам мероприятий.")
          imgui.Text(u8"Скрипт распостраняется только с открытым исходным кодом")
-         imgui.Text(u8"Категорически не рекомендуется использовать этот скрипт вне редактора карт!")
-		 imgui.Text(u8"Протестировать скрипт можно на Absolute DM Play в мире №10 (/мир 10)")
+		 if isAbsolutePlay then
+            imgui.Text(u8"Категорически не рекомендуется использовать этот скрипт вне редактора карт!")
+		 end
+		 imgui.TextColoredRGB("Протестировать скрипт можно на Absolute DM Play в мире №10 {007DFF}(/мир 10)")
+		 if imgui.IsItemClicked() then
+            if isAbsolutePlay then sampSendChat("/мир 10") end
+         end
          imgui.Text(u8"")
          
 		 if isAbsfixInstalled then
@@ -2429,7 +2435,6 @@ function imgui.OnDrawFrame()
      
          imgui.Text(u8"Команды хелпера:")
          imgui.TextColoredRGB("{00FF00}/abshelper{FFFFFF} — открыть главное меню хелпера")
-         imgui.TextColoredRGB("{00FF00}/chatbinds{FFFFFF} — настройки чат-биндов")
          imgui.TextColoredRGB("{00FF00}/jump{FFFFFF} — прыгнуть вперед")
          imgui.TextColoredRGB("{00FF00}/slap{FFFFFF} — слапнуть(подбросить) себя")
          imgui.Text(" ")
@@ -3135,6 +3140,13 @@ function sampev.onShowDialog(dialogId, style, title, button1, button2, text)
    end
 end
 
+--function sampev.onCreateGangZone(zoneId, squareStart, squareEnd, color)
+   --print(zoneId, squareStart, squareEnd, color)
+   --zoneId 481- 580 PUBG zones ids
+   --if zoneId >= 481 and zoneId <= 580 then
+   --end
+--end
+
 function sampev.onServerMessage(color, text)   
    if text:find("У тебя нет прав") then
       if prepareJump then 
@@ -3150,6 +3162,11 @@ function sampev.onServerMessage(color, text)
          sampAddChatMessage("Последний использованный объект: "..lastObjectModelid, 0x00FF00)
 	  end
    end
+   
+   if text:find("Управляющим мира смертельный урон не наносится") then
+      sampAddChatMessage("N - Оружие - Отключить сужающуюся зону урона", -1)
+   end
+   
    if text:find("Установи 0.3DL чтобы включать полёт в этом месте") then
       sampAddChatMessage("Необходимо уходить в полет с другой точки где мало объектов рядом (выйти из зоны стрима)", 0x00FF00)
    end
