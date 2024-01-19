@@ -4,7 +4,7 @@ script_description("Assistant for mappers and event makers on Absolute Play")
 script_dependencies('imgui', 'lib.samp.events', 'vkeys')
 script_properties("work-in-pause")
 script_url("https://github.com/ins1x/AbsEventHelper")
-script_version("2.3.4")
+script_version("2.3.5")
 -- script_moonloader(16) moonloader v.0.26
 
 -- Activaton: ALT + X (show main menu)
@@ -177,6 +177,7 @@ local combobox = {
 local hostip = "193.84.90.23"
 local isAbsolutePlay = false
 local isSampAddonInstalled = false
+local isAbsfixInstalled = false
 local isPlayerSpectating = false
 local tpposX, tpposY, tpposZ
 local disableObjectCollision = false
@@ -275,6 +276,10 @@ function main()
 	  if doesFileExist(getGameDirectory() .. "\\samp.asi") then
          isSampAddonInstalled = true
       end
+	  
+	  if doesFileExist(getGameDirectory() .. "\\moonloader\\AbsoluteFix.lua") then
+	     isAbsfixInstalled = true
+	  end
 	  
       if not doesDirectoryExist("moonloader/resource/abseventhelper") then 
          createDirectory("moonloader/resource/abseventhelper")
@@ -477,15 +482,22 @@ function main()
          showobjects = not showobjects
       end
       
-	  -- Open last chosen player dialog (only if samp addon not installed)
-	  if not isSampAddonInstalled and isKeyJustPressed(VK_B)
-	  and not sampIsChatInputActive() and not isPauseMenuActive()
-	  and not sampIsDialogActive() and not isSampfuncsConsoleActive() then 
-		 if chosenplayer then
-		 if not dialog.main.v then dialog.main.v = true end
-		 dialog.playerstat.v = not dialog.playerstat.v
+	  if not isAbsfixInstalled then
+	     -- Switching textdraws with arrow buttons, mouse buttons, pgup-pgdown keys
+	     if isKeyJustPressed(VK_LEFT) or isKeyJustPressed(VK_XBUTTON1) 
+		 or isKeyJustPressed(VK_PRIOR) and sampIsCursorActive() 
+		 and not sampIsChatInputActive() and not sampIsDialogActive() 
+		 and not isPauseMenuActive() and not isSampfuncsConsoleActive() then
+		    sampSendClickTextdraw(36)
 		 end
-	  end 
+	  
+	     if isKeyJustPressed(VK_RIGHT) or isKeyJustPressed(VK_XBUTTON2) 
+		 or isKeyJustPressed(VK_NEXT) and sampIsCursorActive()
+		 and not sampIsChatInputActive() and not sampIsDialogActive()
+		 and not isPauseMenuActive() and not isSampfuncsConsoleActive() then 
+		    sampSendClickTextdraw(37)
+		 end
+	  end
 	  
 	  -- Count streamed obkects
 	  if countobjects then
@@ -1042,7 +1054,17 @@ function imgui.OnDrawFrame()
 	     end
 	     imgui.SameLine()
          imgui.TextQuestion("( ? )", u8"Увеличит дальность прорисовки nameTag над игроком")
-      
+         
+		 if imgui.Checkbox(u8("Показать скрытые клисты"), checkbox.radarblips) then
+		    if checkbox.radarblips.v then
+		       showAlphaRadarBlips = true
+		    else
+		       showAlphaRadarBlips = false
+		    end
+ 	     end
+	     imgui.SameLine()
+         imgui.TextQuestion("( ? )", u8"Показзывает на радаре скрытых игроков")
+		 
 	     if imgui.Button(u8(hide3dtexts and 'Показать' or 'Скрыть')..u8" 3D тексты", 
          imgui.ImVec2(250, 25)) then
             hide3dtexts = not hide3dtexts
@@ -1689,7 +1711,7 @@ function imgui.OnDrawFrame()
           if chosenplayer then
              local nickname = sampGetPlayerNickname(chosenplayer)
              local ucolor = sampGetPlayerColor(chosenplayer)
-             imgui.TextColoredRGB(string.format("Найден игрок: {%0.6x} %s[%d]",
+             imgui.TextColoredRGB(string.format("Выбран игрок: {%0.6x} %s[%d]",
              bit.band(ucolor,0xffffff), nickname, chosenplayer))
           else
 		     imgui.TextColoredRGB("{FF0000}Красным{CDCDCD} в таблице отмечены подозрительные игроки (малый лвл, большой пинг)")
@@ -1967,7 +1989,10 @@ function imgui.OnDrawFrame()
          imgui.Text(u8"Категорически не рекомендуется использовать этот скрипт вне редактора карт!")
 		 imgui.Text(u8"Протестировать скрипт можно на Absolute DM Play в мире №10 (/мир 10)")
          imgui.Text(u8"")
-
+         
+		 if isAbsfixInstalled then
+		    imgui.TextColoredRGB("Спасибо что используете {007DFF}AbsoluteFix!")
+		 end
          imgui.TextColoredRGB("Homepage: {007DFF}ins1x/AbsEventHelper")
          if imgui.IsItemClicked() then
             os.execute('explorer "https://github.com/ins1x/AbsEventHelper"')
@@ -1997,6 +2022,7 @@ function imgui.OnDrawFrame()
          imgui.TextColoredRGB("VIP игроки могут расширять лимит до {00FF00}2000 объектов.{FFFFFF}")
          imgui.TextColoredRGB("Стоимость расширения мира {00FF00}20 ОА и 500.000$ за 10 объектов.{FFFFFF}") 
          imgui.Text(u8" ")
+		 
          imgui.Text(u8"Лимиты в мире")
          imgui.TextColoredRGB("макс. объектов: {00FF00}300 (VIP 2000)")
          imgui.TextColoredRGB("макс. объектов в одной точке: {00FF00}200 ")
@@ -2008,6 +2034,12 @@ function imgui.OnDrawFrame()
          imgui.Text(u8" ")
          imgui.Text(u8"В радиусе 150 метров нельзя создавать более 200 объектов.")
          imgui.TextColoredRGB("Максимальная длина текста на объектах в редакторе миров - {00FF00}50 символов")
+         
+		 -- imgui.Text("")
+		 -- imgui.TextColoredRGB("Лимиты в SA:MP на {007DFF}https://www.open.mp/docs/scripting/resources/limits")
+         -- if imgui.IsItemClicked() then
+            -- os.execute('explorer "https://www.open.mp/docs/scripting/resources/limits"')
+         -- end
 
       elseif tabmenu.info == 3 then
 
@@ -2699,6 +2731,13 @@ function imgui.OnDrawFrame()
                -- file:close()
 			-- end
 		 end
+		 imgui.SameLine()
+		 if imgui.Button(u8"cleo.log",imgui.ImVec2(150, 25)) then
+		    local file = getGameDirectory().. "\\cleo.log"
+		    if doesFileExist(file) then
+               os.execute('explorer '.. file)
+			end
+		 end
 		 
 		 imgui.Text(" ")
 		 imgui.TextColoredRGB("Форум Absolute Play DM: {007DFF}forum.gta-samp.ru")
@@ -2935,14 +2974,6 @@ function imgui.OnDrawFrame()
 		 end
 	  end
 	 
-	  if imgui.Checkbox(u8("Показать скрытые клисты"), checkbox.radarblips) then
-		 if checkbox.radarblips.v then
-		    showAlphaRadarBlips = true
-		 else
-		    showAlphaRadarBlips = false
-		 end
- 	  end
-	 
 	 if imgui.Checkbox(u8("Уведомлять о тяжелом оружии"), checkbox.heavyweaponwarn) then
 	    if checkbox.heavyweaponwarn.v then
 		   heavyweaponwarn = true
@@ -3073,6 +3104,7 @@ function sampev.onSetPlayerTime(hour, minute)
 end
 
 function sampev.onPlayerQuit(id, reason)
+   if id == chosenplayer then chosenplayer = nil end
    local nick = sampGetPlayerNickname(id)
    
    if reason == 0 then reas = 'Выход'
@@ -3091,6 +3123,18 @@ function sampev.onPlayerQuit(id, reason)
    
 end
 
+function sampev.onShowDialog(dialogId, style, title, button1, button2, text)
+   -- save random color from text editing dialog to clipboard
+   if isAbsolutePlay then
+      if dialogId == 1499 then
+         local randomcolor = string.sub(text, string.len(text)-6, #text-1)
+	     --sampAddChatMessage("Случайный цвет скопирован в буфер обмена",-1)
+		 printStringNow("color "..randomcolor.." copied to clipboard",1000)
+	     setClipboardText(randomcolor)
+      end
+   end
+end
+
 function sampev.onServerMessage(color, text)   
    if text:find("У тебя нет прав") then
       if prepareJump then 
@@ -3101,6 +3145,11 @@ function sampev.onServerMessage(color, text)
       return false
    end
    
+   if text:find("Последнего созданного объекта не существует") then
+      if lastObjectModelid then
+         sampAddChatMessage("Последний использованный объект: "..lastObjectModelid, 0x00FF00)
+	  end
+   end
    if text:find("Установи 0.3DL чтобы включать полёт в этом месте") then
       sampAddChatMessage("Необходимо уходить в полет с другой точки где мало объектов рядом (выйти из зоны стрима)", 0x00FF00)
    end
