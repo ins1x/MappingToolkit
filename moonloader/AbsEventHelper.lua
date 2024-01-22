@@ -4,7 +4,7 @@ script_description("Assistant for mappers and event makers on Absolute Play")
 script_dependencies('imgui', 'lib.samp.events', 'vkeys')
 script_properties("work-in-pause")
 script_url("https://github.com/ins1x/AbsEventHelper")
-script_version("2.3.5")
+script_version("2.3.6")
 -- script_moonloader(16) moonloader v.0.26
 
 -- Activaton: ALT + X (show main menu)
@@ -16,6 +16,7 @@ local sampev = require 'lib.samp.events'
 local imgui = require 'imgui'
 local memory = require 'memory'
 local encoding = require 'encoding'
+local vector3D = require 'vector3d'
 encoding.default = 'CP1251'
 u8 = encoding.UTF8
 
@@ -66,7 +67,13 @@ local closestobjectmodel= imgui.ImInt(0)
 local lastObjectCoords = {x=0.0, y=0.0, z=0.0}
 local gamestates = {'None', 'Wait Connect', 'Await Join', 'Connected', 'Restarting', 'Disconnected'}
 local gamestate = imgui.ImInt(0)
-local fixcam = {x=0.0, y=0.0, z=0.0}
+local fixcam = {x = 0.0, y = 0.0, z = 0.0}
+local tpcpos = {x = 0.0, y = 0.0, z = 0.0}
+local tpc = { 
+   public = {x = 0, y = 0, z = 0},
+   private = {x = 0, y = 0, z = 0},
+   static = {x = 0, y = 0, z = 0}
+}
 --local selected_item = imgui.ImInt(0)
 
 local dialog = {
@@ -96,6 +103,8 @@ local checkbox = {
    lockfps = imgui.ImBool(false),
    changefov = imgui.ImBool(false),
    fixcampos = imgui.ImBool(false),
+   teleportcoords = imgui.ImBool(false),
+   tpcprotect = imgui.ImBool(false),
    logtextdraws = imgui.ImBool(false),
    pickeduppickups = imgui.ImBool(false),
    showtextdrawsid = imgui.ImBool(false),
@@ -140,6 +149,9 @@ local textbuffer = {
    fixcamx = imgui.ImBuffer(12),
    fixcamy = imgui.ImBuffer(12),
    fixcamz = imgui.ImBuffer(12),
+   tpcx = imgui.ImBuffer(12),
+   tpcy = imgui.ImBuffer(12),
+   tpcz = imgui.ImBuffer(12),
    note = imgui.ImBuffer(1024)
 }
 
@@ -179,9 +191,9 @@ local isAbsolutePlay = false
 local isSampAddonInstalled = false
 local isAbsfixInstalled = false
 local isPlayerSpectating = false
-local tpposX, tpposY, tpposZ
 local disableObjectCollision = false
 local prepareTeleport = false
+local smoothTeleport = false
 local prepareJump = false
 local showobjects = false
 local countobjects = true
@@ -369,8 +381,12 @@ function main()
          JumpForward()
       end)
       
-	  -- get FOV
-	  slider.fov.v = getCameraFov()
+	  -- get default camera FOV
+	  if getCameraFov() >= 1.0 or getCameraFov() <= 179.0 then
+	     slider.fov.v = getCameraFov()
+	  else
+	     slider.fov.v = 70
+	  end
 	  
       -- set drawdist and figdist
       memory.setfloat(12044272, ini.settings.drawdist, true)
@@ -553,6 +569,38 @@ function main()
 		 setFixedCameraPosition(fixcam.x, fixcam.y, fixcam.z, 0.0, 0.0, 0.0)
 		 pointCameraAtPoint(fixcam.x, fixcam.y, fixcam.z, 2) 
 	  end
+	  
+	  -- smoothTeleport 
+	  if smoothTeleport and isCharOnFoot(playerPed) then
+         freezeCharPosition(playerPed, true)
+		 local step = 2
+		 local movingSpeed = 10
+         local result, id = sampGetPlayerIdByCharHandle(playerPed)		 
+         local myPosition = {getOffsetFromCharInWorldCoords(playerPed, 0.0, 0.0, 0.2855)}
+		 tpc.static.x, tpc.static.y, tpc.static.z = tpc.private.x - myPosition[1], tpc.private.y - myPosition[2], tpc.private.z - myPosition[3];
+         tpc.public.x, tpc.public.y, tpc.public.z = tpc.public.x - myPosition[1], tpc.public.y - myPosition[2], tpc.public.z - myPosition[3];
+         local vectorPlayer = vector3D(tpc.static.x, tpc.static.y, tpc.static.z)
+	 	 vectorPlayer:normalize()
+         local data = allocateMemory(68)
+         sampStorePlayerOnfootData(id, data)
+         setStructFloatElement(data, 38, 0.0, true)
+         setStructFloatElement(data, 42, 0.0, true)
+         setStructFloatElement(data, 38, 0.02, true)
+         setStructFloatElement(data, 42, 0.02, true)
+         sampSendOnfootData(data)
+         freeMemory(data)
+         setCharCoordinates(playerPed, myPosition[1] + vectorPlayer.x *  step, myPosition[2] + vectorPlayer.y *  step, myPosition[3] + vectorPlayer.z *  step)
+         wait(movingSpeed)
+         if getDistanceBetweenCoords3d(tpc.private.x, tpc.private.y, tpc.private.z, myPosition[1], myPosition[2], myPosition[3]) < 2 then
+            local lastPosition = {getCharCoordinates(playerPed)}
+            setCharCoordinates(playerPed, lastPosition[1], lastPosition[2], lastPosition[3] + 0.02)
+            freezeCharPosition(playerPed, false)
+            smoothTeleport = false
+			tpcpos.x = lastPosition[1]
+			tpcpos.y = lastPosition[2]
+			tpcpos.z = lastPosition[3] + 0.02
+         end
+      end
       -- END main
    end
 end
@@ -565,6 +613,7 @@ function imgui.OnDrawFrame()
       
       imgui.Columns(2, "mainmenucolumns", false)
       imgui.SetColumnWidth(-1, 440)
+      
       if imgui.Button(u8"Основное") then tabmenu.main = 1 end
       imgui.SameLine()
       if imgui.Button(u8"Чат-Бинд") then tabmenu.main = 2 end
@@ -576,7 +625,7 @@ function imgui.OnDrawFrame()
       imgui.NextColumn()
       
       imgui.SameLine()
-      imgui.Text("                     ")
+      imgui.Text("                           ")
 	  imgui.SameLine()
       imgui.Text(string.format("FPS: %i", fps))
 	  imgui.SameLine()
@@ -598,7 +647,9 @@ function imgui.OnDrawFrame()
          if tabmenu.settings == 1 then
 			
 		    local positionX, positionY, positionZ = getCharCoordinates(PLAYER_PED)
-			
+			local result, id = sampGetPlayerIdByCharHandle(PLAYER_PED)
+		    local score = sampGetPlayerScore(id)
+		 
             imgui.TextColoredRGB(string.format("Ваша позиция на карте x: %.1f, y: %.1f, z: %.1f",
             positionX, positionY, positionZ))
 	        if imgui.IsItemClicked() then
@@ -606,11 +657,11 @@ function imgui.OnDrawFrame()
                sampAddChatMessage("Позиция скопирован в буфер обмена", -1)
             end
 	       
-		    if tpposX then
+		    if tpcpos.x then
                imgui.TextColoredRGB(string.format("Сохраненая позиция x: %.1f, y: %.1f, z: %.1f",
-               tpposX, tpposY, tpposZ))
+               tpcpos.x, tpcpos.y, tpcpos.z))
 	           if imgui.IsItemClicked() then
-                  setClipboardText(string.format(u8"%.1f, %.1f, %.1f", tpposX, tpposY, tpposX))
+                  setClipboardText(string.format(u8"%.1f, %.1f, %.1f", tpcpos.x, tpcpos.y, tpcpos.z))
                   sampAddChatMessage("Позиция скопирован в буфер обмена", -1)
                end
 			end
@@ -619,16 +670,20 @@ function imgui.OnDrawFrame()
 		    if bTargetResult then
 		       imgui.Text(string.format(u8"Позиция метки на карте x: %.1f, y: %.1f, z: %.1f",
                bX, bY, bZ))
+			   if imgui.IsItemClicked() then
+			      setClipboardText(string.format(u8"%.1f, %.1f, %.1f", bX, bY, bZ))
+				  sampAddChatMessage("Позиция скопирован в буфер обмена", -1)
+			   end
 		    end 
 		    
-			if tpposX then
-			   imgui.TextColoredRGB(string.format("Расстоянием до сохраненной позиции %.1f m.",
-               getDistanceBetweenCoords3d(positionX, positionY, positionZ, tpposX, tpposY, tpposZ)))
+			if tpcpos.x then
+			   imgui.TextColoredRGB(string.format("Расстояние до сохраненной позиции %.1f m.",
+               getDistanceBetweenCoords3d(positionX, positionY, positionZ, tpcpos.x, tpcpos.y, tpcpos.z)))
 			end
 			
 			local bTargetResult, bX, bY, bZ = getTargetBlipCoordinates()
 		    if bTargetResult then
-		       imgui.Text(string.format(u8"Расстоянием до метки на карте %.1f m.",
+		       imgui.Text(string.format(u8"Расстояние до метки на карте %.1f m.",
                getDistanceBetweenCoords3d(positionX, positionY, positionZ, bX, bY, bZ)))
 		    end 
 			
@@ -646,42 +701,32 @@ function imgui.OnDrawFrame()
                if not sampIsChatInputActive() and not sampIsDialogActive() 
 			   and not isPauseMenuActive() and not isSampfuncsConsoleActive() then 
                -- if isAbsolutePlay then sampSendChat("/коорд") end
-                  tpposX, tpposY, tpposZ = getCharCoordinates(PLAYER_PED)
-                  setClipboardText(string.format("%.1f %.1f %.1f", tpposX, tpposY, tpposZ))
+			      tpcpos.x, tpcpos.y, tpcpos.z = getCharCoordinates(PLAYER_PED)
+                  setClipboardText(string.format("%.1f %.1f %.1f", tpcpos.x, tpcpos.y, tpcpos.z))
                   sampAddChatMessage("Координаты скопированы в буфер обмена", -1)
                   sampAddChatMessage(string.format("Интерьер: %i Координаты: %.1f %.1f %.1f",
-			      getActiveInterior(), tpposX, tpposY, tpposZ), 0x0FFFFFF)
+			      getActiveInterior(), tpcpos.x, tpcpos.y, tpcpos.z), 0x0FFFFFF)
 				  zone = getZoneName(positionX, positionY, positionZ)
                end
             end
             imgui.SameLine()
-            if imgui.Button(u8"Телепорт по координатам", imgui.ImVec2(200, 25)) then
-	           if isAbsolutePlay then 
-                  if tpposX then
-                     prepareTeleport = true
-                     sampSendChat(string.format("/ngr %f %f %f", tpposX, tpposY, tpposZ), 0x0FFFFFF)
-                     sampAddChatMessage(string.format("Телепорт на координаты: %.1f %.1f %.1f",
-                     tpposX, tpposY, tpposZ), 0x0FFFFFF)
-                  else
-                     prepareTeleport = false
-                     sampAddChatMessage("Координаты не были сохранены. Нажмите коорд", 0x0FFFFFF)
-                  end
-		       else
-		          sampAddChatMessage("Данная функция легально работает только на серверах Absolute Play", 0x0FF0000)
-		       end
+            if imgui.Button(u8"Сохранить позицию", imgui.ImVec2(200, 25)) then         
+			   tpcpos.x = positionX
+			   tpcpos.y = positionY
+			   tpcpos.z = positionZ
+			   textbuffer.tpcx.v = string.format("%.1f", tpcpos.x)
+			   textbuffer.tpcy.v = string.format("%.1f", tpcpos.y)
+			   textbuffer.tpcz.v = string.format("%.1f", tpcpos.z)
+			   tpcpos.x, tpcpos.y, tpcpos.z = getCharCoordinates(PLAYER_PED)
+			   setClipboardText(string.format(u8"%.1f %.1f %.1f", tpcpos.x, tpcpos.y, tpcpos.z))
+			   sampAddChatMessage(string.format("Координаты сохранены. %.1f %.1f %.1f", tpcpos.x, tpcpos.y, tpcpos.z), -1)
             end
             
 			if imgui.Button(u8"Прыгнуть вперед", imgui.ImVec2(200, 25)) then
                prepareJump = true
-		       if isAbsolutePlay then 
-                  if not sampIsChatInputActive() and not sampIsDialogActive() 
-			      and not isPauseMenuActive() and not isSampfuncsConsoleActive() then 
-			         sampSendChat("/ghsu") end
-		       else
-		          if sampIsLocalPlayerSpawned() then
-		             JumpForward()
- 		          end
-		       end
+			   if sampIsLocalPlayerSpawned() then
+				  JumpForward()
+			   end
             end
 			imgui.SameLine()
 			if imgui.Button(u8"Прыгнуть вверх", imgui.ImVec2(200, 25)) then
@@ -719,6 +764,112 @@ function imgui.OnDrawFrame()
                end
             end
 			
+			if imgui.Checkbox(u8("Включить телепорт на координаты"), checkbox.teleportcoords) then
+			   tpcpos.x = positionX
+               tpcpos.y = positionY
+               tpcpos.z = positionZ
+	           textbuffer.tpcx.v = string.format("%.1f", tpcpos.x)
+			   textbuffer.tpcy.v = string.format("%.1f", tpcpos.y)
+			   textbuffer.tpcz.v = string.format("%.1f", tpcpos.z)
+		    end
+            imgui.SameLine()
+            imgui.TextQuestion("( ? )", u8"Активирует телепорт по заданным координатам")
+		 
+		    if checkbox.teleportcoords.v then
+			   
+			   imgui.Text("x:")
+			   imgui.SameLine()
+		       imgui.PushItemWidth(70)
+		       if imgui.InputText("##TpcxBuffer", textbuffer.tpcx) then
+			      tpcpos.x = tonumber(textbuffer.tpcx.v)
+			   end
+			   imgui.PopItemWidth()
+			   imgui.SameLine()
+			   imgui.Text("y:")
+			   imgui.SameLine()
+			   imgui.PushItemWidth(70)
+			   if imgui.InputText("##TpcyBuffer", textbuffer.tpcy) then
+			      tpcpos.y = tonumber(textbuffer.tpcy.v)
+			   end
+			   imgui.PopItemWidth()
+			   imgui.SameLine()
+			   imgui.Text("z:")
+			   imgui.SameLine()
+			   imgui.PushItemWidth(70)
+			   if imgui.InputText("##TpczBuffer", textbuffer.tpcz) then
+			      tpcpos.z = tonumber(textbuffer.tpcz.v)
+			   end
+			   imgui.PopItemWidth()
+			   
+			   imgui.SameLine()
+			   imgui.TextQuestion("[=]", u8"Вставить послед. сохраненную позицию")
+			   if imgui.IsItemClicked() then
+			      if tpcpos.x then
+			         textbuffer.tpcx.v = string.format("%.1f", tpcpos.x)
+			         textbuffer.tpcy.v = string.format("%.1f", tpcpos.y)
+			         textbuffer.tpcz.v = string.format("%.1f", tpcpos.z)
+			      end
+			   end
+			   imgui.SameLine()
+			   imgui.TextQuestion("[o]", u8"Вставить координаты с метки на карте")
+			   if imgui.IsItemClicked() then
+			   local bTargetResult, bX, bY, bZ = getTargetBlipCoordinates()
+		          if bTargetResult then
+			         textbuffer.tpcx.v = string.format("%.1f", bX)
+			         textbuffer.tpcy.v = string.format("%.1f", bY)
+			         textbuffer.tpcz.v = string.format("%.1f", bZ)
+			      end
+			   end
+			   
+			   if imgui.Button(u8"Телепорт по координатам", imgui.ImVec2(200, 25)) then
+			   	  freezeCharPosition(playerPed, false)
+				  smoothTeleport = false
+	              if isAbsolutePlay then
+                     if checkbox.tpcprotect.v then
+					    if isCharOnFoot(PLAYER_PED) then
+						   tpc.private.x, tpc.private.y, tpc.private.z = tpcpos.x, tpcpos.y, tpcpos.z;
+                           tpc.public.x, tpc.public.y, tpc.public.z = tpcpos.x, tpcpos.y, tpcpos.z;
+						   smoothTeleport = true
+						   --setCharCoordinates(PLAYER_PED, tpcpos.x, tpcpos.y, tpcpos.z)
+						end
+					 else
+                        if tpcpos.x then
+                           prepareTeleport = true
+                           sampSendChat(string.format("/ngr %f %f %f", tpcpos.x, tpcpos.y, tpcpos.z), 0x0FFFFFF)
+                           sampAddChatMessage(string.format("Телепорт на координаты: %.1f %.1f %.1f",
+                           tpcpos.x, tpcpos.y, tpcpos.z), 0x0FFFFFF)
+                        else
+                           prepareTeleport = false
+                           sampAddChatMessage("Координаты не были сохранены", 0x0FFFFFF)
+						end
+                     end
+		          else
+				     if checkbox.tpcprotect.v then
+					    if isCharOnFoot(PLAYER_PED) and tpcpos.x then
+						   setCharCoordinates(PLAYER_PED, tpcpos.x, tpcpos.y, tpcpos.z)
+						end
+						sampAddChatMessage(string.format("Телепорт на координаты: %.1f %.1f %.1f",
+                        tpcpos.x, tpcpos.y, tpcpos.z), 0x0FFFFFF)
+					 else
+					    if isCharOnFoot(PLAYER_PED) and tpcpos.x then
+					       --local posX, posY, posZ = getCharCoordinates(PLAYER_PED)
+						   smoothTeleport = true
+						   tpc.private.x, tpc.private.y, tpc.private.z = tpcpos.x, tpcpos.y, tpcpos.z;
+                           tpc.public.x, tpc.public.y, tpc.public.z = tpcpos.x, tpcpos.y, tpcpos.z;
+					       --setCharCoordinates(PLAYER_PED, tpcpos.x, tpcpos.y, tpcpos.z)
+						   sampAddChatMessage(string.format("Телепорт на координаты: %.1f %.1f %.1f",
+                           tpcpos.x, tpcpos.y, tpcpos.z), 0x0FFFFFF)
+						end   
+					 end
+		          end
+               end
+			   imgui.SameLine()
+			   imgui.Checkbox(u8("Снять защиту"), checkbox.tpcprotect)
+			   imgui.SameLine()
+               imgui.TextQuestion("( ? )", u8"Снимет все ограничения (Триггерит античит)")
+			   
+		    end
+			
 			imgui.Spacing()
 			imgui.Text(isPlayerSpectating and u8('В наблюдении: Да') or u8('В наблюдении: Нет'))
 			if imgui.Button(u8'Выйти из спектатора', imgui.ImVec2(200, 25)) then
@@ -726,52 +877,62 @@ function imgui.OnDrawFrame()
 			      if isPlayerSpectating then 
 			         sampSendChat("/gjktn")
 			      end
-			      if score == 0 then
-			         emul_rpc('onTogglePlayerSpectating', {false})
-			      end
-			   else
-			      emul_rpc('onTogglePlayerSpectating', {false})
 			   end
             end
             imgui.SameLine()
             if imgui.Button(u8'Войти в спектатор', imgui.ImVec2(200, 25)) then
 		       if isAbsolutePlay then
 			      if not isPlayerSpectating then 
-			         sampSendChat("/gjktn")
+				     if chosenplayer and sampIsPlayerConnected(chosenplayer) then
+			            sampSendChat("/набл "..chosenplayer)
+				     else
+					    if getClosestPlayerId() ~= -1 then
+			               sampSendChat("/набл "..getClosestPlayerId())
+			            else
+					       sampSendChat("/полет")
+						end
+					 end
 			      end
-			      if score == 0 then
-			         emul_rpc('onTogglePlayerSpectating', {true})
-			      end
-			   else
-			      emul_rpc('onTogglePlayerSpectating', {true})
 			   end
 		    end
 	 	 
 		    if imgui.Button(u8'Заспавниться', imgui.ImVec2(200, 25)) then
-		       if isAbsolutePlay then
+			   if isAbsolutePlay then
 			      if score == 0 then
 			         sampSpawnPlayer()
 			         restoreCameraJumpcut()
+				  else 
+				     sampAddChatMessage("В чит-мир захотел? Используй эмуляцию", -1)
 			      end
 			   else
 			      sampSpawnPlayer()
 			      restoreCameraJumpcut()
 			   end
 		    end
-		    imgui.SameLine()
+			imgui.SameLine()
 		    if imgui.Button(u8'Заспавниться (Эмуляция)', imgui.ImVec2(200, 25)) then
-		 	   if isAbsolutePlay then
-			      if score == 0 then
-			         emul_rpc('onRequestSpawnResponse', {true})
-			         emul_rpc('onSetSpawnInfo', {0, 74, 0, {0, 0, 0}, 0, {0}, {0}})
-		 	         restoreCameraJumpcut()
-			      end
+			   if isAbsolutePlay then
+			      local posX, posY, posZ = getCharCoordinates(PLAYER_PED)
+				  setCharCoordinates(PLAYER_PED, posX, posY, posZ+0.2)
+			      freezeCharPosition(PLAYER_PED, false)
+			      setPlayerControl(PLAYER_HANDLE, true)
+			      restoreCameraJumpcut()
+			      clearCharTasksImmediately(PLAYER_PED)
 			   else
-			      emul_rpc('onRequestSpawnResponse', {true})
-			      emul_rpc('onSetSpawnInfo', {0, 74, 0, {0, 0, 0}, 0, {0}, {0}})
-		 	      restoreCameraJumpcut()
+			      sampSpawnPlayer()
+			      restoreCameraJumpcut()
 			   end
 		    end
+			
+			if imgui.Button(u8'Заморозить на позиции', imgui.ImVec2(200, 25)) then
+			   freezeCharPosition(PLAYER_PED, true)
+			end
+			imgui.SameLine()
+			if imgui.Button(u8'Разморозить', imgui.ImVec2(200, 25)) then
+			   freezeCharPosition(PLAYER_PED, false)
+			   setPlayerControl(PLAYER_HANDLE, true)
+			   clearCharTasksImmediately(PLAYER_PED)
+			end
 		imgui.Spacing()
 		
 	  elseif tabmenu.settings == 2 then
@@ -1083,19 +1244,19 @@ function imgui.OnDrawFrame()
          if imgui.Button(u8"Рестрим", imgui.ImVec2(250, 25)) then
 		    lua_thread.create(function()
 			sampAddChatMessage('Начинается процесс рестрима', -1)
-			local tpposX, tpposY, tpposZ = getCharCoordinates(PLAYER_PED)
+			tpcpos.x, tpcpos.y, tpcpos.z = getCharCoordinates(PLAYER_PED)
 			if isAbsolutePlay then
                sampSendChat(string.format("/ngr %f %f %f",
-			   tpposX, tpposY, tpposZ+1000.0), 0x0FFFFFF)
+			   tpcpos.x, tpcpos.y, tpcpos.z+1000.0), 0x0FFFFFF)
 			else
-			   setCharCoordinates(PLAYER_PED, tpposX, tpposY, tpposZ+1000.0)
+			   setCharCoordinates(PLAYER_PED, tpcpos.x, tpcpos.y, tpcpos.z+1000.0)
 			end
 			wait(5000)
 			if isAbsolutePlay then
                sampSendChat(string.format("/ngr %f %f %f",
-			   tpposX, tpposY, tpposZ), 0x0FFFFFF)
+			   tpcpos.x, tpcpos.y, tpcpos.z), 0x0FFFFFF)
 			else
-			   setCharCoordinates(PLAYER_PED, tpposX, tpposY, tpposZ)
+			   setCharCoordinates(PLAYER_PED, tpcpos.x, tpcpos.y, tpcpos.z)
 			end
 			sampAddChatMessage('рестрим завершен', -1)
 			end)
@@ -1161,10 +1322,9 @@ function imgui.OnDrawFrame()
          end
 		 
 		 imgui.Spacing()
-	     imgui.TextColoredRGB("Галлерея погоды на {007DFF}dev.prineside.com")
-         if imgui.IsItemClicked() then
-            os.execute('explorer "https://dev.prineside.com/ru/gtasa_weather_id/"')
-         end
+	     imgui.TextColoredRGB("Галерея погоды")
+		 imgui.SameLine()
+		 imgui.Link("https://dev.prineside.com/ru/gtasa_weather_id/", "dev.prineside.com")
 		 imgui.SameLine()
          imgui.TextQuestion("( ? )", u8"Данная галерея содержит снимки из игры GTA San Andreas, сделанные при разной погоде и времени суток. ")
 		 imgui.Spacing()
@@ -1223,19 +1383,6 @@ function imgui.OnDrawFrame()
 	     imgui.Spacing()
       end -- end tabmenu.settings
       imgui.NextColumn()
-
-      -- _, pID = sampGetPlayerIdByCharHandle(playerPed)
-      -- local name = sampGetPlayerNickname(pID)
-      -- local ucolor = sampGetPlayerColor(pID)
-
-      -- imgui.TextColoredRGB(string.format("Логин: {%0.6x}%s (%d)",
-      -- bit.band(ucolor,0xffffff), name, pID))
-      -- if imgui.IsItemClicked() then
-         -- setClipboardText(pID)
-         -- printStringNow("ID copied to clipboard", 1000)
-      -- end
-
-      --imgui.Text(" ")
 	  
 	  if imgui.Button(u8"Координаты",imgui.ImVec2(150, 25)) then tabmenu.settings = 1 end 
 	  if imgui.Button(u8"Объекты",imgui.ImVec2(150, 25)) then tabmenu.settings = 2 end 
@@ -1245,14 +1392,11 @@ function imgui.OnDrawFrame()
 	  if imgui.Button(u8"Прочее",imgui.ImVec2(150, 25)) then tabmenu.settings = 6 end 
 	  
       imgui.Text(" ")
-      
       imgui.Columns(1)
-      --imgui.Separator()
 
       elseif tabmenu.main == 2 then
 
       --imgui.Text(u8"Здесь вы можете настроить чат-бинды для мероприятия.     ")
-	  
 	  imgui.Text(u8"Профиль: ")
 	  imgui.SameLine()
 	  imgui.PushItemWidth(100)
@@ -1754,7 +1898,7 @@ function imgui.OnDrawFrame()
 	            imgui.SameLine()
 	         end
              --imgui.TextColoredRGB(string.format("{%0.6x} %s", bit.band(ucolor,0xffffff), nickname))
-             imgui.Selectable(string.format("%s", nickname))
+             imgui.Selectable(string.format(u8"%s", nickname))
              if imgui.IsItemClicked() then
                 chosenplayer = v
                 printStringNow("You have chosen a player ".. nickname, 1000)
@@ -1944,7 +2088,7 @@ function imgui.OnDrawFrame()
 			   
                imgui.NextColumn()
                if res then 
-				  imgui.Selectable(string.format("%s", sampGetPlayerNickname(pid)))
+				  imgui.Selectable(string.format(u8"%s", sampGetPlayerNickname(pid)))
                   if imgui.IsItemClicked() then
                      chosenplayer = pid
                      printStringNow("You have chosen a player ".. sampGetPlayerNickname(pid), 1000)
@@ -1999,22 +2143,24 @@ function imgui.OnDrawFrame()
 		 if isAbsfixInstalled then
 		    imgui.TextColoredRGB("Спасибо что используете {007DFF}AbsoluteFix!")
 		 end
-         imgui.TextColoredRGB("Homepage: {007DFF}ins1x/AbsEventHelper")
-         if imgui.IsItemClicked() then
-            os.execute('explorer "https://github.com/ins1x/AbsEventHelper"')
-         end
+		 
+         imgui.Text("Homepage:")
+		 imgui.SameLine()
+		 imgui.Link("https://github.com/ins1x/AbsEventHelper", "ins1x/AbsEventHelper")
+		 
 		 -- imgui.TextColoredRGB("Blasthk: {007DFF}1NS")
          -- if imgui.IsItemClicked() then
             -- os.execute('explorer "https://www.blast.hk/threads/200619/"')
          -- end
-         imgui.TextColoredRGB("Сайт Absolute Play: {007DFF}gta-samp.ru")
-         if imgui.IsItemClicked() then
-            os.execute('explorer "https://gta-samp.ru"')
-         end
-		 imgui.TextColoredRGB("YouTube: {007DFF}1nsanemapping")
-         if imgui.IsItemClicked() then
-            os.execute('explorer "https://www.youtube.com/@1nsanemapping"')
-         end
+         
+		 imgui.Text(u8"Сайт Absolute Play:")
+		 imgui.SameLine()
+		 imgui.Link("https://gta-samp.ru", "gta-samp.ru")
+         
+		 imgui.Text(u8"YouTube:")
+		 imgui.SameLine()
+		 imgui.Link("https://www.youtube.com/@1nsanemapping", "1nsanemapping")
+		 
 		 if imgui.Button(u8"Check updates",imgui.ImVec2(150, 25)) then
 		    os.execute('explorer https://github.com/ins1x/AbsEventHelper/releases')
 		 end
@@ -2188,15 +2334,15 @@ function imgui.OnDrawFrame()
             local carhandle = storeCarCharIsInNoSave(PLAYER_PED)
             imgui.TextColoredRGB(string.format("Цвет текущего т/с %d и %d", getCarColours(carhandle)))
          end
-		 imgui.TextColoredRGB("Цвета транспорта {007DFF}https://www.open.mp/docs/scripting/resources/vehiclecolorid")
-         if imgui.IsItemClicked() then
-		    os.execute('explorer "https://www.open.mp/docs/scripting/resources/vehiclecolorid"')
-		 end
 		 
-		 imgui.TextColoredRGB("Другие цвета {007DFF}https://encycolorpedia.ru/websafe")
-         if imgui.IsItemClicked() then
-            os.execute('explorer "https://encycolorpedia.ru/websafe"')
-         end
+		 imgui.TextColoredRGB("Цвета транспорта")
+		 imgui.SameLine()
+		 imgui.Link("https://www.open.mp/docs/scripting/resources/vehiclecolorid", "www.open.mp")
+         		 
+		 imgui.TextColoredRGB("Другие цвета")
+		 imgui.SameLine()
+		 imgui.Link("https://encycolorpedia.ru/websafe", "encycolorpedia.ru")
+         
       elseif tabmenu.info == 4 then
       
          imgui.Text(u8"Текстуры:")
@@ -2231,10 +2377,9 @@ function imgui.OnDrawFrame()
             show_texture5 = not show_texture5
          end
 		 
-		 imgui.TextColoredRGB("Список всех текстур GTA:SA {007DFF}textures.xyin.ws")
-         if imgui.IsItemClicked() then
-            os.execute('explorer "https://textures.xyin.ws/?page=textures&p=1&limit=100"')
-         end
+		 imgui.TextColoredRGB("Список всех текстур GTA:SA")
+		 imgui.SameLine()
+		 imgui.Link("https://textures.xyin.ws/?page=textures&p=1&limit=100", "textures.xyin.ws")
 		 
          imgui.Text(u8"Шрифты:")
 
@@ -2263,10 +2408,9 @@ function imgui.OnDrawFrame()
             show_fontsimg5 = not show_fontsimg5
          end
 
-		 imgui.TextColoredRGB("Список всех спецсимволов {007DFF}pawnokit.ru")
-         if imgui.IsItemClicked() then
-            os.execute('explorer "https://pawnokit.ru/ru/spec_symbols"')
-         end
+		 imgui.TextColoredRGB("Список всех спецсимволов")
+		 imgui.SameLine()
+		 imgui.Link("https://pawnokit.ru/ru/spec_symbols", "pawnokit.ru")
 
       elseif tabmenu.info == 5 then
          
@@ -2382,40 +2526,34 @@ function imgui.OnDrawFrame()
 		       end
 	        end
 		 
-		    imgui.TextColoredRGB("Список всех разрушаемых объектов на {007DFF}dev.prineside.com/customsearch")
-            if imgui.IsItemClicked() then
-			    os.execute('explorer "https://dev.prineside.com/ru/gtasa_samp_model_id/customsearch/?c%5B%5D=1&s=id-asc&bc=-1&bb=1&bt=-1&ba=-1"')
-            end
+		    imgui.TextColoredRGB("Список всех разрушаемых объектов на ")
+            imgui.SameLine()
+		    imgui.Link("https://dev.prineside.com/ru/gtasa_samp_model_id/customsearch/?c%5B%5D=1&s=id-asc&bc=-1&bb=1&bt=-1&ba=-1", "dev.prineside.com/customsearch")
          end
 	
          imgui.Text(u8"______________________________________________________________________")
 	     if isAbsolutePlay then
- 	        imgui.TextColoredRGB("Описание работы редактора карт на {007DFF}forum.gta-samp.ru")
-            if imgui.IsItemClicked() then
-               os.execute('explorer "https://forum.gta-samp.ru/index.php?/topic/1016832-миры-описание-работы-редактора-карт/"')
-		    end
+ 	        imgui.TextColoredRGB("Описание работы редактора карт ")
+            imgui.SameLine()
+			imgui.Link("https://forum.gta-samp.ru/index.php?/topic/1016832-миры-описание-работы-редактора-карт/", "forum.gta-samp.ru")
          end
 		 
-         imgui.TextColoredRGB("Не нашли нужный объект? посмотрите на {007DFF}dev.prineside.com")
-         if imgui.IsItemClicked() then
-            os.execute('explorer "https://dev.prineside.com/ru/gtasa_samp_model_id/"')
-         end
-      
-         imgui.TextColoredRGB("Карта объектов которые не видны редакторами карт {007DFF}map.romzes.com")
-         if imgui.IsItemClicked() then
-            os.execute('explorer "https://map.romzes.com/"')
-         end
+         imgui.TextColoredRGB("Не нашли нужный объект? посмотрите на")
+		 imgui.SameLine()
+		 imgui.Link("https://dev.prineside.com/ru/gtasa_samp_model_id/", "dev.prineside.com")
+               
+         imgui.TextColoredRGB("Карта объектов которые не видны редакторами карт")
+		 imgui.SameLine()
+		 imgui.Link("https://map.romzes.com/", "map.romzes.com")
 	  
-         imgui.TextColoredRGB("Список всех текстур GTA:SA {007DFF}textures.xyin.ws")
-         if imgui.IsItemClicked() then
-            os.execute('explorer https://textures.xyin.ws/?page=textures&p=1&limit=100"')
-         end
+         imgui.TextColoredRGB("Список всех текстур GTA:SA")
+		 imgui.SameLine()
+		 imgui.Link("https://textures.xyin.ws/?page=textures&p=1&limit=100", "textures.xyin.ws")
       
-	     imgui.TextColoredRGB("Браузер спрайтов {007DFF}pawnokit.ru")
-         if imgui.IsItemClicked() then
-            os.execute('explorer "https://pawnokit.ru/ru/txmngr"')
-         end
-	  
+	     imgui.TextColoredRGB("Браузер спрайтов")
+		 imgui.SameLine()
+		 imgui.Link("https://pawnokit.ru/ru/txmngr", "pawnokit.ru")
+           
       elseif tabmenu.info == 6 then
          imgui.Text(u8"Серверные команды:") 
        
@@ -2595,9 +2733,8 @@ function imgui.OnDrawFrame()
        
        imgui.Text(u8"Оригинал темы посмотрите на форуме")
        imgui.TextColoredRGB("{007DFF}https://forum.sa-mp.ru/index.php?/topic/1016828-миры-редактор-карт-faq/")
-       if imgui.IsItemClicked() then
-          os.execute('explorer "https://forum.sa-mp.ru/index.php?/topic/1016828-миры-редактор-карт-faq/"')
-       end
+       imgui.SameLine()
+	   imgui.Link("https://forum.sa-mp.ru/index.php?/topic/1016828-миры-редактор-карт-faq/", "forum.gta-samp.ru")
 		 
       elseif tabmenu.info == 8 then
          imgui.Text(u8"Горячие клавиши")
@@ -2745,10 +2882,9 @@ function imgui.OnDrawFrame()
 		 end
 		 
 		 imgui.Text(" ")
-		 imgui.TextColoredRGB("Форум Absolute Play DM: {007DFF}forum.gta-samp.ru")
-         if imgui.IsItemClicked() then
-            os.execute('explorer "https://forum.gta-samp.ru/"')
-         end
+		 imgui.TextColoredRGB("Форум Absolute Play DM: ")
+         imgui.SameLine()
+	     imgui.Link("https://forum.gta-samp.ru/index.php?/forum/23-absolute-dm-play/", "forum.gta-samp.ru")
       end -- end tabmenu.info
 		 
       imgui.NextColumn()
@@ -3054,10 +3190,9 @@ function imgui.OnDrawFrame()
          show_texture5 = not show_texture5
       end
 		 
-	  imgui.TextColoredRGB("Список всех текстур GTA:SA {007DFF}textures.xyin.ws")
-      if imgui.IsItemClicked() then
-         os.execute('explorer "https://textures.xyin.ws/?page=textures&p=1&limit=100"')
-      end
+	  imgui.TextColoredRGB("Список всех текстур GTA:SA")
+	  imgui.SameLine()
+	  imgui.Link("https://textures.xyin.ws/?page=textures&p=1&limit=100", "textures.xyin.ws")
 		 
       imgui.Text(u8"Шрифты:")
 
@@ -3086,11 +3221,10 @@ function imgui.OnDrawFrame()
          show_fontsimg5 = not show_fontsimg5
       end
 
-	  imgui.TextColoredRGB("Список всех спецсимволов {007DFF}pawnokit.ru")
-      if imgui.IsItemClicked() then
-         os.execute('explorer "https://pawnokit.ru/ru/spec_symbols"')
-      end
-		 
+	  imgui.TextColoredRGB("Список всех спецсимволов")
+      imgui.SameLine()
+      imgui.Link("https://pawnokit.ru/ru/spec_symbols", "pawnokit.ru")
+      		 
       imgui.End()
    end
    
@@ -3333,6 +3467,24 @@ function JumpForward()
          end
       end
    end
+end
+
+function getClosestPlayerId()
+    local closestId = -1
+    mydist = 30
+    local x, y, z = getCharCoordinates(PLAYER_PED)
+    for i = 0, 999 do
+        local streamed, pedID = sampGetCharHandleBySampPlayerId(i)
+        if streamed and getCharHealth(pedID) > 0 and not sampIsPlayerPaused(pedID) then
+            local xi, yi, zi = getCharCoordinates(pedID)
+            local dist = getDistanceBetweenCoords3d(x, y, z, xi, yi, zi)
+            if dist <= mydist then
+                mydist = dist
+                closestId = i
+            end
+        end
+    end
+    return closestId
 end
 
 function getClosestCar()
@@ -3588,6 +3740,18 @@ function imgui.TextColoredRGB(text)
     end
 
     render_text(text)
+end
+
+function imgui.Link(link, text)
+    text = text or link
+    local tSize = imgui.CalcTextSize(text)
+    local p = imgui.GetCursorScreenPos()
+    local DL = imgui.GetWindowDrawList()
+    local col = { 0xFFFF7700, 0xFFFF9900 }
+    if imgui.InvisibleButton("##" .. link, tSize) then os.execute("explorer " .. link) end
+    local color = imgui.IsItemHovered() and col[1] or col[2]
+    DL:AddText(p, color, text)
+    DL:AddLine(imgui.ImVec2(p.x, p.y + tSize.y), imgui.ImVec2(p.x + tSize.x, p.y + tSize.y), color)
 end
 
 function imgui.TextQuestion(label, description)
