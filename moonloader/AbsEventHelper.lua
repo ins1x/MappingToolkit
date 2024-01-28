@@ -4,7 +4,7 @@ script_description("Assistant for mappers and event makers on Absolute Play")
 script_dependencies('imgui', 'lib.samp.events', 'vkeys')
 script_properties("work-in-pause")
 script_url("https://github.com/ins1x/AbsEventHelper")
-script_version("2.3.7")
+script_version("2.4")
 -- script_moonloader(16) moonloader v.0.26
 
 -- Activaton: ALT + X (show main menu)
@@ -204,7 +204,6 @@ local showobjectrot = false
 local ENBSeries = false
 local chosenplayer = nil
 local lastObjectModelid = nil
-local showAlphaRadarBlips = false
 local hide3dtexts = false
 local nameTag = true
 local nameTagWh = false
@@ -266,13 +265,13 @@ function main()
          if ini.settings.noabsunload then
             thisScript():unload()
          else
-		    sampAddChatMessage("{00BFFF}Absolute {FFD700}Events {FFFFFF}Helper.\
-		    Открыть меню: {FFD700}ALT + X", 0xFFFFFF)
+		    sampAddChatMessage("{880000}Absolute Events Helper.\
+		    {FFFFFF}Открыть меню: {CDCDCD0}ALT + X", 0xFFFFFF)
 		 end
       else
 	     isAbsolutePlay = true
-         sampAddChatMessage("{00BFFF}Absolute {FFD700}Events {FFFFFF}Helper.\
-		 Открыть меню: {FFD700}ALT + X", 0xFFFFFF)
+         sampAddChatMessage("{880000}Absolute Events Helper.\
+		 {FFFFFF}Открыть меню: {CDCDCD}ALT + X", 0xFFFFFF)
       end
       
 	  -- Load chat binds
@@ -901,7 +900,7 @@ function imgui.OnDrawFrame()
 		    if imgui.Button(u8'Заспавниться', imgui.ImVec2(200, 25)) then
 			   if isAbsolutePlay then
 			      if score == 0 then
-			         sampSpawnPlayer()
+				     sampSpawnPlayer()
 			         restoreCameraJumpcut()
 				  else 
 				     sampAddChatMessage("В чит-мир захотел? Используй эмуляцию", -1)
@@ -921,8 +920,8 @@ function imgui.OnDrawFrame()
 			      restoreCameraJumpcut()
 			      clearCharTasksImmediately(PLAYER_PED)
 			   else
-			      sampSpawnPlayer()
-			      restoreCameraJumpcut()
+			      SpawnPlayer()
+				  restoreCameraJumpcut()
 			   end
 		    end
 			
@@ -935,7 +934,7 @@ function imgui.OnDrawFrame()
 			   setPlayerControl(PLAYER_HANDLE, true)
 			   clearCharTasksImmediately(PLAYER_PED)
 			end
-		imgui.Spacing()
+		 imgui.Spacing()
 		
 	  elseif tabmenu.settings == 2 then
 	  
@@ -1218,13 +1217,8 @@ function imgui.OnDrawFrame()
 	     imgui.SameLine()
          imgui.TextQuestion("( ? )", u8"Увеличит дальность прорисовки nameTag над игроком")
          
-		 if imgui.Checkbox(u8("Показать скрытые клисты"), checkbox.radarblips) then
-		    if checkbox.radarblips.v then
-		       showAlphaRadarBlips = true
-		    else
-		       showAlphaRadarBlips = false
-		    end
- 	     end
+		 imgui.Checkbox(u8("Показать скрытые клисты"), checkbox.radarblips)
+		 
 	     imgui.SameLine()
          imgui.TextQuestion("( ? )", u8"Показзывает на радаре скрытых игроков")
 		 
@@ -1358,6 +1352,10 @@ function imgui.OnDrawFrame()
             local score = sampGetPlayerScore(id)
 		    if score == 0 then
 		       imgui.Checkbox(u8'Отключить урон', checkbox.nophealth)
+			   if imgui.Button(u8'Выбор класса', imgui.ImVec2(200, 25)) then
+			      local skin = getCharModel(PLAYER_PED)
+	              sampRequestClass(skin)
+			   end
 	        end
 		 end
 		
@@ -2320,7 +2318,7 @@ function imgui.OnDrawFrame()
          imgui.TextColoredRGB(textbuffer.rgb.v)
        
          imgui.SameLine()
-         if imgui.Button("Copy") then
+         if imgui.Button(u8"Скопировать") then
             setClipboardText(textbuffer.rgb.v)
 			sampAddChatMessage("Текст скопирован в буфер обмена", -1)
          end
@@ -2335,7 +2333,7 @@ function imgui.OnDrawFrame()
          if imgui.IsItemClicked() then
             setClipboardText(tostring(intToHex(join_argb(color.v[4] * 255, color.v[1] * 255,
             color.v[2] * 255, color.v[3] * 255))))
-            sampAddChatMessage("скопирован в буфер обмена", -1)
+            sampAddChatMessage("Цвет скопирован в буфер обмена", -1)
          end
          imgui.SameLine()
          imgui.TextQuestion("( ? )", u8"Нажмите чтобы скопировать цвет в буффер обмена")
@@ -2345,6 +2343,7 @@ function imgui.OnDrawFrame()
             imgui.TextColoredRGB(string.format("Цвет текущего т/с %d и %d", getCarColours(carhandle)))
          end
 		 
+		 imgui.Spacing()
 		 imgui.TextColoredRGB("Цвета транспорта")
 		 imgui.SameLine()
 		 imgui.Link("https://www.open.mp/docs/scripting/resources/vehiclecolorid", "www.open.mp")
@@ -2363,8 +2362,7 @@ function imgui.OnDrawFrame()
          end
 		 
 		 if imgui.CollapsingHeader(u8'Текстуры') then
-		 
-            if imgui.Button(u8"1-60", imgui.ImVec2(200, 25)) then
+		    if imgui.Button(u8"1-60", imgui.ImVec2(200, 25)) then
                hideAllTextureImages()
                show_texture1 = not show_texture1
             end
@@ -2391,7 +2389,11 @@ function imgui.OnDrawFrame()
 		 end
 		 
 		 if imgui.CollapsingHeader(u8'Шрифты') then
-         
+		    if isAbsolutePlay then 
+			   imgui.TextColoredRGB("Максимальный размер шрифта 200")
+			else
+			   imgui.TextColoredRGB("Максимальный размер шрифта 255")
+            end
             if imgui.Button(u8"GTAWeapon3", imgui.ImVec2(200, 25)) then
                hideAllFontsImages()
                show_fontsimg1 = not show_fontsimg1
@@ -2417,7 +2419,75 @@ function imgui.OnDrawFrame()
                show_fontsimg5 = not show_fontsimg5
             end
          end
+		 if imgui.CollapsingHeader(u8'Поверхности для текста') then
+		    imgui.TextColoredRGB("Прозрачные ровные плоские поверхности без коллизий, для SetObjectMaterialText")
+		    imgui.TextColoredRGB("{00FF00}19480{FFFFFF} - Размер (радиус):{00FF00} 11.070")
+			if imgui.IsItemClicked() then
+                setClipboardText("19480")
+                sampAddChatMessage("19480 - Скопирован в буфер обмена", -1)
+            end
+		    imgui.TextColoredRGB("{00FF00}19481{FFFFFF} - Размер (радиус):{00FF00} 19.582")
+			if imgui.IsItemClicked() then
+                setClipboardText("19481")
+                sampAddChatMessage("19481 - Скопирован в буфер обмена", -1)
+            end
+		    imgui.TextColoredRGB("{00FF00}19479{FFFFFF} - Размер (радиус):{00FF00} 8.096")
+			if imgui.IsItemClicked() then
+                setClipboardText("19479")
+                sampAddChatMessage("19479 - Скопирован в буфер обмена", -1)
+            end
+		    imgui.TextColoredRGB("{00FF00}19482{FFFFFF} - Размер (радиус):{00FF00} 3.108")
+			if imgui.IsItemClicked() then
+                setClipboardText("19482")
+                sampAddChatMessage("19482 - Скопирован в буфер обмена", -1)
+            end
+		    imgui.TextColoredRGB("{00FF00}19477{FFFFFF} - Размер (радиус):{00FF00} 1.555")
+			if imgui.IsItemClicked() then
+                setClipboardText("19477")
+                sampAddChatMessage("19477 - Скопирован в буфер обмена", -1)
+            end
+		    imgui.TextColoredRGB("{00FF00}19483{FFFFFF} - Размер (радиус):{00FF00} 1.436")
+			if imgui.IsItemClicked() then
+                setClipboardText("19483")
+                sampAddChatMessage("19483 - Скопирован в буфер обмена", -1)
+            end
+		    imgui.TextColoredRGB("{00FF00}19476{FFFFFF} - Размер (радиус):{00FF00} 0.529")
+			if imgui.IsItemClicked() then
+                setClipboardText("19476")
+                sampAddChatMessage("19476 - Скопирован в буфер обмена", -1)
+            end
+		    imgui.TextColoredRGB("{00FF00}19475{FFFFFF} - Размер (радиус):{00FF00} 0.130")
+			if imgui.IsItemClicked() then
+                setClipboardText("19475")
+                sampAddChatMessage("19475 - Скопирован в буфер обмена", -1)
+            end
+		    imgui.TextColoredRGB("{00FF00}19480{FFFFFF} - Размер (радиус):{00FF00} 0.141")
+			if imgui.IsItemClicked() then
+                setClipboardText("19480")
+                sampAddChatMessage("19480 - Скопирован в буфер обмена", -1)
+            end
+		 end
+		 if imgui.CollapsingHeader(u8'Размеры текста') then
+		    imgui.TextColoredRGB("Для SetObjectMaterialText существует два типа параметров: ")
+			imgui.TextColoredRGB("выравнивание текста материала, и размеры текста материала.")
+			imgui.TextColoredRGB("Размеры текста указаны в таблице:")
+		    imgui.TextColoredRGB("10  - OBJECT_MATERIAL_SIZE_32x32")
+		    imgui.TextColoredRGB("20  - OBJECT_MATERIAL_SIZE_64x32")
+		    imgui.TextColoredRGB("30  - OBJECT_MATERIAL_SIZE_64x64")
+		    imgui.TextColoredRGB("40  - OBJECT_MATERIAL_SIZE_128x32")
+		    imgui.TextColoredRGB("50  - OBJECT_MATERIAL_SIZE_128x64")
+		    imgui.TextColoredRGB("60  - OBJECT_MATERIAL_SIZE_128x128")
+		    imgui.TextColoredRGB("70  - OBJECT_MATERIAL_SIZE_256x32")
+		    imgui.TextColoredRGB("80  - OBJECT_MATERIAL_SIZE_256x64")
+		    imgui.TextColoredRGB("90  - OBJECT_MATERIAL_SIZE_256x128")
+		    imgui.TextColoredRGB("100 - OBJECT_MATERIAL_SIZE_256x256")
+		    imgui.TextColoredRGB("110 - OBJECT_MATERIAL_SIZE_512x64")
+		    imgui.TextColoredRGB("120 - OBJECT_MATERIAL_SIZE_512x128")
+		    imgui.TextColoredRGB("130 - OBJECT_MATERIAL_SIZE_512x256")
+		    imgui.TextColoredRGB("140 - OBJECT_MATERIAL_SIZE_512x512")
+		 end
 		 
+		 imgui.Spacing()
 		 imgui.TextColoredRGB("Список всех спецсимволов")
 		 imgui.SameLine()
 		 imgui.Link("https://pawnokit.ru/ru/spec_symbols", "pawnokit.ru")
@@ -2430,6 +2500,11 @@ function imgui.OnDrawFrame()
 		 imgui.SameLine()
 		 imgui.Link("https://dev.prineside.com/gtasa_samp_game_texture/view/", "dev.prineside.com")
 		
+		 imgui.TextColoredRGB("Вики по функцииям")
+		 imgui.SameLine()
+		 imgui.Link("https://www.open.mp/docs/scripting/functions/SetObjectMaterialText", "SetObjectMaterialText")
+		 imgui.SameLine()
+		 imgui.Link("https://www.open.mp/docs/scripting/functions/SetObjectMaterial", "SetObjectMaterial")
 		 
       elseif tabmenu.info == 5 then
          
@@ -2574,7 +2649,8 @@ function imgui.OnDrawFrame()
 		 imgui.Link("https://pawnokit.ru/ru/txmngr", "pawnokit.ru")
            
       elseif tabmenu.info == 6 then
-	     imgui.TextColoredRGB("{00FF00}/abshelper{FFFFFF} — открыть главное меню хелпера")
+	     imgui.TextColoredRGB("/abshelper — открыть главное меню хелпера")
+		 imgui.Spacing()
 	     if imgui.CollapsingHeader(u8"Клиентские команды:") then
             imgui.TextColoredRGB("{00FF00}/headmove{FFFFFF} - вкл/выкл поворот головы скина по направлению камеры")
             imgui.TextColoredRGB("{00FF00}/timestamp{FFFFFF} - вкл/выкл показ времени в чате у каждого сообщения")
@@ -2614,21 +2690,31 @@ function imgui.OnDrawFrame()
 		 if imgui.CollapsingHeader(u8"Горячие клавиши:") then
 		    imgui.TextColoredRGB("{00FF00}Клавиша N{FFFFFF} — меню редактора карт (в полете)")
             imgui.TextColoredRGB("{00FF00}Клавиша J{FFFFFF} — полет в наблюдении (/полет)")
-            imgui.TextColoredRGB("{00FF00}Боковые клавиши мыши{FFFFFF} — отменяют и сохраняют редактирование объекта")
+            imgui.TextColoredRGB("{FF0000}Боковые клавиши мыши{FFFFFF} — отменяют и сохраняют редактирование объекта")
             imgui.Spacing()
             imgui.TextColoredRGB("В режиме редактирования:")
-            imgui.TextColoredRGB("{00FF00}Зажатие клавиши ALT{FFFFFF} — скрыть объект")
-            imgui.TextColoredRGB("{00FF00}Зажатие клавиши CTRL{FFFFFF} — визуально увеличить объект")
-            imgui.TextColoredRGB("{00FF00}Зажатие клавиши SHIFT{FFFFFF} — плавное перемещение объекта")
-            imgui.TextColoredRGB("{00FF00}Клавиша RMB (Правая кл.мыши){FFFFFF}  — вернуть объект на исходную позицию")
+            imgui.TextColoredRGB("{FF0000}Зажатие клавиши ALT{FFFFFF} — скрыть объект")
+            imgui.TextColoredRGB("{FF0000}Зажатие клавиши CTRL{FFFFFF} — визуально увеличить объект")
+            imgui.TextColoredRGB("{FF0000}Зажатие клавиши SHIFT{FFFFFF} — плавное перемещение объекта")
+            imgui.TextColoredRGB("{FF0000}Клавиша RMB (Правая кл.мыши){FFFFFF}  — вернуть объект на исходную позицию")
             imgui.TextColoredRGB("{00FF00}Клавиша Enter{FFFFFF}  — сохранить редактируемый объект")
             imgui.Spacing()
             imgui.TextColoredRGB("В режиме выделения:")
-            imgui.TextColoredRGB("{00FF00}Клавиша RMB (Правая кл.мыши){FFFFFF}  — скопирует номер модели объекта")
-            imgui.TextColoredRGB("{00FF00}Клавиша SHIFT{FFFFFF} — переключение между объектами")
+			imgui.TextColoredRGB("{FF0000}Клавиша RMB (Правая кл.мыши){FFFFFF}  — скопирует номер модели объекта")
+            imgui.TextColoredRGB("{FF0000}Клавиша SHIFT{FFFFFF} — переключение между объектами")
+			imgui.Spacing()
+            imgui.TextColoredRGB("* {FF0000}Красным цветом{cdcdcd} обозначены клавиши доступные только с SAMP Addon")
 		 end
+		 
+		 imgui.Spacing()
+		 imgui.TextColoredRGB("Команды SAMPFUNCS")
+		 imgui.SameLine()
+		 imgui.Link("https://wiki.blast.hk/sampfuncs/console", "https://wiki.blast.hk/sampfuncs/console")
          
-         imgui.Spacing()
+		 imgui.TextColoredRGB("Команды RCON")
+		 imgui.SameLine()
+		 imgui.Link("https://www.open.mp/docs/server/ControllingServer", "https://www.open.mp/docs/")
+         
       elseif tabmenu.info == 7 then
 
        if imgui.CollapsingHeader(u8'Что такое "мир" и зачем он нужен?') then
@@ -2926,7 +3012,7 @@ function imgui.OnDrawFrame()
       if imgui.Button(u8"Объекты", imgui.ImVec2(100,25)) then tabmenu.info = 5 end
       if imgui.Button(u8"Лимиты", imgui.ImVec2(100,25)) then tabmenu.info = 2 end
       if imgui.Button(u8"Цвета", imgui.ImVec2(100,25)) then tabmenu.info = 3 end
-      if imgui.Button(u8"Текстуры", imgui.ImVec2(100,25)) then tabmenu.info = 4 end
+      if imgui.Button(u8"Ретекстур", imgui.ImVec2(100,25)) then tabmenu.info = 4 end
       -- if imgui.Button(u8"Текстуры", imgui.ImVec2(100,25)) then 
 	     -- dialog.textures.v = not dialog.textures.v
 	  -- end
@@ -3376,6 +3462,7 @@ function sampev.onShowDialog(dialogId, style, title, button1, button2, text)
 	     --sampAddChatMessage("Случайный цвет скопирован в буфер обмена",-1)
 		 printStringNow("color "..randomcolor.." copied to clipboard",1000)
 	     setClipboardText(randomcolor)
+		 --sampSetCurrentDialogEditboxText(randomcolor)
       end
 	  -- if dialogId == 1420 then
 	     -- print(text)
@@ -3497,7 +3584,7 @@ function sampev.onSendEnterEditObject(type, objectId, model, position)
 end
 
 function sampev.onPlayerStreamIn(id, team, model, position, rotation, color, fight)
-   if showAlphaRadarBlips then
+   if checkbox.radarblips.v then
 	  local ucolor = sampGetPlayerColor(id)
 	  local aa, rr, gg, bb = explode_argb(ucolor)
       newcolor = join_argb(0, rr, gg, bb)
