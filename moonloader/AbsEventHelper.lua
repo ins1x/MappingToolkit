@@ -4,7 +4,7 @@ script_description("Assistant for mappers and event makers on Absolute Play")
 script_dependencies('imgui', 'lib.samp.events', 'vkeys')
 script_properties("work-in-pause")
 script_url("https://github.com/ins1x/AbsEventHelper")
-script_version("2.4")
+script_version("2.4.1")
 -- script_moonloader(16) moonloader v.0.26
 
 -- Activaton: ALT + X (show main menu)
@@ -15,8 +15,8 @@ local keys = require 'vkeys'
 local sampev = require 'lib.samp.events'
 local imgui = require 'imgui'
 local memory = require 'memory'
-local encoding = require 'encoding'
 local vector3D = require 'vector3d'
+local encoding = require 'encoding'
 encoding.default = 'CP1251'
 u8 = encoding.UTF8
 
@@ -204,9 +204,17 @@ local showobjectrot = false
 local ENBSeries = false
 local chosenplayer = nil
 local lastObjectModelid = nil
+local lastObjectId = nil
 local hide3dtexts = false
 local nameTag = true
 local nameTagWh = false
+local currentEditmode = 0 
+local isSelectObject = false 
+local hideEditObject = false
+local scaleEditObject = false
+local lastObjectBlip = nil
+local lastObjectHidden = true
+local lastWorldNumber = 0 -- is not same GetVirtualWorldId
 --local hideTextdraws = true
 local removedBuildings = 0;
 streamedObjects = 0
@@ -469,7 +477,7 @@ function main()
          setWeather(slider.weather.v)
 	  end
 	  
-      -- Hide dialogs o ESC
+      -- Hide dialogs on ESC
       if isKeyJustPressed(VK_ESCAPE) and not sampIsChatInputActive() 
       and not sampIsDialogActive() and not isPauseMenuActive() 
       and not isSampfuncsConsoleActive() then 
@@ -483,6 +491,41 @@ function main()
          if dialog.extendedbinds.v then dialog.extendedbinds.v = false end
       end 
       
+	  -- In onSendEditObject copy object modelid on RMB
+	  if isKeyJustPressed(VK_RBUTTON) and currentEditmode == 2 and not sampIsChatInputActive() 
+      and not sampIsDialogActive() and not isPauseMenuActive() 
+      and not isSampfuncsConsoleActive() then 
+	     setClipboardText(lastObjectModelid)
+		 sampAddChatMessage("modelid скопирован в буфер обмена", -1)
+	  end
+	  
+	  -- hide edited object on hold ALT key
+      if isKeyDown(VK_MENU) and currentEditmode > 0 and not sampIsChatInputActive() 
+      and not sampIsDialogActive() and not isPauseMenuActive() 
+      and not isSampfuncsConsoleActive() then
+	     hideEditObject = true
+	  else
+		 hideEditObject = false
+	  end
+	  
+	  -- upscale edited object on hold CTRL key
+	  if isKeyDown(VK_CONTROL) and currentEditmode > 0 and not sampIsChatInputActive() 
+      and not sampIsDialogActive() and not isPauseMenuActive() 
+      and not isSampfuncsConsoleActive() then
+	     scaleEditObject = true
+	  else
+		 scaleEditObject = false
+	  end
+	  
+	  -- if isKeyJustPressed(VK_N) and not sampIsChatInputActive() 
+      -- and not sampIsDialogActive() and not isPauseMenuActive() 
+      -- and not isSampfuncsConsoleActive() then 
+	     -- if lastObjectId then
+		    -- local result, positionX, positionY, positionZ = getObjectCoordinates(lastObjectId)
+	        -- sampSendEditObject(false, lastObjectId, 1, positionX, positionY, positionZ, 0.0, 0.0, 0,0)
+		 -- end	
+	  --end
+	 
       -- ALT+X (Main menu activation)
       if isKeyDown(VK_MENU) and isKeyJustPressed(VK_X) 
 	  and not sampIsChatInputActive() and not sampIsDialogActive()
@@ -657,14 +700,20 @@ function imgui.OnDrawFrame()
                setClipboardText(string.format(u8"%.1f, %.1f, %.1f", positionX, positionY, positionZ))
                sampAddChatMessage("Позиция скопирован в буфер обмена", -1)
             end
-	       
+	        
+			local angle = math.ceil(getCharHeading(PLAYER_PED))
+			imgui.SameLine()
+            imgui.Text(string.format(u8" %s  %i°", direction(), angle))
+			
 		    if tpcpos.x then
-               imgui.TextColoredRGB(string.format("Сохраненая позиция x: %.1f, y: %.1f, z: %.1f",
-               tpcpos.x, tpcpos.y, tpcpos.z))
-	           if imgui.IsItemClicked() then
-                  setClipboardText(string.format(u8"%.1f, %.1f, %.1f", tpcpos.x, tpcpos.y, tpcpos.z))
-                  sampAddChatMessage("Позиция скопирован в буфер обмена", -1)
-               end
+			   if tpcpos.x ~= 0 then
+                  imgui.TextColoredRGB(string.format("Сохраненая позиция x: %.1f, y: %.1f, z: %.1f",
+                  tpcpos.x, tpcpos.y, tpcpos.z))
+	              if imgui.IsItemClicked() then
+                    setClipboardText(string.format(u8"%.1f, %.1f, %.1f", tpcpos.x, tpcpos.y, tpcpos.z))
+                    sampAddChatMessage("Позиция скопирован в буфер обмена", -1)
+                  end
+			   end
 			end
 			
 		    local bTargetResult, bX, bY, bZ = getTargetBlipCoordinates()
@@ -688,12 +737,25 @@ function imgui.OnDrawFrame()
                getDistanceBetweenCoords3d(positionX, positionY, positionZ, bX, bY, bZ)))
 		    end 
 			
-            local angle = math.ceil(getCharHeading(PLAYER_PED))
-            imgui.Text(string.format(u8"Направление: %s  %i°", direction(), angle))
-			
-			--local zone = getZoneName(positionX, positionY, positionZ)
+			zone = getZoneName(positionX, positionY, positionZ)
 			if zone then 
 			   imgui.Text(string.format(u8"Район: %s", zone))
+			   if lastWorldNumber > 0 then
+			      imgui.SameLine()
+			      imgui.Text(string.format(u8"Последний мир: №%s", lastWorldNumber))
+			      if imgui.IsItemClicked() then
+			         sampAddChatMessage("Выбран мир №"..lastWorldNumber, -1)
+			         sampSendChat("/мир "..lastWorldNumber)
+			      end
+			   end
+			else
+			   if lastWorldNumber > 0 then 
+			      imgui.Text(string.format(u8"Последний мир: №%s", lastWorldNumber))
+			      if imgui.IsItemClicked() then
+			         sampAddChatMessage("Выбран мир №"..lastWorldNumber, -1)
+			         sampSendChat("/мир "..lastWorldNumber)
+			      end
+			   end
 			end
 			
 			imgui.Spacing()
@@ -707,7 +769,6 @@ function imgui.OnDrawFrame()
                   sampAddChatMessage("Координаты скопированы в буфер обмена", -1)
                   sampAddChatMessage(string.format("Интерьер: %i Координаты: %.1f %.1f %.1f",
 			      getActiveInterior(), tpcpos.x, tpcpos.y, tpcpos.z), 0x0FFFFFF)
-				  zone = getZoneName(positionX, positionY, positionZ)
                end
             end
             imgui.SameLine()
@@ -943,13 +1004,13 @@ function imgui.OnDrawFrame()
          end
 		 
          if lastObjectModelid then
-            imgui.Text(string.format(u8"Последний объект: %i", lastObjectModelid))
+            imgui.Text(string.format(u8"Последний modelid объекта: %i", lastObjectModelid))
             if imgui.IsItemClicked() then
                setClipboardText(lastObjectModelid)
 			   sampAddChatMessage("modelid скопирован в буфер обмена", -1)
             end
 		 else 
-		    imgui.Text(u8"Последний объект: не выбран")
+		    imgui.Text(u8"Последний modelid объекта: не выбран")
          end
 		 
 		 if lastObjectModelid then
@@ -1057,10 +1118,41 @@ function imgui.OnDrawFrame()
 		end
 	    
 		if imgui.Button(u8"ТП к последнему объекту", imgui.ImVec2(250, 25)) then
-		   if lastObjectModelid then
-		      sampSendChat(string.format("/ngr %f %f %f",
-			  lastObjectCoords.x, lastObjectCoords.y, lastObjectCoords.z),
-			  0x0FFFFFF)
+		   if lastObjectModelid and lastObjectCoords.x ~= 0 then
+		      if isAbsolutePlay then
+		         sampSendChat(string.format("/ngr %f %f %f",
+			     lastObjectCoords.x, lastObjectCoords.y, lastObjectCoords.z), 0x0FFFFFF)
+			  else
+			     setCharCoordinates(PLAYER_PED, lastObjectCoords.x, lastObjectCoords.x, lastObjectCoords.z+0.2)
+			  end
+			  sampAddChatMessage("Вы телепортировались к объекту "..lastObjectModelid, -1)
+		   else
+		      sampAddChatMessage("Не найден последний объект", -1)
+		   end
+		end
+		
+		if imgui.Button(u8(lastObjectBlip and "Убрать метку с объекта" or "Метку на последний объект"), imgui.ImVec2(250, 25)) then
+		   if lastObjectId then
+		       if lastObjectBlip then
+			      removeBlip(lastObjectBlip)
+				  lastObjectBlip = nil
+			   else
+		          lastObjectBlip = addBlipForObject(lastObjectId)
+			   end
+		   else
+		      sampAddChatMessage("Не найден последний объект", -1)
+		   end
+		end
+		
+	    if imgui.Button(u8(lastObjectHidden and "Скрыть" or "Показать")..u8" последний объект", imgui.ImVec2(250, 25)) then
+		   if lastObjectId then
+		      if lastObjectHidden then
+		         setObjectVisible(lastObjectId, false)
+				 lastObjectHidden = false
+			  else
+			     setObjectVisible(lastObjectId, true)
+				 lastObjectHidden = true
+			  end
 		   else
 		      sampAddChatMessage("Не найден последний объект", -1)
 		   end
@@ -1355,6 +1447,7 @@ function imgui.OnDrawFrame()
 			   if imgui.Button(u8'Выбор класса', imgui.ImVec2(200, 25)) then
 			      local skin = getCharModel(PLAYER_PED)
 	              sampRequestClass(skin)
+				  --setPlayerModel(skin)
 			   end
 	        end
 		 end
@@ -2690,20 +2783,20 @@ function imgui.OnDrawFrame()
 		 if imgui.CollapsingHeader(u8"Горячие клавиши:") then
 		    imgui.TextColoredRGB("{00FF00}Клавиша N{FFFFFF} — меню редактора карт (в полете)")
             imgui.TextColoredRGB("{00FF00}Клавиша J{FFFFFF} — полет в наблюдении (/полет)")
-            imgui.TextColoredRGB("{FF0000}Боковые клавиши мыши{FFFFFF} — отменяют и сохраняют редактирование объекта")
+            imgui.TextColoredRGB("{00FF00}Боковые клавиши мыши{FFFFFF} — отменяют и сохраняют редактирование объекта")
+            imgui.TextColoredRGB("{FFFFFF}Используйте {00FF00}клавишу бега{FFFFFF}, для перемещения камеры вовремя редактирования")
             imgui.Spacing()
             imgui.TextColoredRGB("В режиме редактирования:")
-            imgui.TextColoredRGB("{FF0000}Зажатие клавиши ALT{FFFFFF} — скрыть объект")
-            imgui.TextColoredRGB("{FF0000}Зажатие клавиши CTRL{FFFFFF} — визуально увеличить объект")
+            imgui.TextColoredRGB("{00FF00}Зажатие клавиши ALT{FFFFFF} — скрыть объект")
+            imgui.TextColoredRGB("{00FF00}Зажатие клавиши CTRL{FFFFFF} — визуально увеличить объект")
             imgui.TextColoredRGB("{FF0000}Зажатие клавиши SHIFT{FFFFFF} — плавное перемещение объекта")
-            imgui.TextColoredRGB("{FF0000}Клавиша RMB (Правая кл.мыши){FFFFFF}  — вернуть объект на исходную позицию")
             imgui.TextColoredRGB("{00FF00}Клавиша Enter{FFFFFF}  — сохранить редактируемый объект")
             imgui.Spacing()
             imgui.TextColoredRGB("В режиме выделения:")
-			imgui.TextColoredRGB("{FF0000}Клавиша RMB (Правая кл.мыши){FFFFFF}  — скопирует номер модели объекта")
+			imgui.TextColoredRGB("{00FF00}Клавиша RMB (Правая кл.мыши){FFFFFF}  — скопирует номер модели объекта")
             imgui.TextColoredRGB("{FF0000}Клавиша SHIFT{FFFFFF} — переключение между объектами")
 			imgui.Spacing()
-            imgui.TextColoredRGB("* {FF0000}Красным цветом{cdcdcd} обозначены клавиши доступные только с SAMP Addon")
+            imgui.TextColoredRGB("* {FF0000}Красным цветом{cdcdcd} обозначены функции доступные только с SAMP Addon")
 		 end
 		 
 		 imgui.Spacing()
@@ -3449,9 +3542,38 @@ function sampev.onSendDialogResponse(dialogId, button, listboxId, input)
    if checkbox.logdialogresponse.v then
       print(dialogId, button, listboxId, input)
    end
-   -- if dialogId == 1430 and listboxId == 8 and button == 1 then
-      -- sampAddChatMessage("Вы можете показать для себя скрытые клисты через доп.опции игрока", -1)
-   -- end
+   
+   if isAbsolutePlay then
+      -- if player wxit from world without command drop lastWorldNumber var 
+      if dialogId == 1405 and listboxId == 5 and button == 1 then
+         lastWorldNumber = 0
+      end
+	  
+	  -- Get current world number from server dialogs
+	  if dialogId == 1426 and listboxId == 65535 and button == 1 then
+         if tonumber(input) > 0 and tonumber(input) < 500 then
+		    lastWorldNumber = tonumber(input)
+	     end
+      end
+	  
+	  if dialogId == 1406 and button == 1 then
+	     local world = tonumber(string.sub(input, 0, 3))
+	     if world then
+		    lastWorldNumber = world
+		 end
+	  end
+	  
+	  if dialogId == 1429 and button == 1 then
+		 local startpos = input:find("№")
+		 local endpos = startpos + 3
+		 local world = tonumber(string.sub(input, startpos+1, endpos))
+		 print(world, startpos, endpos)
+	     if world then
+		    lastWorldNumber = world
+		 end
+	  end
+
+   end
 end
 
 function sampev.onShowDialog(dialogId, style, title, button1, button2, text)
@@ -3520,6 +3642,25 @@ function sampev.onServerMessage(color, text)
    end
 end
 
+function sampev.onSendCommand(command)
+   if command:find('(.+) (.+)') then
+      local cmd, arg = command:match('(.+) (.+)')
+      
+	  -- Get world id (not virtual world id)
+	  if cmd:find("vbh") or cmd:find("мир") then
+	     local id = tonumber(arg)
+		 if id > 0 and id <= 500 then 
+		    lastWorldNumber = id
+	     end
+	  end
+	  
+	  if cmd:find("ds[jl") or cmd:find("exit") or cmd:find("выход") then
+		 lastWorldNumber = 0
+	  end
+
+   end
+end
+
 function onExitScript()
 	if nameTagWh then
 	   nameTagWh = false
@@ -3554,18 +3695,42 @@ end
 function sampev.onSendEditObject(playerObject, objectId, response, position, rotation)
    local object = sampGetObjectHandleBySampId(objectId)
    local modelId = getObjectModel(object)
+   lastObjectId = object
    lastObjectModelid = modelId
    lastObjectCoords.x = position.x
    lastObjectCoords.y = position.y
    lastObjectCoords.z = position.z
+   currentEditmode = response
    
    if showobjectrot then
       printStringNow(string.format("x:~b~~h~%0.2f, ~w~y:~r~~h~%0.2f, ~w~z:~g~~h~%0.2f~n~ ~w~rx:~b~~h~%0.2f, ~w~ry:~r~~h~%0.2f, ~w~rz:~g~~h~%0.2f",
 	  position.x, position.y, position.z, rotation.x, rotation.y, rotation.z), 1000)
    end
+   
+   if response > 0 then
+      if hideEditObject then
+	     setObjectVisible(object, false)
+      else
+	     setObjectVisible(object, true)
+	  end
+	  
+	  if scaleEditObject then
+	     setObjectScale(object, 1.35)
+	  else
+	     setObjectScale(object, 1.0)
+	  end
+   else 
+      setObjectVisible(object, true)
+	  setObjectScale(object, 1.0)
+   end
 end
 
 function sampev.onSendEnterEditObject(type, objectId, model, position)
+   local object = sampGetObjectHandleBySampId(objectId)
+   local modelId = getObjectModel(object)
+   lastObjectId = object
+   lastObjectModelid = modelId
+   
    if model == 3586 or model == 3743 then
       sampAddChatMessage("Объект "..model.." пропадет только после релога (баг SAMP)", 0x0FF0000)
    end
@@ -3634,8 +3799,6 @@ function sampev.onSetPlayerHealth(health)
    end
 end
 
--- function sampev.onEnterSelectObject()
--- end
 -- END hooks
 
 -- Macros
