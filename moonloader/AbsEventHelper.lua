@@ -4,11 +4,12 @@ script_description("Assistant for mappers and event makers on Absolute Play")
 script_dependencies('imgui', 'lib.samp.events', 'vkeys')
 script_properties("work-in-pause")
 script_url("https://github.com/ins1x/AbsEventHelper")
-script_version("2.4.1")
+script_version("2.4.2")
 -- script_moonloader(16) moonloader v.0.26
 
 -- Activaton: ALT + X (show main menu)
 -- Lot of functions only work on Absolute Play servers
+-- Blast.hk thread: https://www.blast.hk/threads/200619/
 
 require 'lib.moonloader'
 local keys = require 'vkeys'
@@ -32,6 +33,7 @@ local ini = inicfg.load({
       disconnectreminder = true,
       lockserverweather = false,
       usecustomcamdist = false,
+	  showobjectrot = false,
       drawdist = "450",
       fog = "200",
 	  camdist = "1",
@@ -65,6 +67,7 @@ local color = imgui.ImFloat4(1, 0, 0, 1)
 local hideobjectid = imgui.ImInt(650)
 local closestobjectmodel= imgui.ImInt(0)
 local lastObjectCoords = {x=0.0, y=0.0, z=0.0}
+local lastRemovedObjectCoords = {x=0.0, y=0.0, z=0.0, rx=0.0, ry=0.0, rz=0.0}
 local gamestates = {'None', 'Wait Connect', 'Await Join', 'Connected', 'Restarting', 'Disconnected'}
 local gamestate = imgui.ImInt(0)
 local fixcam = {x = 0.0, y = 0.0, z = 0.0}
@@ -93,7 +96,7 @@ local checkbox = {
    lockserverweather = imgui.ImBool(ini.settings.lockserverweather),
    usecustomcamdist = imgui.ImBool(ini.settings.usecustomcamdist),
    radarblips = imgui.ImBool(false),
-   showobjectrot = imgui.ImBool(false),
+   showobjectrot = imgui.ImBool(ini.settings.showobjectrot),
    showobjects = imgui.ImBool(false),
    showclosestobjects = imgui.ImBool(false),
    vehstream = imgui.ImBool(true),
@@ -108,6 +111,8 @@ local checkbox = {
    tpcprotect = imgui.ImBool(false),
    logtextdraws = imgui.ImBool(false),
    logdialogresponse = imgui.ImBool(false),
+   logobjects = imgui.ImBool(false),
+   logtxd = imgui.ImBool(false),
    pickeduppickups = imgui.ImBool(false),
    showtextdrawsid = imgui.ImBool(false),
    nophealth = imgui.ImBool(false),
@@ -185,7 +190,8 @@ local combobox = {
    profiles = imgui.ImInt(0),
    selecttable = imgui.ImInt(0),
    objects = imgui.ImInt(6),
-   itemad = imgui.ImInt(0)
+   itemad = imgui.ImInt(0),
+   logs = imgui.ImInt(0)
 }
 
 -- If the server changes IP, change it here
@@ -200,10 +206,10 @@ local smoothTeleport = false
 local prepareJump = false
 local showobjects = false
 local countobjects = true
-local showobjectrot = false
 local ENBSeries = false
 local chosenplayer = nil
 local lastObjectModelid = nil
+local lastRemovedObjectModelid = nil
 local lastObjectId = nil
 local hide3dtexts = false
 local nameTag = true
@@ -274,7 +280,7 @@ function main()
             thisScript():unload()
          else
 		    sampAddChatMessage("{880000}Absolute Events Helper.\
-		    {FFFFFF}Открыть меню: {CDCDCD0}ALT + X", 0xFFFFFF)
+		    {FFFFFF}Открыть меню: {CDCDCD}ALT + X", 0xFFFFFF)
 		 end
       else
 	     isAbsolutePlay = true
@@ -1031,13 +1037,9 @@ function imgui.OnDrawFrame()
          imgui.TextQuestion("( ? )", u8"Применимо только для объектов в области стрима (CTRL + O)")
       
       
-        if imgui.Checkbox(u8("Показывать координаты объекта при перемещении"), checkbox.showobjectrot) then 
-           if checkbox.showobjectrot.v  then
-              showobjectrot = true
-           else
-              showobjectrot = false
-           end
-        end
+        if imgui.Checkbox(u8("Показывать координаты объекта при перемещении"), checkbox.showobjectrot) then
+		   save()
+		end
         imgui.SameLine()
         imgui.TextQuestion("( ? )", u8"Показывает координаты объекта при перемещении в редакторе карт")
       
@@ -1118,21 +1120,21 @@ function imgui.OnDrawFrame()
 		end
 	    
 		if imgui.Button(u8"ТП к последнему объекту", imgui.ImVec2(250, 25)) then
-		   if lastObjectModelid and lastObjectCoords.x ~= 0 then
+		   if lastObjectModelid and lastObjectCoords.x ~= 0 and doesObjectExist(lastObjectId) then
 		      if isAbsolutePlay then
 		         sampSendChat(string.format("/ngr %f %f %f",
 			     lastObjectCoords.x, lastObjectCoords.y, lastObjectCoords.z), 0x0FFFFFF)
 			  else
 			     setCharCoordinates(PLAYER_PED, lastObjectCoords.x, lastObjectCoords.x, lastObjectCoords.z+0.2)
 			  end
-			  sampAddChatMessage("Вы телепортировались к объекту "..lastObjectModelid, -1)
+			  sampAddChatMessage("Вы телепортировались на координаты к послед.объекту "..lastObjectModelid, -1)
 		   else
 		      sampAddChatMessage("Не найден последний объект", -1)
 		   end
 		end
 		
 		if imgui.Button(u8(lastObjectBlip and "Убрать метку с объекта" or "Метку на последний объект"), imgui.ImVec2(250, 25)) then
-		   if lastObjectId then
+		   if lastObjectId and doesObjectExist(lastObjectId) then
 		       if lastObjectBlip then
 			      removeBlip(lastObjectBlip)
 				  lastObjectBlip = nil
@@ -1145,7 +1147,7 @@ function imgui.OnDrawFrame()
 		end
 		
 	    if imgui.Button(u8(lastObjectHidden and "Скрыть" or "Показать")..u8" последний объект", imgui.ImVec2(250, 25)) then
-		   if lastObjectId then
+		   if lastObjectId and doesObjectExist(lastObjectId) then
 		      if lastObjectHidden then
 		         setObjectVisible(lastObjectId, false)
 				 lastObjectHidden = false
@@ -1157,6 +1159,14 @@ function imgui.OnDrawFrame()
 		      sampAddChatMessage("Не найден последний объект", -1)
 		   end
 		end
+		
+		-- if imgui.Button(u8"Восстановить удаленный объект", imgui.ImVec2(250, 25)) then
+		   -- if isAbsolutePlay then
+		      -- if lastRemovedObjectModelid then
+			     -- undoMode = not undoMode 
+			  -- end
+		   -- end
+		-- end
 		imgui.Spacing()
 		
 	  elseif tabmenu.settings == 3 then
@@ -1208,7 +1218,7 @@ function imgui.OnDrawFrame()
 		 end
 		 
 		 if imgui.Checkbox(u8("Разблокировать изменение дистанции камеры"), checkbox.usecustomcamdist) then 
-		 ini.settings.usecustomcamdist = not ini.settings.usecustomcamdist
+		    ini.settings.usecustomcamdist = not ini.settings.usecustomcamdist
             if ini.settings.usecustomcamdist then
 		       setCameraDistanceActivated(1)
 			   setCameraDistance(ini.settings.camdist)
@@ -1438,6 +1448,8 @@ function imgui.OnDrawFrame()
 		 imgui.Checkbox(u8'Логгировать в консоли нажатые текстдравы', checkbox.logtextdraws)
 		 imgui.Checkbox(u8'Логгировать в консоли поднятые пикапы', checkbox.pickeduppickups)
 		 imgui.Checkbox(u8'Логгировать в консоли ответы на диалоги', checkbox.logdialogresponse)
+		 imgui.Checkbox(u8'Логгировать в консоли выбранные объекты', checkbox.logobjects)
+		 imgui.Checkbox(u8'Логгировать в консоли установку текстуры', checkbox.logtxd)
 		 imgui.Checkbox(u8'Отображать ID текстдравов', checkbox.showtextdrawsid)
 		 if isAbsolutePlay then
 		    local result, id = sampGetPlayerIdByCharHandle(PLAYER_PED)
@@ -1532,7 +1544,7 @@ function imgui.OnDrawFrame()
             textbuffer.bind6.v = u8("Запрещено находиться в афк после начала мероприятия")
             textbuffer.bind7.v = u8("Запрещено использовать телепорт и текстурные баги")
             textbuffer.bind8.v = u8("За первое место приз - , за второе - , за третье -")
-            textbuffer.bindad.v = u8("Заходите на МП '' в мир , приз ")
+            textbuffer.bindad.v = u8("Заходите на МП 'Гонки' в мир , приз ")
 			sampAddChatMessage('Загружен профиль Race', -1)
          end
          if combobox.profiles.v == 2 then
@@ -1965,7 +1977,7 @@ function imgui.OnDrawFrame()
 	            imgui.SameLine()
 	         end
              --imgui.TextColoredRGB(string.format("{%0.6x} %s", bit.band(ucolor,0xffffff), nickname))
-             imgui.Selectable(string.format(u8"%s", nickname))
+             imgui.Selectable(u8(nickname))
              if imgui.IsItemClicked() then
                 chosenplayer = v
                 printStringNow("You have chosen a player ".. nickname, 1000)
@@ -2208,22 +2220,23 @@ function imgui.OnDrawFrame()
          imgui.Text(u8"")
          
 		 if isAbsfixInstalled then
-		    imgui.TextColoredRGB("Спасибо что используете {007DFF}AbsoluteFix!")
+		    imgui.TextColoredRGB("Спасибо что используете ")
+			imgui.SameLine()
+ 		    imgui.Link("https://github.com/ins1x/useful-samp-stuff/tree/main/luascripts/absolutefix", "AbsoluteFix!")
 		 end
 		 
          imgui.Text("Homepage:")
 		 imgui.SameLine()
 		 imgui.Link("https://github.com/ins1x/AbsEventHelper", "ins1x/AbsEventHelper")
 		 
-		 -- imgui.TextColoredRGB("Blasthk: {007DFF}1NS")
-         -- if imgui.IsItemClicked() then
-            -- os.execute('explorer "https://www.blast.hk/threads/200619/"')
-         -- end
-         
 		 imgui.Text(u8"Сайт Absolute Play:")
 		 imgui.SameLine()
 		 imgui.Link("https://gta-samp.ru", "gta-samp.ru")
          
+		 imgui.Text(u8"Blast.hk thread:")
+		 imgui.SameLine()
+		 imgui.Link("https://www.blast.hk/threads/200619/", "https://www.blast.hk")
+		 
 		 imgui.Text(u8"YouTube:")
 		 imgui.SameLine()
 		 imgui.Link("https://www.youtube.com/@1nsanemapping", "1nsanemapping")
@@ -2800,6 +2813,7 @@ function imgui.OnDrawFrame()
 		 end
 		 
 		 imgui.Spacing()
+		 
 		 imgui.TextColoredRGB("Команды SAMPFUNCS")
 		 imgui.SameLine()
 		 imgui.Link("https://wiki.blast.hk/sampfuncs/console", "https://wiki.blast.hk/sampfuncs/console")
@@ -2808,6 +2822,18 @@ function imgui.OnDrawFrame()
 		 imgui.SameLine()
 		 imgui.Link("https://www.open.mp/docs/server/ControllingServer", "https://www.open.mp/docs/")
          
+		 if isAbsolutePlay then 
+		    if isAbsfixInstalled then
+			   imgui.TextColoredRGB("Стандартные горячие клавиши восстановлены")
+			   imgui.SameLine()
+			   imgui.Link("https://github.com/ins1x/useful-samp-stuff/tree/main/luascripts/absolutefix", "AbsoluteFix")
+            else
+			   imgui.TextColoredRGB("Чтобы восстановить все стандартные горячие клавиши установите")
+			   imgui.SameLine()
+			   imgui.Link("https://github.com/ins1x/useful-samp-stuff/tree/main/luascripts/absolutefix", "AbsoluteFix")
+			end
+		 end
+		 
       elseif tabmenu.info == 7 then
 
        if imgui.CollapsingHeader(u8'Что такое "мир" и зачем он нужен?') then
@@ -3061,43 +3087,30 @@ function imgui.OnDrawFrame()
 		 imgui.Spacing()
 		 imgui.Text(u8"Стандартные логи:")
 		 
-		 if imgui.Button(u8"moonloader.log",imgui.ImVec2(150, 25)) then
-		    local file = getGameDirectory().. "\\moonloader\\moonloader.log"
-		    if doesFileExist(file) then
-               os.execute('explorer '.. file)
-			end
-		 end
-		 imgui.SameLine()
-		 if imgui.Button(u8"modloader.log",imgui.ImVec2(150, 25)) then
-		    local file = getGameDirectory().. "\\modloader\\modloader.log"
-		    if doesFileExist(file) then
-               os.execute('explorer '.. file)
-			end
-		 end
-		 imgui.SameLine()
-		 if imgui.Button(u8"sampfuncs.log",imgui.ImVec2(150, 25)) then
-		    local file = getGameDirectory().. "\\SAMPFUNCS\\SAMPFUNCS.log"
-		    if doesFileExist(file) then
-               os.execute('explorer '.. file)
-			end
-		 end
+		 imgui.PushItemWidth(150)
+		 imgui.Combo(u8'##ComboBoxLogslist', combobox.logs,
+         {"moonloader.log", "modloader.log", "sampfuncs.log", "chatlog.txt", "cleo.log"})
 		 
-		 if imgui.Button(u8"chatlog.txt",imgui.ImVec2(150, 25)) then
-		    os.execute('explorer '..getFolderPath(5) ..'\\GTA San Andreas User Files\\SAMP\\chatlog.txt')
-		    -- if doesFileExist(getFolderPath(5) ..'\\GTA San Andreas User Files\\SAMP\\chatlog.txt') then
-			   -- local file = assert(io.open(getFolderPath(5) ..'\\GTA San Andreas User Files\\SAMP\\chatlog.txt', "r"))
-               -- textbuffer.logsbuff.v = u8:decode(file:read('*a'))
-               -- file:close()
-			-- end
-		 end
 		 imgui.SameLine()
-		 if imgui.Button(u8"cleo.log",imgui.ImVec2(150, 25)) then
-		    local file = getGameDirectory().. "\\cleo.log"
+		 if imgui.Button(u8"показать",imgui.ImVec2(150, 25)) then
+		    local file
+			if combobox.logs.v == 0 then
+		       file = getGameDirectory().. "\\moonloader\\moonloader.log"
+			elseif combobox.logs.v == 1 then
+			   file = getGameDirectory().. "\\modloader\\modloader.log"
+			elseif combobox.logs.v == 2 then
+			   file = getGameDirectory().. "\\SAMPFUNCS\\SAMPFUNCS.log"
+			elseif combobox.logs.v == 3 then
+			   file = getFolderPath(5)..'\\GTA San Andreas User Files\\SAMP\\chatlog.txt'
+			elseif combobox.logs.v == 4 then
+			   file = getGameDirectory().. "\\cleo.log"
+			end
+			
 		    if doesFileExist(file) then
                os.execute('explorer '.. file)
 			end
 		 end
-		 
+		
       end -- end tabmenu.info
 		 
       imgui.NextColumn()
@@ -3111,7 +3124,7 @@ function imgui.OnDrawFrame()
 	  -- end
       if imgui.Button(u8"Команды", imgui.ImVec2(100,25)) then tabmenu.info = 6 end
       if imgui.Button(u8"FAQ", imgui.ImVec2(100,25)) then tabmenu.info = 7 end
-      if imgui.Button(u8"Логи", imgui.ImVec2(100,25)) then tabmenu.info = 8 end
+      if imgui.Button(u8"Админлог", imgui.ImVec2(100,25)) then tabmenu.info = 8 end
       if imgui.Button(u8"About", imgui.ImVec2(100, 25)) then tabmenu.info = 1 end
 
       imgui.Columns(1)
@@ -3324,7 +3337,7 @@ function imgui.OnDrawFrame()
 			sampAddChatMessage("Отключены уведомления о вылете игроков с сервера", -1)
 		 end
 	  end
-	 
+	  
 	  imgui.Checkbox(u8("Уведомлять о тяжелом оружии"), checkbox.heavyweaponwarn)
 	  
 	  if imgui.Button(u8"Получить id и ники игроков рядом", imgui.ImVec2(230, 25)) then
@@ -3342,24 +3355,42 @@ function imgui.OnDrawFrame()
 		 end
 	  end
 	  
+	  if imgui.Button(u8"Объявить победителей МП", imgui.ImVec2(230, 25)) then
+		 local pidtable = {}
+		 local resulstring
+		 for k, v in ipairs(getAllChars()) do
+		    local res, id = sampGetPlayerIdByCharHandle(v)
+		    if res and v ~= playerPed then
+			   local nickname = sampGetPlayerNickname(id)
+			   table.insert(pidtable, string.format("%s[%d] ", nickname, id))
+			   resulstring = table.concat(pidtable)
+			   setClipboardText(resulstring)
+			   sampSetChatInputEnabled(true)
+			   sampSetChatInputText('* Победители МП " " '..resulstring..' .Поздравляем!')
+			   sampAddChatMessage("Текст скопирован в строку чата", -1)
+			   dialog.main.v = not dialog.main.v 
+		    end
+		 end
+	  end
+	  
 	  if imgui.Button(u8"Игрок с наибольшим уровнем", imgui.ImVec2(230, 25)) then
 		 local maxscore = {score = 0, id = 0}
 		 local _, playerid = sampGetPlayerIdByCharHandle(playerPed)
 		 for k, v in ipairs(getAllChars()) do
 		    local res, id = sampGetPlayerIdByCharHandle(v)
 			local score = sampGetPlayerScore(v)
-		    if res then
-			   --if id ~= playerid then
-			      if score > maxscore.score then
-			         maxscore.score = score
-				     maxscore.id = id
-			      end
-			   --end
+		    if res and v ~= playerPed then
+			   if score > maxscore.score then
+			      maxscore.score = score
+				  maxscore.id = id
+			   end
 		    end
 		 end
 		 if maxscore.score > 0 then
 		    setClipboardText(sampGetPlayerNickname(maxscore.id).. "[" .. maxscore.id .. "]")--maxscore.id
-		    sampAddChatMessage("Ид и ник игрока с наибольшим уровнем скопирован в буфер обмена", -1)
+		    sampAddChatMessage("Ид и ник игрока ".. sampGetPlayerNickname(maxscore.id) .." с наибольшим уровнем скопирован в буфер обмена", -1)
+		 else
+		    sampAddChatMessage("Нет других игроков рядом, кого выбирать?", -1)
 		 end
 	  end
 	  
@@ -3373,7 +3404,62 @@ function imgui.OnDrawFrame()
 		    sampAddChatMessage("Случайный игрок: ".. sampGetPlayerNickname(playersTable[rand]), -1)
 		 end
 	  end
-  
+	  
+	  if imgui.Button(u8"Вывести список лагеров", imgui.ImVec2(230, 25)) then
+	     local counter = 0
+		 if next(playersTable) == nil then -- if playersTable is empty
+		    sampAddChatMessage("Сперва обнови список игроков!", -1) 
+		 else
+	        for k, v in pairs(playersTable) do
+		       local ping = sampGetPlayerPing(v)
+               local nickname = sampGetPlayerNickname(v)
+			   if (ping > 70) then
+			      counter = counter + 1
+			      sampAddChatMessage(string.format("Лагер %s(%i) ping: %i", nickname, v, ping), 0xFF0000)
+               end
+		    end
+		    if counter == 0 then
+		       sampAddChatMessage("Лагеры не найдены", -1)
+		    end
+	     end
+	  end
+      
+	  if imgui.Button(u8"Вывести список игроков AFK", imgui.ImVec2(230, 25)) then
+	     local counter = 0
+		 if next(playersTable) == nil then -- if playersTable is empty
+		    sampAddChatMessage("Сперва обнови список игроков!", -1) 
+		 else
+	        for k, v in pairs(playersTable) do
+               local nickname = sampGetPlayerNickname(v)
+		       if sampIsPlayerPaused(v) then
+			      counter = counter + 1
+	              sampAddChatMessage(string.format("AFK %s(%i)", nickname, v), 0xFF0000)
+	           end
+		    end
+		    if counter == 0 then
+		       sampAddChatMessage("АФКашники не найдены", -1)
+		    end
+		 end
+	  end
+	  
+	  if imgui.Button(u8"Статистика по игрокам в сети", imgui.ImVec2(230, 25)) then
+	     local totalonline = 0
+		 local olds = 0
+		 local newbies = 0
+		 
+	     for i = 0, sampGetMaxPlayerId(false) do
+            if sampIsPlayerConnected(i) then 
+			   totalonline = totalonline + 1
+			   local score = sampGetPlayerScore(i)
+			   if score > 100 then
+			      olds = olds + 1
+			   else
+			      newbies = newbies + 1
+			   end
+			end
+         end
+		 sampAddChatMessage("Игроков в сети "..totalonline.." из них новички "..newbies.." а "..olds.." постояльцы", -1)
+	  end
 	  imgui.End()
    end
    
@@ -3535,7 +3621,6 @@ function sampev.onPlayerQuit(id, reason)
          end
       end
    end
-   
 end
 
 function sampev.onSendDialogResponse(dialogId, button, listboxId, input)
@@ -3572,6 +3657,27 @@ function sampev.onSendDialogResponse(dialogId, button, listboxId, input)
 		    lastWorldNumber = world
 		 end
 	  end
+      
+	  if dialogId == 1412 and listboxId == 2 and button == 1 then
+	     sampAddChatMessage("Вы изменили разрешение на редактирование мира для всех игроков!", 0xFF0000)
+	  end
+	  
+	  -- if dialogId == 1403 or dialogId == 1411 and button == 1 then
+	     -- if lastObjectModelid then 
+		    -- lastRemovedObjectModelid = lastObjectModelid
+			-- lastRemovedObjectCoords.x = lastObjectCoords.x
+			-- lastRemovedObjectCoords.y = lastObjectCoords.y
+			-- lastRemovedObjectCoords.z = lastObjectCoords.z
+		 -- end
+	  -- end
+	  
+	  -- if dialogId == 1401 and button == 1 then
+	     -- if undoMode then
+		    -- if lastObjectId and doesObjectExist(lastObjectId) then
+		       -- setObjectCoordinates(lastObjectId, lastRemovedObjectCoords.x, lastRemovedObjectCoords.y, lastRemovedObjectCoords.z)
+			-- end
+		 -- end
+	  -- end
 
    end
 end
@@ -3586,9 +3692,6 @@ function sampev.onShowDialog(dialogId, style, title, button1, button2, text)
 	     setClipboardText(randomcolor)
 		 --sampSetCurrentDialogEditboxText(randomcolor)
       end
-	  -- if dialogId == 1420 then
-	     -- print(text)
-	  -- end
    end
    
    if checkbox.logdialogresponse.v then
@@ -3649,8 +3752,10 @@ function sampev.onSendCommand(command)
 	  -- Get world id (not virtual world id)
 	  if cmd:find("vbh") or cmd:find("мир") then
 	     local id = tonumber(arg)
-		 if id > 0 and id <= 500 then 
-		    lastWorldNumber = id
+		 if id then 
+		    if id > 0 and id <= 500 then 
+		       lastWorldNumber = id
+			end
 	     end
 	  end
 	  
@@ -3692,6 +3797,12 @@ function sampev.onCreateObject(objectId, data)
    end
 end
 
+function sampev.onSetObjectMaterial(id, data)
+   if checkbox.logtxd.v then
+      print(id, data.materialId, data.modelId, data.libraryName, data.textureName, data.color)
+   end
+end
+
 function sampev.onSendEditObject(playerObject, objectId, response, position, rotation)
    local object = sampGetObjectHandleBySampId(objectId)
    local modelId = getObjectModel(object)
@@ -3702,7 +3813,7 @@ function sampev.onSendEditObject(playerObject, objectId, response, position, rot
    lastObjectCoords.z = position.z
    currentEditmode = response
    
-   if showobjectrot then
+   if checkbox.showobjectrot.v then
       printStringNow(string.format("x:~b~~h~%0.2f, ~w~y:~r~~h~%0.2f, ~w~z:~g~~h~%0.2f~n~ ~w~rx:~b~~h~%0.2f, ~w~ry:~r~~h~%0.2f, ~w~rz:~g~~h~%0.2f",
 	  position.x, position.y, position.z, rotation.x, rotation.y, rotation.z), 1000)
    end
@@ -3730,6 +3841,9 @@ function sampev.onSendEnterEditObject(type, objectId, model, position)
    local modelId = getObjectModel(object)
    lastObjectId = object
    lastObjectModelid = modelId
+   lastObjectCoords.x = position.x
+   lastObjectCoords.y = position.y
+   lastObjectCoords.z = position.z
    
    if model == 3586 or model == 3743 then
       sampAddChatMessage("Объект "..model.." пропадет только после релога (баг SAMP)", 0x0FF0000)
@@ -3746,6 +3860,10 @@ function sampev.onSendEnterEditObject(type, objectId, model, position)
    if model == 3426 then
       sampAddChatMessage("Этот объект "..model.." неккоректно отображается под поверхностью, в воде, либо при повороте (баг SAMP)", 0x0FF0000)
    end
+   
+   if checkbox.logobjects.v then
+      print(type, objectId, model)
+   end
 end
 
 function sampev.onPlayerStreamIn(id, team, model, position, rotation, color, fight)
@@ -3755,12 +3873,6 @@ function sampev.onPlayerStreamIn(id, team, model, position, rotation, color, fig
       newcolor = join_argb(0, rr, gg, bb)
 	  return {id, team, model, position, rotation, newcolor, fight}
    end
-   
-   -- Show white gm players clists at radar
-   -- if color == -33752043 then
-      -- newclist = join_rgba(0xFF, 0xFF, 0xFF, 255)
-      -- return {id, team, model, position, rotation, newclist , fight}
-   -- end
 end
 
 function sampev.onCreate3DText(id, color, position, distance, testLOS,
