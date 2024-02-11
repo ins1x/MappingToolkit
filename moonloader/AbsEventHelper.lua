@@ -4,7 +4,7 @@ script_description("Assistant for mappers and event makers on Absolute Play")
 script_dependencies('imgui', 'lib.samp.events', 'vkeys')
 script_properties("work-in-pause")
 script_url("https://github.com/ins1x/AbsEventHelper")
-script_version("2.4.2")
+script_version("2.4.3")
 -- script_moonloader(16) moonloader v.0.26
 
 -- Activaton: ALT + X (show main menu)
@@ -60,12 +60,10 @@ function save()
 end
 ---------------------------------------------------------
 
-objectsrenderfont = renderCreateFont("Arial", 8, 5)
+objectsrenderfont = renderCreateFont("Arial", 7, 5)
 local sizeX, sizeY = getScreenResolution()
 local v = nil
 local color = imgui.ImFloat4(1, 0, 0, 1)
-local hideobjectid = imgui.ImInt(650)
-local closestobjectmodel= imgui.ImInt(0)
 local lastObjectCoords = {x=0.0, y=0.0, z=0.0}
 local lastRemovedObjectCoords = {x=0.0, y=0.0, z=0.0, rx=0.0, ry=0.0, rz=0.0}
 local gamestates = {'None', 'Wait Connect', 'Await Join', 'Connected', 'Restarting', 'Disconnected'}
@@ -99,6 +97,7 @@ local checkbox = {
    showobjectrot = imgui.ImBool(ini.settings.showobjectrot),
    showobjects = imgui.ImBool(false),
    showclosestobjects = imgui.ImBool(false),
+   drawlinetomodelid = imgui.ImBool(false),
    vehstream = imgui.ImBool(true),
    noempyvehstream = imgui.ImBool(true),
    heavyweaponwarn = imgui.ImBool(true),
@@ -116,7 +115,31 @@ local checkbox = {
    pickeduppickups = imgui.ImBool(false),
    showtextdrawsid = imgui.ImBool(false),
    nophealth = imgui.ImBool(false),
-   objectcollision = imgui.ImBool(false)
+   vehloads = imgui.ImBool(false),
+   shadows = imgui.ImBool(false),
+   noeffects = imgui.ImBool(false),
+   nofactorysmoke = imgui.ImBool(false),
+   nowater = imgui.ImBool(false),
+   aniso = imgui.ImBool(false),
+   postfx = imgui.ImBool(true),
+   grassfix = imgui.ImBool(false),
+   blur = imgui.ImBool(false),
+   sunfix = imgui.ImBool(false),
+   nightvision = imgui.ImBool(false),
+   infraredvision = imgui.ImBool(false),
+   lightmap = imgui.ImBool(false),
+   hidealltextdraws = imgui.ImBool(false),
+   objectcollision = imgui.ImBool(false),
+   changemdo = imgui.ImBool(false),
+   test = imgui.ImBool(false)
+}
+
+local input = {
+   hideobjectid = imgui.ImInt(615),
+   mdomodel = imgui.ImInt(0),
+   mdodist = imgui.ImInt(100),
+   rendselectedmodelid = imgui.ImInt(0),
+   closestobjectmodel = imgui.ImInt(0)
 }
 
 local slider = {
@@ -205,6 +228,7 @@ local prepareTeleport = false
 local smoothTeleport = false
 local prepareJump = false
 local showobjects = false
+local showrenderline = false
 local countobjects = true
 local ENBSeries = false
 local chosenplayer = nil
@@ -394,13 +418,6 @@ function main()
       -- sampRegisterChatCommand("jump", function ()
          -- JumpForward()
       -- end)
-      
-	  -- get default camera FOV
-	  -- if getCameraFov() >= 1.0 or getCameraFov() <= 179.0 then
-	     -- slider.fov.v = getCameraFov()
-	  -- else
-	     -- slider.fov.v = 70
-	  -- end
 	  
       -- set drawdist and figdist
       memory.setfloat(12044272, ini.settings.drawdist, true)
@@ -543,7 +560,7 @@ function main()
       if isKeyDown(VK_CONTROL) and isKeyJustPressed(VK_O)
 	  and not sampIsChatInputActive() and not isPauseMenuActive()
 	  and not isSampfuncsConsoleActive() then 
-         showobjects = not showobjects
+         checkbox.showobjects.v= not checkbox.showobjects.v
       end
       
 	  if not isAbsfixInstalled then
@@ -574,7 +591,7 @@ function main()
 	  end
 	  
       -- Objects render
-      if showobjects and not isPauseMenuActive() then
+      if checkbox.showobjects.v and not isPauseMenuActive() then
          for _, v in pairs(getAllObjects()) do
             if isObjectOnScreen(v) then
                local _, x, y, z = getObjectCoordinates(v)
@@ -587,6 +604,24 @@ function main()
          end
       end
       
+	  if checkbox.drawlinetomodelid.v and not isPauseMenuActive() then
+	     for _, v in pairs(getAllObjects()) do
+            if isObjectOnScreen(v) then
+			   local model = getObjectModel(v)
+               local _, x, y, z = getObjectCoordinates(v)
+			   local px, py, pz = getCharCoordinates(PLAYER_PED)
+			   local x1, y1 = convert3DCoordsToScreen(x,y,z)
+			   local x10, y10 = convert3DCoordsToScreen(px,py,pz)
+			   local distance = string.format("%.0f", getDistanceBetweenCoords3d(x, y, z, px, py, pz))
+			   if model ~= 2680 and model ~= 1276 -- ignore hidden packages
+			   and model == input.rendselectedmodelid.v then
+                  renderFontDrawText(objectsrenderfont, "{CCFFFFFF} " .. getObjectModel(v) .." distace: ".. distance, x1, y1, -1)
+				  renderDrawLine(x10, y10, x1, y1, 1.0, '0xCCFFFFFF')
+			   end
+            end
+         end
+	  end 
+	  
       -- Collision
       if disableObjectCollision then
          find_obj_x, find_obj_y, find_obj_z = getCharCoordinates(PLAYER_PED)
@@ -601,6 +636,8 @@ function main()
 	  if checkbox.changefov.v then
 	     if slider.fov.v >= 1 and slider.fov.v <= 179 then 
 	        cameraSetLerpFov(slider.fov.v, slider.fov.v, 999988888, true)
+		 else
+		    slider.fov.v = 70
 	     end
 	  end
 	  
@@ -692,7 +729,7 @@ function imgui.OnDrawFrame()
       if tabmenu.main == 1 then
 
          imgui.Columns(2)
-         imgui.SetColumnWidth(-1, 460)
+         imgui.SetColumnWidth(-1, 455)
 
          if tabmenu.settings == 1 then
 			
@@ -733,8 +770,10 @@ function imgui.OnDrawFrame()
 		    end 
 		    
 			if tpcpos.x then
-			   imgui.TextColoredRGB(string.format("Расстояние до сохраненной позиции %.1f m.",
-               getDistanceBetweenCoords3d(positionX, positionY, positionZ, tpcpos.x, tpcpos.y, tpcpos.z)))
+			   if tpcpos.x ~= 0 then
+			      imgui.TextColoredRGB(string.format("Расстояние до сохраненной позиции %.1f m.",
+                  getDistanceBetweenCoords3d(positionX, positionY, positionZ, tpcpos.x, tpcpos.y, tpcpos.z)))
+			   end	  
 			end
 			
 			local bTargetResult, bX, bY, bZ = getTargetBlipCoordinates()
@@ -931,10 +970,12 @@ function imgui.OnDrawFrame()
 					 end
 		          end
                end
-			   imgui.SameLine()
-			   imgui.Checkbox(u8("Снять защиту"), checkbox.tpcprotect)
-			   imgui.SameLine()
-               imgui.TextQuestion("( ? )", u8"Снимет все ограничения (Триггерит античит)")
+			   if not isAbsolutePlay then
+			      imgui.SameLine()
+			      imgui.Checkbox(u8("Снять защиту"), checkbox.tpcprotect)
+			      imgui.SameLine()
+                  imgui.TextQuestion("( ? )", u8"Снимет все ограничения (Триггерит античит)")
+			   end
 			   
 		    end
 			
@@ -1027,22 +1068,131 @@ function imgui.OnDrawFrame()
 		 imgui.Spacing()
 		 
          if imgui.Checkbox(u8("Показывать modelid объектов"), checkbox.showobjects) then 
-            if checkbox.showobjects.v  then
-               showobjects = true
-            else
-               showobjects = false
-            end
-         end
+            if checkbox.drawlinetomodelid.v then checkbox.drawlinetomodelid.v = false end
+		 end
          imgui.SameLine()
          imgui.TextQuestion("( ? )", u8"Применимо только для объектов в области стрима (CTRL + O)")
-      
-      
-        if imgui.Checkbox(u8("Показывать координаты объекта при перемещении"), checkbox.showobjectrot) then
+        
+		if imgui.Checkbox(u8("Найти объекты рядом по ID модели"), checkbox.drawlinetomodelid) then
+		   if checkbox.showobjects.v then checkbox.showobjects.v = false end
+		end
+		imgui.SameLine()
+        imgui.TextQuestion("( ? )", u8"Рисует линию к объекту с указанием расстояния")
+              
+	    if checkbox.drawlinetomodelid.v then 
+		   if lastObjectModelid and input.rendselectedmodelid.v == 0 then 
+		      input.rendselectedmodelid.v = lastObjectModelid
+		   end
+		   
+	       imgui.Text(u8"modelid объекта: ")
+           imgui.SameLine()
+           imgui.PushItemWidth(55)
+           imgui.InputInt('##INPUT_REND_SELECTED', input.rendselectedmodelid, 0)
+		   imgui.PopItemWidth()
+		   imgui.SameLine()
+           imgui.SameLine()
+           imgui.TextQuestion("( ? )", u8"Введите modelid от 615-18300 [GTASA], 18632-19521 [SAMP]")
+	    end
+	  
+     	if imgui.Checkbox(u8("Найти ближайший объект по ID модели"), checkbox.showclosestobjects) then
+	    end
+	    imgui.SameLine()
+        imgui.TextQuestion("( ? )", u8"Найдет ближайший объект по ID модели")
+		
+		if checkbox.showclosestobjects.v then
+           imgui.Text(u8"modelid объекта: ")
+		   imgui.SameLine()
+		   imgui.PushItemWidth(55)
+	       imgui.InputInt('##INPUT_CLOOBJECTID', input.closestobjectmodel, 0)
+           imgui.PopItemWidth()
+		   
+		   if lastObjectModelid and input.closestobjectmodel.v == 0 then 
+		      input.closestobjectmodel.v = lastObjectModelid
+		   end
+		   
+		   if string.len(input.closestobjectmodel.v) > 0 then
+              local result, distance, x, y, z = GetNearestObject(input.closestobjectmodel.v)
+              if result then 
+			     imgui.Text(string.format(u8'Объект находится на расстоянии %.2f метров от вас', distance), -1)
+			  end	 
+		   end
+		end
+		
+	 	if imgui.Checkbox(u8("Скрыть объекты по ID модели"), checkbox.hideobject) then 
+	       if not checkbox.hideobject.v then
+		      if hiddenObjects[1] ~= nil then
+                 for i = 1, #hiddenObjects do
+                    table.remove(hiddenObjects, i)
+				 end
+              end
+		   end
+	    end
+	    imgui.SameLine()
+        imgui.TextQuestion("( ? )", u8"Скроет объект по ID модели (modelid). Действует при обновлении зоны стрима")
+	   
+	    if checkbox.hideobject.v then 
+		   if lastObjectModelid and input.hideobjectid.v == 615 then 
+		      input.hideobjectid.v = lastObjectModelid
+		   end
+		   
+	       imgui.Text(u8"modelid объекта: ")
+           imgui.SameLine()
+           imgui.PushItemWidth(55)
+           imgui.InputInt('##INPUT_HIDEOBJECT_ID', input.hideobjectid, 0)
+		   imgui.PopItemWidth()
+		   imgui.SameLine()
+		   if imgui.Button(u8"Скрыть объект", imgui.ImVec2(110, 25)) then 
+		      if string.len(input.hideobjectid.v) > 0 then 
+                 if(tonumber(input.hideobjectid.v) < 615 or tonumber(input.hideobjectid.v) > 19521) then
+			 	    sampAddChatMessage("Объект не был добавлен, так как вы ввели некорректный id!", -1)
+				 else
+			        table.insert(hiddenObjects, tonumber(input.hideobjectid.v))
+				    sampAddChatMessage(string.format("Вы скрыли все объекты с modelid: %i",
+                    tonumber(input.hideobjectid.v)), -1)
+                 end
+				 sampAddChatMessage("Изменения будут видны после обновления зоны стрима!", -1)
+    		  else
+			     sampAddChatMessage("Объект не был добавлен, так как вы не ввели id!", -1)
+			  end
+		   end
+           imgui.SameLine()
+           imgui.TextQuestion("( ? )", u8"Введите modelid от 615-18300 [GTASA], 18632-19521 [SAMP]")
+	    end
+	    
+	    if imgui.Checkbox(u8("Дальность прорисовки объекта по ID модели"), checkbox.changemdo) then
+	    end
+	    imgui.SameLine()
+        imgui.TextQuestion("( ? )", u8"Изменяет далльность прорисовки объекта (визуально)")
+		
+		if checkbox.changemdo.v then
+           imgui.Text(u8"modelid объекта: ")
+		   imgui.SameLine()
+		   imgui.PushItemWidth(55)
+	       imgui.InputInt('##INPUT_MDOMODELID', input.mdomodel, 0)
+		   imgui.SameLine()
+		   imgui.Text(u8"дистанция: ")
+		   imgui.SameLine()
+		   imgui.PushItemWidth(35)
+		   imgui.InputInt('##INPUT_MDODIST', input.mdodist, 0)
+		   
+		   if lastObjectModelid and input.mdomodel.v == 0 then 
+		      input.mdomodel.v = lastObjectModelid
+		   end
+		   
+		   imgui.SameLine()
+		   if imgui.Button(u8"Применить") then
+		      if string.len(input.mdomodel.v) > 0 and string.len(input.mdodist.v) > 0 then
+                 memory.setfloat(getMDO(input.mdomodel.v), input.mdodist.v, true)
+		      end
+		   end
+		end
+	    
+		if imgui.Checkbox(u8("Показывать координаты объекта при перемещении"), checkbox.showobjectrot) then
 		   save()
 		end
         imgui.SameLine()
         imgui.TextQuestion("( ? )", u8"Показывает координаты объекта при перемещении в редакторе карт")
-      
+		
         if imgui.Checkbox(u8("Отключить коллизию у объектов"), checkbox.objectcollision) then 
            if checkbox.objectcollision.v then
            disableObjectCollision = true
@@ -1062,63 +1212,7 @@ function imgui.OnDrawFrame()
       
         imgui.SameLine()
         imgui.TextQuestion("( ? )", u8"Применимо только для объектов в области стрима")
-	  
-	 	if imgui.Checkbox(u8("Скрыть объекты по ID модели"), checkbox.hideobject) then 
-	       if not checkbox.hideobject.v then
-		      if hiddenObjects[1] ~= nil then
-                 for i = 1, #hiddenObjects do
-                    table.remove(hiddenObjects, i)
-				 end
-              end
-		   end
-	    end
-	    imgui.SameLine()
-        imgui.TextQuestion("( ? )", u8"Скроет объект по ID модели (modelid). Действует при обновлении зоны стрима")
-	   
-	    if checkbox.hideobject.v then
-	       imgui.Text(u8"modelid объекта: ")
-           imgui.SameLine()
-           imgui.PushItemWidth(55)
-           imgui.InputInt('##INPUT_HIDEOBJECT_ID', hideobjectid, 0)
-		   imgui.PopItemWidth()
-		   imgui.SameLine()
-		   if imgui.Button(u8"Скрыть объект", imgui.ImVec2(110, 25)) then 
-		      if string.len(hideobjectid.v) > 0 then 
-                 if(tonumber(hideobjectid.v) < 615 or tonumber(hideobjectid.v) > 19521) then
-			 	    sampAddChatMessage("Объект не был добавлен, так как вы ввели некорректный id!", -1)
-				 else
-			        table.insert(hiddenObjects, tonumber(hideobjectid.v))
-				    sampAddChatMessage(string.format("Вы скрыли все объекты с modelid: %i",
-                    tonumber(hideobjectid.v)), -1)
-                 end
-				 sampAddChatMessage("Изменения будут видны после обновления зоны стрима!", -1)
-    		  else
-			     sampAddChatMessage("Объект не был добавлен, так как вы не ввели id!", -1)
-			  end
-		   end
-           imgui.SameLine()
-           imgui.TextQuestion("( ? )", u8"Введите modelid от 615-18300 [GTASA], 18632-19521 [SAMP]")
-	    end
-	  
-	    if imgui.Checkbox(u8("Найти ближайший объект по ID модели"), checkbox.showclosestobjects) then
-	    end
-	    imgui.SameLine()
-        imgui.TextQuestion("( ? )", u8"Найдет ближайший объект по ID модели")
 		
-		if checkbox.showclosestobjects.v then
-           imgui.Text(u8"modelid объекта: ")
-		   imgui.SameLine()
-		   imgui.PushItemWidth(55)
-	       imgui.InputInt('##INPUT_CLOOBJECTID', closestobjectmodel, 0)
-           imgui.PopItemWidth()
-		   if string.len(closestobjectmodel.v) > 0 then
-              local result, distance, x, y, z = GetNearestObject(closestobjectmodel.v)
-              if result then 
-			     imgui.Text(string.format(u8'Объект находится на расстоянии %.2f метров от вас', distance), -1)
-			  end	 
-		   end
-		end
-	    
 		if imgui.Button(u8"ТП к последнему объекту", imgui.ImVec2(250, 25)) then
 		   if lastObjectModelid and lastObjectCoords.x ~= 0 and doesObjectExist(lastObjectId) then
 		      if isAbsolutePlay then
@@ -1159,7 +1253,6 @@ function imgui.OnDrawFrame()
 		      sampAddChatMessage("Не найден последний объект", -1)
 		   end
 		end
-		
 		-- if imgui.Button(u8"Восстановить удаленный объект", imgui.ImVec2(250, 25)) then
 		   -- if isAbsolutePlay then
 		      -- if lastRemovedObjectModelid then
@@ -1233,6 +1326,11 @@ function imgui.OnDrawFrame()
 		 
 	  	 if ini.settings.usecustomcamdist then
 	        imgui.TextColoredRGB("Дистанция камеры {51484f} (по-умолчанию 1)")
+			if imgui.IsItemClicked() then
+		       slider.camdist.v = 1
+			   ini.settings.camdist = slider.camdist.v
+			   save()
+		    end
 	        if imgui.SliderInt(u8"##camdist", slider.camdist, -100, 250) then
                ini.settings.camdist = slider.camdist.v
                setCameraDistanceActivated(1)		  
@@ -1251,6 +1349,10 @@ function imgui.OnDrawFrame()
 		 
 		 if checkbox.changefov.v then
 		    imgui.TextColoredRGB("FOV {51484f} (по-умолчанию 70)")
+			if imgui.IsItemClicked() then
+		       slider.changefov.v = 1
+		       cameraSetLerpFov(slider.fov.v, slider.fov.v, 999988888, true)
+		    end
 		    if imgui.SliderInt(u8"##fovslider", slider.fov, 1, 179) then
                cameraSetLerpFov(slider.fov.v, slider.fov.v, 999988888, true)
             end
@@ -1294,6 +1396,10 @@ function imgui.OnDrawFrame()
 	  
 	     imgui.Spacing()
 	     imgui.TextColoredRGB("Дистанция прорисовки {51484f} (по-умолчанию 450)")
+		 if imgui.IsItemClicked() then
+		    slider.drawdist.v = 450
+		    memory.setfloat(12044272, slider.drawdist.v, true)
+		 end
          if imgui.SliderInt(u8"##Drawdist", slider.drawdist, 50, 3000) then
             ini.settings.drawdist = slider.drawdist.v
             save()
@@ -1301,6 +1407,10 @@ function imgui.OnDrawFrame()
          end
         
          imgui.TextColoredRGB("Дистанция тумана {51484f} (по-умолчанию 200)")
+		 if imgui.IsItemClicked() then
+		    slider.fog.v = 200
+			memory.setfloat(13210352, slider.fog.v, true)
+		 end
          if imgui.SliderInt(u8"##fog", slider.fog, -390, 390) then
             ini.settings.fog = slider.fog.v
             save()
@@ -1320,9 +1430,18 @@ function imgui.OnDrawFrame()
          imgui.TextQuestion("( ? )", u8"Увеличит дальность прорисовки nameTag над игроком")
          
 		 imgui.Checkbox(u8("Показать скрытые клисты"), checkbox.radarblips)
-		 
 	     imgui.SameLine()
          imgui.TextQuestion("( ? )", u8"Показзывает на радаре скрытых игроков")
+		 
+		 if imgui.Checkbox(u8'Vehicle LODs', checkbox.vehloads) then
+		    if checkbox.vehloads.v then
+			   memory.write(5425646, 1, 1, false)
+			else
+			   memory.write(5425646, 0, 1, false)
+			end
+		 end
+		 imgui.SameLine()
+         imgui.TextQuestion("( ? )", u8"Отображение лодов транспорта")
 		 
 	     if imgui.Button(u8(hide3dtexts and 'Показать' or 'Скрыть')..u8" 3D тексты", 
          imgui.ImVec2(250, 25)) then
@@ -1423,6 +1542,15 @@ function imgui.OnDrawFrame()
 		    slider.weather.v = 20
             setWeather(slider.weather.v)
          end
+		 if imgui.Button(u8"Монохромная", imgui.ImVec2(150, 25)) then
+		    slider.weather.v = 44
+            setWeather(slider.weather.v)
+         end
+		 imgui.SameLine()
+		 if imgui.Button(u8"Темная", imgui.ImVec2(150, 25)) then
+		    slider.weather.v = 45
+            setWeather(slider.weather.v)
+         end
 		 
 		 imgui.Spacing()
 	     imgui.TextColoredRGB("Галерея погоды")
@@ -1431,8 +1559,180 @@ function imgui.OnDrawFrame()
 		 imgui.SameLine()
          imgui.TextQuestion("( ? )", u8"Данная галерея содержит снимки из игры GTA San Andreas, сделанные при разной погоде и времени суток. ")
 		 imgui.Spacing()
+	
+      elseif tabmenu.settings == 6 then
+         if imgui.Checkbox(u8'Тени мира', checkbox.shadows) then
+		    if checkbox.shadows.v then
+			   memory.write(5497177, 233, 1, false)
+               memory.write(5489067, 492560616, 4, false)
+               memory.write(5489071, 0, 1, false)
+               memory.write(6186889, 33807, 2, false)
+               memory.write(7388587, 111379727, 4, false)
+               memory.write(7388591, 0, 2, false)
+               memory.write(7391066, 32081167, 4, false)
+               memory.write(7391070, -1869611008, 4, false)
+			else
+			   memory.write(5497177, 195, 1, false)
+               memory.fill(5489067, 144, 5, false)
+               memory.write(6186889, 59792, 2, false)
+               memory.fill(7388587, 144, 6, false)
+               memory.fill(7391066, 144, 9, false)
+			end
+		 end
+		 imgui.SameLine()
+         imgui.TextQuestion("( ? )", u8"Переключает тени мира")
+	     
+		 -- Gorskin https://www.blast.hk/threads/13380/post-1110222
+		 if imgui.Checkbox(u8'Отключить все эффекты игры', checkbox.noeffects) then
+		    if checkbox.noeffects.v then
+			   memory.fill(0x53EAD3, 0x90, 5, true) 
+			else
+			   memory.hex2bin("E898F6FFFF", 0x53EAD3, 5) 
+			end
+		 end
+		 imgui.SameLine()
+         imgui.TextQuestion("( ? )", u8"Отключает эффекты дыма, пыли, тени")
 		 
-	  elseif tabmenu.settings == 6 then
+		 if imgui.Checkbox(u8'Отрисовка травы и растений', checkbox.grassfix) then
+		    if checkbox.grassfix.v then
+			   memory.hex2bin("E8420E0A00", 0x53C159, 5) 
+			   memory.protect(0x53C159, 5, memory.unprotect(0x53C159, 5)) 
+			else
+			   memory.fill(0x53C159, 0x90, 5, true)
+			end
+		 end
+		 imgui.SameLine()
+         imgui.TextQuestion("( ? )", u8"Возвращает траву из одиночной игры")
+		 
+		 -- Gorskin https://www.blast.hk/threads/13380/post-1107000
+		 if imgui.Checkbox(u8'Оттключить дым из труб и огонь с факелов', checkbox.nofactorysmoke) then
+		    if checkbox.nofactorysmoke.v then
+			   memory.fill(0x4A125D, 0x90, 8, true)
+			   writeMemory(0x539F00, 4, 0x0024C2, true)
+			else
+			   memory.hex2bin('8B4E08E88B900000', 0x4A125D, 8)
+			   writeMemory(0x539F00, 4, 0x6C8B5551, true)
+			end
+		 end
+		 imgui.SameLine()
+         imgui.TextQuestion("( ? )", u8"Отключает дым из труб на заводах и прочие эффекты по типу факелов, горящих черепов. (Требуется рестрим)")
+		 
+		 if imgui.Checkbox(u8'Пост-обработка (PostFX)', checkbox.postfx) then
+		    if checkbox.postfx.v then
+               memory.write(7358318, 1448280247, 4, false)
+               memory.write(7358314, -988281383, 4, false)
+			else
+			   memory.write(7358318, 2866, 4, false)
+               memory.write(7358314, -380152237, 4, false)
+			end
+		 end
+		 imgui.SameLine()
+         imgui.TextQuestion("( ? )", u8"Отключает постобработку (PostFX)")
+		 
+		 if imgui.Checkbox(u8'Анизотропная фильтрация текстур', checkbox.aniso) then
+		    if checkbox.aniso.v then
+			    if readMemory(0x730F9C, 1, false) ~= 0 then
+                memory.write(0x730F9C, 0, 1, false)
+                loadScene(1337, 1337, 1337)
+                callFunction(0x40D7C0, 1, 1, -1)
+                end
+			else
+			    if readMemory(0x730F9C, 1, false) ~= 1 then
+                memory.write(0x730F9C, 1, 1, false)
+                loadScene(1337, 1337, 1337)
+                callFunction(0x40D7C0, 1, 1, -1)
+                end
+			end
+		 end
+		 imgui.SameLine()
+         imgui.TextQuestion("( ? )", u8"Исправление ряби на текстурах")
+		 
+		 if imgui.Checkbox(u8'Blur эффект', checkbox.blur) then
+		    if checkbox.blur.v then
+		       memory.fill(0x704E8A, 0xE8, 1, true)
+			   memory.fill(0x704E8B, 0x11, 1, true)
+			   memory.fill(0x704E8C, 0xE2, 1, true)
+			   memory.fill(0x704E8D, 0xFF, 1, true)
+			   memory.fill(0x704E8E, 0xFF, 1, true)
+		    else
+			   memory.fill(0x704E8A, 0x90, 1, true)
+			   memory.fill(0x704E8B, 0x90, 1, true)
+			   memory.fill(0x704E8C, 0x90, 1, true)
+			   memory.fill(0x704E8D, 0x90, 1, true)
+			   memory.fill(0x704E8E, 0x90, 1, true)
+		    end
+		 end
+		 imgui.SameLine()
+         imgui.TextQuestion("( ? )", u8"Переключает размытость при передвижении в транспорте с увеличением скорости")
+		 
+		 if imgui.Checkbox(u8'Sun эффект', checkbox.sunfix) then
+		    if checkbox.sunfix.v then
+			   memory.hex2bin("E865041C00", 0x53C136, 5) 
+			   memory.protect(0x53C136, 5, memory.unprotect(0x53C136, 5))
+			else
+			   memory.fill(0x53C136, 0x90, 5, true)
+			end
+		 end
+		 imgui.SameLine()
+         imgui.TextQuestion("( ? )", u8"Возвращает солнце из одиночной игры")
+		 
+		 if imgui.Checkbox(u8'Nightvision', checkbox.nightvision) then
+		    if checkbox.nightvision.v then
+			   setNightVision(true)
+			else
+			   setNightVision(false)
+			end
+		 end
+		 imgui.SameLine()
+         imgui.TextQuestion("( ? )", u8"Включает эффект ночного зрения")
+		 
+		 if imgui.Checkbox(u8'InfraredVision', checkbox.infraredvision) then
+		    if checkbox.infraredvision.v then
+			   setInfraredVision(true)
+			else
+			   setInfraredVision(false)
+			end
+		 end
+		 imgui.SameLine()
+         imgui.TextQuestion("( ? )", u8"Включает эффект инфракрасного зрения")
+		 
+		 -- https://github.com/JuniorDjjr/GraphicsTweaker/tree/master/GraphicsTweaker
+		 if imgui.Checkbox(u8'LightMap', checkbox.lightmap) then
+		    if checkbox.lightmap.v then
+			   -- local value = memory.read(0x73558B, 2, true)
+			   -- print(value)
+			   memory.fill(0x73558B, 0x90, 2, true)
+			else
+			   -- local value = memory.read(0x73558B, 2, true)
+			   -- print(value)
+			   memory.write(0x73558B, 15476, 2, true)
+			end
+		 end
+		 imgui.SameLine()
+         imgui.TextQuestion("( ? )", u8"Все окружение становится светлым в любое время и погоду.")
+		 
+		 -- By 4elove4ik
+		 if imgui.Checkbox(u8'NoWater', checkbox.nowater) then
+		    if checkbox.nowater.v then
+			   memory.fill(0x53DD31, 0x90, 5, false)
+               memory.fill(0x53E004, 0x90, 5, false)
+               memory.fill(0x53E142, 0x90, 5, false)
+			else
+			   memory.setuint32(0x53DD31,  0x1B191AE8, false)
+               memory.setuint8(0x53DD31 + 0x4, 0x00, false)
+
+               memory.setuint32(0x53E004, 0x1B1647E8, false)
+               memory.setuint8(0x53E004 + 0x4, 0x00, false)
+ 
+               memory.setuint32(0x53E142, 0x1B1509E8, false)
+               memory.setuint8(0x53E142 + 0x4, 0x00, false)
+			end
+		 end
+		 imgui.SameLine()
+         imgui.TextQuestion("( ? )", u8"Отключает воду (Визуально)")
+		 
+		 imgui.Spacing()
+	  elseif tabmenu.settings == 7 then
 	     
 		 local result, id = sampGetPlayerIdByCharHandle(PLAYER_PED)
 		 local score = sampGetPlayerScore(id)
@@ -1451,6 +1751,11 @@ function imgui.OnDrawFrame()
 		 imgui.Checkbox(u8'Логгировать в консоли выбранные объекты', checkbox.logobjects)
 		 imgui.Checkbox(u8'Логгировать в консоли установку текстуры', checkbox.logtxd)
 		 imgui.Checkbox(u8'Отображать ID текстдравов', checkbox.showtextdrawsid)
+		 if imgui.Checkbox(u8'Скрыть все текстдравы', checkbox.hidealltextdraws) then
+		    for i = 0, 2048 do
+               sampTextdrawDelete(i)
+            end
+		 end
 		 if isAbsolutePlay then
 		    local result, id = sampGetPlayerIdByCharHandle(PLAYER_PED)
             local score = sampGetPlayerScore(id)
@@ -1507,7 +1812,8 @@ function imgui.OnDrawFrame()
 	  if imgui.Button(u8"Камера",imgui.ImVec2(150, 25)) then tabmenu.settings = 3 end 
 	  if imgui.Button(u8"Стрим",imgui.ImVec2(150, 25)) then tabmenu.settings = 4 end 
 	  if imgui.Button(u8"Погода",imgui.ImVec2(150, 25)) then tabmenu.settings = 5 end 
-	  if imgui.Button(u8"Прочее",imgui.ImVec2(150, 25)) then tabmenu.settings = 6 end 
+	  if imgui.Button(u8"Эффекты",imgui.ImVec2(150, 25)) then tabmenu.settings = 6 end 
+	  if imgui.Button(u8"Прочее",imgui.ImVec2(150, 25)) then tabmenu.settings = 7 end 
 	  
       imgui.Spacing()
       imgui.Columns(1)
@@ -2198,7 +2504,7 @@ function imgui.OnDrawFrame()
 
       elseif tabmenu.main == 4 then
       imgui.Columns(2)
-      imgui.SetColumnWidth(-1, 520)
+      imgui.SetColumnWidth(-1, 510)
       
       if tabmenu.info == 1 then
          imgui.Text(u8"Absolute Events Helper v".. thisScript().version)
@@ -2208,7 +2514,7 @@ function imgui.OnDrawFrame()
 			sampAddChatMessage("IP скопирован в буфер обмена", -1)
          end
          imgui.Text(u8"Скрипт позволит сделать процесс маппинга в внутриигровом редакторе карт")
-         imgui.Text(u8"максимально приятным, и даст больше возможностей организаторам мероприятий.")
+         imgui.Text(u8"максимально приятным, и даст больше возможностей организаторам мероприятий")
          imgui.Text(u8"Скрипт распостраняется только с открытым исходным кодом")
 		 if isAbsolutePlay then
             imgui.Text(u8"Категорически не рекомендуется использовать этот скрипт вне редактора карт!")
@@ -2431,14 +2737,12 @@ function imgui.OnDrawFrame()
        
          imgui.Text(u8"RR — красная часть цвета, GG — зеленая, BB — синяя, AA — альфа")
          imgui.ColorEdit4("", color)
-       --imgui.SameLine()
-       --imgui.TextQuestion("( ? )", u8"RR — красная часть цвета, GG — зеленая, BB — синяя, AA — альфа")
          imgui.SameLine()
-         imgui.Text("HEX: " ..intToHex(join_argb(color.v[4] * 255, color.v[1] * 255,
-         color.v[2] * 255, color.v[3] * 255)))
+		 local hexcolor = tostring(intToHex(join_argb(color.v[4] * 255,
+		 color.v[1] * 255, color.v[2] * 255, color.v[3] * 255)))
+         imgui.Text("HEX: " .. hexcolor)
          if imgui.IsItemClicked() then
-            setClipboardText(tostring(intToHex(join_argb(color.v[4] * 255, color.v[1] * 255,
-            color.v[2] * 255, color.v[3] * 255))))
+            setClipboardText(hexcolor)
             sampAddChatMessage("Цвет скопирован в буфер обмена", -1)
          end
          imgui.SameLine()
@@ -2675,7 +2979,7 @@ function imgui.OnDrawFrame()
             imgui.Text(u8"Картины: 2255-2289, 3962-3964, 14860, 14812, 14737")
          elseif combobox.objects.v == 5 then
             imgui.Text(u8"Здесь вы можете сохранить ваши объекты в избранное")
-            imgui.InputTextMultiline('##bufftext', textbuffer.note, imgui.ImVec2(515, 150))
+            imgui.InputTextMultiline('##bufftext', textbuffer.note, imgui.ImVec2(480, 150))
 
             if imgui.Button(u8"Сохранить избранные в файл", imgui.ImVec2(200, 25)) then
                favfile = io.open(getGameDirectory() ..
@@ -2836,6 +3140,42 @@ function imgui.OnDrawFrame()
 		 
       elseif tabmenu.info == 7 then
 
+	   imgui.Spacing()
+	   imgui.Text(u8"Общее")
+	   imgui.Spacing()
+	   
+	   if imgui.CollapsingHeader(u8'Что такое виртуальный мир?') then
+          imgui.Text(u8"Виртуальный мир это функция которая позволяет отделить игрока от других игроков\nпоместив его в отдельный виртуальный экземпляр мира.\nПричем функция не просто делает игроков невидимыми, а вообще не обрабатывает\nтранспортные средства или другие объекты из других виртуальных миров.")
+       end
+	   
+       if imgui.CollapsingHeader(u8'Что такое стример (streamer)?') then
+          imgui.Text(u8"Это плагин который отображает объекты, пикапы, контрольные точки,\nзначки карт, 3D-текст и актеров с заданными пользователем тактами сервера.\n\n")
+       end
+	   
+	   if imgui.CollapsingHeader(u8'Как исправить рябь на стыках?') then
+          imgui.Text(u8"Рябь на стыках появляется в следствие наложения объектов.\nДля исправления нужно сместить объект чуть в сторону,\nлибо ниже (достаточно сдвинуть на 0.0001).\nМногие ошибочно считают что flickr устранит это мерцание — нет,\nплагин не решает проблему плохо сведенных между собой объектов")
+       end
+	   
+	   if imgui.CollapsingHeader(u8'Как убрать засветы и тени?') then
+          imgui.Text(u8"Их скрывают при помомщи Невидимых текстур.\nОдна из таких текстур - ID 19962 (Index 8955 в «Texture Studio»)\nДанная текстура очень полезна при сокрытии некоторых несовершенств\nдефолтных объектов GTA SA и при создании каких-либо новых объектов.")
+       end
+	   
+	   if imgui.CollapsingHeader(u8'Как создается зеркальный пол?') then
+	      imgui.Text(u8"В GTA есть стандартные интерьеры, в которых такой пол встречается.\nИ вокруг них есть небольшая зона, в которой есть зеркальное отражение.\nНазываются они cull zones.\nВ МapСonstructor возможно их все вывести на экран и чётко увидеть их границы\nТо есть, чтоб получить зеркальный пол, Вам нужно:\n- 1. Создать объект в области cull zone.\n- 2. Наложить на него текстуру и сделать её немного прозрачной.\n")
+       end
+	   
+	   if imgui.CollapsingHeader(u8'Статические и динамические объекты в чем разница?') then
+	      imgui.Text(u8"Чтобы понять разницу нужно немного углубиться в кодовую базу.\nВ SA:MP cтатический объект создается через функцию CreateObject,\nа динамический CreateDynamicObject.\nДинамические объекты начинают прорисовываться на определенном расстоянии\nзаданном в настройках стримера, а статические как указано в настройках сервера.\nМожно создать всего 1000 статических объектов!\nОсновные понятия:\n- Динамические объекты - это объекты, пикапы, иконки, 3D тексты\nзоны, чекпоинты в целом обрабатываемые стримером.\n- Динамические зоны - виртуальная зона, представляет собой\nтолько точки в пространстве объединенные в логическую зону.")
+	   end
+	   
+	   if imgui.CollapsingHeader(u8'Как создать движущийся текст?') then
+	      imgui.Text(u8"Создать объект 7313(vgsN_scrollsgn01) и наложить текст на него\nлибо использовать объект воды из водопада 19842(WaterFallWater1).")
+	   end
+
+	   imgui.Spacing()
+	   imgui.Text(u8"Редактор карт на Absolute Play")
+	   imgui.Spacing()
+	   
        if imgui.CollapsingHeader(u8'Что такое "мир" и зачем он нужен?') then
           imgui.Text(u8"Мир это виртуальное пространство, в котором игрок при помощи редактора карт\nможет создавать свои карты используя GTA:SA и SA:MP объекты.\nВ мире владельцу предоставляются достаточно широкие функции \nдля воплощения своих идей и проведения мероприятий.\n")
        end  
@@ -3308,6 +3648,7 @@ function imgui.OnDrawFrame()
        if imgui.Button(u8"ответ", imgui.ImVec2(150, 25)) then
           dialog.fastanswer.v = not dialog.fastanswer.v
        end
+	   
 	 imgui.End()
    end
 
@@ -3604,6 +3945,12 @@ function sampev.onSetPlayerTime(hour, minute)
    end
 end
 
+function sampev.onShowTextDraw(id, data)
+   if checkbox.hidealltextdraws.v then
+      return false
+   end
+end
+
 function sampev.onPlayerQuit(id, reason)
    if id == chosenplayer then chosenplayer = nil end
    local nick = sampGetPlayerNickname(id)
@@ -3706,7 +4053,12 @@ end
    --end
 --end
 
-function sampev.onServerMessage(color, text)   
+function sampev.onServerMessage(color, text)  
+   -- Some functions are prohibited on Arizona
+   if text:find('Добро пожаловать на Arizona Role Play!') then
+      thisScript():unload()
+   end
+   
    if text:find("У тебя нет прав") then
       if prepareJump then 
          JumpForward()
@@ -4200,6 +4552,22 @@ function setWeather(weatherId)
     memory.write(0xC81320, weatherId, 2, false)
 end
 
+-- https://www.blast.hk/threads/13380/post-1110222
+function getMDO(id_obj) -- by Gorskin 
+   -- print(memory.getfloat(getMDO(objectid), true))
+   local mem_obj = callFunction(4210080, 1, 1, id_obj)
+   return mem_obj + 24
+end
+
+-- https://www.blast.hk/threads/13380/post-376878
+-- ampRegisterChatCommand("editobject", function(param)  editObjectBySampId(tonumber(param), false)
+-- function editObjectBySampId(id, playerobj) 
+   -- if isSampAvailable() then
+   -- local ffi = require("ffi")
+      -- ffi.cast("void (__thiscall*)(unsigned long, short int, unsigned long)", sampGetBase() + 0x6DE40)(readMemory(sampGetBase() + 0x21A0C4, 4), id, playerobj and 1 or 0)
+   -- end
+-- end
+
 -- imgui fuctions
 function imgui.TextColoredRGB(text)
     local style = imgui.GetStyle()
@@ -4243,6 +4611,19 @@ function imgui.TextColoredRGB(text)
     end
 
     render_text(text)
+end
+
+--imgui.CustomButton(u8"Кнопка!", imgui.ImVec2(80, 80), u8:encode("Подсказка!"))
+function imgui.TooltipButton(label, size, description)
+   local result = imgui.Button(u8(label), size, u8(description))
+   if imgui.IsItemHovered() then
+      imgui.BeginTooltip()
+      imgui.PushTextWrapPos(600)
+      imgui.TextUnformatted(description)
+      imgui.PopTextWrapPos()
+      imgui.EndTooltip()
+   end
+   return result
 end
 
 function imgui.Link(link, text)
