@@ -4,7 +4,7 @@ script_description("Assistant for mappers and event makers on Absolute Play")
 script_dependencies('imgui', 'lib.samp.events', 'vkeys')
 script_properties("work-in-pause")
 script_url("https://github.com/ins1x/AbsEventHelper")
-script_version("2.4.3")
+script_version("2.4.4")
 -- script_moonloader(16) moonloader v.0.26
 
 -- Activaton: ALT + X (show main menu)
@@ -64,7 +64,7 @@ objectsrenderfont = renderCreateFont("Arial", 7, 5)
 local sizeX, sizeY = getScreenResolution()
 local v = nil
 local color = imgui.ImFloat4(1, 0, 0, 1)
-local lastObjectCoords = {x=0.0, y=0.0, z=0.0}
+local lastObjectCoords = {x=0.0, y=0.0, z=0.0, rx=0.0, ry=0.0, rz=0.0}
 local lastRemovedObjectCoords = {x=0.0, y=0.0, z=0.0, rx=0.0, ry=0.0, rz=0.0}
 local gamestates = {'None', 'Wait Connect', 'Await Join', 'Connected', 'Restarting', 'Disconnected'}
 local gamestate = imgui.ImInt(0)
@@ -75,7 +75,6 @@ local tpc = {
    private = {x = 0, y = 0, z = 0},
    static = {x = 0, y = 0, z = 0}
 }
---local selected_item = imgui.ImInt(0)
 
 local dialog = {
    main = imgui.ImBool(false),
@@ -83,6 +82,7 @@ local dialog = {
    playerstat = imgui.ImBool(false),
    extendedtab = imgui.ImBool(false),
    extendedbinds = imgui.ImBool(false),
+   objectinfo = imgui.ImBool(false),
    fastanswer = imgui.ImBool(false)
 }
 
@@ -235,6 +235,10 @@ local chosenplayer = nil
 local lastObjectModelid = nil
 local lastRemovedObjectModelid = nil
 local lastObjectId = nil
+local lastObject = nil
+local lastObjectlibraryName = nil
+local lastObjecttextureName = nil
+local lastObjecttexturesrcID = nil
 local hide3dtexts = false
 local nameTag = true
 local nameTagWh = false
@@ -292,6 +296,70 @@ VehicleNames = {
    "Police Car (SF)", "Police Car (LV)", "Police Ranger", "Picador", "S.W.A.T. Van",
    "Alpha", "Phoenix", "Glendale", "Sadler", "Luggage Trailer", "Luggage Trailer",
    "Stair Trailer", "Boxville", "Farm Plow", "Utility Trailer"
+}
+
+AbsTxdNames = {"invalid", "vent_64", "alleydoor3", "sw_wallbrick_01", "sw_door11",
+   "newall4-4", "rest_wall4", "crencouwall1", "mp_snow", "mottled_grey_64HV",
+   "marblekb_256128", "Marble2", "Marble", "DinerFloor", "concretebig3_256",
+   "Bow_Abattoir_Conc2", "barbersflr1_LA", "ws_green_wall1", "ws_stationfloor",
+   "Slabs", "Road_blank256HV", "gun_ceiling3", "dts_elevator_carpet2",
+   "cj_white_wall2", "cj_sheetmetal2", "CJ_RUBBER", "CJ_red_COUNTER", "CJ_POLISHED",
+   "cj_juank_1", "CJ_G_CHROME", "cj_chromepipe", "CJ_CHROME2", "CJ_CHIP_M2",
+   "CJ_BLACK_RUB2", "ceiling_256", "bigbrick", "airportmetalwall256", "CJ_BANDEDMETAL",
+   "sky33_64hv", "plainwoodoor2", "notice01_128", "newall15128", "KeepOut_64",
+   "HospitalCarPark_64", "hospitalboard_128a", "fire_exit128", "dustyconcrete128",
+   "cutscenebank128", "concretenew256", "banding9_64HV", "AmbulanceParking_64",
+   "Alumox64", "tenwhite128", "tarmac_64HV", "sandytar_64HV", "LO1road_128",
+   "indsmallwall64", "Grass_128HV", "firewall", "rack", "metal6", "metal5",
+   "metal2", "metal1", "Grass", "dinerfloor01_128", "concretebig3_256",
+   "wallmix64HV", "Road_yellowline256HV", "newallktenb1128", "newallkb1128",
+   "newall9-1", "newall10_seamless", "forestfloor3", "bricksoftgrey128",
+   "tenbeigebrick64", "tenbeige128", "indtena128", "artgal_128", "alleypave_64V",
+   "taxi_256128", "walldirtynewa256128", "wallbrown02_64HV", "TENterr2_128",
+   "TENdbrown5_128", "TENdblue2_128", "tenabrick64", "indtena128", "indten2btm128",
+   "chipboardgrating64HV", "waterclear256", "sw_grass01", "newgrnd1brntrk_128",
+   "grassdeep1blnd", "grassdeep1", "desertstones256grass", "cuntbrnclifftop",
+   "cuntbrncliffbtmbmp", "planks01", "Gen_Scaffold_Wood_Under", "crate128",
+   "cj_crates", "newall2_16c128", "ws_oldwall1", "telepole128", "sw_shedwindow1",
+   "steel128", "skyclouds", "rocktb128", "plaintarmac1", "newall9b_16c128",
+   "LoadingDoorClean", "metaldoor01_256", "des_sherrifwall1", "corrRoof_64HV",
+   "concretenewb256", "chevron_red_64HVa", "Bow_stained_wall", "beigehotel_128",
+   "warnsigns2", "BLOCK", "sw_sand", "sandnew_law", "rocktq128_dirt", "rocktbrn128",
+   "des_dirt1", "desertstones256", "cw2_mounttrailblank", "bonyrd_skin2", "sam_camo",
+   "a51_intdoor", "a51_blastdoor", "washapartwall1_256", "ws_carparkwall2", "girder2_grey_64HV",
+   "jumptop1_64", "ammotrn92crate64", "nopark128", "iron", "ADDWOOD", "tatty_wood_1",
+   "nf_blackbrd", "brk_ball1", "brk_Ball2", "cargo_gir3", "cargo_pipes", "cargo_ceil2",
+   "cargo_top1", "cargo_floor2", "cargo_floor1", "cargo_gir2", "ws_carrierdeckbase",
+   "ab_wood1", "wall1", "motel_wall4", "mp_diner_ceilingdirt", "mp_burn_wall1",
+   "frate64_yellow", "frate_doors64yellow", "frate64_red", "frate_doors128red",
+   "frate_doors64", "frate64_blue", "ct_stall1", "liftdoorsac128", "Metalox64",
+   "redmetal", "snpedtest1", "banding8_64", "skip_rubble1", "metpat64",
+   "walldirtynewa256", "skipY", "vendredmetal", "hazardtile13-128x128", "metalox64",
+   "cj_lightwood", "metalalumox1", "wood1", "rockbrown1", "foil1-128x128", "foil2-128x128",
+   "foil3-128x128", "foil4-128x128", "foil5-128x128", "mp_bobbie_pompom", "mp_bobbie_pompom1",
+   "mp_bobbie_pompom2", "goldplated1", "gen_log", "stonefloortile13", "dts_elevator_door",
+   "dts_elevator_woodpanel", "dts_elevator_carpet2", "dt_officflr2", "conc_wall2_128H",
+   "sl_stapldoor1", "ws_gayflag1", "brick008", "yello007", "metal013", "knot_wood128",
+   "stonewalltile1-5", "stonewalltile1-3", "stonewall4", "metallamppost4", "DanceFloor1",
+   "hazardtile19-2", "concreteoldpainted1", "hazardtile15-3", "sampeasteregg",
+   "stonewalltile1-2", "silk5-128x128", "silk6-128x128", "silk8-128x128", "silk9-128x128",
+   "silk7-128x128", "wrappingpaper4-2", "wrappingpaper1", "wrappingpaper16", "wrappingpaper20",
+   "wrappingpaper28", "CJ-COUCHL1", "metaldrumold1", "metalplate23-3", "gtasavectormap1",
+   "gtasamapbit1", "gtasamapbit2", "gtasamapbit3", "gtasamapbit4", "rustyboltpanel",
+   "planks01", "wallgarage", "floormetal1", "WoodPanel1", "redrailing", "roadguides",
+   "cardboard4", "cardboard4-16", "cardboard4-2", "cardboard4-12", "cardboard4-21",
+   "knot_woodpaint128", "knot_wood128", "telepole2128", "hazardwall2", "bboardblank_law",
+   "ab_sheetSteel", "scratchedmetal", "ws_wetdryblendsand2", "multi086", "wood020",
+   "metal1_128", "bluefoil", "truchettiling3-4", "beetles1", "lava1", "garbagepile1",
+   "concrete12", "samppicture1", "samppicture2", "samppicture3", "samppicture4", "rocktb128",
+   "lavalake", "easter_egg01", "easter_egg02", "easter_egg03", "easter_egg04", "easter_egg05",
+   "711_walltemp", "ab_clubloungewall", "ab_corwallupr", "cj_lightwood", "cj_white_wall2",
+   "cl_of_wltemp", "copbtm_brown", "gym_floor5", "kb_kit_wal1", "la_carp3",
+   "motel_wall3", "mp_carter_bwall", "mp_carter_wall", "mp_diner_woodwall",
+   "mp_motel_bluew", "mp_motel_pinkw", "mp_motel_whitewall", "mp_shop_floor2",
+   "stormdrain3_nt", "des_dirt1", "desgreengrass", "des_ranchwall1", "des_wigwam",
+   "des_wigwamdoor", "des_dustconc", "sanruf", "des_redslats", "duskyred_64",
+   "des_ghotwood1", "Tablecloth", "StainedGlass", "Panel", "bistro_alpha"
 }
 
 function main()
@@ -512,6 +580,7 @@ function main()
          if dialog.playerstat.v then dialog.playerstat.v = false end
          if dialog.extendedtab.v then dialog.extendedtab.v = false end
          if dialog.extendedbinds.v then dialog.extendedbinds.v = false end
+         if dialog.objectinfo.v then dialog.objectinfo.v = false end
       end 
       
 	  -- In onSendEditObject copy object modelid on RMB
@@ -543,9 +612,9 @@ function main()
 	  -- if isKeyJustPressed(VK_N) and not sampIsChatInputActive() 
       -- and not sampIsDialogActive() and not isPauseMenuActive() 
       -- and not isSampfuncsConsoleActive() then 
-	     -- if lastObjectId then
-		    -- local result, positionX, positionY, positionZ = getObjectCoordinates(lastObjectId)
-	        -- sampSendEditObject(false, lastObjectId, 1, positionX, positionY, positionZ, 0.0, 0.0, 0,0)
+	     -- if lastObject then
+		    -- local result, positionX, positionY, positionZ = getObjectCoordinates(lastObject)
+	        -- sampSendEditObject(false, lastObject, 1, positionX, positionY, positionZ, 0.0, 0.0, 0,0)
 		 -- end	
 	  --end
 	 
@@ -714,12 +783,23 @@ function imgui.OnDrawFrame()
       imgui.SameLine()
       imgui.Text("                           ")
 	  imgui.SameLine()
+      
       imgui.Text(string.format("FPS: %i", fps))
+      if imgui.IsItemClicked() then
+         runSampfuncsConsoleCommand("fps")
+      end
+      
 	  imgui.SameLine()
       if imgui.Button(u8"Свернуть") then
          dialog.main.v = not dialog.main.v 
          hideAllFontsImages()
          hideAllTextureImages()
+      end
+      imgui.SameLine()
+      imgui.TextColoredRGB("{424242}( ? )")
+      if imgui.IsItemClicked() then 
+         tabmenu.main = 4
+         tabmenu.info = 1
       end
       imgui.Columns(1)
 
@@ -1045,11 +1125,19 @@ function imgui.OnDrawFrame()
 		 imgui.Spacing()
 		
 	  elseif tabmenu.settings == 2 then
-	  
-	     if countobjects then
-            imgui.Text(string.format(u8"Объектов в области в стрима: %i", streamedObjects))
-         end
 		 
+         if lastObject and doesObjectExist(lastObject) then
+            if dialog.objectinfo.v then 
+               if imgui.Button("(>>)") then
+                  dialog.objectinfo.v = not dialog.objectinfo.v
+               end
+            else
+               if imgui.Button("(<<)") then
+                  dialog.objectinfo.v = not dialog.objectinfo.v
+               end
+            end             
+            imgui.SameLine()
+         end   
          if lastObjectModelid then
             imgui.Text(string.format(u8"Последний modelid объекта: %i", lastObjectModelid))
             if imgui.IsItemClicked() then
@@ -1060,12 +1148,12 @@ function imgui.OnDrawFrame()
 		    imgui.Text(u8"Последний modelid объекта: не выбран")
          end
 		 
-		 if lastObjectModelid then
-		    imgui.TextColoredRGB(string.format("Координаты объекта {3f70d6}x: %.1f, {e0364e}y: %.1f, {26b85d}z: %.1f", lastObjectCoords.x, lastObjectCoords.y, lastObjectCoords.z))
-		 end
-		 
 		 imgui.Text(string.format(u8"Удаленные стандартные объекты (removeBuilding): %i", removedBuildings))
-		 imgui.Spacing()
+		 if countobjects then
+            imgui.Text(string.format(u8"Объектов в области в стрима: %i", streamedObjects))
+         end
+         
+         imgui.Spacing()
 		 
          if imgui.Checkbox(u8("Показывать modelid объектов"), checkbox.showobjects) then 
             if checkbox.drawlinetomodelid.v then checkbox.drawlinetomodelid.v = false end
@@ -1214,7 +1302,7 @@ function imgui.OnDrawFrame()
         imgui.TextQuestion("( ? )", u8"Применимо только для объектов в области стрима")
 		
 		if imgui.Button(u8"ТП к последнему объекту", imgui.ImVec2(250, 25)) then
-		   if lastObjectModelid and lastObjectCoords.x ~= 0 and doesObjectExist(lastObjectId) then
+		   if lastObjectModelid and lastObjectCoords.x ~= 0 and doesObjectExist(lastObject) then
 		      if isAbsolutePlay then
 		         sampSendChat(string.format("/ngr %f %f %f",
 			     lastObjectCoords.x, lastObjectCoords.y, lastObjectCoords.z), 0x0FFFFFF)
@@ -1228,12 +1316,12 @@ function imgui.OnDrawFrame()
 		end
 		
 		if imgui.Button(u8(lastObjectBlip and "Убрать метку с объекта" or "Метку на последний объект"), imgui.ImVec2(250, 25)) then
-		   if lastObjectId and doesObjectExist(lastObjectId) then
+		   if lastObject and doesObjectExist(lastObject) then
 		       if lastObjectBlip then
 			      removeBlip(lastObjectBlip)
 				  lastObjectBlip = nil
 			   else
-		          lastObjectBlip = addBlipForObject(lastObjectId)
+		          lastObjectBlip = addBlipForObject(lastObject)
 			   end
 		   else
 		      sampAddChatMessage("Не найден последний объект", -1)
@@ -1241,18 +1329,19 @@ function imgui.OnDrawFrame()
 		end
 		
 	    if imgui.Button(u8(lastObjectHidden and "Скрыть" or "Показать")..u8" последний объект", imgui.ImVec2(250, 25)) then
-		   if lastObjectId and doesObjectExist(lastObjectId) then
+		   if lastObject and doesObjectExist(lastObject) then
 		      if lastObjectHidden then
-		         setObjectVisible(lastObjectId, false)
+		         setObjectVisible(lastObject, false)
 				 lastObjectHidden = false
 			  else
-			     setObjectVisible(lastObjectId, true)
+			     setObjectVisible(lastObject, true)
 				 lastObjectHidden = true
 			  end
 		   else
 		      sampAddChatMessage("Не найден последний объект", -1)
 		   end
 		end
+         
 		-- if imgui.Button(u8"Восстановить удаленный объект", imgui.ImVec2(250, 25)) then
 		   -- if isAbsolutePlay then
 		      -- if lastRemovedObjectModelid then
@@ -3649,9 +3738,73 @@ function imgui.OnDrawFrame()
           dialog.fastanswer.v = not dialog.fastanswer.v
        end
 	   
-	 imgui.End()
+	  imgui.End()
    end
 
+   if dialog.objectinfo.v then
+      imgui.SetNextWindowPos(imgui.ImVec2(sizeX / 15, sizeY / 4),
+      imgui.Cond.FirstUseEver, imgui.ImVec2(0.5, 0.5))
+      imgui.Begin(u8"Информация о объекте", dialog.objectinfo)
+      
+      if lastObject and doesObjectExist(lastObject) then
+         imgui.TextColoredRGB("modelid: {3f70d6}".. lastObjectModelid)
+         imgui.TextColoredRGB("id: {3f70d6}".. lastObjectId)
+         if not lastObjectCoords.x ~= nil then
+	        imgui.TextColoredRGB(string.format("{3f70d6}x: %.1f, {e0364e}y: %.1f, {26b85d}z: %.1f", lastObjectCoords.x, lastObjectCoords.y, lastObjectCoords.z))
+         end   
+	     if not lastObjectCoords.rx ~= nil then
+            imgui.TextColoredRGB(string.format("{4f70d6}rx: %.1f, {f0364e}ry: %.1f, {36b85d}rz: %.1f", lastObjectCoords.rx, lastObjectCoords.ry, lastObjectCoords.rz))
+         end   
+	     imgui.TextColoredRGB(string.format("angle: {3f70d6}%.1f", getObjectHeading(lastObject)))
+	     --imgui.TextColoredRGB("объект "..(isObjectOnScreen(lastObject) and 'на экране' or 'не на экране'))
+	     if not isObjectOnScreen(lastObject) then 
+            imgui.TextColoredRGB("{ff0000}объект вне зоны прямой видимости")
+         end
+         if isAbsolutePlay and lastObjecttextureName ~= nil then
+            for k, txdname in pairs(AbsTxdNames) do
+               if txdname == lastObjecttextureName then
+                  imgui.TextColoredRGB("texture internalid: {3f70d6}" .. k-1)
+               end
+            end
+	        imgui.TextColoredRGB("txdname: {3f70d6}".. lastObjecttextureName .. " ("..lastObjectlibraryName..") ")
+         end
+         
+         imgui.Spacing()  
+         if imgui.TooltipButton(u8"Инфо по объекту (online)",imgui.ImVec2(200, 25), u8"Посмотреть подробную информацию по объекту на Prineside DevTools") then		    
+            local link = 'explorer "https://dev.prineside.com/ru/gtasa_samp_model_id/search/?q=' .. lastObjectModelid..'"'
+		    os.execute(link)
+	     end
+         
+         if imgui.Button(u8"В буффер обмена", imgui.ImVec2(200, 25)) then
+            if not lastObjectCoords.rx ~= nil then
+               setClipboardText(string.format("%i, %.2f, %.2f, %.2f, %.2f, %.2f, %.2f", lastObjectModelid, lastObjectCoords.x, lastObjectCoords.y, lastObjectCoords.z, lastObjectCoords.rx, lastObjectCoords.ry, lastObjectCoords.rz))
+            else
+               setClipboardText(string.format("%i, %.2f, %.2f, %.2f", lastObjectModelid, lastObjectCoords.x, lastObjectCoords.y, lastObjectCoords.z))
+            end
+            sampAddChatMessage("Текcт скопирован в буфер обмена", -1)
+	     end
+         
+         if imgui.Button(u8"Экспортировать", imgui.ImVec2(200, 25)) then
+            if lastObjecttextureName ~= nil then
+               if not lastObjectCoords.rx ~= nil then
+                  sampAddChatMessage(string.format("tmpobjid = CreateObject(%i, %.2f, %.2f, %.2f, %.2f, %.2f, %.2f);", lastObjectModelid, lastObjectCoords.x, lastObjectCoords.y, lastObjectCoords.z, lastObjectCoords.rx, lastObjectCoords.ry, lastObjectCoords.rz), -1)
+               else
+                  sampAddChatMessage(string.format("tmpobjid = CreateObject(%i, %.2f, %.2f, %.2f);", lastObjectModelid, lastObjectCoords.x, lastObjectCoords.y, lastObjectCoords.z), -1)
+               end
+               sampAddChatMessage(string.format('SetObjectMaterial(tmpobjid, 0, %i, %s, %s, 0xFFFFFFFF);', lastObjecttexturesrcID, lastObjectlibraryName, lastObjecttextureName), -1) 
+            else 
+               if not lastObjectCoords.rx ~= nil then
+                  sampAddChatMessage(string.format("CreateObject(%i, %.2f, %.2f, %.2f, %.2f, %.2f, %.2f)", lastObjectModelid, lastObjectCoords.x, lastObjectCoords.y, lastObjectCoords.z, lastObjectCoords.rx, lastObjectCoords.ry, lastObjectCoords.rz), -1)
+               else
+                  sampAddChatMessage(string.format("CreateObject(%i, %.2f, %.2f, %.2f)", lastObjectModelid, lastObjectCoords.x, lastObjectCoords.y, lastObjectCoords.z), -1)
+               end
+            end
+	     end
+         imgui.Spacing()   
+      end
+	  imgui.End()
+   end
+   
    if dialog.extendedtab.v then
       imgui.SetNextWindowPos(imgui.ImVec2(sizeX / 15, sizeY / 4),
       imgui.Cond.FirstUseEver, imgui.ImVec2(0.5, 0.5))
@@ -3787,19 +3940,19 @@ function imgui.OnDrawFrame()
 	     local totalonline = 0
 		 local olds = 0
 		 local newbies = 0
-		 
+         
 	     for i = 0, sampGetMaxPlayerId(false) do
             if sampIsPlayerConnected(i) then 
 			   totalonline = totalonline + 1
 			   local score = sampGetPlayerScore(i)
 			   if score > 100 then
 			      olds = olds + 1
-			   else
+			   elseif score >= 3 and score <= 100 then 
 			      newbies = newbies + 1
 			   end
 			end
          end
-		 sampAddChatMessage("Игроков в сети "..totalonline.." из них новички "..newbies.." а "..olds.." постояльцы", -1)
+		 sampAddChatMessage("Игроков в сети "..totalonline.." из них новички "..newbies.." а "..olds.." постояльцы (боты: "..(totalonline-newbies-olds)..")", -1)
 	  end
 	  imgui.End()
    end
@@ -3975,12 +4128,12 @@ function sampev.onSendDialogResponse(dialogId, button, listboxId, input)
       print(dialogId, button, listboxId, input)
    end
    
-   if isAbsolutePlay then
+   if isAbsisAbsolutePlay then
       -- if player wxit from world without command drop lastWorldNumber var 
       if dialogId == 1405 and listboxId == 5 and button == 1 then
          lastWorldNumber = 0
       end
-	  
+      
 	  -- Get current world number from server dialogs
 	  if dialogId == 1426 and listboxId == 65535 and button == 1 then
          if tonumber(input) > 0 and tonumber(input) < 500 then
@@ -4020,8 +4173,8 @@ function sampev.onSendDialogResponse(dialogId, button, listboxId, input)
 	  
 	  -- if dialogId == 1401 and button == 1 then
 	     -- if undoMode then
-		    -- if lastObjectId and doesObjectExist(lastObjectId) then
-		       -- setObjectCoordinates(lastObjectId, lastRemovedObjectCoords.x, lastRemovedObjectCoords.y, lastRemovedObjectCoords.z)
+		    -- if lastObject and doesObjectExist(lastObject) then
+		       -- setObjectCoordinates(lastObject, lastRemovedObjectCoords.x, lastRemovedObjectCoords.y, lastRemovedObjectCoords.z)
 			-- end
 		 -- end
 	  -- end
@@ -4038,6 +4191,10 @@ function sampev.onShowDialog(dialogId, style, title, button1, button2, text)
 		 printStringNow("color "..randomcolor.." copied to clipboard",1000)
 	     setClipboardText(randomcolor)
 		 --sampSetCurrentDialogEditboxText(randomcolor)
+      end
+      
+      if dialogId == 1407 then
+         sampAddChatMessage("Подробнее на https://forum.sa-mp.ru/index.php?/topic/1016828-миры-редактор-карт-faq", -1) 
       end
    end
    
@@ -4150,6 +4307,11 @@ function sampev.onCreateObject(objectId, data)
 end
 
 function sampev.onSetObjectMaterial(id, data)
+   if id == lastObjectId then 
+      lastObjectlibraryName = data.libraryName
+      lastObjecttextureName = data.textureName
+      lastObjecttexturesrcID = data.modelId
+   end
    if checkbox.logtxd.v then
       print(id, data.materialId, data.modelId, data.libraryName, data.textureName, data.color)
    end
@@ -4158,11 +4320,16 @@ end
 function sampev.onSendEditObject(playerObject, objectId, response, position, rotation)
    local object = sampGetObjectHandleBySampId(objectId)
    local modelId = getObjectModel(object)
-   lastObjectId = object
+   lastObject = object
+   lastObjectId = objectId
    lastObjectModelid = modelId
    lastObjectCoords.x = position.x
    lastObjectCoords.y = position.y
    lastObjectCoords.z = position.z
+   lastObjectCoords.rx = rotation.x
+   lastObjectCoords.ry = rotation.y
+   lastObjectCoords.rz = rotation.z
+   
    currentEditmode = response
    
    if checkbox.showobjectrot.v then
@@ -4191,7 +4358,8 @@ end
 function sampev.onSendEnterEditObject(type, objectId, model, position)
    local object = sampGetObjectHandleBySampId(objectId)
    local modelId = getObjectModel(object)
-   lastObjectId = object
+   lastObject = object
+   lastObjectId = objectId
    lastObjectModelid = modelId
    lastObjectCoords.x = position.x
    lastObjectCoords.y = position.y
@@ -4615,7 +4783,7 @@ end
 
 --imgui.CustomButton(u8"Кнопка!", imgui.ImVec2(80, 80), u8:encode("Подсказка!"))
 function imgui.TooltipButton(label, size, description)
-   local result = imgui.Button(u8(label), size, u8(description))
+   local result = imgui.Button(label, size, description)
    if imgui.IsItemHovered() then
       imgui.BeginTooltip()
       imgui.PushTextWrapPos(600)
