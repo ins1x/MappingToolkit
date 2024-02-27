@@ -234,7 +234,8 @@ local hide3dtexts = false
 local nameTag = true
 local nameTagWh = false
 local currentEditmode = 0 
-local isSelectObject = false 
+local isSelectObject = false
+local isTexturesListOpened = false
 local hideEditObject = false
 local scaleEditObject = false
 local lastObjectBlip = nil
@@ -576,6 +577,11 @@ function main()
 		 end
 	  end
 	  
+      if isKeyJustPressed(VK_K) and not sampIsChatInputActive() and not sampIsDialogActive()
+	  and not isPauseMenuActive() and not isSampfuncsConsoleActive() then 
+         isTexturesListOpened = false
+      end
+      
 	  -- Count streamed obkects
 	  if countobjects then
 	     streamedObjects = 0
@@ -3948,11 +3954,12 @@ function sampev.onSendDialogResponse(dialogId, button, listboxId, input)
    end
    
    if isAbsolutePlay then
+      isTexturesListOpened = false
       -- if player wxit from world without command drop lastWorldNumber var 
       if dialogId == 1405 and listboxId == 5 and button == 1 then
          lastWorldNumber = 0
       end
-      
+       
 	  -- Get current world number from server dialogs
 	  if dialogId == 1426 and listboxId == 65535 and button == 1 then
          if tonumber(input) > 0 and tonumber(input) < 500 then
@@ -3987,6 +3994,13 @@ function sampev.onSendDialogResponse(dialogId, button, listboxId, input)
                end
             end
          end
+      end
+      
+      if dialogId == 1400 and listboxId == 4 and button == 1 then
+         isTexturesListOpened = true
+      end
+      if dialogId == 1403 and listboxId == 2 and button == 1 then
+         isTexturesListOpened = true
       end
       
 	  if dialogId == 1429 and button == 1 then
@@ -4118,6 +4132,10 @@ function sampev.onSendCommand(command)
 	     end
 	  end
 	  
+      if cmd:find("vfibye2") or cmd:find("машину2") then 
+         isTexturesListOpened = false
+      end
+      
 	  if cmd:find("ds[jl") or cmd:find("exit") or cmd:find("выход") then
 		 lastWorldNumber = 0
 	  end
@@ -4271,7 +4289,7 @@ function sampev.onSendClickPlayer(playerId, source)
 end
 
 function sampev.onShowTextDraw(id, data)
-   if isAbsolutePlay then
+   if isAbsolutePlay and isTexturesListOpened then
       if id >= 2053 and id <= 2100 then
          local index = tonumber(data.text)
          if index ~= nil then
