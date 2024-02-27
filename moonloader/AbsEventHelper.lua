@@ -4,7 +4,7 @@ script_description("Assistant for mappers and event makers on Absolute Play")
 script_dependencies('imgui', 'lib.samp.events', 'vkeys')
 script_properties("work-in-pause")
 script_url("https://github.com/ins1x/AbsEventHelper")
-script_version("2.4.5")
+script_version("2.5")
 -- script_moonloader(16) moonloader v.0.26
 
 -- Activaton: ALT + X (show main menu)
@@ -182,20 +182,8 @@ local textbuffer = {
    tpcx = imgui.ImBuffer(12),
    tpcy = imgui.ImBuffer(12),
    tpcz = imgui.ImBuffer(12),
-   note = imgui.ImBuffer(1024)
-}
-
-local txd = {
-   texture1 = nil,
-   texture2 = nil,
-   texture3 = nil,
-   texture4 = nil,
-   texture5 = nil,
-   fontsimg1 = nil,
-   fontsimg2 = nil,
-   fontsimg3 = nil, 
-   fontsimg4 = nil,
-   fontsimg5 = nil
+   note = imgui.ImBuffer(1024),
+   texturesbuff = imgui.ImBuffer(1024)
 }
 
 local combobox = {
@@ -215,10 +203,13 @@ local combobox = {
    itemad = imgui.ImInt(0),
    logs = imgui.ImInt(0)
 }
--- TRAINING 46.174.50.168
+
 -- If the server changes IP, change it here
-local hostip = "193.84.90.23"
+local ipAbsolutePlay = "193.84.90.23"
 local isAbsolutePlay = false
+local ipTraining = "46.174.50.168"
+local isTraining = false
+
 local isSampAddonInstalled = false
 local isAbsfixInstalled = false
 local isPlayerSpectating = false
@@ -298,7 +289,8 @@ VehicleNames = {
    "Stair Trailer", "Boxville", "Farm Plow", "Utility Trailer"
 }
 
-AbsTxdNames = {"invalid", "vent_64", "alleydoor3", "sw_wallbrick_01", "sw_door11",
+AbsTxdNames = {
+   "invalid", "vent_64", "alleydoor3", "sw_wallbrick_01", "sw_door11",
    "newall4-4", "rest_wall4", "crencouwall1", "mp_snow", "mottled_grey_64HV",
    "marblekb_256128", "Marble2", "Marble", "DinerFloor", "concretebig3_256",
    "Bow_Abattoir_Conc2", "barbersflr1_LA", "ws_green_wall1", "ws_stationfloor",
@@ -360,6 +352,17 @@ AbsTxdNames = {"invalid", "vent_64", "alleydoor3", "sw_wallbrick_01", "sw_door11
    "stormdrain3_nt", "des_dirt1", "desgreengrass", "des_ranchwall1", "des_wigwam",
    "des_wigwamdoor", "des_dustconc", "sanruf", "des_redslats", "duskyred_64",
    "des_ghotwood1", "Tablecloth", "StainedGlass", "Panel", "bistro_alpha"
+}
+
+AbsFontNames = {
+   "Verdana","Comic Sans MS","Calibri",
+   "Cambria","Impact","Times New Roman",
+   "Palatino Linotype","Lucida Sans Unicode",
+   "Lucida Console","Georgia","Franklin Gothic Medium",
+   "Courier New","Corbel","Consolas",
+   "Candara","Trebuchet MS","Tahoma",
+   "Sylfaen","Segoe UI","Webdings",
+   "Wingdings","Symbol","GTAWEAPON3"
 }
 
 function commandparser(args)
@@ -424,11 +427,14 @@ function main()
    if not isSampLoaded() or not isSampfuncsLoaded() then return end
       while not isSampAvailable() do wait(100) end
       local ip, port = sampGetCurrentServerAddress()
-      if not ip:find(hostip) then
+      if not ip:find(ipAbsolutePlay) then
 	     isAbsolutePlay = false
          if ini.settings.noabsunload then
             thisScript():unload()
          else
+            if ip:find(ipTraining) then
+               isTraining = true
+            end
 		    sampAddChatMessage("{880000}Absolute Events Helper.\
 		    {FFFFFF}Открыть меню: {CDCDCD}ALT + X", 0xFFFFFF)
 		 end
@@ -460,68 +466,6 @@ function main()
          createDirectory("moonloader/resource/abseventhelper")
       end
       
-      if doesFileExist(getGameDirectory() .. '\\moonloader\\resource\\abseventhelper\\texture1.jpg') then
-         txd.texture1 = renderLoadTextureFromFile(getGameDirectory() .. '\\moonloader\\resource\\abseventhelper\\texture1.jpg')
-      else
-         print("AbsEventHelper failed import texture1")
-      end
-      
-      if doesFileExist(getGameDirectory() .. '\\moonloader\\resource\\abseventhelper\\texture2.jpg') then
-         txd.texture2 = renderLoadTextureFromFile(getGameDirectory() .. '\\moonloader\\resource\\abseventhelper\\texture2.jpg')
-      else
-         print("AbsEventHelper failed import texture2")
-      end
-      
-      if doesFileExist(getGameDirectory() .. '\\moonloader\\resource\\abseventhelper\\texture3.jpg') then
-         txd.texture3 = renderLoadTextureFromFile(getGameDirectory() .. '\\moonloader\\resource\\abseventhelper\\texture3.jpg')
-      else
-         print("AbsEventHelper failed import texture3")
-      end
-      
-      if doesFileExist(getGameDirectory() .. '\\moonloader\\resource\\abseventhelper\\texture3.jpg') then
-         txd.texture4 = renderLoadTextureFromFile(getGameDirectory() .. '\\moonloader\\resource\\abseventhelper\\texture4.jpg')
-      else
-         print("AbsEventHelper failed import texture4")
-      end
-      
-      if doesFileExist(getGameDirectory() .. '\\moonloader\\resource\\abseventhelper\\texture3.jpg') then
-         txd.texture5 = renderLoadTextureFromFile(getGameDirectory() .. '\\moonloader\\resource\\abseventhelper\\texture5.jpg')
-      else
-         print("AbsEventHelper failed import texture5")
-      end
-      
-      -- Rights to the images belong to the pawnokit project
-      -- https://pawnokit.ru/ru/spec_symbols
-      if doesFileExist(getGameDirectory() .. '\\moonloader\\resource\\abseventhelper\\fGTAWeapon3.jpg') then
-         txd.fontsimg1 = renderLoadTextureFromFile(getGameDirectory() .. '\\moonloader\\resource\\abseventhelper\\fGTAWeapon3.jpg')
-      else
-         print("AbsEventHelper failed import fGTAWeapon3.jpg")
-      end
-      
-      if doesFileExist(getGameDirectory() .. '\\moonloader\\resource\\abseventhelper\\fWebdingsEN.jpg') then
-         txd.fontsimg2 = renderLoadTextureFromFile(getGameDirectory() .. '\\moonloader\\resource\\abseventhelper\\fWebdingsEN.jpg')
-      else
-         print("AbsEventHelper failed import fWebdingsEN.jpg")
-      end
-      
-      if doesFileExist(getGameDirectory() .. '\\moonloader\\resource\\abseventhelper\\fWebdingsRU.jpg') then
-         txd.fontsimg3 = renderLoadTextureFromFile(getGameDirectory() .. '\\moonloader\\resource\\abseventhelper\\fWebdingsRU.jpg')
-      else
-         print("AbsEventHelper failed import fWebdingsRU.jpg")
-      end
-      
-      if doesFileExist(getGameDirectory() .. '\\moonloader\\resource\\abseventhelper\\fWingdingsEN.jpg') then
-         txd.fontsimg4 = renderLoadTextureFromFile(getGameDirectory() .. '\\moonloader\\resource\\abseventhelper\\fWingdingsEN.jpg')
-      else
-         print("AbsEventHelper failed import fWingdingsEN.jpg")
-      end
-      
-      if doesFileExist(getGameDirectory() .. '\\moonloader\\resource\\abseventhelper\\fWingdingsRU.jpg') then
-         txd.fontsimg5 = renderLoadTextureFromFile(getGameDirectory() .. '\\moonloader\\resource\\abseventhelper\\fWingdingsRU.jpg')
-      else
-         print("AbsEventHelper failed import fWingdingsRU.jpg")
-      end
-      
       if doesFileExist(getGameDirectory() .. '\\moonloader\\resource\\abseventhelper\\objects.txt') then
          favfile = io.open(getGameDirectory() ..
          "//moonloader//resource//abseventhelper//objects.txt", "r")
@@ -538,64 +482,6 @@ function main()
       --- END init
       while true do
       wait(0)
-      
-      local imgX, imgY = 770, 480 -- image size
-      
-      if(tabmenu.info == 4) then
-          if show_texture1 and txd.texture1 then
-             renderDrawTexture(txd.texture1, (sizeX - imgX) / 2,
-             (sizeY - imgY) / 2,imgX, imgY, 0, 0xffffffff)
-          end
-          
-          if show_texture2 and txd.texture2 then
-             renderDrawTexture(txd.texture2, (sizeX - imgX) / 2,
-             (sizeY - imgY) / 2, imgX, imgY, 0, 0xffffffff)
-          end
-          
-          if show_texture3 and txd.texture3 then
-             renderDrawTexture(txd.texture3, (sizeX - imgX) / 2,
-             (sizeY - imgY) / 2, imgX, imgY, 0, 0xffffffff)
-          end
-          
-          if show_texture4 and txd.texture4 then
-             renderDrawTexture(txd.texture4, (sizeX - imgX) / 2,
-             (sizeY - imgY) / 2, imgX, imgY, 0, 0xffffffff)
-          end
-          
-          if show_texture5 and txd.texture5 then
-             renderDrawTexture(txd.texture5, (sizeX - imgX) / 2,
-             (sizeY - imgY) / 2, imgX, imgY, 0, 0xffffffff)
-          end
-      end
-      
-      local imgX, imgY = 500, 450 -- image size
-      
-      if(tabmenu.info == 4) then
-          if show_fontsimg1 and txd.fontsimg1 then
-             renderDrawTexture(txd.fontsimg1, (sizeX - imgX) / 2,
-             (sizeY - imgY) / 2, imgX, imgY, 0, 0xffffffff)
-          end
-          
-          if show_fontsimg2 and txd.fontsimg2 then
-             renderDrawTexture(txd.fontsimg2, (sizeX - imgX) / 2,
-             (sizeY - imgY) / 2, imgX, imgY, 0, 0xffffffff)
-          end
-          
-          if show_fontsimg3 and txd.fontsimg3 then
-             renderDrawTexture(txd.fontsimg3, (sizeX - imgX) / 2,
-             (sizeY - imgY) / 2, imgX, imgY, 0, 0xffffffff)
-          end
-          
-          if show_fontsimg4 and txd.fontsimg4 then
-             renderDrawTexture(txd.fontsimg4, (sizeX - imgX) / 2,
-             (sizeY - imgY) / 2, imgX, imgY, 0, 0xffffffff)
-          end
-          
-          if show_fontsimg5 and txd.fontsimg5 then
-             renderDrawTexture(txd.fontsimg5, (sizeX - imgX) / 2,
-             (sizeY - imgY) / 2, imgX, imgY, 0, 0xffffffff)
-          end
-       end
       
       -- Imgui menu
       if not ENBSeries then imgui.Process = dialog.main.v end
@@ -616,8 +502,6 @@ function main()
       if isKeyJustPressed(VK_ESCAPE) and not sampIsChatInputActive() 
       and not sampIsDialogActive() and not isPauseMenuActive() 
       and not isSampfuncsConsoleActive() then 
-         hideAllFontsImages()
-         hideAllTextureImages()
          if dialog.main.v then dialog.main.v = false end
          if dialog.fastanswer.v then dialog.fastanswer.v = false end
          if dialog.textures.v then dialog.textures.v = false end
@@ -838,11 +722,10 @@ function imgui.OnDrawFrame()
 	  imgui.SameLine()
       if imgui.Button(u8"Свернуть") then
          dialog.main.v = not dialog.main.v 
-         hideAllFontsImages()
-         hideAllTextureImages()
       end
       imgui.SameLine()
-      imgui.TextColoredRGB("{424242}( ? )")
+      --imgui.TextColoredRGB("{424242}( ? )")
+      imgui.TextQuestion("( ? )", u8"О скрипте")
       if imgui.IsItemClicked() then 
          tabmenu.main = 4
          tabmenu.info = 1
@@ -869,10 +752,6 @@ function imgui.OnDrawFrame()
                setClipboardText(string.format(u8"%.1f, %.1f, %.1f", positionX, positionY, positionZ))
                sampAddChatMessage("Позиция скопирован в буфер обмена", -1)
             end
-	        
-			local angle = math.ceil(getCharHeading(PLAYER_PED))
-			imgui.SameLine()
-            imgui.Text(string.format(u8" %s  %i°", direction(), angle))
 			
 		    if tpcpos.x then
 			   if tpcpos.x ~= 0 then
@@ -1107,6 +986,7 @@ function imgui.OnDrawFrame()
 			
 			imgui.Spacing()
 			imgui.Text(isPlayerSpectating and u8('В наблюдении: Да') or u8('В наблюдении: Нет'))
+            --imgui.SameLine()
 			if imgui.Button(u8'Выйти из спектатора', imgui.ImVec2(200, 25)) then
 		       if isAbsolutePlay then
 			      if isPlayerSpectating then 
@@ -1115,6 +995,7 @@ function imgui.OnDrawFrame()
 			   end
                sampSendChat("/spec")
             end
+            
             imgui.SameLine()
             if imgui.Button(u8'Войти в спектатор', imgui.ImVec2(200, 25)) then
 		       if isAbsolutePlay then
@@ -1155,7 +1036,7 @@ function imgui.OnDrawFrame()
 			      restoreCameraJumpcut()
 			      clearCharTasksImmediately(PLAYER_PED)
 			   else
-			      SpawnPlayer()
+			      sampSpawnPlayer()
 				  restoreCameraJumpcut()
 			   end
 		    end
@@ -1399,6 +1280,9 @@ function imgui.OnDrawFrame()
 		imgui.Spacing()
 		
 	  elseif tabmenu.settings == 3 then
+
+		 local angle = math.ceil(getCharHeading(PLAYER_PED))
+         imgui.Text(string.format(u8"Направление: %s  %i°", direction(), angle))
 	     local camX, camY, camZ = getActiveCameraCoordinates()
 		 imgui.Text(string.format(u8"Камера x: %.1f, y: %.1f, z: %.1f",
          camX, camY, camZ))
@@ -1856,7 +1740,18 @@ function imgui.OnDrawFrame()
 	     
 		 local result, id = sampGetPlayerIdByCharHandle(PLAYER_PED)
 		 local score = sampGetPlayerScore(id)
-		 
+		 local ip, port = sampGetCurrentServerAddress()
+         
+         if not ip:find(ipAbsolutePlay) then
+            if ip:find(ipTraining) then
+               imgui.TextColoredRGB(u8"TRAINING " ..tostring(ip) ..":".. tostring(port).. "  ".. os.date('%d.%m.%Y %X'))
+            else
+            imgui.TextColoredRGB(u8"SERVER " ..tostring(ip) ..":".. tostring(port).. "  ".. os.date('%d.%m.%Y %X'))
+            end
+         else
+            imgui.TextColoredRGB(u8"Absolute Play " ..tostring(ip) ..":".. tostring(port).. "  ".. os.date('%d.%m.%Y %X'))
+         end
+         
 	     imgui.Text(u8'Ваш текущий Gamestate: '..gamestates[sampGetGamestate() + 1])
 		 imgui.PushItemWidth(200)
 		 imgui.Combo(u8'##Gamestates', gamestate, gamestates)
@@ -1864,12 +1759,14 @@ function imgui.OnDrawFrame()
 		 if imgui.Button(u8'Сменить') then
 			sampSetGamestate(gamestate.v)
 		 end
-		 
-		 imgui.Checkbox(u8'Логгировать в консоли нажатые текстдравы', checkbox.logtextdraws)
-		 imgui.Checkbox(u8'Логгировать в консоли поднятые пикапы', checkbox.pickeduppickups)
-		 imgui.Checkbox(u8'Логгировать в консоли ответы на диалоги', checkbox.logdialogresponse)
-		 imgui.Checkbox(u8'Логгировать в консоли выбранные объекты', checkbox.logobjects)
-		 imgui.Checkbox(u8'Логгировать в консоли установку текстуры', checkbox.logtxd)
+		 if imgui.CollapsingHeader(u8"Логгировать в консоли:") then
+            imgui.Checkbox(u8'Логгировать в консоли нажатые текстдравы', checkbox.logtextdraws)
+            imgui.Checkbox(u8'Логгировать в консоли поднятые пикапы', checkbox.pickeduppickups)
+            imgui.Checkbox(u8'Логгировать в консоли ответы на диалоги', checkbox.logdialogresponse)
+            imgui.Checkbox(u8'Логгировать в консоли выбранные объекты', checkbox.logobjects)
+            imgui.Checkbox(u8'Логгировать в консоли установку текстуры', checkbox.logtxd)
+         end
+         
 		 imgui.Checkbox(u8'Отображать ID текстдравов', checkbox.showtextdrawsid)
 		 if imgui.Checkbox(u8'Скрыть все текстдравы', checkbox.hidealltextdraws) then
 		    for i = 0, 2048 do
@@ -2656,7 +2553,7 @@ function imgui.OnDrawFrame()
          imgui.Text(u8"Absolute Events Helper v".. thisScript().version)
          imgui.TextColoredRGB("Ассистент для мапперов и организаторов мероприятий на серверах {007DFF}Absolute Play.")
 		 if imgui.IsItemClicked() then
-            setClipboardText(hostip)
+            setClipboardText(ipAbsolutePlay)
 			sampAddChatMessage("IP скопирован в буфер обмена", -1)
          end
          imgui.Text(u8"Скрипт позволит сделать процесс маппинга в внутриигровом редакторе карт")
@@ -2674,7 +2571,7 @@ function imgui.OnDrawFrame()
 		 if isAbsfixInstalled then
 		    imgui.TextColoredRGB("Спасибо что используете ")
 			imgui.SameLine()
- 		    imgui.Link("https://github.com/ins1x/useful-samp-stuff/tree/main/luascripts/absolutefix", "AbsoluteFix!")
+ 		    imgui.Link("https://github.com/ins1x/useful-samp-stuff/tree/main/luascripts/absolutefix", "AbsoluteFix")
 		 end
 		 
          imgui.Text("Homepage:")
@@ -2728,13 +2625,22 @@ function imgui.OnDrawFrame()
             imgui.TextColoredRGB("STREAMER_ACTOR_SD {00FF00}200.0")
 		 end
 		 if imgui.CollapsingHeader(u8"Лимиты в мире:") then
-            imgui.TextColoredRGB("макс. объектов: {00FF00}300 (VIP 2000)")
-            imgui.TextColoredRGB("макс. объектов в одной точке: {00FF00}200 ")
-            imgui.TextColoredRGB("макс. пикапов: {00FF00}500")
-            imgui.TextColoredRGB("макс. маркеров для гонок: {00FF00}40")
-            imgui.TextColoredRGB("макс. транспорта: {00FF00}50")
-            imgui.TextColoredRGB("макс. слотов под гонки: {00FF00}5")
-            imgui.TextColoredRGB("макс. виртуальных миров: {00FF00}500")
+            if isAbsolutePlay then
+               imgui.TextColoredRGB("макс. объектов: {00FF00}300 (VIP 2000)")
+               imgui.TextColoredRGB("макс. объектов в одной точке: {00FF00}200 ")
+               imgui.TextColoredRGB("макс. пикапов: {00FF00}500")
+               imgui.TextColoredRGB("макс. маркеров для гонок: {00FF00}40")
+               imgui.TextColoredRGB("макс. транспорта: {00FF00}50")
+               imgui.TextColoredRGB("макс. слотов под гонки: {00FF00}5")
+               imgui.TextColoredRGB("макс. виртуальных миров: {00FF00}500")
+            end
+            if isTraining then
+               imgui.TextColoredRGB("Слоты сохранения игровых миров: {00FF00}3 > 10")
+               imgui.TextColoredRGB("Объекты: {00FF00}300 > 3500")
+               imgui.TextColoredRGB("Пикапы(проходы): {00FF00}20 > 100")
+               imgui.TextColoredRGB("Актеры: {00FF00}50 > 200")
+               imgui.TextColoredRGB("Транспорт: {00FF00}30 > 80")
+            end
          end
          imgui.Text(u8"В радиусе 150 метров нельзя создавать более 200 объектов.")
          imgui.TextColoredRGB("Максимальная длина текста на объектах в редакторе миров - {00FF00}50 символов")
@@ -2911,72 +2817,38 @@ function imgui.OnDrawFrame()
          
       elseif tabmenu.info == 4 then
       
-         
-		 imgui.SameLine(300)
-         if imgui.Button(u8"Скрыть все", imgui.ImVec2(200, 25)) then
-            hideAllTextureImages()
-            hideAllFontsImages()
-         end
-		 
-		 if imgui.CollapsingHeader(u8'Текстуры') then
-		    if imgui.Button(u8"1-60", imgui.ImVec2(200, 25)) then
-               hideAllTextureImages()
-               show_texture1 = not show_texture1
+		 if imgui.CollapsingHeader(u8'Доступные текстуры на Absolute Play:') then
+            --imgui.InputTextMultiline('##bufftextures', textbuffer.texturesbuff, imgui.ImVec2(480, 150))
+            if isAbsolutePlay then
+               local texturelink
+               local texturename
+               imgui.Spacing()
+               imgui.Link("https://textures.xyin.ws/", "1.No texture")
+               for k, txdname in pairs(AbsTxdNames) do
+                  if k % 3 ~= 0 then imgui.SameLine() end
+                  texturelink = string.format("https://textures.xyin.ws/?page=textures&limit=10&search=%s", AbsTxdNames[k+1])
+                  texturename = string.format("%d.%s", k+1, AbsTxdNames[k+1])
+                  imgui.Link(texturelink, texturename)
+               end
             end
-         
-            if imgui.Button(u8"60-120", imgui.ImVec2(200, 25)) then
-               hideAllTextureImages()
-               show_texture2 = not show_texture2
-            end
-         
-            if imgui.Button(u8"120-180", imgui.ImVec2(200, 25)) then
-               hideAllTextureImages()
-               show_texture3 = not show_texture3
-            end
-    
-            if imgui.Button(u8"180-240", imgui.ImVec2(200, 25)) then
-               hideAllTextureImages()
-               show_texture4 = not show_texture4
-            end
-      
-            if imgui.Button(u8"240-302", imgui.ImVec2(200, 25)) then
-               hideAllTextureImages()
-               show_texture5 = not show_texture5
-            end		 
 		 end
 		 
-		 if imgui.CollapsingHeader(u8'Шрифты') then
-		    if isAbsolutePlay then 
+		 if imgui.CollapsingHeader(u8'Популярные шрифты') then
+            if isAbsolutePlay then
+               local fontlink
+               imgui.Spacing()
+               for k, fontname in pairs(AbsFontNames) do
+                  fontlink = string.format("https://flamingtext.ru/Font-Search?q=%s", fontname)
+                  imgui.Link(fontlink, fontname)
+               end
+            end
+            imgui.Spacing()
+            imgui.Text(u8"Пример использования:")
+            imgui.TextColoredRGB(u8'SetObjectMaterialText(string, "TEST", 0, 140, "webdings", 150, 0, -65536, 0, 1);')
+            if isAbsolutePlay then 
 			   imgui.TextColoredRGB("Максимальный размер шрифта 200")
 			else
 			   imgui.TextColoredRGB("Максимальный размер шрифта 255")
-            end
-            
-            imgui.Text(u8"Пример использования:")
-            imgui.TextColoredRGB(u8'SetObjectMaterialText(string, "TEST", 0, 140, "webdings", 150, 0, -65536, 0, 1);')
-            if imgui.Button(u8"GTAWeapon3", imgui.ImVec2(200, 25)) then
-               hideAllFontsImages()
-               show_fontsimg1 = not show_fontsimg1
-            end
-      
-            if imgui.Button(u8"WebdingsEN", imgui.ImVec2(200, 25)) then
-               hideAllFontsImages()
-               show_fontsimg2 = not show_fontsimg2
-            end
-      
-            if imgui.Button(u8"WebdingsRU", imgui.ImVec2(200, 25)) then
-               hideAllFontsImages()
-               show_fontsimg3 = not show_fontsimg3
-            end
-    
-            if imgui.Button(u8"WingdingsEN", imgui.ImVec2(200, 25)) then
-               hideAllFontsImages()
-               show_fontsimg4 = not show_fontsimg4
-            end
-      
-            if imgui.Button(u8"fWingdingsRU", imgui.ImVec2(200, 25)) then
-               hideAllFontsImages()
-               show_fontsimg5 = not show_fontsimg5
             end
          end
 		 if imgui.CollapsingHeader(u8'Поверхности для текста') then
@@ -3060,6 +2932,10 @@ function imgui.OnDrawFrame()
 		 imgui.SameLine()
 		 imgui.Link("https://dev.prineside.com/gtasa_samp_game_texture/view/", "dev.prineside.com")
 		
+         imgui.TextColoredRGB("Браузер спрайтов")
+		 imgui.SameLine()
+		 imgui.Link("https://pawnokit.ru/ru/txmngr", "pawnokit.ru")
+         
 		 imgui.TextColoredRGB("Вики по функцииям")
 		 imgui.SameLine()
 		 imgui.Link("https://www.open.mp/docs/scripting/functions/SetObjectMaterialText", "SetObjectMaterialText")
@@ -3179,10 +3055,6 @@ function imgui.OnDrawFrame()
 	              textbuffer.objectid.v = tostring(lastObjectModelid)
 		       end
 	        end
-		 
-		    imgui.TextColoredRGB("Список всех разрушаемых объектов на ")
-            imgui.SameLine()
-		    imgui.Link("https://dev.prineside.com/ru/gtasa_samp_model_id/customsearch/?c%5B%5D=1&s=id-asc&bc=-1&bb=1&bt=-1&ba=-1", "dev.prineside.com/customsearch")
          end
 	
          imgui.Text(u8"______________________________________________________________________")
@@ -3199,14 +3071,10 @@ function imgui.OnDrawFrame()
          imgui.TextColoredRGB("Карта объектов которые не видны редакторами карт")
 		 imgui.SameLine()
 		 imgui.Link("https://map.romzes.com/", "map.romzes.com")
-	  
-         imgui.TextColoredRGB("Список всех текстур GTA:SA")
-		 imgui.SameLine()
-		 imgui.Link("https://textures.xyin.ws/?page=textures&p=1&limit=100", "textures.xyin.ws")
-      
-	     imgui.TextColoredRGB("Браузер спрайтов")
-		 imgui.SameLine()
-		 imgui.Link("https://pawnokit.ru/ru/txmngr", "pawnokit.ru")
+         
+         imgui.TextColoredRGB("Список всех разрушаемых объектов на ")
+         imgui.SameLine()
+         imgui.Link("https://dev.prineside.com/ru/gtasa_samp_model_id/customsearch/?c%5B%5D=1&s=id-asc&bc=-1&bb=1&bt=-1&ba=-1", "dev.prineside.com/customsearch")
            
       elseif tabmenu.info == 6 then
 		 imgui.Spacing()
@@ -3634,8 +3502,10 @@ function imgui.OnDrawFrame()
       imgui.EndChild()
 
       local ip, port = sampGetCurrentServerAddress()
-      if not ip:find(hostip) then
-         imgui.TextColoredRGB("{FF0000}Некоторые функции будут недоступны. Скрипт предназначен для Absolute Play")
+      if not ip:find(ipAbsolutePlay) then
+         if ip:find(ipTraining) then
+            imgui.TextColoredRGB("{FF0000}Некоторые функции будут недоступны. Скрипт предназначен для Absolute Play")
+         end
       end
 
       imgui.End()
@@ -4039,82 +3909,6 @@ function imgui.OnDrawFrame()
 	  imgui.End()
    end
    
-   if dialog.textures.v then
-      imgui.SetNextWindowPos(imgui.ImVec2(sizeX /10, sizeY /10),
-      imgui.Cond.FirstUseEver, imgui.ImVec2(0.5, 0.5))
-      imgui.Begin(u8"Textures", dialog.textures)
-
-      imgui.Text(u8"Текстуры:")
-	  --imgui.SameLine(300)
-	  imgui.SameLine()
-      if imgui.Button(u8"Скрыть все", imgui.ImVec2(200, 25)) then
-         hideAllTextureImages()
-         hideAllFontsImages()
-      end
-		 
-      if imgui.Button(u8"1-60", imgui.ImVec2(200, 25)) then
-         hideAllTextureImages()
-         show_texture1 = not show_texture1
-      end
-         
-      if imgui.Button(u8"60-120", imgui.ImVec2(200, 25)) then
-         hideAllTextureImages()
-         show_texture2 = not show_texture2
-      end
-         
-      if imgui.Button(u8"120-180", imgui.ImVec2(200, 25)) then
-         hideAllTextureImages()
-         show_texture3 = not show_texture3
-      end
-    
-      if imgui.Button(u8"180-240", imgui.ImVec2(200, 25)) then
-         hideAllTextureImages()
-         show_texture4 = not show_texture4
-      end
-      
-      if imgui.Button(u8"240-302", imgui.ImVec2(200, 25)) then
-         hideAllTextureImages()
-         show_texture5 = not show_texture5
-      end
-		 
-	  imgui.TextColoredRGB("Список всех текстур GTA:SA")
-	  imgui.SameLine()
-	  imgui.Link("https://textures.xyin.ws/?page=textures&p=1&limit=100", "textures.xyin.ws")
-		 
-      imgui.Text(u8"Шрифты:")
-
-      if imgui.Button(u8"GTAWeapon3", imgui.ImVec2(200, 25)) then
-         hideAllFontsImages()
-         show_fontsimg1 = not show_fontsimg1
-      end
-      
-      if imgui.Button(u8"WebdingsEN", imgui.ImVec2(200, 25)) then
-         hideAllFontsImages()
-         show_fontsimg2 = not show_fontsimg2
-      end
-      
-      if imgui.Button(u8"WebdingsRU", imgui.ImVec2(200, 25)) then
-         hideAllFontsImages()
-         show_fontsimg3 = not show_fontsimg3
-      end
-    
-      if imgui.Button(u8"WingdingsEN", imgui.ImVec2(200, 25)) then
-         hideAllFontsImages()
-         show_fontsimg4 = not show_fontsimg4
-      end
-      
-      if imgui.Button(u8"fWingdingsRU", imgui.ImVec2(200, 25)) then
-         hideAllFontsImages()
-         show_fontsimg5 = not show_fontsimg5
-      end
-
-	  imgui.TextColoredRGB("Список всех спецсимволов")
-      imgui.SameLine()
-      imgui.Link("https://pawnokit.ru/ru/spec_symbols", "pawnokit.ru")
-      		 
-      imgui.End()
-   end
-   
 end
 
 function sampev.onSetWeather(weatherId)
@@ -4230,17 +4024,28 @@ function sampev.onSendDialogResponse(dialogId, button, listboxId, input)
 end
 
 function sampev.onShowDialog(dialogId, style, title, button1, button2, text)
-   -- save random color from text editing dialog to clipboard
    if isAbsolutePlay then
-      if dialogId == 1496 then
-         local randomcolor = string.sub(text, string.len(text)-6, #text-1)
-		 printStringNow("color "..randomcolor.." copied to clipboard",1000)
-	     setClipboardText(randomcolor)
-		 --sampSetCurrentDialogEditboxText(randomcolor)
-      end
+      -- save random color from text editing dialog to clipboard
+      -- moved to absolutefix
+      -- if dialogId == 1496 then
+         -- local randomcolor = string.sub(text, string.len(text)-6, #text-1)
+		 -- printStringNow("color "..randomcolor.." copied to clipboard",1000)
+	     -- setClipboardText(randomcolor)
+      -- end
       
       if dialogId == 1407 then
-         sampAddChatMessage("Подробнее на https://forum.sa-mp.ru/index.php?/topic/1016828-миры-редактор-карт-faq", -1) 
+         return {dialogId, style, title, button1, button2, text.."\nПодробнее на https://forum.sa-mp.ru/index.php?/topic/1016828-миры-редактор-карт-faq"}
+      end
+      
+      if dialogId == 1401 then
+         local newtext = 
+         "615-18300   GTA-SA \n"..
+         "18632-19521 SA-MP\n"..
+         "19477-19482 Text \n\n"..
+         "Номера объектов можно найти на сайте:\n"..
+         "https://dev.prineside.com/ru/gtasa_samp_model_id/\n"..
+         "\nВведи номер объекта: \n"
+         return {dialogId, style, title, button1, button2, newtext}
       end
    end
    
@@ -4255,15 +4060,8 @@ function sampev.onShowDialog(dialogId, style, title, button1, button2, text)
    end
 end
 
---function sampev.onCreateGangZone(zoneId, squareStart, squareEnd, color)
-   --print(zoneId, squareStart, squareEnd, color)
-   --zoneId 481- 580 PUBG zones ids
-   --if zoneId >= 481 and zoneId <= 580 then
-   --end
---end
-
 function sampev.onServerMessage(color, text)  
-   -- Some functions are prohibited on Arizona
+   -- Some functions are prohibited on Arizona (Autounload)
    if text:find('Добро пожаловать на Arizona Role Play!') then
       thisScript():unload()
    end
@@ -4472,20 +4270,24 @@ function sampev.onSendClickPlayer(playerId, source)
    tabselectedplayer = playerId
 end
 
--- function sampev.onTextDrawSetString(id, text)
-   -- if id >= 2053 and id <= 2099 then
-      -- sampTextdrawSetString(id, "test")
-   -- end
--- end
-
--- function sampev.onShowTextDraw(id, data)
-   -- if id >= 2053 and id <= 2099 then
-      
-   -- end
-   -- if checkbox.hidealltextdraws.v then
-      -- return false
-   -- end
--- end
+function sampev.onShowTextDraw(id, data)
+   if isAbsolutePlay then
+      if id >= 2053 and id <= 2100 then
+         local index = tonumber(data.text)
+         if index ~= nil then
+            local txdlabel = data.text.."~n~~n~"..tostring(AbsTxdNames[index+1])
+            data.text = txdlabel
+            data.letterWidth = 0.12
+            data.letterHeight = 0.7
+            return{id, data}    
+         end
+      end
+   end
+   
+   if checkbox.hidealltextdraws.v then
+      return false
+   end
+end
 
 function sampev.onSendClickTextDraw(textdrawId)
    if checkbox.logtextdraws.v then
@@ -4752,21 +4554,6 @@ function intToHex(int)
     return '{'..string.sub(bit.tohex(int), 3, 8)..'}'
 end
 
-function hideAllFontsImages()
-   show_fontsimg1 = false
-   show_fontsimg2 = false
-   show_fontsimg3 = false
-   show_fontsimg4 = false
-   show_fontsimg5 = false
-end
-
-function hideAllTextureImages()
-   show_texture1 = false
-   show_texture2 = false
-   show_texture3 = false
-   show_texture4 = false
-   show_texture5 = false
-end 
 
 function cleanBindsForm()
    textbuffer.bind1.v = " "
@@ -4913,15 +4700,15 @@ function imgui.TooltipButton(label, size, description)
 end
 
 function imgui.Link(link, text)
-    text = text or link
-    local tSize = imgui.CalcTextSize(text)
-    local p = imgui.GetCursorScreenPos()
-    local DL = imgui.GetWindowDrawList()
-    local col = { 0xFFFF7700, 0xFFFF9900 }
-    if imgui.InvisibleButton("##" .. link, tSize) then os.execute("explorer " .. link) end
-    local color = imgui.IsItemHovered() and col[1] or col[2]
-    DL:AddText(p, color, text)
-    DL:AddLine(imgui.ImVec2(p.x, p.y + tSize.y), imgui.ImVec2(p.x + tSize.x, p.y + tSize.y), color)
+   text = text or link
+   local tSize = imgui.CalcTextSize(text)
+   local p = imgui.GetCursorScreenPos()
+   local DL = imgui.GetWindowDrawList()
+   local col = { 0xFFFF7700, 0xFFFF9900 }
+   if imgui.InvisibleButton("##" .. link, tSize) then os.execute('explorer "' .. link ..'"');print(link) end
+   local color = imgui.IsItemHovered() and col[1] or col[2]
+   DL:AddText(p, color, text)
+   DL:AddLine(imgui.ImVec2(p.x, p.y + tSize.y), imgui.ImVec2(p.x + tSize.x, p.y + tSize.y), color)
 end
 
 function imgui.TextQuestion(label, description)
