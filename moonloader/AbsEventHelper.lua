@@ -4,7 +4,7 @@ script_description("Assistant for mappers and event makers on Absolute Play")
 script_dependencies('imgui', 'lib.samp.events', 'vkeys')
 script_properties("work-in-pause")
 script_url("https://github.com/ins1x/AbsEventHelper")
-script_version("2.5")
+script_version("2.5.1")
 -- script_moonloader(16) moonloader v.0.26
 
 -- Activaton: ALT + X (show main menu)
@@ -119,6 +119,7 @@ local checkbox = {
    noeffects = imgui.ImBool(false),
    nofactorysmoke = imgui.ImBool(false),
    nowater = imgui.ImBool(false),
+   underwater = imgui.ImBool(false),
    aniso = imgui.ImBool(false),
    postfx = imgui.ImBool(true),
    grassfix = imgui.ImBool(false),
@@ -182,8 +183,7 @@ local textbuffer = {
    tpcx = imgui.ImBuffer(12),
    tpcy = imgui.ImBuffer(12),
    tpcz = imgui.ImBuffer(12),
-   note = imgui.ImBuffer(1024),
-   texturesbuff = imgui.ImBuffer(1024)
+   note = imgui.ImBuffer(1024)
 }
 
 local combobox = {
@@ -207,8 +207,6 @@ local combobox = {
 -- If the server changes IP, change it here
 local ipAbsolutePlay = "193.84.90.23"
 local isAbsolutePlay = false
-local ipTraining = "46.174.50.168"
-local isTraining = false
 
 local isSampAddonInstalled = false
 local isAbsfixInstalled = false
@@ -432,12 +430,6 @@ function main()
 	     isAbsolutePlay = false
          if ini.settings.noabsunload then
             thisScript():unload()
-         else
-            if ip:find(ipTraining) then
-               isTraining = true
-            end
-		    sampAddChatMessage("{880000}Absolute Events Helper.\
-		    {FFFFFF}Открыть меню: {CDCDCD}ALT + X", 0xFFFFFF)
 		 end
       else
 	     isAbsolutePlay = true
@@ -1275,7 +1267,7 @@ function imgui.OnDrawFrame()
 		      sampAddChatMessage("Не найден последний объект", -1)
 		   end
 		end
-         
+              
 		-- if imgui.Button(u8"Восстановить удаленный объект", imgui.ImVec2(250, 25)) then
 		   -- if isAbsolutePlay then
 		      -- if lastRemovedObjectModelid then
@@ -1741,6 +1733,16 @@ function imgui.OnDrawFrame()
 		 imgui.SameLine()
          imgui.TextQuestion("( ? )", u8"Отключает воду (Визуально)")
 		 
+		 if imgui.Checkbox(u8'NoUnderwater', checkbox.underwater) then
+		    if checkbox.underwater.v then
+			   DisableUnderWaterEffects(true)
+			else
+			   DisableUnderWaterEffects(false)
+			end
+		 end
+		 imgui.SameLine()
+         imgui.TextQuestion("( ? )", u8"Отключает все эффекты накладываемые игрой под водой")
+         
 		 imgui.Spacing()
 	  elseif tabmenu.settings == 7 then
 	     
@@ -1749,11 +1751,7 @@ function imgui.OnDrawFrame()
 		 local ip, port = sampGetCurrentServerAddress()
          
          if not ip:find(ipAbsolutePlay) then
-            if ip:find(ipTraining) then
-               imgui.TextColoredRGB(u8"TRAINING " ..tostring(ip) ..":".. tostring(port).. "  ".. os.date('%d.%m.%Y %X'))
-            else
             imgui.TextColoredRGB(u8"SERVER " ..tostring(ip) ..":".. tostring(port).. "  ".. os.date('%d.%m.%Y %X'))
-            end
          else
             imgui.TextColoredRGB(u8"Absolute Play " ..tostring(ip) ..":".. tostring(port).. "  ".. os.date('%d.%m.%Y %X'))
          end
@@ -2331,7 +2329,6 @@ function imgui.OnDrawFrame()
              imgui.Selectable(u8(nickname))
              if imgui.IsItemClicked() then
                 chosenplayer = v
-                printStringNow("You have chosen a player ".. nickname, 1000)
 			    if not dialog.playerstat.v then dialog.playerstat.v = true end
              end
              imgui.SetColumnWidth(-1, 250)
@@ -2640,13 +2637,6 @@ function imgui.OnDrawFrame()
                imgui.TextColoredRGB("макс. слотов под гонки: {00FF00}5")
                imgui.TextColoredRGB("макс. виртуальных миров: {00FF00}500")
             end
-            if isTraining then
-               imgui.TextColoredRGB("Слоты сохранения игровых миров: {00FF00}3 > 10")
-               imgui.TextColoredRGB("Объекты: {00FF00}300 > 3500")
-               imgui.TextColoredRGB("Пикапы(проходы): {00FF00}20 > 100")
-               imgui.TextColoredRGB("Актеры: {00FF00}50 > 200")
-               imgui.TextColoredRGB("Транспорт: {00FF00}30 > 80")
-            end
          end
          imgui.Text(u8"В радиусе 150 метров нельзя создавать более 200 объектов.")
          imgui.TextColoredRGB("Максимальная длина текста на объектах в редакторе миров - {00FF00}50 символов")
@@ -2824,8 +2814,8 @@ function imgui.OnDrawFrame()
       elseif tabmenu.info == 4 then
       
 		 if imgui.CollapsingHeader(u8'Доступные текстуры на Absolute Play:') then
-            --imgui.InputTextMultiline('##bufftextures', textbuffer.texturesbuff, imgui.ImVec2(480, 150))
             if isAbsolutePlay then
+               imgui.Link("https://sun9-56.userapi.com/impf/qzMWsYTX7NTQ7_9tYfFgyMIgXHfjfeHnJWF11A/UQwq0T9ZxwM.jpg?size=771x2160&quality=95&sign=61ac0f5281133dc714855724b7c8c51a&type=album", u8"Изображение со всеми текстурами")
                local texturelink
                local texturename
                imgui.Spacing()
@@ -3317,27 +3307,27 @@ function imgui.OnDrawFrame()
            imgui.Spacing()
            
            if imgui.CollapsingHeader(u8'Ошибка. В этой области создано слишком много объектов') then
-              imgui.Text(u8"Такая ошибка появляется если вы создали много объектов в одной области.\nВ радиусе 150 метров нельзя создавать больше 200 объектов.\nЭто сигнал о том что ваша локация перегружена объектами, и стоит провести оптимизацию и очистить эту область.\n")
+              imgui.Text(u8"Такая ошибка появляется если вы создали много объектов в одной области.\nВ радиусе 150 метров нельзя создавать больше 200 объектов.\nЭто сигнал о том что ваша локация перегружена объектами\nи стоит провести оптимизацию и очистить эту область.\n")
            end
            
            if imgui.CollapsingHeader(u8'Ошибка. Создано максимум объектов') then
-              imgui.Text(u8"Нужно увеличить лимит. Y - Редактор карт - Управление мирами - Повышение лимита объектов. ")
+              imgui.Text(u8"Нужно увеличить лимит.\nY - Редактор карт - Управление мирами - Повышение лимита объектов. ")
            end
            
            if imgui.CollapsingHeader(u8'Ошибка. Максимальное количество созданных миров - 500') then
-              imgui.Text(u8"Невозможно создать мир, нет свободных слотов.\nМожно ждать пока освободится слот, либо купить мир у игрока.")
+              imgui.Text(u8"Невозможно создать мир, нет свободных слотов.\nМожно ждать пока освободится слот,\nлибо купить мир у игрока.")
            end
            
            if imgui.CollapsingHeader(u8'Ошибка. Античит отправил тебя на место появления') then
-              imgui.Text(u8"Это может происходить если вы без аддона уходите в афк на большой высоте, либо если вы находитесь афк над водой.")
+              imgui.Text(u8"Это может происходить если вы без аддона уходите в афк на большой высоте,\nлибо если вы находитесь афк над водой.")
            end
 
            if imgui.CollapsingHeader(u8'Ошибка. Транспорт мира не создан. Транспорта в мире нет') then
-              imgui.Text(u8"Может появиться если вы не создали транспорт через меню транспорта, но пытаетесь при этом применить к нему какие-либо действия.")
+              imgui.Text(u8"Может появиться если вы не создали транспорт через меню транспорта,\nно пытаетесь при этом применить к нему какие-либо действия.")
            end     
            
            if imgui.CollapsingHeader(u8'Ошибка. Установи 0.3DL чтоб включать полет в этом месте') then
-              imgui.Text(u8"Необходимо устанавливать новый DL клиент с samp-ru, либо уходить в полет с другой точки где мало объектов рядом (выйти из зоны стрима).")
+              imgui.Text(u8"Необходимо устанавливать новый DL клиент с samp-ru,\nлибо уходить в полет с другой точки где мало объектов рядом (выйти из зоны стрима).")
            end
            
            if imgui.CollapsingHeader(u8'При создании нового или копировании объекта, он не выделяется автоматически') then
@@ -3492,9 +3482,6 @@ function imgui.OnDrawFrame()
       if imgui.Button(u8"Лимиты", imgui.ImVec2(100,25)) then tabmenu.info = 2 end
       if imgui.Button(u8"Цвета", imgui.ImVec2(100,25)) then tabmenu.info = 3 end
       if imgui.Button(u8"Ретекстур", imgui.ImVec2(100,25)) then tabmenu.info = 4 end
-      -- if imgui.Button(u8"Текстуры", imgui.ImVec2(100,25)) then 
-	     -- dialog.textures.v = not dialog.textures.v
-	  -- end
       if imgui.Button(u8"Команды", imgui.ImVec2(100,25)) then tabmenu.info = 6 end
       if imgui.Button(u8"FAQ", imgui.ImVec2(100,25)) then tabmenu.info = 7 end
       if isAbsolutePlay then
@@ -3509,9 +3496,7 @@ function imgui.OnDrawFrame()
 
       local ip, port = sampGetCurrentServerAddress()
       if not ip:find(ipAbsolutePlay) then
-         if ip:find(ipTraining) then
-            imgui.TextColoredRGB("{FF0000}Некоторые функции будут недоступны. Скрипт предназначен для Absolute Play")
-         end
+         imgui.TextColoredRGB("{FF0000}Некоторые функции будут недоступны. Скрипт предназначен для Absolute Play")
       end
 
       imgui.End()
@@ -4007,7 +3992,6 @@ function sampev.onSendDialogResponse(dialogId, button, listboxId, input)
 		 local startpos = input:find("№")
 		 local endpos = startpos + 3
 		 local world = tonumber(string.sub(input, startpos+1, endpos))
-		 print(world, startpos, endpos)
 	     if world then
 		    lastWorldNumber = world
 		 end
@@ -4048,7 +4032,13 @@ function sampev.onShowDialog(dialogId, style, title, button1, button2, text)
       -- end
       
       if dialogId == 1407 then
-         return {dialogId, style, title, button1, button2, text.."\nПодробнее на https://forum.sa-mp.ru/index.php?/topic/1016828-миры-редактор-карт-faq"}
+         return {dialogId, style, title, button1, button2,
+         text.."\nПодробнее на https://forum.sa-mp.ru/index.php?/topic/1016828-миры-редактор-карт-faq"}
+      end
+      
+      if dialogId == 1498 then
+         return {dialogId, style, title, button1, button2,
+         "Введи размер шрифта от 1 до 255"}
       end
       
       if dialogId == 1401 then
@@ -4060,6 +4050,23 @@ function sampev.onShowDialog(dialogId, style, title, button1, button2, text)
          "https://dev.prineside.com/ru/gtasa_samp_model_id/\n"..
          "\nВведи номер объекта: \n"
          return {dialogId, style, title, button1, button2, newtext}
+      end
+      
+      if dialogId == 1426 then
+         if lastWorldNumber > 0 then
+            local newtext = 
+            "Если вы хотите попробовать редактор карт\n"..
+            "Посетите мир 10, он всегда открыт для редактирования\n\n"..
+            "Последний мир в котором вы были: "..lastWorldNumber.."\n"..
+            "Введите номер мира в который хотите войти:\n"
+            return {dialogId, style, title, button1, button2, newtext}
+         else
+            local newtext = 
+            "Если вы хотите попробовать редактор карт\n"..
+            "Посетите мир 10, он всегда открыт для редактирования\n\n"..
+            "Введите номер мира в который хотите войти:\n"
+            return {dialogId, style, title, button1, button2, newtext}
+         end
       end
    end
    
@@ -4484,6 +4491,10 @@ function setCameraDistance(distance) -- KepchiK
 	memory.setfloat(0xB6F028 + 0xD8, distance)
 	memory.setfloat(0xB6F028 + 0xC0, distance)
 	memory.setfloat(0xB6F028 + 0xC4, distance)
+end
+
+function DisableUnderWaterEffects(bState) -- kin4stat
+   memory.setuint8(0x52CCF9, bState and 0xEB or 0x74, false)
 end
 
 function ClearChat()
