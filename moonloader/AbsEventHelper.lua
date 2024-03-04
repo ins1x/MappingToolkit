@@ -4,7 +4,7 @@ script_description("Assistant for mappers and event makers on Absolute Play")
 script_dependencies('imgui', 'lib.samp.events', 'vkeys')
 script_properties("work-in-pause")
 script_url("https://github.com/ins1x/AbsEventHelper")
-script_version("2.5.1")
+script_version("2.5.2")
 -- script_moonloader(16) moonloader v.0.26
 
 -- Activaton: ALT + X (show main menu)
@@ -3970,7 +3970,7 @@ function sampev.onSendDialogResponse(dialogId, button, listboxId, input)
          end
       end
       
-      if dialogId == 1400 and listboxId == 4 and button == 1 then
+      if dialogId == 1400 and listboxId == 4 and button == 1 and not input:find("Игрок") then
          if lastObjecttextureName ~= nil then
             for k, txdname in pairs(AbsTxdNames) do
                if txdname == lastObjecttextureName then
@@ -3980,6 +3980,7 @@ function sampev.onSendDialogResponse(dialogId, button, listboxId, input)
             end
          end
       end
+      
       
       if dialogId == 1400 and listboxId == 4 and button == 1 then
          isTexturesListOpened = true
@@ -4050,6 +4051,24 @@ function sampev.onShowDialog(dialogId, style, title, button1, button2, text)
          "https://dev.prineside.com/ru/gtasa_samp_model_id/\n"..
          "\nВведи номер объекта: \n"
          return {dialogId, style, title, button1, button2, newtext}
+      end
+      
+      if dialogId == 1410 then
+         return {dialogId, style, title, button1, button2, 
+         "Выбери радиус в котором необходимо удалить объекты (Рекомендуется не больше 50)"}
+      end
+      
+      if dialogId == 1413 then
+         local newtext = 
+         "Для создания мира необходимо:\n"..
+         "20 LvL, $1.000.000, 100 ОА\n\n"..
+         "Ты уверен что хочешь создать мир для строительства?\n"
+         return {dialogId, style, title, button1, button2, newtext}
+      end
+      
+      if dialogId == 1414 then
+         return {dialogId, style, title, button1, button2, 
+         "{FF0000}Это действие необратимо!!!\nТы уверен что хочешь удалить мир?"}
       end
       
       if dialogId == 1426 then
