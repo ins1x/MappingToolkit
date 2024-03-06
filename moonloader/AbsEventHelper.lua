@@ -1,10 +1,10 @@
 script_author("1NS")
 script_name("Absolute Events Helper")
 script_description("Assistant for mappers and event makers on Absolute Play")
-script_dependencies('imgui', 'lib.samp.events', 'vkeys')
+script_dependencies('imgui', 'lib.samp.events', 'vkeys', 'vector3d')
 script_properties("work-in-pause")
 script_url("https://github.com/ins1x/AbsEventHelper")
-script_version("2.5.2")
+script_version("2.5.3")
 -- script_moonloader(16) moonloader v.0.26
 
 -- Activaton: ALT + X (show main menu)
@@ -234,6 +234,7 @@ local nameTagWh = false
 local currentEditmode = 0 
 local isSelectObject = false
 local isTexturesListOpened = false
+local isSampObjectsListOpened = false
 local hideEditObject = false
 local scaleEditObject = false
 local lastObjectBlip = nil
@@ -351,6 +352,161 @@ AbsTxdNames = {
    "stormdrain3_nt", "des_dirt1", "desgreengrass", "des_ranchwall1", "des_wigwam",
    "des_wigwamdoor", "des_dustconc", "sanruf", "des_redslats", "duskyred_64",
    "des_ghotwood1", "Tablecloth", "StainedGlass", "Panel", "bistro_alpha"
+}
+
+AbsParticleNames = {
+   [18643] = "Красный лазер",
+   [18647] = "Красный неон",
+   [18648] = "Синий неон",
+   [18649] = "Зеленый неон",
+   [18650] = "Желтый неон",
+   [18651] = "Розовый неон",
+   [18652] = "Белый неон",
+   [18653] = "Красный прожектор",
+   [18654] = "Зеленый прожектор",
+   [18655] = "Синий прожектор",
+   [18668] = "Кровь",
+   [18669] = "Брызги воды",
+   [18670] = "Вспышка камеры",
+   [18671] = "Дым белый густой",
+   [18672] = "Льющийся цемент",
+   [18673] = "Дым от сигаретты",
+   [18674] = "Летящие облака",
+   [18675] = "Вспышка дыма",
+   [18676] = "Струя воды",
+   [18677] = "Небольшой дым исчезающий",
+   [18678] = "Ломающаяся коробка ",
+   [18679] = "Ломающаяся коробка2",
+   [18680] = "Выстрел",
+   [18681] = "Взрыв тип1 маленький",
+   [18682] = "Взрыв тип2 огромный",
+   [18683] = "Взрыв тип3 огромный",
+   [18684] = "Взрыв тип4 огромный",
+   [18685] = "Взрыв тип5 огромный",
+   [18686] = "Взрыв тип7 маленький",
+   [18687] = "Пена огнетушителя",
+   [18688] = "Огонь1 маленький",
+   [18689] = "Огонь2 с дымом маленький",
+   [18690] = "Огонь3 с дымом средний",
+   [18691] = "Огонь4 средний",
+   [18692] = "Огонь5 маленький",
+   [18693] = "Огонь6 очень маленький",
+   [18694] = "Огонь из огнемета",
+   [18695] = "Эфект выстрела одиночный",
+   [18696] = "Дым от выстрела одиночный",
+   [18697] = "Пыль из под вертолета",
+   [18698] = "Спавнер мух",
+   [18699] = "Огонь от джетпака",
+   [18700] = "Нитро",
+   [18701] = "Огонь свечи",
+   [18702] = "Большое нитро",
+   [18703] = "Дым маленький",
+   [18704] = "Дым маленький с искрами",
+   [18705] = "Струя мочи",
+   [18706] = "Белый фонтан крови",
+   [18707] = "Водопад",
+   [18708] = "Пузырьки воздуха при плавании",
+   [18709] = "Ломающееся стекло",
+   [18710] = "Густой дым постоянный",
+   [18711] = "Ломающееся стекло 2",
+   [18712] = "Гильзы при стрельбе",
+   [18713] = "Дым большой белый",
+   [18714] = "Дым2 большой белый",
+   [18715] = "Дым большой серый",
+   [18716] = "Дым маленький серый",
+   [18717] = "Искры при стрельбе",
+   [18718] = "Искры при стрельбе 2",
+   [18719] = "След на воде",
+   [18720] = "Падающие капли воды",
+   [18721] = "Высокий водопад",
+   [18722] = "Рвота",
+   [18723] = "Дым большой черный клубящийся",
+   [18724] = "Взрыв со стеклами",
+   [18725] = "Дым маленький переменный",
+   [18726] = "Дым маленький черный",
+   [18727] = "Дым средний переменный",
+   [18728] = "Свет сигнальной ракеты",
+   [18729] = "Краска из баллончика",
+   [18730] = "Выстрел танка",
+   [18731] = "Дымовая шашка1",
+   [18732] = "Дымовая шашка2",
+   [18733] = "Падающие листья ",
+   [18734] = "Падающие листья2",
+   [18735] = "Дым маленький серый",
+   [18736] = "Дым 2 маленький серый",
+   [18737] = "Большие клубы пыли",
+   [18738] = "Фонтан с паузой",
+   [18739] = "Фонтан постоянный",
+   [18740] = "Сбитый пожарный гидрант",
+   [18741] = "Круги на воде",
+   [18742] = "Большие брызги",
+   [18743] = "Средний всплеск воды",
+   [18744] = "Большой всплеск воды",
+   [18745] = "Маленький всплеск воды1",
+   [18746] = "Маленький всплеск воды2",
+   [18747] = "Брызги водопада",
+   [18748] = "Дым от заводской трубы",
+   [18863] = "Маленький снег",
+   [18864] = "Большой снег",
+   [18888] = "Прозрачный блок2",
+   [18889] = "Прозрачный блок3",
+   [19080] = "Синий лазер",
+   [19081] = "Розовый лазер",
+   [19082] = "Оранжевый лазер",
+   [19083] = "Зеленый лазер",
+   [19084] = "Желтый лазер",
+   [19121] = "Белый светящийся столб",
+   [19122] = "Синий светящийся столб",
+   [19123] = "Зеленый светящийся столб",
+   [19124] = "Красный светящийся столб",
+   [19125] = "Желтый светящийся столб",
+   [19143] = "Белый прожектор",
+   [19144] = "Красный прожектор",
+   [19145] = "Зеленый прожектор",
+   [19146] = "Синий прожектор",
+   [19147] = "Желтый прожектор",
+   [19148] = "Розовый прожектор",
+   [19149] = "Голубой прожектор",
+   [19150] = "Белый мигающий прожектор",
+   [19151] = "Карсный мигающий прожектор",
+   [19152] = "Зеленый мигающий прожектор",
+   [19153] = "Синий мигающий прожектор",
+   [19154] = "Желтый мигающий прожектор",
+   [19155] = "Розовый мигающий прожектор",
+   [19156] = "Голубой мигающий прожектор",
+   [19281] = "Белый шар",
+   [19282] = "Красный шар",
+   [19283] = "Зеленый шар",
+   [19284] = "Синий шар",
+   [19285] = "Белый быстро моргающий шар",
+   [19286] = "Красный быстро моргающий шар",
+   [19287] = "Зеленый быстро моргающий шар",
+   [19288] = "Синий быстро моргающий шар",
+   [19289] = "Белый медленно моргающий шар",
+   [19290] = "Красный медленно моргающий шар",
+   [19291] = "Зеленый медленно моргающий шар",
+   [19292] = "Синий медленно моргающий шар",
+   [19293] = "Фиолетовый медленно моргающий шар",
+   [19294] = "Желтый медленно моргающий шар",
+   [19295] = "Белый большой шар",
+   [19296] = "Красный большой шар",
+   [19297] = "Зеленый большой шар",
+   [19298] = "Синий большой шар",
+   [19299] = "Луна",
+   [19300] = "blankmodel",
+   [19374] = "Невидимая стена",
+   [19382] = "Невидимая стена",
+   [19475] = "Небольшая поверхность для текста",
+   [19476] = "Небольшая поверхность для текста",
+   [19477] = "Средняя поверхность для текста",
+   [19478] = "Поверхность для текста",
+   [19479] = "Большая поверхность для текста",
+   [19480] = "Маленькая поверхность для текста",
+   [19481] = "Большая поверхность для текста",
+   [19483] = "Средняя поверхность для текста",
+   [19482] = "Средняя поверхность для текста",
+   [19803] = "Мигалки эвакуатора",
+   [19895] = "Аварийка"
 }
 
 AbsFontNames = {
@@ -572,6 +728,7 @@ function main()
       if isKeyJustPressed(VK_K) and not sampIsChatInputActive() and not sampIsDialogActive()
 	  and not isPauseMenuActive() and not isSampfuncsConsoleActive() then 
          isTexturesListOpened = false
+         isSanpObjectsListOpened = false
       end
       
 	  -- Count streamed obkects
@@ -2849,15 +3006,16 @@ function imgui.OnDrawFrame()
          end
 		 if imgui.CollapsingHeader(u8'Поверхности для текста') then
 		    imgui.TextColoredRGB("Прозрачные ровные плоские поверхности без коллизий, для SetObjectMaterialText")
-		    imgui.TextColoredRGB("{00FF00}19480{FFFFFF} - Размер (радиус):{00FF00} 11.070")
-			if imgui.IsItemClicked() then
-                setClipboardText("19480")
-                sampAddChatMessage("19480 - Скопирован в буфер обмена", -1)
-            end
+		    
 		    imgui.TextColoredRGB("{00FF00}19481{FFFFFF} - Размер (радиус):{00FF00} 19.582")
 			if imgui.IsItemClicked() then
                 setClipboardText("19481")
                 sampAddChatMessage("19481 - Скопирован в буфер обмена", -1)
+            end
+            imgui.TextColoredRGB("{00FF00}19480{FFFFFF} - Размер (радиус):{00FF00} 11.070")
+			if imgui.IsItemClicked() then
+                setClipboardText("19480")
+                sampAddChatMessage("19480 - Скопирован в буфер обмена", -1)
             end
 		    imgui.TextColoredRGB("{00FF00}19479{FFFFFF} - Размер (радиус):{00FF00} 8.096")
 			if imgui.IsItemClicked() then
@@ -2888,11 +3046,6 @@ function imgui.OnDrawFrame()
 			if imgui.IsItemClicked() then
                 setClipboardText("19475")
                 sampAddChatMessage("19475 - Скопирован в буфер обмена", -1)
-            end
-		    imgui.TextColoredRGB("{00FF00}19480{FFFFFF} - Размер (радиус):{00FF00} 0.141")
-			if imgui.IsItemClicked() then
-                setClipboardText("19480")
-                sampAddChatMessage("19480 - Скопирован в буфер обмена", -1)
             end
 		 end
 		 if imgui.CollapsingHeader(u8'Размеры текста') then
@@ -3067,6 +3220,10 @@ function imgui.OnDrawFrame()
          imgui.TextColoredRGB("Карта объектов которые не видны редакторами карт")
 		 imgui.SameLine()
 		 imgui.Link("https://map.romzes.com/", "map.romzes.com")
+         
+         imgui.TextColoredRGB("Частицы (партиклы) из SA")
+		 imgui.SameLine()
+		 imgui.Link("https://gtamods.com/wiki/Particle_(SA)", "gtamods.com")
          
          imgui.TextColoredRGB("Список всех разрушаемых объектов на ")
          imgui.SameLine()
@@ -3940,6 +4097,7 @@ function sampev.onSendDialogResponse(dialogId, button, listboxId, input)
    
    if isAbsolutePlay then
       isTexturesListOpened = false
+      isSanpObjectsListOpened = false
       -- if player wxit from world without command drop lastWorldNumber var 
       if dialogId == 1405 and listboxId == 5 and button == 1 then
          lastWorldNumber = 0
@@ -3987,6 +4145,10 @@ function sampev.onSendDialogResponse(dialogId, button, listboxId, input)
       end
       if dialogId == 1403 and listboxId == 2 and button == 1 then
          isTexturesListOpened = true
+      end
+      
+      if dialogId == 1409 and listboxId == 2 and button == 1 and input:find("MP объекты") then
+         isSampObjectsListOpened = true
       end
       
 	  if dialogId == 1429 and button == 1 then
@@ -4045,10 +4207,10 @@ function sampev.onShowDialog(dialogId, style, title, button1, button2, text)
       if dialogId == 1401 then
          local newtext = 
          "615-18300   GTA-SA \n"..
-         "18632-19521 SA-MP\n"..
-         "19477-19482 Text \n\n"..
+         "18632-19521 SA-MP\n\n"..
          "Номера объектов можно найти на сайте:\n"..
          "https://dev.prineside.com/ru/gtasa_samp_model_id/\n"..
+         (lastObjectModelid and "\nПоследний использованный объект: "..lastObjectModelid or " ")..
          "\nВведи номер объекта: \n"
          return {dialogId, style, title, button1, button2, newtext}
       end
@@ -4160,6 +4322,7 @@ function sampev.onSendCommand(command)
 	  
       if cmd:find("vfibye2") or cmd:find("машину2") then 
          isTexturesListOpened = false
+         isSanpObjectsListOpened = false
       end
       
 	  if cmd:find("ds[jl") or cmd:find("exit") or cmd:find("выход") then
@@ -4323,6 +4486,24 @@ function sampev.onShowTextDraw(id, data)
             data.text = txdlabel
             data.letterWidth = 0.12
             data.letterHeight = 0.7
+            return{id, data}    
+         end
+      end
+   end
+   
+   if isAbsolutePlay and isSampObjectsListOpened then
+      if id >= 2053 and id <= 2100 then
+         local modelid = tonumber(string.sub(data.text, 0, 5))
+         if modelid ~= nil then
+            --print(cyrillic(tostring(AbsParticleNames[modelid])))
+            local particlename = tostring(AbsParticleNames[modelid])
+		    local particlename = string.gsub(particlename, " ", "~n~")
+            
+            local txdlabel = modelid.."~n~~n~"..cyrillic(particlename)
+            --print(string.len(txdlabel))
+            if string.len(txdlabel) > 14 then data.text = txdlabel end
+            data.letterWidth = 0.18
+            data.letterHeight = 0.9
             return{id, data}    
          end
       end
@@ -4689,6 +4870,16 @@ end
       -- ffi.cast("void (__thiscall*)(unsigned long, short int, unsigned long)", sampGetBase() + 0x6DE40)(readMemory(sampGetBase() + 0x21A0C4, 4), id, playerobj and 1 or 0)
    -- end
 -- end
+
+function cyrillic(text)
+      local convtbl = {[230]=155,[231]=159,[247]=164,[234]=107,[250]=144,[251]=168,[254]=171,[253]=170,[255]=172,[224]=97,[240]=112,[241]=99,[226]=162,[228]=154,[225]=151,[227]=153,[248]=165,[243]=121,[184]=101,[235]=158,[238]=111,[245]=120,[233]=157,[242]=166,[239]=163,[244]=63,[237]=174,[229]=101,[246]=36,[236]=175,[232]=156,[249]=161,[252]=169,[215]=141,[202]=75,[204]=77,[220]=146,[221]=147,[222]=148,[192]=65,[193]=128,[209]=67,[194]=139,[195]=130,[197]=69,[206]=79,[213]=88,[168]=69,[223]=149,[207]=140,[203]=135,[201]=133,[199]=136,[196]=131,[208]=80,[200]=133,[198]=132,[210]=143,[211]=89,[216]=142,[212]=129,[214]=137,[205]=72,[217]=138,[218]=167,[219]=145}
+      local result = {}
+      for i = 1, #text do
+          local c = text:byte(i)
+          result[i] = string.char(convtbl[c] or c)
+      end
+      return table.concat(result)
+end
 
 -- imgui fuctions
 function imgui.TextColoredRGB(text)
