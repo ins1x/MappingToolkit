@@ -64,10 +64,52 @@ objectsrenderfont = renderCreateFont("Arial", 7, 5)
 local sizeX, sizeY = getScreenResolution()
 local v = nil
 local color = imgui.ImFloat4(1, 0, 0, 1)
-local lastObjectCoords = {x=0.0, y=0.0, z=0.0, rx=0.0, ry=0.0, rz=0.0}
 local lastRemovedObjectCoords = {x=0.0, y=0.0, z=0.0, rx=0.0, ry=0.0, rz=0.0}
 local gamestates = {'None', 'Wait Connect', 'Await Join', 'Connected', 'Restarting', 'Disconnected'}
 local gamestate = imgui.ImInt(0)
+
+-- If the server changes IP, change it here
+local ipAbsolutePlay = "193.84.90.23"
+local isAbsolutePlay = false
+
+local isSampAddonInstalled = false
+local isAbsfixInstalled = false
+local isPlayerSpectating = false
+local disableObjectCollision = false
+local prepareTeleport = false
+local smoothTeleport = false
+local prepareJump = false
+local showobjects = false
+local showrenderline = false
+local countobjects = true
+local ENBSeries = false
+local chosenplayer = nil
+local tabselectedplayer = nil
+local lastRemovedObjectModelid = nil
+local hide3dtexts = false
+local nameTag = true
+local nameTagWh = false
+local currentEditmode = 0 
+local isSelectObject = false
+local isTexturesListOpened = false
+local isSampObjectsListOpened = false
+local hideEditObject = false
+local scaleEditObject = false
+local lastWorldNumber = 0 -- is not same GetVirtualWorldId
+local removedBuildings = 0
+
+local fps = 0
+local fps_counter = 0
+local vehinfomodelid = 0 
+
+local objectsCollisionDel = {}
+local playersTable = {}
+local vehiclesTable = {}
+local hiddenObjects = {}
+vehiclesTotal = 0
+playersTotal = 0
+streamedObjects = 0 -- should be global!
+
 local fixcam = {x = 0.0, y = 0.0, z = 0.0}
 local tpcpos = {x = 0.0, y = 0.0, z = 0.0}
 local tpc = { 
@@ -204,56 +246,18 @@ local combobox = {
    logs = imgui.ImInt(0)
 }
 
--- If the server changes IP, change it here
-local ipAbsolutePlay = "193.84.90.23"
-local isAbsolutePlay = false
-
-local isSampAddonInstalled = false
-local isAbsfixInstalled = false
-local isPlayerSpectating = false
-local disableObjectCollision = false
-local prepareTeleport = false
-local smoothTeleport = false
-local prepareJump = false
-local showobjects = false
-local showrenderline = false
-local countobjects = true
-local ENBSeries = false
-local chosenplayer = nil
-local tabselectedplayer = nil
-local lastObjectModelid = nil
-local lastRemovedObjectModelid = nil
-local lastObjectId = nil
-local lastObject = nil
-local lastObjectlibraryName = nil
-local lastObjecttextureName = nil
-local lastObjecttexturesrcID = nil
-local hide3dtexts = false
-local nameTag = true
-local nameTagWh = false
-local currentEditmode = 0 
-local isSelectObject = false
-local isTexturesListOpened = false
-local isSampObjectsListOpened = false
-local hideEditObject = false
-local scaleEditObject = false
-local lastObjectBlip = nil
-local lastObjectHidden = true
-local lastWorldNumber = 0 -- is not same GetVirtualWorldId
---local hideTextdraws = true
-local removedBuildings = 0;
-streamedObjects = 0
-
-local fps = 0
-local fps_counter = 0
-local vehinfomodelid = 0 
-
-local objectsCollisionDel = {}
-local playersTable = {}
-local vehiclesTable = {}
-local hiddenObjects = {}
-vehiclesTotal = 0
-playersTotal = 0
+local LastObjectData = {
+   handle = nil,
+   id = nil,
+   modelid = nil,
+   txdname = nil,
+   txdlibname = nil,
+   txdmodel = nil,
+   blip = false,
+   hidden = true,
+   position = {x=0.0, y=0.0, z=0.0},
+   rotation = {rx=0.0, ry=0.0, rz=0.0}
+}
 
 VehicleNames = {
    "Landstalker", "Bravura", "Buffalo", "Linerunner", "Pereniel", "Sentinel", "Dumper",
@@ -663,7 +667,7 @@ function main()
 	  if isKeyJustPressed(VK_RBUTTON) and currentEditmode == 2 and not sampIsChatInputActive() 
       and not sampIsDialogActive() and not isPauseMenuActive() 
       and not isSampfuncsConsoleActive() then 
-	     setClipboardText(lastObjectModelid)
+	     setClipboardText(LastObjectData.modelid)
 		 sampAddChatMessage("modelid скопирован в буфер обмена", -1)
 	  end
 	  
@@ -688,9 +692,9 @@ function main()
 	  -- if isKeyJustPressed(VK_N) and not sampIsChatInputActive() 
       -- and not sampIsDialogActive() and not isPauseMenuActive() 
       -- and not isSampfuncsConsoleActive() then 
-	     -- if lastObject then
-		    -- local result, positionX, positionY, positionZ = getObjectCoordinates(lastObject)
-	        -- sampSendEditObject(false, lastObject, 1, positionX, positionY, positionZ, 0.0, 0.0, 0,0)
+	     -- if LastObjectData.handle then
+		    -- local result, positionX, positionY, positionZ = getObjectCoordinates(LastObjectData.handle)
+	        -- sampSendEditObject(false, LastObjectData.handle, 1, positionX, positionY, positionZ, 0.0, 0.0, 0,0)
 		 -- end	
 	  --end
 	 
@@ -1209,7 +1213,7 @@ function imgui.OnDrawFrame()
 		
 	  elseif tabmenu.settings == 2 then
 		 
-         if lastObject and doesObjectExist(lastObject) then
+         if LastObjectData.handle and doesObjectExist(LastObjectData.handle) then
             if dialog.objectinfo.v then 
                if imgui.Button("(>>)") then
                   dialog.objectinfo.v = not dialog.objectinfo.v
@@ -1221,10 +1225,10 @@ function imgui.OnDrawFrame()
             end             
             imgui.SameLine()
          end   
-         if lastObjectModelid then
-            imgui.Text(string.format(u8"Последний modelid объекта: %i", lastObjectModelid))
+         if LastObjectData.modelid then
+            imgui.Text(string.format(u8"Последний modelid объекта: %i", LastObjectData.modelid))
             if imgui.IsItemClicked() then
-               setClipboardText(lastObjectModelid)
+               setClipboardText(LastObjectData.modelid)
 			   sampAddChatMessage("modelid скопирован в буфер обмена", -1)
             end
 		 else 
@@ -1251,8 +1255,8 @@ function imgui.OnDrawFrame()
         imgui.TextQuestion("( ? )", u8"Рисует линию к объекту с указанием расстояния")
               
 	    if checkbox.drawlinetomodelid.v then 
-		   if lastObjectModelid and input.rendselectedmodelid.v == 0 then 
-		      input.rendselectedmodelid.v = lastObjectModelid
+		   if LastObjectData.modelid and input.rendselectedmodelid.v == 0 then 
+		      input.rendselectedmodelid.v = LastObjectData.modelid
 		   end
 		   
 	       imgui.Text(u8"modelid объекта: ")
@@ -1277,8 +1281,8 @@ function imgui.OnDrawFrame()
 	       imgui.InputInt('##INPUT_CLOOBJECTID', input.closestobjectmodel, 0)
            imgui.PopItemWidth()
 		   
-		   if lastObjectModelid and input.closestobjectmodel.v == 0 then 
-		      input.closestobjectmodel.v = lastObjectModelid
+		   if LastObjectData.modelid and input.closestobjectmodel.v == 0 then 
+		      input.closestobjectmodel.v = LastObjectData.modelid
 		   end
 		   
 		   if string.len(input.closestobjectmodel.v) > 0 then
@@ -1302,8 +1306,8 @@ function imgui.OnDrawFrame()
         imgui.TextQuestion("( ? )", u8"Скроет объект по ID модели (modelid). Действует при обновлении зоны стрима")
 	   
 	    if checkbox.hideobject.v then 
-		   if lastObjectModelid and input.hideobjectid.v == 615 then 
-		      input.hideobjectid.v = lastObjectModelid
+		   if LastObjectData.modelid and input.hideobjectid.v == 615 then 
+		      input.hideobjectid.v = LastObjectData.modelid
 		   end
 		   
 	       imgui.Text(u8"modelid объекта: ")
@@ -1346,8 +1350,8 @@ function imgui.OnDrawFrame()
 		   imgui.PushItemWidth(35)
 		   imgui.InputInt('##INPUT_MDODIST', input.mdodist, 0)
 		   
-		   if lastObjectModelid and input.mdomodel.v == 0 then 
-		      input.mdomodel.v = lastObjectModelid
+		   if LastObjectData.modelid and input.mdomodel.v == 0 then 
+		      input.mdomodel.v = LastObjectData.modelid
 		   end
 		   
 		   imgui.SameLine()
@@ -1385,40 +1389,40 @@ function imgui.OnDrawFrame()
         imgui.TextQuestion("( ? )", u8"Применимо только для объектов в области стрима")
 		
 		if imgui.Button(u8"ТП к последнему объекту", imgui.ImVec2(250, 25)) then
-		   if lastObjectModelid and lastObjectCoords.x ~= 0 and doesObjectExist(lastObject) then
+		   if LastObjectData.modelid and LastObjectData.position.x ~= 0 and doesObjectExist(LastObjectData.handle) then
 		      if isAbsolutePlay then
 		         sampSendChat(string.format("/ngr %f %f %f",
-			     lastObjectCoords.x, lastObjectCoords.y, lastObjectCoords.z), 0x0FFFFFF)
+			     LastObjectData.position.x, LastObjectData.position.y, LastObjectData.position.z), 0x0FFFFFF)
 			  else
-			     setCharCoordinates(PLAYER_PED, lastObjectCoords.x, lastObjectCoords.x, lastObjectCoords.z+0.2)
+			     setCharCoordinates(PLAYER_PED, LastObjectData.position.x, LastObjectData.position.x, LastObjectData.position.z+0.2)
 			  end
-			  sampAddChatMessage("Вы телепортировались на координаты к послед.объекту "..lastObjectModelid, -1)
+			  sampAddChatMessage("Вы телепортировались на координаты к послед.объекту "..LastObjectData.modelid, -1)
 		   else
 		      sampAddChatMessage("Не найден последний объект", -1)
 		   end
 		end
 		
-		if imgui.Button(u8(lastObjectBlip and "Убрать метку с объекта" or "Метку на последний объект"), imgui.ImVec2(250, 25)) then
-		   if lastObject and doesObjectExist(lastObject) then
-		       if lastObjectBlip then
-			      removeBlip(lastObjectBlip)
-				  lastObjectBlip = nil
+		if imgui.Button(u8(LastObjectData.blip and "Убрать метку с объекта" or "Метку на последний объект"), imgui.ImVec2(250, 25)) then
+		   if LastObjectData.handle and doesObjectExist(LastObjectData.handle) then
+		       if LastObjectData.blip then
+			      removeBlip(LastObjectData.blip)
+				  LastObjectData.blip = nil
 			   else
-		          lastObjectBlip = addBlipForObject(lastObject)
+		          LastObjectData.blip = addBlipForObject(LastObjectData.handle)
 			   end
 		   else
 		      sampAddChatMessage("Не найден последний объект", -1)
 		   end
 		end
 		
-	    if imgui.Button(u8(lastObjectHidden and "Скрыть" or "Показать")..u8" последний объект", imgui.ImVec2(250, 25)) then
-		   if lastObject and doesObjectExist(lastObject) then
-		      if lastObjectHidden then
-		         setObjectVisible(lastObject, false)
-				 lastObjectHidden = false
+	    if imgui.Button(u8(LastObjectData.hidden and "Скрыть" or "Показать")..u8" последний объект", imgui.ImVec2(250, 25)) then
+		   if LastObjectData.handle and doesObjectExist(LastObjectData.handle) then
+		      if LastObjectData.hidden then
+		         setObjectVisible(LastObjectData.handle, false)
+				 LastObjectData.hidden = false
 			  else
-			     setObjectVisible(lastObject, true)
-				 lastObjectHidden = true
+			     setObjectVisible(LastObjectData.handle, true)
+				 LastObjectData.hidden = true
 			  end
 		   else
 		      sampAddChatMessage("Не найден последний объект", -1)
@@ -3099,12 +3103,11 @@ function imgui.OnDrawFrame()
 	     {u8'Основные', u8'Специальные', u8'Эффекты', u8'Освещение',
 		 u8'Интерьер', u8'Избранные', u8'Поиск (Онлайн)'}, 7) then
 		 end
-		 
+         
 		 imgui.Spacing()
 		 
          if combobox.objects.v == 0 then
             imgui.Text(u8"Большие прозрачные объекты для текста: 19481, 19480, 19482, 19477")
-            --imgui.Selectable(u8"Большие прозрачные объекты для текста: 19481, 19480, 19482, 19477")
             imgui.Text(u8"Маленькие объекты для текста: 19475, 19476, 2662")
             imgui.Text(u8"Бетонные блоки: 18766, 18765, 18764, 18763, 18762")
             imgui.Text(u8"Горы: вулкан 18752, песочница 18751, песочные горы ландшафт 19548")
@@ -3155,15 +3158,15 @@ function imgui.OnDrawFrame()
          elseif combobox.objects.v == 5 then
             imgui.Text(u8"Здесь вы можете сохранить ваши объекты в избранное")
             imgui.InputTextMultiline('##bufftext', textbuffer.note, imgui.ImVec2(480, 150))
-
+               
             if imgui.Button(u8"Сохранить избранные в файл", imgui.ImVec2(200, 25)) then
                favfile = io.open(getGameDirectory() ..
-               "//moonloader//resource//abseventhelper//objects.txt", "a")
+               "//moonloader//resource//abseventhelper//objects.txt", "w")
                --favfile:write("\n")
                --favfile:write(string.format("%s \n", os.date("%d.%m.%y %H:%M:%S")))
                favfile:write(textbuffer.note.v)
                favfile:close()
-               sampAddChatMessage("Saved moonloader/resource/abseventhelper/objects.txt", -1)
+               sampAddChatMessage("Сохранено в файл избранных: moonloader/resource/abseventhelper/objects.txt", -1)
             end
          
             imgui.SameLine()
@@ -3199,9 +3202,9 @@ function imgui.OnDrawFrame()
 		       end
 	        end
 		 
-		    if lastObjectModelid then
-		       if imgui.Button(u8"Вставить последний объект id: "..lastObjectModelid, imgui.ImVec2(300, 25)) then
-	              textbuffer.objectid.v = tostring(lastObjectModelid)
+		    if LastObjectData.modelid then
+		       if imgui.Button(u8"Вставить последний объект id: "..LastObjectData.modelid, imgui.ImVec2(300, 25)) then
+	              textbuffer.objectid.v = tostring(LastObjectData.modelid)
 		       end
 	        end
          end
@@ -3836,61 +3839,69 @@ function imgui.OnDrawFrame()
       imgui.Cond.FirstUseEver, imgui.ImVec2(0.5, 0.5))
       imgui.Begin(u8"Информация о объекте", dialog.objectinfo)
       
-      if lastObject and doesObjectExist(lastObject) then
-         imgui.TextColoredRGB("modelid: {3f70d6}".. lastObjectModelid)
-         imgui.TextColoredRGB("id: {3f70d6}".. lastObjectId)
-         if not lastObjectCoords.x ~= nil then
-	        imgui.TextColoredRGB(string.format("{3f70d6}x: %.1f, {e0364e}y: %.1f, {26b85d}z: %.1f", lastObjectCoords.x, lastObjectCoords.y, lastObjectCoords.z))
+      if LastObjectData.handle and doesObjectExist(LastObjectData.handle) then
+         imgui.TextColoredRGB("modelid: {3f70d6}".. LastObjectData.modelid)
+         imgui.TextColoredRGB("id: {3f70d6}".. LastObjectData.id)
+         if not LastObjectData.position.x ~= nil then
+	        imgui.TextColoredRGB(string.format("{3f70d6}x: %.1f, {e0364e}y: %.1f, {26b85d}z: %.1f", LastObjectData.position.x, LastObjectData.position.y, LastObjectData.position.z))
          end   
-	     if not lastObjectCoords.rx ~= nil then
-            imgui.TextColoredRGB(string.format("{4f70d6}rx: %.1f, {f0364e}ry: %.1f, {36b85d}rz: %.1f", lastObjectCoords.rx, lastObjectCoords.ry, lastObjectCoords.rz))
+	     if not LastObjectData.rotation.rx ~= nil then
+            imgui.TextColoredRGB(string.format("{4f70d6}rx: %.1f, {f0364e}ry: %.1f, {36b85d}rz: %.1f", LastObjectData.rotation.rx, LastObjectData.rotation.ry, LastObjectData.rotation.rz))
          end   
-	     imgui.TextColoredRGB(string.format("angle: {3f70d6}%.1f", getObjectHeading(lastObject)))
-	     --imgui.TextColoredRGB("объект "..(isObjectOnScreen(lastObject) and 'на экране' or 'не на экране'))
-	     if not isObjectOnScreen(lastObject) then 
+	     imgui.TextColoredRGB(string.format("angle: {3f70d6}%.1f", getObjectHeading(LastObjectData.handle)))
+	     --imgui.TextColoredRGB("объект "..(isObjectOnScreen(LastObjectData.handle) and 'на экране' or 'не на экране'))
+	     if not isObjectOnScreen(LastObjectData.handle) then 
             imgui.TextColoredRGB("{ff0000}объект вне зоны прямой видимости")
          end
-         if isAbsolutePlay and lastObjecttextureName ~= nil then
+         if isAbsolutePlay and LastObjectData.txdname ~= nil then
             for k, txdname in pairs(AbsTxdNames) do
-               if txdname == lastObjecttextureName then
+               if txdname == LastObjectData.txdname then
                   imgui.TextColoredRGB("texture internalid: {3f70d6}" .. k-1)
                   break
                end
             end
-	        imgui.TextColoredRGB("txdname: {3f70d6}".. lastObjecttextureName .. " ("..lastObjectlibraryName..") ")
+	        imgui.TextColoredRGB("txdname: {3f70d6}".. LastObjectData.txdname .. " ("..LastObjectData.txdlibname..") ")
          end
          
          imgui.Spacing()  
          if imgui.TooltipButton(u8"Инфо по объекту (online)",imgui.ImVec2(200, 25), u8"Посмотреть подробную информацию по объекту на Prineside DevTools") then		    
-            local link = 'explorer "https://dev.prineside.com/ru/gtasa_samp_model_id/search/?q=' .. lastObjectModelid..'"'
+            local link = 'explorer "https://dev.prineside.com/ru/gtasa_samp_model_id/search/?q=' .. LastObjectData.modelid..'"'
 		    os.execute(link)
 	     end
          
          if imgui.Button(u8"В буффер обмена", imgui.ImVec2(200, 25)) then
-            if not lastObjectCoords.rx ~= nil then
-               setClipboardText(string.format("%i, %.2f, %.2f, %.2f, %.2f, %.2f, %.2f", lastObjectModelid, lastObjectCoords.x, lastObjectCoords.y, lastObjectCoords.z, lastObjectCoords.rx, lastObjectCoords.ry, lastObjectCoords.rz))
+            if not LastObjectData.rotation.rx ~= nil then
+               setClipboardText(string.format("%i, %.2f, %.2f, %.2f, %.2f, %.2f, %.2f", LastObjectData.modelid, LastObjectData.position.x, LastObjectData.position.y, LastObjectData.position.z, LastObjectData.rotation.rx, LastObjectData.rotation.ry, LastObjectData.rotation.rz))
             else
-               setClipboardText(string.format("%i, %.2f, %.2f, %.2f", lastObjectModelid, lastObjectCoords.x, lastObjectCoords.y, lastObjectCoords.z))
+               setClipboardText(string.format("%i, %.2f, %.2f, %.2f", LastObjectData.modelid, LastObjectData.position.x, LastObjectData.position.y, LastObjectData.position.z))
             end
             sampAddChatMessage("Текcт скопирован в буфер обмена", -1)
 	     end
          
          if imgui.Button(u8"Экспортировать", imgui.ImVec2(200, 25)) then
-            if lastObjecttextureName ~= nil then
-               if not lastObjectCoords.rx ~= nil then
-                  sampAddChatMessage(string.format("tmpobjid = CreateObject(%i, %.2f, %.2f, %.2f, %.2f, %.2f, %.2f);", lastObjectModelid, lastObjectCoords.x, lastObjectCoords.y, lastObjectCoords.z, lastObjectCoords.rx, lastObjectCoords.ry, lastObjectCoords.rz), -1)
+            if LastObjectData.txdname ~= nil then
+               if not LastObjectData.rotation.rx ~= nil then
+                  sampAddChatMessage(string.format("tmpobjid = CreateObject(%i, %.2f, %.2f, %.2f, %.2f, %.2f, %.2f);", LastObjectData.modelid, LastObjectData.position.x, LastObjectData.position.y, LastObjectData.position.z, LastObjectData.rotation.rx, LastObjectData.rotation.ry, LastObjectData.rotation.rz), -1)
                else
-                  sampAddChatMessage(string.format("tmpobjid = CreateObject(%i, %.2f, %.2f, %.2f);", lastObjectModelid, lastObjectCoords.x, lastObjectCoords.y, lastObjectCoords.z), -1)
+                  sampAddChatMessage(string.format("tmpobjid = CreateObject(%i, %.2f, %.2f, %.2f);", LastObjectData.modelid, LastObjectData.position.x, LastObjectData.position.y, LastObjectData.position.z), -1)
                end
-               sampAddChatMessage(string.format('SetObjectMaterial(tmpobjid, 0, %i, %s, %s, 0xFFFFFFFF);', lastObjecttexturesrcID, lastObjectlibraryName, lastObjecttextureName), -1) 
+               sampAddChatMessage(string.format('SetObjectMaterial(tmpobjid, 0, %i, %s, %s, 0xFFFFFFFF);', LastObjectData.txdmodel, LastObjectData.txdlibname, LastObjectData.txdname), -1) 
             else 
-               if not lastObjectCoords.rx ~= nil then
-                  sampAddChatMessage(string.format("CreateObject(%i, %.2f, %.2f, %.2f, %.2f, %.2f, %.2f)", lastObjectModelid, lastObjectCoords.x, lastObjectCoords.y, lastObjectCoords.z, lastObjectCoords.rx, lastObjectCoords.ry, lastObjectCoords.rz), -1)
+               if not LastObjectData.rotation.rx ~= nil then
+                  sampAddChatMessage(string.format("CreateObject(%i, %.2f, %.2f, %.2f, %.2f, %.2f, %.2f)", LastObjectData.modelid, LastObjectData.position.x, LastObjectData.position.y, LastObjectData.position.z, LastObjectData.rotation.rx, LastObjectData.rotation.ry, LastObjectData.rotation.rz), -1)
                else
-                  sampAddChatMessage(string.format("CreateObject(%i, %.2f, %.2f, %.2f)", lastObjectModelid, lastObjectCoords.x, lastObjectCoords.y, lastObjectCoords.z), -1)
+                  sampAddChatMessage(string.format("CreateObject(%i, %.2f, %.2f, %.2f)", LastObjectData.modelid, LastObjectData.position.x, LastObjectData.position.y, LastObjectData.position.z), -1)
                end
             end
 	     end
+         
+         if imgui.Button(u8"В избранное", imgui.ImVec2(200, 25)) then
+            favfile = io.open(getGameDirectory() ..
+            "//moonloader//resource//abseventhelper//objects.txt", "a")
+            favfile:write(" ,"..LastObjectData.modelid)
+            favfile:close()
+            sampAddChatMessage("Добавлен в файл избранных (objects.txt)", -1)
+         end
          imgui.Spacing()   
       end
 	  imgui.End()
@@ -4118,9 +4129,9 @@ function sampev.onSendDialogResponse(dialogId, button, listboxId, input)
 	  end
 	  
       if dialogId == 1403 and listboxId == 2 and button == 1 then
-         if lastObjecttextureName ~= nil then
+         if LastObjectData.txdname ~= nil then
             for k, txdname in pairs(AbsTxdNames) do
-               if txdname == lastObjecttextureName then
+               if txdname == LastObjectData.txdname then
                   sampAddChatMessage("Последняя использованная текстура: " .. k-1, 0xFF00FF00)
                   break
                end
@@ -4129,9 +4140,9 @@ function sampev.onSendDialogResponse(dialogId, button, listboxId, input)
       end
       
       if dialogId == 1400 and listboxId == 4 and button == 1 and not input:find("Игрок") then
-         if lastObjecttextureName ~= nil then
+         if LastObjectData.txdname ~= nil then
             for k, txdname in pairs(AbsTxdNames) do
-               if txdname == lastObjecttextureName then
+               if txdname == LastObjectData.txdname then
                   sampAddChatMessage("Последняя использованная текстура: " .. k-1, 0xFF00FF00)
                   break
                end
@@ -4165,18 +4176,18 @@ function sampev.onSendDialogResponse(dialogId, button, listboxId, input)
 	  end
 	  
 	  -- if dialogId == 1403 or dialogId == 1411 and button == 1 then
-	     -- if lastObjectModelid then 
-		    -- lastRemovedObjectModelid = lastObjectModelid
-			-- lastRemovedObjectCoords.x = lastObjectCoords.x
-			-- lastRemovedObjectCoords.y = lastObjectCoords.y
-			-- lastRemovedObjectCoords.z = lastObjectCoords.z
+	     -- if LastObjectData.modelid then 
+		    -- lastRemovedObjectModelid = LastObjectData.modelid
+			-- lastRemovedObjectCoords.x = LastObjectData.position.x
+			-- lastRemovedObjectCoords.y = LastObjectData.position.y
+			-- lastRemovedObjectCoords.z = LastObjectData.position.z
 		 -- end
 	  -- end
 	  
 	  -- if dialogId == 1401 and button == 1 then
 	     -- if undoMode then
-		    -- if lastObject and doesObjectExist(lastObject) then
-		       -- setObjectCoordinates(lastObject, lastRemovedObjectCoords.x, lastRemovedObjectCoords.y, lastRemovedObjectCoords.z)
+		    -- if LastObjectData.handle and doesObjectExist(LastObjectData.handle) then
+		       -- setObjectCoordinates(LastObjectData.handle, lastRemovedObjectCoords.x, lastRemovedObjectCoords.y, lastRemovedObjectCoords.z)
 			-- end
 		 -- end
 	  -- end
@@ -4210,7 +4221,7 @@ function sampev.onShowDialog(dialogId, style, title, button1, button2, text)
          "18632-19521 SA-MP\n\n"..
          "Номера объектов можно найти на сайте:\n"..
          "https://dev.prineside.com/ru/gtasa_samp_model_id/\n"..
-         (lastObjectModelid and "\nПоследний использованный объект: "..lastObjectModelid or " ")..
+         (LastObjectData.modelid and "\nПоследний использованный объект: "..LastObjectData.modelid or " ")..
          "\nВведи номер объекта: \n"
          return {dialogId, style, title, button1, button2, newtext}
       end
@@ -4278,8 +4289,8 @@ function sampev.onServerMessage(color, text)
    end
    
    if text:find("Последнего созданного объекта не существует") then
-      if lastObjectModelid then
-         sampAddChatMessage("Последний использованный объект: "..lastObjectModelid, 0x00FF00)
+      if LastObjectData.modelid then
+         sampAddChatMessage("Последний использованный объект: "..LastObjectData.modelid, 0x00FF00)
 	  end
    end
    
@@ -4372,10 +4383,10 @@ function sampev.onCreateObject(objectId, data)
 end
 
 function sampev.onSetObjectMaterial(id, data)
-   if id == lastObjectId then 
-      lastObjectlibraryName = data.libraryName
-      lastObjecttextureName = data.textureName
-      lastObjecttexturesrcID = data.modelId
+   if id == LastObjectData.id then 
+      LastObjectData.txdlibname = data.libraryName
+      LastObjectData.txdname = data.textureName
+      LastObjectData.txdmodel = data.modelId
    end
    if checkbox.logtxd.v then
       print(id, data.materialId, data.modelId, data.libraryName, data.textureName, data.color)
@@ -4385,15 +4396,15 @@ end
 function sampev.onSendEditObject(playerObject, objectId, response, position, rotation)
    local object = sampGetObjectHandleBySampId(objectId)
    local modelId = getObjectModel(object)
-   lastObject = object
-   lastObjectId = objectId
-   lastObjectModelid = modelId
-   lastObjectCoords.x = position.x
-   lastObjectCoords.y = position.y
-   lastObjectCoords.z = position.z
-   lastObjectCoords.rx = rotation.x
-   lastObjectCoords.ry = rotation.y
-   lastObjectCoords.rz = rotation.z
+   LastObjectData.handle = object
+   LastObjectData.id = objectId
+   LastObjectData.modelid = modelId
+   LastObjectData.position.x = position.x
+   LastObjectData.position.y = position.y
+   LastObjectData.position.z = position.z
+   LastObjectData.rotation.rx = rotation.x
+   LastObjectData.rotation.ry = rotation.y
+   LastObjectData.rotation.rz = rotation.z
    
    currentEditmode = response
    
@@ -4423,12 +4434,12 @@ end
 function sampev.onSendEnterEditObject(type, objectId, model, position)
    local object = sampGetObjectHandleBySampId(objectId)
    local modelId = getObjectModel(object)
-   lastObject = object
-   lastObjectId = objectId
-   lastObjectModelid = modelId
-   lastObjectCoords.x = position.x
-   lastObjectCoords.y = position.y
-   lastObjectCoords.z = position.z
+   LastObjectData.handle = object
+   LastObjectData.id = objectId
+   LastObjectData.modelid = modelId
+   LastObjectData.position.x = position.x
+   LastObjectData.position.y = position.y
+   LastObjectData.position.z = position.z
    
    if model == 3586 or model == 3743 then
       sampAddChatMessage("Объект "..model.." пропадет только после релога (баг SAMP)", 0x0FF0000)
