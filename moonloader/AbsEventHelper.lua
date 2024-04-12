@@ -4,7 +4,7 @@ script_description("Assistant for mappers and event makers on Absolute Play")
 script_dependencies('imgui', 'lib.samp.events', 'vkeys', 'vector3d')
 script_properties("work-in-pause")
 script_url("https://github.com/ins1x/AbsEventHelper")
-script_version("2.5.3")
+script_version("2.5.4")
 -- script_moonloader(16) moonloader v.0.26
 
 -- Activaton: ALT + X (show main menu)
@@ -84,6 +84,7 @@ local showrenderline = false
 local countobjects = true
 local ENBSeries = false
 local chosenplayer = nil
+local chosenvehicle = nil
 local tabselectedplayer = nil
 local lastRemovedObjectModelid = nil
 local hide3dtexts = false
@@ -122,6 +123,7 @@ local dialog = {
    main = imgui.ImBool(false),
    textures = imgui.ImBool(false),
    playerstat = imgui.ImBool(false),
+   vehstat = imgui.ImBool(false),
    extendedtab = imgui.ImBool(false),
    objectinfo = imgui.ImBool(false),
    fastanswer = imgui.ImBool(false)
@@ -139,7 +141,6 @@ local checkbox = {
    showobjects = imgui.ImBool(false),
    showclosestobjects = imgui.ImBool(false),
    drawlinetomodelid = imgui.ImBool(false),
-   vehstream = imgui.ImBool(true),
    noempyvehstream = imgui.ImBool(true),
    heavyweaponwarn = imgui.ImBool(true),
    nametagwh = imgui.ImBool(false),
@@ -173,6 +174,7 @@ local checkbox = {
    hidealltextdraws = imgui.ImBool(false),
    objectcollision = imgui.ImBool(false),
    changemdo = imgui.ImBool(false),
+   findveh = imgui.ImBool(false),
    test = imgui.ImBool(false)
 }
 
@@ -549,6 +551,14 @@ function commandparser(args)
                end
 			   return
 	        end
+            if cmd:find("savepos") then
+               if sampIsLocalPlayerSpawned() then
+                  local x, y, z = getCharCoordinates(PLAYER_PED)
+		          setClipboardText(string.format("%.2f %.2f %.2f", x, y, z))
+		          sampAddChatMessage("Позиция скопирована в буфер обмена", -1)
+               end
+               return
+            end
             if cmd:find("jump") then
                if sampIsLocalPlayerSpawned() then
                   JumpForward()
@@ -659,6 +669,7 @@ function main()
          if dialog.fastanswer.v then dialog.fastanswer.v = false end
          if dialog.textures.v then dialog.textures.v = false end
          if dialog.playerstat.v then dialog.playerstat.v = false end
+         if dialog.vehstat.v then dialog.vehstat.v = false end
          if dialog.extendedtab.v then dialog.extendedtab.v = false end
          if dialog.objectinfo.v then dialog.objectinfo.v = false end
       end 
@@ -863,7 +874,7 @@ function imgui.OnDrawFrame()
       imgui.SameLine()
       if imgui.Button(u8"Чат-Бинд") then tabmenu.main = 2 end
       imgui.SameLine()
-      if imgui.Button(u8"Мероприятие") then tabmenu.main = 3 end
+      if imgui.Button(u8"Сущности рядом") then tabmenu.main = 3 end
       imgui.SameLine()
       if imgui.Button(u8"Информация") then tabmenu.main = 4 end
 
@@ -909,7 +920,7 @@ function imgui.OnDrawFrame()
             positionX, positionY, positionZ))
 	        if imgui.IsItemClicked() then
                setClipboardText(string.format(u8"%.1f, %.1f, %.1f", positionX, positionY, positionZ))
-               sampAddChatMessage("Позиция скопирован в буфер обмена", -1)
+               sampAddChatMessage("Позиция скопирована в буфер обмена", -1)
             end
 			
 		    if tpcpos.x then
@@ -918,7 +929,7 @@ function imgui.OnDrawFrame()
                   tpcpos.x, tpcpos.y, tpcpos.z))
 	              if imgui.IsItemClicked() then
                     setClipboardText(string.format(u8"%.1f, %.1f, %.1f", tpcpos.x, tpcpos.y, tpcpos.z))
-                    sampAddChatMessage("Позиция скопирован в буфер обмена", -1)
+                    sampAddChatMessage("Позиция скопирована в буфер обмена", -1)
                   end
 			   end
 			end
@@ -929,7 +940,7 @@ function imgui.OnDrawFrame()
                bX, bY, bZ))
 			   if imgui.IsItemClicked() then
 			      setClipboardText(string.format(u8"%.1f, %.1f, %.1f", bX, bY, bZ))
-				  sampAddChatMessage("Позиция скопирован в буфер обмена", -1)
+				  sampAddChatMessage("Позиция скопирована в буфер обмена", -1)
 			   end
 		    end 
 		    
@@ -1447,7 +1458,7 @@ function imgui.OnDrawFrame()
          camX, camY, camZ))
 		 if imgui.IsItemClicked() then
             setClipboardText(string.format(u8"%.1f, %.1f, %.1f", camX, camY, camZ))
-            sampAddChatMessage("Позиция скопирован в буфер обмена", -1)
+            sampAddChatMessage("Позиция скопирована в буфер обмена", -1)
          end
 		 
 		 if imgui.Checkbox(u8("Зафиксировать камеру на координатах"), checkbox.fixcampos) then
@@ -2378,7 +2389,7 @@ function imgui.OnDrawFrame()
 	   imgui.SameLine()
 	   --imgui.TextQuestion("( ? )", u8"Открыть расширенные настройки")
 	   --imgui.SameLine()
-	   imgui.Text(u8"Выберите таблицу:")
+	   imgui.Text(u8"Выберите сущность:")
 	   imgui.SameLine()
 	   imgui.PushItemWidth(120)
 	   imgui.Combo(u8'##ComboBoxSelecttable', combobox.selecttable, 
@@ -2541,173 +2552,123 @@ function imgui.OnDrawFrame()
          --elseif tabmenu.main == 4 then
          imgui.Columns(2, "vehtableheader", false)
          imgui.SetColumnWidth(-1, 320)
-         -- https://wiki.multitheftauto.com/wiki/Vehicle_IDs
-         imgui.Text(u8"Найти ID транспорта по имени:")
-         if imgui.InputText("##BindVehs", textbuffer.vehiclename) then 
-            for k, vehname in ipairs(VehicleNames) do
-               if vehname:lower():find(u8:decode(textbuffer.vehiclename.v:lower())) then
-                  vehinfomodelid = 399+k
+         
+         if imgui.Checkbox(u8("Найти ID транспорта по имени"), checkbox.findveh) then
+            -- https://wiki.multitheftauto.com/wiki/Vehicle_IDs
+         end
+            
+         if checkbox.findveh.v then 
+            if imgui.InputText("##BindVehs", textbuffer.vehiclename) then 
+               for k, vehname in ipairs(VehicleNames) do
+                  if vehname:lower():find(u8:decode(textbuffer.vehiclename.v:lower())) then
+                     vehinfomodelid = 399+k
+                  end
                end
             end
-         end 
-       
-         imgui.SameLine()
-         if textbuffer.vehiclename.v == "" then
-            imgui.Spacing()
-         else
-            imgui.Text(string.format(u8"ID: %i", vehinfomodelid))
-         end
-         imgui.SameLine()
-         imgui.TextQuestion("( ? )", u8"Введите имя транспорта, например Infernus")
-       
-         local closestcarhandle, closestcarid = getClosestCar()
-         if closestcarhandle then
-            local closestcarmodel = getCarModel(closestcarhandle)
-            imgui.Text(string.format(u8"Ближайший т/с: %s [id: %i] (%i)",
-            VehicleNames[closestcarmodel-399], closestcarmodel, closestcarid))
+            
             imgui.SameLine()
-            imgui.TextQuestion("( ? )", u8"В скобках указан внутренний ID (/dl)")
-         else
-            imgui.Text(u8"Нет транспорта в зоне стрима")
+            if textbuffer.vehiclename.v == "" then
+               imgui.Spacing()
+            else
+               imgui.Text(string.format(u8"ID: %i", vehinfomodelid))
+            end
+            imgui.SameLine()
+            imgui.TextQuestion("( ? )", u8"Введите имя транспорта, например Infernus")
+       
+            local closestcarhandle, closestcarid = getClosestCar()
+            if closestcarhandle then
+               local closestcarmodel = getCarModel(closestcarhandle)
+               imgui.Text(string.format(u8"Ближайший т/с: %s [id: %i] (%i)",
+               VehicleNames[closestcarmodel-399], closestcarmodel, closestcarid))
+               imgui.SameLine()
+               imgui.TextQuestion("( ? )", u8"В скобках указан внутренний ID (/dl)")
+            else
+               imgui.Text(u8"Нет транспорта в зоне стрима")
+            end
+         
          end
        
          if isCharInAnyCar(PLAYER_PED) then 
             local carhandle = storeCarCharIsInNoSave(PLAYER_PED)
             local carmodel = getCarModel(carhandle)
-            imgui.Text(string.format(u8"Вы в транспорте: %s(%i)  хп: %i",
-            VehicleNames[carmodel-399], carmodel, getCarHealth(carhandle)))
+            imgui.Text(string.format(u8"Вы в транспорте: %s(%i)",
+            VehicleNames[carmodel-399], carmodel))
          end
        
          imgui.NextColumn()
-         if imgui.Button(u8"Заказать машину по имени", imgui.ImVec2(200, 25)) then
-            if not sampIsChatInputActive() and not sampIsDialogActive() and not isPauseMenuActive() and not  isSampfuncsConsoleActive() then
-               for k, vehname in ipairs(VehicleNames) do
-                  if vehname:lower():find(u8:decode(textbuffer.vehiclename.v:lower())) then
-                     vehinfomodelid = 399+k
-                  end 
-               end
-               if isAbsolutePlay then 
-			      sampSendChat(string.format(u8"/vfibye2 %i", vehinfomodelid))
-			   else
-                  sampSendChat(string.format(u8"/v %i", vehinfomodelid))
-			   end
+         imgui.Columns(1)
+            
+         vehiclesTable = {}
+         vehiclesTotal = 0
+       
+         for k, v in ipairs(getAllVehicles()) do
+            local streamed, id = sampGetVehicleIdByCarHandle(v)
+            if streamed then
+               table.insert(vehiclesTable, v)
+               vehiclesTotal = vehiclesTotal + 1
             end
          end
-	     -- imgui.SameLine()
-	     -- if imgui.Button(u8"Найти ID траспорта онлайн", imgui.ImVec2(190, 25)) then
-	        -- os.execute('explorer "https://wiki.multitheftauto.com/wiki/Vehicle_IDs"')
-	     -- end
-	     if imgui.Button(u8"Заказать машину из списка", imgui.ImVec2(200, 25)) then
-	        if isAbsolutePlay then
-               if not sampIsChatInputActive() and not sampIsDialogActive() and not isPauseMenuActive() and not isSampfuncsConsoleActive() then 
-			       sampSendChat("/vfibye2")
-				   dialog.main.v = not dialog.main.v
-		       end
-            end
-	     end
-		 
-		 if imgui.Button(u8"Информация о модели (онлайн)", imgui.ImVec2(200, 25)) then
-		    if vehinfomodelid then
-               if vehinfomodelid > 400 and vehinfomodelid < 611 then 
-	              os.execute(string.format('explorer "http://gta.rockstarvision.com/vehicleviewer/#sa/%d"', vehinfomodelid))
-               else
-                  sampAddChatMessage("Некорректный ид транспорта", -1)
-               end
-			end
-	     end
-	     -- imgui.SameLine()
-	     -- if imgui.Button(u8"Handling.cfg (онлайн)", imgui.ImVec2(190, 25)) then
-	     -- os.execute('explorer "https://github.com/ins1x/useful-samp-stuff/blob/main/docs/server/VehicleHandling.txt"')
-	     -- end
-	   
+         
+         imgui.Separator()
+         imgui.Columns(4)
+         imgui.TextQuestion("ID", u8"Внутренний ID (/dl)")
+         imgui.NextColumn()
+         imgui.Text("Vehicle")
+         imgui.NextColumn()
+         imgui.SetColumnWidth(-1, 350)
+         imgui.Text("Driver")
+         imgui.NextColumn()
+         imgui.Text("Health")
+         imgui.NextColumn()
          imgui.Columns(1)
-         imgui.Checkbox(u8("Показать список транспорта в стриме"), checkbox.vehstream)
-         --imgui.Checkbox(u8("Скрывать пустой транспорт"), checkbox.noempyvehstream)
-         if checkbox.vehstream.v then
+         imgui.Separator()
+       
+         for k, v in ipairs(getAllVehicles()) do
+            local health = getCarHealth(v)
+            local carmodel = getCarModel(v)
+            local streamed, id = sampGetVehicleIdByCarHandle(v)
+            local ped = getDriverOfCar(v)
+            local res, pid = sampGetPlayerIdByCharHandle(ped)
+            local vehmodelname = string.format("%s", VehicleNames[carmodel-399])
             
-			vehiclesTable = {}
-            vehiclesTotal = 0
-          
-            for k, v in ipairs(getAllVehicles()) do
-               local streamed, id = sampGetVehicleIdByCarHandle(v)
-               if streamed then
-			  	  table.insert(vehiclesTable, v)
-                  vehiclesTotal = vehiclesTotal + 1
-               end
-            end
-			
-            imgui.Separator()
             imgui.Columns(4)
-            imgui.TextQuestion("ID", u8"Внутренний ID (/dl)")
+            imgui.TextColoredRGB(string.format("%i", id))
+            imgui.SetColumnWidth(-1, 50)
             imgui.NextColumn()
-            imgui.Text("Vehicle")
+            imgui.Selectable(vehmodelname)
+            if imgui.IsItemClicked() then
+               chosenvehicle = v
+               vehinfomodelid = carmodel
+			   if not dialog.vehstat.v then dialog.vehstat.v = true end
+            end
+                   
             imgui.NextColumn()
-            imgui.SetColumnWidth(-1, 350)
-            imgui.Text("Driver")
+            if res then 
+               imgui.Selectable(string.format(u8"%s", sampGetPlayerNickname(pid)))
+               if imgui.IsItemClicked() then
+                  chosenplayer = pid
+                  printStringNow("You have chosen a player ".. sampGetPlayerNickname(pid), 1000)
+                  if not dialog.playerstat.v then dialog.playerstat.v = true end
+               end
+            else
+               imgui.Text(u8"пустой")
+            end
             imgui.NextColumn()
-            imgui.Text("Health")
-            imgui.NextColumn()
+            if health > 10000 then
+               imgui.TextColoredRGB("{ff0000}GM")
+            elseif health > 1000 then
+               imgui.TextColoredRGB(string.format("{ff0000}%i", health))
+            elseif health < 450 then
+               imgui.TextColoredRGB(string.format("{ff8c00}%i", health))
+            else 
+               imgui.TextColoredRGB(string.format("%i", health))
+            end
             imgui.Columns(1)
             imgui.Separator()
-          
-            for k, v in ipairs(getAllVehicles()) do
-               local health = getCarHealth(v)
-               local carmodel = getCarModel(v)
-               local streamed, id = sampGetVehicleIdByCarHandle(v)
-               local ped = getDriverOfCar(v)
-               local res, pid = sampGetPlayerIdByCharHandle(ped)
-			   local vehmodelname = nil
-			   
-               imgui.Columns(4)
-               imgui.TextColoredRGB(string.format("%i", id))
-               imgui.SetColumnWidth(-1, 50)
-               imgui.NextColumn()
-			   if carmodel == 447 or carmodel == 425 or carmodel == 432 or carmodel == 520 then
-                  vehmodelname = string.format("{FF0000}%s", VehicleNames[carmodel-399])
-			   elseif carmodel == 476 or carmodel == 430 or carmodel == 406 or carmodel == 592 then
-			      vehmodelname = string.format("{FF8C00}%s", VehicleNames[carmodel-399])
-			   elseif carmodel == 601 or carmodel == 407 then
-			      vehmodelname = string.format("{1E90FF}%s", VehicleNames[carmodel-399])
-			   else
-			      vehmodelname = string.format("%s", VehicleNames[carmodel-399])
-			   end
-			   
-			   imgui.TextColoredRGB(vehmodelname)
-			   if imgui.IsItemClicked() then 
-				  textbuffer.vehiclename.v = tostring(VehicleNames[carmodel-399])
-				  vehinfomodelid = carmodel
-			   end
-			   
-               imgui.NextColumn()
-               if res then 
-				  imgui.Selectable(string.format(u8"%s", sampGetPlayerNickname(pid)))
-                  if imgui.IsItemClicked() then
-                     chosenplayer = pid
-                     printStringNow("You have chosen a player ".. sampGetPlayerNickname(pid), 1000)
-			         if not dialog.playerstat.v then dialog.playerstat.v = true end
-                  end
-               else
-                  imgui.Text(u8"пустой")
-               end
-               imgui.NextColumn()
-               if health > 10000 then
-                  imgui.TextColoredRGB("{ff0000}GM")
-               elseif health > 1000 then
-                  imgui.TextColoredRGB(string.format("{ff0000}%i", health))
-               elseif health < 450 then
-                  imgui.TextColoredRGB(string.format("{ff8c00}%i", health))
-               else 
-                  imgui.TextColoredRGB(string.format("%i", health))
-               end
-               imgui.Columns(1)
-               imgui.Separator()
-            end
-          
-            if checkbox.vehstream.v then
-               imgui.Text(u8"Всего транспорта в таблице: ".. vehiclesTotal)
-            end
          end
-	  end
+       
+         imgui.Text(u8"Всего транспорта в таблице: ".. vehiclesTotal)
+      end
 
       elseif tabmenu.main == 4 then
       imgui.Columns(2)
@@ -3242,6 +3203,7 @@ function imgui.OnDrawFrame()
             imgui.TextColoredRGB("{00FF00}/abs {FFFF00}render{FFFFFF} - показывать ид объектов (CTRL+O)")
             imgui.TextColoredRGB("{00FF00}/abs {FFFF00}recon{FFFFFF} - рекконект")
             imgui.TextColoredRGB("{00FF00}/abs {FFFF00}restream{FFFFFF} - рестрим")
+            imgui.TextColoredRGB("{00FF00}/abs {FFFF00}savepos{FFFFFF} - сохранить позицию")
          end
 	     if imgui.CollapsingHeader(u8"Клиентские команды:") then
             imgui.TextColoredRGB("{00FF00}/headmove{FFFFFF} - вкл/выкл поворот головы скина по направлению камеры")
@@ -3833,7 +3795,124 @@ function imgui.OnDrawFrame()
 	   
 	  imgui.End()
    end
+   
+   
+   if dialog.vehstat.v then
+      imgui.SetNextWindowPos(imgui.ImVec2(sizeX / 1.25, sizeY / 4),
+      imgui.Cond.FirstUseEver, imgui.ImVec2(0.5, 0.5))
+      imgui.Begin(u8"Меню транспорта", dialog.vehstat)
+      
+      
+      if chosenvehicle then
+         local health = getCarHealth(chosenvehicle)
+         local carmodel = getCarModel(chosenvehicle)
+         local streamed, id = sampGetVehicleIdByCarHandle(chosenvehicle)
+         local ped = getDriverOfCar(chosenvehicle)
+         local res, pid = sampGetPlayerIdByCharHandle(ped)
+         local passengers, valPassengers = getNumberOfPassengers(chosenvehicle)
+         local maxPassengers = getMaximumNumberOfPassengers(chosenvehicle)
+         local engineon = isCarEngineOn(chosenvehicle)
+         local primaryColor, secondaryColor = getCarColours(chosenvehicle)
+         local paintjob = getCurrentVehiclePaintjob(chosenvehicle)
+         local availablePaintjobs = getNumAvailablePaintjobs(chosenvehicle)
+         
+         if carmodel == 447 or carmodel == 425 or carmodel == 432 or carmodel == 520 then
+            vehmodelname = string.format("{FF0000}%s (id:%d)", VehicleNames[carmodel-399], carmodel)
+         elseif carmodel == 476 or carmodel == 430 or carmodel == 406 or carmodel == 592 then
+            vehmodelname = string.format("{FF8C00}%s (id:%d)", VehicleNames[carmodel-399], carmodel)
+         elseif carmodel == 601 or carmodel == 407 then
+            vehmodelname = string.format("{1E90FF}%s (id:%d)", VehicleNames[carmodel-399], carmodel)
+         else
+            vehmodelname = string.format("%s (id:%d)", VehicleNames[carmodel-399], carmodel)
+         end
+	   
+         imgui.TextColoredRGB(vehmodelname)
+         if imgui.IsItemClicked() then 
+            textbuffer.vehiclename.v = tostring(VehicleNames[carmodel-399])
+            vehinfomodelid = carmodel
+         end
+         
+         imgui.TextColoredRGB(string.format("Хп: %i", health))
+         
+         imgui.Text(u8"Водитель:")
+         imgui.SameLine()
+         if res then 
+            imgui.Selectable(string.format(u8"%s", sampGetPlayerNickname(pid)))
+            if imgui.IsItemClicked() then
+               chosenplayer = pid
+               printStringNow("You have chosen a player ".. sampGetPlayerNickname(pid), 1000)
+               if not dialog.playerstat.v then dialog.playerstat.v = true end
+            end
+         else
+            imgui.Text(u8"Нет")
+         end
+         
+         imgui.Text(string.format(u8"Скорость: %.0f", getCarSpeed(chosenvehicle)))
+         
+         if passengers then
+            imgui.Text(string.format(u8"Пассажиров в транспорте: %i (max %i)", valPassengers, maxPassengers))
+         else
+            imgui.Text(string.format(u8"Пассажиров в транспорте: нет (max %i)", maxPassengers))
+         end
+         
+         imgui.Text(engineon and u8('Двигатель: Работает') or u8('Двигатель: Заглушен'))
+         
+         
+         imgui.Text(string.format(u8"Цвет 1: %i  Цвет 2: %i", primaryColor, secondaryColor))
+         
+         imgui.Text(string.format(u8"Покраска: %i/%i", paintjob, availablePaintjobs))
+          
+         if imgui.Button(u8"Информация о модели (онлайн)", imgui.ImVec2(250, 25)) then
+	        if vehinfomodelid then
+               if vehinfomodelid > 400 and vehinfomodelid < 611 then 
+	              os.execute(string.format('explorer "https://gtaundergroundmod.com/pages/ug-mp/documentation/vehicle/%d/details"', vehinfomodelid))
+               else
+                  sampAddChatMessage("Некорректный ид транспорта", -1)
+               end
+	        end
+	     end
+                  
+         if imgui.Button(u8"Предпросмотр 3D модели (онлайн)", imgui.ImVec2(250, 25)) then
+	        if vehinfomodelid then
+               if vehinfomodelid > 400 and vehinfomodelid < 611 then 
+	              os.execute(string.format('explorer "http://gta.rockstarvision.com/vehicleviewer/#sa/%d"', vehinfomodelid))
+               else
+                  sampAddChatMessage("Некорректный ид транспорта", -1)
+               end
+	        end
+	     end
+         
+         if imgui.Button(u8"Таблица цветов транспорта (онлайн)", imgui.ImVec2(250, 25)) then
+            os.execute(string.format('explorer "https://www.open.mp/docs/scripting/resources/vehiclecolorid"'))
+	     end
+         
+      end
+      
 
+            
+            	     -- imgui.SameLine()
+	     -- if imgui.Button(u8"Handling.cfg (онлайн)", imgui.ImVec2(190, 25)) then
+	     -- os.execute('explorer "https://github.com/ins1x/useful-samp-stuff/blob/main/docs/server/VehicleHandling.txt"')
+	     -- end
+         
+         
+          -- if imgui.Button(u8"Заказать машину по имени", imgui.ImVec2(200, 25)) then
+            -- if not sampIsChatInputActive() and not sampIsDialogActive() and not isPauseMenuActive() and not  isSampfuncsConsoleActive() then
+               -- for k, vehname in ipairs(VehicleNames) do
+                  -- if vehname:lower():find(u8:decode(textbuffer.vehiclename.v:lower())) then
+                     -- vehinfomodelid = 399+k
+                  -- end 
+               -- end
+               -- if isAbsolutePlay then 
+			      -- sampSendChat(string.format(u8"/vfibye2 %i", vehinfomodelid))
+			   -- else
+                  -- sampSendChat(string.format(u8"/v %i", vehinfomodelid))
+			   -- end
+            -- end
+         -- end
+   	  imgui.End()
+   end
+   
    if dialog.objectinfo.v then
       imgui.SetNextWindowPos(imgui.ImVec2(sizeX / 15, sizeY / 4),
       imgui.Cond.FirstUseEver, imgui.ImVec2(0.5, 0.5))
