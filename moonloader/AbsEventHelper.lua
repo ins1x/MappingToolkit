@@ -4,7 +4,7 @@ script_description("Assistant for mappers and event makers on Absolute Play")
 script_dependencies('imgui', 'lib.samp.events', 'vkeys', 'vector3d')
 script_properties("work-in-pause")
 script_url("https://github.com/ins1x/AbsEventHelper")
-script_version("2.5.4")
+script_version("2.5.5")
 -- script_moonloader(16) moonloader v.0.26
 
 -- Activaton: ALT + X (show main menu)
@@ -29,7 +29,6 @@ local ini = inicfg.load({
    {
       showhud = true,
       noabsunload = false,
-      autoupdplayerstable = false,
       disconnectreminder = true,
       lockserverweather = false,
       usecustomcamdist = false,
@@ -132,7 +131,6 @@ local dialog = {
 local checkbox = {
    showhud = imgui.ImBool(ini.settings.showhud),
    noabsunload = imgui.ImBool(ini.settings.noabsunload),
-   autoupdplayerstable = imgui.ImBool(ini.settings.autoupdplayerstable),
    disconnectreminder = imgui.ImBool(ini.settings.disconnectreminder),
    lockserverweather = imgui.ImBool(ini.settings.lockserverweather),
    usecustomcamdist = imgui.ImBool(ini.settings.usecustomcamdist),
@@ -2401,42 +2399,24 @@ function imgui.OnDrawFrame()
              imgui.Text(u8"Перед началом мероприятия обновите список игроков, и сохраните")
           end
           
-          if imgui.TooltipButton(u8"Обновить", imgui.ImVec2(100, 25), u8:encode("Обновить таблицу")) then
-             playersTable = {}       
-             playersTotal = 0
-             
-             for k, v in ipairs(getAllChars()) do
-                local res, id = sampGetPlayerIdByCharHandle(v)
-                if res then
-                   table.insert(playersTable, id)
-                   playersTotal = playersTotal + 1
-                end
-             end
-          end
-       
-          imgui.SameLine()
-          if imgui.TooltipButton(u8"Сохранить", imgui.ImVec2(100, 25), u8:encode("Сохранить таблицу")) then 
-             ptablefile = io.open(getGameDirectory().."/moonloader/resource/abseventhelper/players.txt", "a")
-             ptablefile:write("\n")
-             ptablefile:write(string.format("%s \n", os.date("%d.%m.%y %H:%M:%S")))
-             local counter = 0
-             for k, v in pairs(playersTable) do
-                ptablefile:write(string.format("%d [id:%d] %s lvl: %i \n",
-                counter + 1, v, sampGetPlayerNickname(v), sampGetPlayerScore(v)))
-                counter = counter + 1
-             end
-             ptablefile:write(string.format("Total: %d \n", counter))
-             ptablefile:close()
-             sampAddChatMessage("Список игроков сохранен в moonloader/resource/abseventhelper/players.txt", -1)
-          end
+          playersTable = {}       
+	 	  playersTotal = 0
+	  
+		  for k, v in ipairs(getAllChars()) do
+		     local res, id = sampGetPlayerIdByCharHandle(v)
+		     if res then
+		 	     table.insert(playersTable, id)
+		 	     playersTotal = playersTotal + 1
+		      end
+	 	   end
           
-          imgui.SameLine()
-          if imgui.TooltipButton(u8"Очистить", imgui.ImVec2(100, 25), u8:encode("Очистить таблицу")) then
-             playersTable = {}       
-             playersTotal = 0
-			 if dialog.playerstat.v then dialog.playerstat.v = false end
-			 chosenplayer = nil
-          end
+          -- imgui.SameLine()
+          -- if imgui.TooltipButton(u8"Очистить", imgui.ImVec2(100, 25), u8:encode("Очистить таблицу")) then
+             -- playersTable = {}       
+             -- playersTotal = 0
+			 -- if dialog.playerstat.v then dialog.playerstat.v = false end
+			 -- chosenplayer = nil
+          -- end
           imgui.SameLine()
           imgui.Text(u8"Найти в таблице:")
        
@@ -3990,20 +3970,6 @@ function imgui.OnDrawFrame()
       imgui.SetNextWindowPos(imgui.ImVec2(sizeX / 15, sizeY / 4),
       imgui.Cond.FirstUseEver, imgui.ImVec2(0.5, 0.5))
       imgui.Begin(u8"Расширенные настройки", dialog.extendedtab)
-	  	  
-	  imgui.Checkbox(u8("Автоообновление списка игроков"), checkbox.autoupdplayerstable)
-	  if checkbox.autoupdplayerstable.v then
-	 	 playersTable = {}       
-	 	 playersTotal = 0
-	  
-		for k, v in ipairs(getAllChars()) do
-		   local res, id = sampGetPlayerIdByCharHandle(v)
-		   if res then
-		 	   table.insert(playersTable, id)
-		 	   playersTotal = playersTotal + 1
-		    end
-	 	 end
-	  end
 	 
 	  if imgui.Checkbox(u8("Уведомлять о дисконнекте игрока"), checkbox.disconnectreminder) then
 	 	 if checkbox.disconnectreminder.v then
@@ -4144,6 +4110,22 @@ function imgui.OnDrawFrame()
          end
 		 sampAddChatMessage("Игроков в сети "..totalonline.." из них новички "..newbies.." а "..olds.." постояльцы (боты: "..(totalonline-newbies-olds)..")", -1)
 	  end
+      
+      if imgui.Button(u8"Сохранить список игроков в файл", imgui.ImVec2(230, 25)) then 
+         ptablefile = io.open(getGameDirectory().."/moonloader/resource/abseventhelper/players.txt", "a")
+         ptablefile:write("\n")
+         ptablefile:write(string.format("%s \n", os.date("%d.%m.%y %H:%M:%S")))
+         local counter = 0
+         for k, v in pairs(playersTable) do
+            ptablefile:write(string.format("%d [id:%d] %s lvl: %i \n",
+            counter + 1, v, sampGetPlayerNickname(v), sampGetPlayerScore(v)))
+            counter = counter + 1
+         end
+         ptablefile:write(string.format("Total: %d \n", counter))
+         ptablefile:close()
+         sampAddChatMessage("Список игроков сохранен в moonloader/resource/abseventhelper/players.txt", -1)
+      end
+      
 	  imgui.End()
    end
    
