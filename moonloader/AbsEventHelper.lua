@@ -4,7 +4,7 @@ script_description("Assistant for mappers and event makers on Absolute Play")
 script_dependencies('imgui', 'lib.samp.events', 'vkeys', 'vector3d')
 script_properties("work-in-pause")
 script_url("https://github.com/ins1x/AbsEventHelper")
-script_version("2.6.0 beta")
+script_version("2.6.0 beta 1")
 -- script_moonloader(16) moonloader v.0.26
 
 -- Activaton: ALT + X (show main menu)
@@ -33,6 +33,7 @@ local ini = inicfg.load({
       lockserverweather = false,
       usecustomcamdist = false,
 	  showobjectrot = false,
+      chatmentions = false,
       drawdist = "450",
       fog = "200",
 	  camdist = "1",
@@ -97,6 +98,8 @@ local scaleEditObject = false
 local lastWorldNumber = 0 -- is not same GetVirtualWorldId
 local removedBuildings = 0
 local mpStartedDTime = nil
+local mpStarted = false
+local autoAnnounce = false
 
 local fps = 0
 local fps_counter = 0
@@ -175,7 +178,7 @@ local checkbox = {
    changemdo = imgui.ImBool(false),
    findveh = imgui.ImBool(false),
    healthcheck = imgui.ImBool(false),
-   mentions = imgui.ImBool(true),
+   chatmentions = imgui.ImBool(ini.settings.chatmentions),
    test = imgui.ImBool(false)
 }
 
@@ -5714,25 +5717,39 @@ function imgui.OnDrawFrame()
                end
             end
             imgui.SameLine()
-            if imgui.Button(u8"Включить флуд МП", imgui.ImVec2(220, 25)) then
-               sampAddChatMessage("В бета версии недоступно", -1)
+            if imgui.TooltipButton(autoAnnounce and u8('Отключить авто-объявление') or u8('Включить авто-объявление'), imgui.ImVec2(220, 25), u8:encode("Автоматически шлет объявление о МП (раз в минуту)")) then
+               if string.len(textbuffer.mpname.v) > 0 and string.len(textbuffer.mpprize.v) > 0 then 
+                  autoAnnounce = not autoAnnounce
+                  if autoAnnounce then 
+                     sampAddChatMessage("В объявление будет подано: "..u8:decode(textbuffer.mpname.v)..", приз "..u8:decode(textbuffer.mpprize.v), -1)
+                  end   
+                  AutoAd()
+               else
+                  sampAddChatMessage("Сперва укажите название мероприятия и приз!", -1)
+               end
             end
             
-            if imgui.Button(u8"Начать мероприятие", imgui.ImVec2(220, 25)) then
-               mpStartedDTime = os.date('%X')
-               sampSetChatInputEnabled(true)
-               sampSetChatInputText('* Начали! Желаю удачи всем игрокам')
-            end
-            imgui.SameLine()
-            if imgui.Button(u8"Остановить мероприятие", imgui.ImVec2(220, 25)) then
-               mpStartedDTime = nil
-               --sampSetChatInputEnabled(true)
-               --sampSetChatInputText('* МП Остановлено')
-               sampAddChatMessage("МП остановлено!", -1)
+            if imgui.Button(mpStarted and u8("Остановить мероприятие") or u8("Начать мероприятие"), imgui.ImVec2(220, 25)) then
+               mpStarted = not mpStarted
+               if mpStarted then
+                  autoAnnounce = false
+                  mpStartedDTime = os.date('%X')
+                  sampSetChatInputEnabled(true)
+                  sampSetChatInputText('* Начали! Желаю удачи всем игрокам')
+               else
+                  mpStartedDTime = nil
+                  --sampSetChatInputEnabled(true)
+                  --sampSetChatInputText('* МП Остановлено')
+                  sampAddChatMessage("МП остановлено!", -1)
+               end
             end
 	        
             imgui.Spacing()
             imgui.Text(u8"Список игроков:")
+            if next(playersTable) == nil then -- if playersTable is empty
+               imgui.SameLine()
+               imgui.TextColoredRGB("   {FF0000}Перед началом мероприятия{cbcbcb} обновите список игроков")
+            end
             if imgui.Button(u8"Обновить список игроков", imgui.ImVec2(220, 25)) then
                playersTable = {}       
                playersTotal = 0
@@ -5762,40 +5779,52 @@ function imgui.OnDrawFrame()
             end
             
             if imgui.Button(u8"Сохранить список игроков в файл", imgui.ImVec2(220, 25)) then 
-               ptablefile = io.open(getGameDirectory().."/moonloader/resource/abseventhelper/players.txt", "a")
-               ptablefile:write("\n")
-               ptablefile:write(string.format("%s \n", os.date("%d.%m.%y %H:%M:%S")))
-               local counter = 0
-               for k, v in pairs(playersTable) do
-                  ptablefile:write(string.format("%d [id:%d] %s lvl: %i \n",
-                  counter + 1, v, sampGetPlayerNickname(v), sampGetPlayerScore(v)))
-                  counter = counter + 1
+               if next(playersTable) == nil then -- if playersTable is empty
+                  sampAddChatMessage("Сперва обновите список игроков", -1)
+               else
+                  ptablefile = io.open(getGameDirectory().."/moonloader/resource/abseventhelper/players.txt", "a")
+                  ptablefile:write("\n")
+                  ptablefile:write(string.format("%s \n", os.date("%d.%m.%y %H:%M:%S")))
+                  local counter = 0
+                  for k, v in pairs(playersTable) do
+                     ptablefile:write(string.format("%d [id:%d] %s lvl: %i \n",
+                     counter + 1, v, sampGetPlayerNickname(v), sampGetPlayerScore(v)))
+                     counter = counter + 1
+                  end
+                  ptablefile:write(string.format("Total: %d \n", counter))
+                  ptablefile:close()
+                  sampAddChatMessage("Список игроков сохранен в moonloader/resource/abseventhelper/players.txt", -1)
                end
-               ptablefile:write(string.format("Total: %d \n", counter))
-               ptablefile:close()
-               sampAddChatMessage("Список игроков сохранен в moonloader/resource/abseventhelper/players.txt", -1)
             end
             
-            if next(playersTable) == nil then -- if playersTable is empty
-               imgui.Text(u8"Перед началом мероприятия обновите список игроков, и сохраните")
-            end
-            
+            -- online stats
             local totalonline = 0
 	 	    local olds = 0
+            local players = 0
 	 	    local newbies = 0
+            local bots = 0
             
 	        for i = 0, sampGetMaxPlayerId(false) do
                if sampIsPlayerConnected(i) then 
-	 	        totalonline = totalonline + 1
-	 	        local score = sampGetPlayerScore(i)
-	 	        if score > 100 then
-	 	           olds = olds + 1
-	 	        elseif score >= 3 and score <= 100 then 
-	 	           newbies = newbies + 1
-	 	        end
-	 	     end
+	 	          totalonline = totalonline + 1
+	 	          local score = sampGetPlayerScore(i)
+                  local ping = sampGetPlayerPing(i)
+                  if ping <= 30 then
+                     if score < 10 or score < 1000 then
+                        bots = bots + 1
+                     end
+                  end
+	 	          if score > 1000 then
+	 	             olds = olds + 1
+	 	          elseif score >= 50 and score < 1000 then 
+                     players = players + 1
+                  else 
+                     newbies = newbies + 1
+	 	          end
+	 	       end
             end
-	 	    imgui.Text(u8"Игроков в сети "..totalonline..u8" из них новички "..newbies..u8" а "..olds..u8" постояльцы (возможные боты: "..(totalonline-newbies-olds)..")")
+	 	    imgui.Text(string.format(u8"Игроков в сети %i из них новички %i, постояльцы %i, олды %i (возможно боты %i)",
+            totalonline, newbies, players, olds, bots))
             
          elseif tabmenu.mp == 2 then
             if imgui.Button(u8"Выдаю оружие и броню!", imgui.ImVec2(220, 25)) then
@@ -5881,7 +5910,10 @@ function imgui.OnDrawFrame()
             if imgui.Button(u8"Открыть лог чата (chatlog.txt)", imgui.ImVec2(220, 25)) then
 	           os.execute('explorer '..getFolderPath(5) ..'\\GTA San Andreas User Files\\SAMP\\chatlog.txt')
 	        end
-            if imgui.Checkbox(u8("Уведеомлять при упоминании в чате"), checkbox.mentions) then
+            
+            if imgui.Checkbox(u8("Уведомлять при упоминании в чате"), checkbox.chatmentions) then
+               ini.settings.chatmentions = checkbox.chatmentions.v
+               save()
             end
             
          elseif tabmenu.mp == 4 then
@@ -5889,17 +5921,146 @@ function imgui.OnDrawFrame()
              imgui.ColorEdit4("##ColorEdit4lite", color, imgui.ColorEditFlags.NoInputs)
              imgui.SameLine()
              -- line 1
-             imgui.PushItemWidth(70)
-             imgui.Combo('##ComboChatSelect', combobox.chatselect, {u8'мчат', u8'общий'}, 2)
+             imgui.PushItemWidth(90)
+             imgui.Combo('##ComboChatSelect', combobox.chatselect, {u8'мчат', u8'глобальный', u8"без префикса"}, 3)
              imgui.PopItemWidth()
              
              imgui.SameLine()
-             if imgui.TooltipButton("[R]", imgui.ImVec2(40, 25), u8:encode("Перезагрузить бинды")) then 
+             if imgui.TooltipButton(u8"Правила сервера", imgui.ImVec2(150, 25), u8:encode("Полный список правил сервера")) then 
+		        os.execute('explorer https://forum.sa-mp.ru/index.php?/topic/802952-%D0%BF%D1%80%D0%B0%D0%B2%D0%B8%D0%BB%D0%B0-dm-%D1%81%D0%B5%D1%80%D0%B2%D0%B5%D1%80%D0%B0/')
+		     end
+             
+             local prefix = ""
+             if combobox.chatselect.v == 0 then
+                prefix = "/мчат "
+             elseif combobox.chatselect.v == 1 then
+                prefix = "* "
+             elseif combobox.chatselect.v == 2 then
+                prefix = ""
+             end
+             
+             --imgui.Text(u8"Профиль: ")
+             --imgui.SameLine()
+             -- line 1
+             imgui.Text("1.")
+             imgui.SameLine()
+             imgui.PushItemWidth(400)
+             if imgui.InputText("##Bind1", textbuffer.bind1) then 
+             end
+             imgui.PopItemWidth()
+             -- if imgui.IsItemHovered() and imgui.IsMouseDown(1) then
+                -- imgui.Text('Hovered and RMB down')
+             -- end
+             
+             imgui.SameLine()
+             if imgui.TooltipButton(u8"[>]##SendchatBind1", imgui.ImVec2(25, 25), u8:encode("Отправить в чат")) then
+                sampSendChat(prefix..u8:decode(textbuffer.bind1.v))
+             end
+             -- line 2
+             imgui.Text("2.")
+             imgui.SameLine()
+             imgui.PushItemWidth(400)
+             if imgui.InputText("##Bind2", textbuffer.bind2) then 
+             end
+             imgui.PopItemWidth()
+             
+             imgui.SameLine()
+             if imgui.TooltipButton(u8"[>]##SendchatBind2", imgui.ImVec2(25, 25), u8:encode("Отправить в чат")) then
+                sampSendChat(prefix..u8:decode(textbuffer.bind2.v))
+             end
+             -- line 3 
+             imgui.Text("3.")
+             imgui.SameLine()
+             imgui.PushItemWidth(400)
+             if imgui.InputText("##Bind3", textbuffer.bind3) then 
+             end
+             imgui.PopItemWidth()
+             
+             imgui.SameLine()
+             if imgui.TooltipButton(u8"[>]##SendchatBind3", imgui.ImVec2(25, 25), u8:encode("Отправить в чат")) then
+                sampSendChat(prefix..u8:decode(textbuffer.bind3.v))
+             end
+             -- line 4
+             imgui.Text("4.")
+             imgui.SameLine()
+             imgui.PushItemWidth(400)
+             if imgui.InputText("##Bind4", textbuffer.bind4) then 
+             end
+             imgui.PopItemWidth()
+             
+             imgui.SameLine()
+             if imgui.TooltipButton(u8"[>]##SendchatBind4", imgui.ImVec2(25, 25), u8:encode("Отправить в чат")) then
+                sampSendChat(prefix..u8:decode(textbuffer.bind4.v))
+             end
+             -- line 5
+             imgui.Text("5.")
+             imgui.SameLine()
+             imgui.PushItemWidth(400)
+             if imgui.InputText("##Bind5", textbuffer.bind5) then 
+             end
+             imgui.PopItemWidth()
+             
+             imgui.SameLine()
+             if imgui.TooltipButton(u8"[>]##SendchatBind5", imgui.ImVec2(25, 25), u8:encode("Отправить в чат")) then
+                sampSendChat(prefix..u8:decode(textbuffer.bind5.v))
+             end
+             -- line 6
+             imgui.Text("6.")
+             imgui.SameLine()
+             imgui.PushItemWidth(400)
+             if imgui.InputText("##Bind6", textbuffer.bind6) then 
+             end
+             imgui.PopItemWidth()
+             
+             imgui.SameLine()
+             if imgui.TooltipButton(u8"[>]##SendchatBind6", imgui.ImVec2(25, 25), u8:encode("Отправить в чат")) then
+                sampSendChat(prefix..u8:decode(textbuffer.bind6.v))
+             end
+             -- line 7
+             imgui.Text("7.")
+             imgui.SameLine()
+             imgui.PushItemWidth(400)
+             if imgui.InputText("##Bind7", textbuffer.bind7) then 
+             end
+             imgui.PopItemWidth()
+             
+             imgui.SameLine()
+             if imgui.TooltipButton(u8"[>]##SendchatBind7", imgui.ImVec2(25, 25), u8:encode("Отправить в чат")) then
+                sampSendChat(prefix..u8:decode(textbuffer.bind7.v))
+             end
+             -- line 8
+             imgui.Text("8.")
+             imgui.SameLine()
+             imgui.PushItemWidth(400)
+             if imgui.InputText("##Bind8", textbuffer.bind8) then 
+             end
+             imgui.PopItemWidth()
+             
+             imgui.SameLine()
+             if imgui.TooltipButton(u8"[>]##SendchatBind8", imgui.ImVec2(25, 25), u8:encode("Отправить в чат")) then
+                sampSendChat(prefix..u8:decode(textbuffer.bind8.v))
+             end
+             -- line 9
+             imgui.Text("9.")
+             imgui.SameLine()
+             imgui.PushItemWidth(400)
+             if imgui.InputText("##Bind9", textbuffer.bind9) then 
+             end
+             imgui.PopItemWidth()
+             
+             imgui.SameLine()
+             if imgui.TooltipButton(u8"[>]##SendchatBind9", imgui.ImVec2(25, 25), u8:encode("Отправить в чат")) then
+                sampSendChat(prefix..u8:decode(textbuffer.bind9.v))
+             end
+             -- -- last line
+             
+             --imgui.SameLine()
+             if imgui.TooltipButton("Reload", imgui.ImVec2(60, 25), u8:encode("Перезагрузить бинды")) then 
                reloadBindsFromConfig()        
                sampAddChatMessage("Бинды были успешно презагружены из конфига", -1)
              end
              imgui.SameLine()
-	         if imgui.TooltipButton("[S]", imgui.ImVec2(40, 25), u8:encode("Сохранить бинды")) then 
+	         if imgui.TooltipButton("Save", imgui.ImVec2(60, 25), u8:encode("Сохранить бинды")) then 
                ini.binds.textbuffer1 = u8:decode(textbuffer.bind1.v)
                ini.binds.textbuffer2 = u8:decode(textbuffer.bind2.v)
                ini.binds.textbuffer3 = u8:decode(textbuffer.bind3.v)
@@ -5914,189 +6075,15 @@ function imgui.OnDrawFrame()
                sampAddChatMessage("Бинды были успешно сохранены", -1)
              end
              imgui.SameLine()
-             if imgui.TooltipButton(u8"[C]", imgui.ImVec2(40, 25), u8:encode("Очистить бинды")) then
+             if imgui.TooltipButton(u8"Clean", imgui.ImVec2(60, 25), u8:encode("Очистить бинды")) then
                 cleanBindsForm()
              end
              imgui.SameLine()
-             if imgui.TooltipButton(u8"Правила сервера", imgui.ImVec2(150, 25), u8:encode("Полный список правил сервера")) then 
-		        os.execute('explorer https://forum.sa-mp.ru/index.php?/topic/802952-%D0%BF%D1%80%D0%B0%D0%B2%D0%B8%D0%BB%D0%B0-dm-%D1%81%D0%B5%D1%80%D0%B2%D0%B5%D1%80%D0%B0/')
-		     end
-             
-             -- line 1
-             imgui.Text("1.")
+             imgui.Text("           ")
              imgui.SameLine()
-             imgui.PushItemWidth(400)
-             if imgui.InputText("##Bind1", textbuffer.bind1) then 
+             if imgui.TooltipButton(u8"All [>]", imgui.ImVec2(60, 25), u8:encode("Анонсировать все правила в чат (Задержка в 2с, пустые строки игнорируются)")) then
+                sampSendChat(prefix..u8:decode(textbuffer.bind9.v))
              end
-             imgui.PopItemWidth()
-             -- if imgui.IsItemHovered() and imgui.IsMouseDown(1) then
-                -- imgui.Text('Hovered and RMB down')
-             -- end
-             
-             imgui.SameLine()
-             if imgui.Button(u8"[>]##SendchatBind1") then
-                if combobox.chatselect.v == 0 then
-                   u8:decode(textbuffer.bind1.v)
-                   sampSendChat(string.format("/мчат %s", u8:decode(textbuffer.bind1.v)))
-                end
-                if combobox.chatselect.v == 1 then
-                   u8:decode(textbuffer.bind1.v)
-                   sampSendChat(string.format("* %s", u8:decode(textbuffer.bind1.v)))
-                end
-             end
-             -- line 2
-             imgui.Text("2.")
-             imgui.SameLine()
-             imgui.PushItemWidth(400)
-             if imgui.InputText("##Bind2", textbuffer.bind2) then 
-             end
-             imgui.PopItemWidth()
-             
-             imgui.SameLine()
-             if imgui.Button(u8"[>]##SendchatBind2") then
-                if combobox.chatselect.v == 0 then
-                   u8:decode(textbuffer.bind2.v)
-                   sampSendChat(string.format("/мчат %s", u8:decode(textbuffer.bind2.v)))
-                end
-                if combobox.chatselect.v == 1 then
-                   u8:decode(textbuffer.bind2.v)
-                   sampSendChat(string.format("* %s", u8:decode(textbuffer.bind2.v)))
-                end
-             end
-             -- line 3 
-             imgui.Text("3.")
-             imgui.SameLine()
-             imgui.PushItemWidth(400)
-             if imgui.InputText("##Bind3", textbuffer.bind3) then 
-             end
-             imgui.PopItemWidth()
-             
-             imgui.SameLine()
-             if imgui.Button(u8"[>]##SendchatBind3") then
-                if combobox.chatselect.v == 0 then
-                   u8:decode(textbuffer.bind3.v)
-                   sampSendChat(string.format("/мчат %s", u8:decode(textbuffer.bind3.v)))
-                end
-                if combobox.chatselect.v == 1 then
-                   u8:decode(textbuffer.bind3.v)
-                   sampSendChat(string.format("* %s", u8:decode(textbuffer.bind3.v)))
-                end
-             end
-             -- line 4
-             imgui.Text("4.")
-             imgui.SameLine()
-             imgui.PushItemWidth(400)
-             if imgui.InputText("##Bind4", textbuffer.bind4) then 
-             end
-             imgui.PopItemWidth()
-             
-             imgui.SameLine()
-             if imgui.Button(u8"[>]##SendchatBind4") then
-                if combobox.chatselect.v == 0 then
-                   u8:decode(textbuffer.bind4.v)
-                   sampSendChat(string.format("/мчат %s", u8:decode(textbuffer.bind4.v)))
-                end
-                if combobox.chatselect.v == 1 then
-                   u8:decode(textbuffer.bind4.v)
-                   sampSendChat(string.format("* %s", u8:decode(textbuffer.bind4.v)))
-                end
-             end
-             -- line 5
-             imgui.Text("5.")
-             imgui.SameLine()
-             imgui.PushItemWidth(400)
-             if imgui.InputText("##Bind5", textbuffer.bind5) then 
-             end
-             imgui.PopItemWidth()
-             
-             imgui.SameLine()
-             if imgui.Button(u8"[>]##SendchatBind5") then
-                if combobox.chatselect.v == 0 then
-                   u8:decode(textbuffer.bind5.v)
-                   sampSendChat(string.format("/мчат %s", u8:decode(textbuffer.bind5.v)))
-                end
-                if combobox.chatselect.v == 1 then
-                   u8:decode(textbuffer.bind5.v)
-                   sampSendChat(string.format("* %s", u8:decode(textbuffer.bind5.v)))
-                end
-             end
-             -- line 6
-             imgui.Text("6.")
-             imgui.SameLine()
-             imgui.PushItemWidth(400)
-             if imgui.InputText("##Bind6", textbuffer.bind6) then 
-             end
-             imgui.PopItemWidth()
-             
-             imgui.SameLine()
-             if imgui.Button(u8"[>]##SendchatBind6") then
-                if combobox.chatselect.v == 0 then
-                   u8:decode(textbuffer.bind6.v)
-                   sampSendChat(string.format("/мчат %s", u8:decode(textbuffer.bind6.v)))
-                end
-                if combobox.chatselect.v == 1 then
-                   u8:decode(textbuffer.bind6.v)
-                   sampSendChat(string.format("* %s", u8:decode(textbuffer.bind6.v)))
-                end
-             end
-             -- line 7
-             imgui.Text("7.")
-             imgui.SameLine()
-             imgui.PushItemWidth(400)
-             if imgui.InputText("##Bind7", textbuffer.bind7) then 
-             end
-             imgui.PopItemWidth()
-             
-             imgui.SameLine()
-             if imgui.Button(u8"[>]##SendchatBind7") then
-                if combobox.chatselect.v == 0 then
-                   u8:decode(textbuffer.bind7.v)
-                   sampSendChat(string.format("/мчат %s", u8:decode(textbuffer.bind7.v)))
-                end
-                if combobox.chatselect.v == 1 then
-                   u8:decode(textbuffer.bind7.v)
-                   sampSendChat(string.format("* %s", u8:decode(textbuffer.bind7.v)))
-                end
-             end
-             -- line 8
-             imgui.Text("8.")
-             imgui.SameLine()
-             imgui.PushItemWidth(400)
-             if imgui.InputText("##Bind8", textbuffer.bind8) then 
-             end
-             imgui.PopItemWidth()
-             
-             imgui.SameLine()
-             if imgui.Button(u8"[>]##SendchatBind8") then
-                if combobox.chatselect.v == 0 then
-                   u8:decode(textbuffer.bind8.v)
-                   sampSendChat(string.format("/мчат %s", u8:decode(textbuffer.bind8.v)))
-                end
-                if combobox.chatselect.v == 1 then
-                   u8:decode(textbuffer.bind8.v)
-                   sampSendChat(string.format("* %s", u8:decode(textbuffer.bind8.v)))
-                end
-             end
-             -- line 9
-             imgui.Text("9.")
-             imgui.SameLine()
-             imgui.PushItemWidth(400)
-             if imgui.InputText("##Bind9", textbuffer.bind9) then 
-             end
-             imgui.PopItemWidth()
-             
-             imgui.SameLine()
-             if imgui.Button(u8"[>]##SendchatBind9") then
-                if combobox.chatselect.v == 0 then
-                   u8:decode(textbuffer.bind9.v)
-                   sampSendChat(string.format("/мчат %s", u8:decode(textbuffer.bind9.v)))
-                end
-                if combobox.chatselect.v == 1 then
-                   u8:decode(textbuffer.bind9.v)
-                   sampSendChat(string.format("* %s", u8:decode(textbuffer.bind9.v)))
-                end
-             end
-             -- -- last line
              -- imgui.PushItemWidth(70)
              -- imgui.Combo('    ', combobox.itemad, {u8'объявление', u8'общий', u8'мчат'}, 3)
              -- imgui.PopItemWidth()
@@ -6176,14 +6163,16 @@ function imgui.OnDrawFrame()
             
             if imgui.Checkbox(u8("Уведомлять о дисконнекте игрока"), checkbox.disconnectreminder) then
 	   	       if checkbox.disconnectreminder.v then
-	 	     	   sampAddChatMessage("При вылете игроков с сервера будет выводить уведомление", -1)
+	 	     	  sampAddChatMessage("При вылете игроков с сервера будет выводить уведомление", -1)
 	 	       else
-	 	     	   sampAddChatMessage("Отключены уведомления о вылете игроков с сервера", -1)
+	 	     	  sampAddChatMessage("Отключены уведомления о вылете игроков с сервера", -1)
 	 	       end
 	        end
 	        
 	        imgui.Checkbox(u8("Уведомлять о тяжелом оружии"), checkbox.heavyweaponwarn)
-	        imgui.Checkbox(u8("Уведомлять о пополнении хп игроком"), checkbox.healthcheck)
+	        if imgui.Checkbox(u8("Уведомлять о пополнении хп игроком"), checkbox.healthcheck) then
+               sampAddChatMessage("Недоступно в бета версии", -1)
+            end
             
             imgui.Text(u8"Проверить игроков:")
 	        if imgui.Button(u8"Вывести список лагеров", imgui.ImVec2(220, 25)) then
@@ -6801,10 +6790,19 @@ function sampev.onServerMessage(color, text)
    local result, id = sampGetPlayerIdByCharHandle(playerPed)
    local nickname = sampGetPlayerNickname(id)
    
-   if checkbox.mentions.v then
-      --if text:find('(.*)'..id..'%s(.*)') then
-      if text:find(id) then
-         printStringNow("chat mention", 1000)
+   if checkbox.chatmentions.v then
+      -- mentions by nickname
+      if text:find(nickname) then
+         if not text:find("Управляющий мира "..nickname) then
+            printStyledString('You were mentioned in the chat', 2000, 4)
+            addOneOffSound(0.0, 0.0, 0.0, 1138) -- CHECKPOINT_GREEN
+            return true
+         end
+      end
+      
+      -- mentions by id
+      if text:find(id) and text:match("(%d+)(%d+)%s") then
+         printStyledString('You were mentioned in the chat', 2000, 4)
          addOneOffSound(0.0, 0.0, 0.0, 1138) -- CHECKPOINT_GREEN
          return true
       end
@@ -7250,6 +7248,16 @@ function ClearChat()
    memory.write(sampGetChatInfoPtr() + 0x63DA, 1, 1)
 end
 
+function AutoAd()
+   lua_thread.create(function()
+   while autoAnnounce do
+      wait(1000*60)
+      sampAddChatMessage(" "..u8:decode(textbuffer.mpname.v)..", приз "..u8:decode(textbuffer.mpprize.v), -1)
+      --sampSendChat("/об "..u8:decode(textbuffer.mpname.v)..", приз "..u8:decode(textbuffer.mpprize.v), -1)
+   end   
+   end)
+end
+
 function Recon()
    lua_thread.create(function()
    sampDisconnectWithReason(quit)
@@ -7329,7 +7337,6 @@ end
 function intToHex(int)
     return '{'..string.sub(bit.tohex(int), 3, 8)..'}'
 end
-
 
 function cleanBindsForm()
    textbuffer.bind1.v = " "
