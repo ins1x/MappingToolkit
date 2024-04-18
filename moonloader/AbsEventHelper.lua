@@ -1,10 +1,10 @@
 script_author("1NS")
 script_name("Absolute Events Helper")
 script_description("Assistant for mappers and event makers on Absolute Play")
-script_dependencies('imgui', 'lib.samp.events', 'vkeys', 'vector3d')
+script_dependencies('imgui', 'lib.samp.events', 'vkeys')
 script_properties("work-in-pause")
 script_url("https://github.com/ins1x/AbsEventHelper")
-script_version("2.6.0 beta 1")
+script_version("2.6.0 beta 2")
 -- script_moonloader(16) moonloader v.0.26
 
 -- Activaton: ALT + X (show main menu)
@@ -16,7 +16,6 @@ local keys = require 'vkeys'
 local sampev = require 'lib.samp.events'
 local imgui = require 'imgui'
 local memory = require 'memory'
-local vector3D = require 'vector3d'
 local encoding = require 'encoding'
 encoding.default = 'CP1251'
 u8 = encoding.UTF8
@@ -48,8 +47,7 @@ local ini = inicfg.load({
       textbuffer6 = " ",
       textbuffer7 = " ",
       textbuffer8 = " ",
-      textbuffer9 = " ",
-      adtextbuffer = " "
+      textbuffer9 = " "
    }
 }, configIni)
 inicfg.save(ini, configIni)
@@ -76,7 +74,6 @@ local isAbsfixInstalled = false
 local isPlayerSpectating = false
 local disableObjectCollision = false
 local prepareTeleport = false
-local smoothTeleport = false
 local prepareJump = false
 local showobjects = false
 local showrenderline = false
@@ -87,8 +84,6 @@ local chosenvehicle = nil
 local tabselectedplayer = nil
 local lastRemovedObjectModelid = nil
 local hide3dtexts = false
-local nameTag = true
-local nameTagWh = false
 local currentEditmode = 0 
 local isSelectObject = false
 local isTexturesListOpened = false
@@ -100,6 +95,7 @@ local removedBuildings = 0
 local mpStartedDTime = nil
 local mpStarted = false
 local autoAnnounce = false
+local isChatFreezed = false
 
 local fps = 0
 local fps_counter = 0
@@ -109,6 +105,7 @@ local objectsCollisionDel = {}
 local playersTable = {}
 local vehiclesTable = {}
 local hiddenObjects = {}
+local chatbuffer = {}
 -- should be global!
 vehiclesTotal = 0
 playersTotal = 0
@@ -138,20 +135,16 @@ local checkbox = {
    disconnectreminder = imgui.ImBool(ini.settings.disconnectreminder),
    lockserverweather = imgui.ImBool(ini.settings.lockserverweather),
    usecustomcamdist = imgui.ImBool(ini.settings.usecustomcamdist),
-   radarblips = imgui.ImBool(false),
    showobjectrot = imgui.ImBool(ini.settings.showobjectrot),
    showobjects = imgui.ImBool(false),
    showclosestobjects = imgui.ImBool(false),
    drawlinetomodelid = imgui.ImBool(false),
    noempyvehstream = imgui.ImBool(true),
-   heavyweaponwarn = imgui.ImBool(true),
-   nametagwh = imgui.ImBool(false),
    hideobject = imgui.ImBool(false),
    lockfps = imgui.ImBool(false),
    changefov = imgui.ImBool(false),
    fixcampos = imgui.ImBool(false),
    teleportcoords = imgui.ImBool(false),
-   tpcprotect = imgui.ImBool(false),
    logtextdraws = imgui.ImBool(false),
    logdialogresponse = imgui.ImBool(false),
    logobjects = imgui.ImBool(false),
@@ -178,6 +171,7 @@ local checkbox = {
    changemdo = imgui.ImBool(false),
    findveh = imgui.ImBool(false),
    healthcheck = imgui.ImBool(false),
+   freezechat = imgui.ImBool(false),
    chatmentions = imgui.ImBool(ini.settings.chatmentions),
    test = imgui.ImBool(false)
 }
@@ -221,7 +215,6 @@ local textbuffer = {
    bind7 = imgui.ImBuffer(256),
    bind8 = imgui.ImBuffer(256),
    bind9 = imgui.ImBuffer(256),
-   bindad = imgui.ImBuffer(256),
    findplayer = imgui.ImBuffer(32),
    findlog = imgui.ImBuffer(128),
    ckeckplayer = imgui.ImBuffer(32),
@@ -252,6 +245,7 @@ local combobox = {
    selecttable = imgui.ImInt(0),
    objects = imgui.ImInt(6),
    itemad = imgui.ImInt(0),
+   sitelogsource = imgui.ImInt(0),
    logs = imgui.ImInt(0)
 }
 
@@ -266,6 +260,15 @@ local LastObjectData = {
    hidden = true,
    position = {x=0.0, y=0.0, z=0.0},
    rotation = {rx=0.0, ry=0.0, rz=0.0}
+}
+
+absServersNames = {
+   'Deathmatch', 'Platinum', 'Titanium', 'Chromium', 'Aurum', 'Litium'
+}
+
+profilesNames = {
+   'Default', 'Race', 'Derby', 'Survival', 'PvP', 'Death-Roof', 'TDM',
+   'Hide-n-Seek', 'Quiz', 'King', 'Hunt'
 }
 
 VehicleNames = {
@@ -3125,37 +3128,19 @@ function main()
 		 pointCameraAtPoint(fixcam.x, fixcam.y, fixcam.z, 2) 
 	  end
 	  
-	  -- smoothTeleport 
-	  if smoothTeleport and isCharOnFoot(playerPed) then
-         freezeCharPosition(playerPed, true)
-		 local step = 2
-		 local movingSpeed = 10
-         local result, id = sampGetPlayerIdByCharHandle(playerPed)		 
-         local myPosition = {getOffsetFromCharInWorldCoords(playerPed, 0.0, 0.0, 0.2855)}
-		 tpc.static.x, tpc.static.y, tpc.static.z = tpc.private.x - myPosition[1], tpc.private.y - myPosition[2], tpc.private.z - myPosition[3];
-         tpc.public.x, tpc.public.y, tpc.public.z = tpc.public.x - myPosition[1], tpc.public.y - myPosition[2], tpc.public.z - myPosition[3];
-         local vectorPlayer = vector3D(tpc.static.x, tpc.static.y, tpc.static.z)
-	 	 vectorPlayer:normalize()
-         local data = allocateMemory(68)
-         sampStorePlayerOnfootData(id, data)
-         setStructFloatElement(data, 38, 0.0, true)
-         setStructFloatElement(data, 42, 0.0, true)
-         setStructFloatElement(data, 38, 0.02, true)
-         setStructFloatElement(data, 42, 0.02, true)
-         sampSendOnfootData(data)
-         freeMemory(data)
-         setCharCoordinates(playerPed, myPosition[1] + vectorPlayer.x *  step, myPosition[2] + vectorPlayer.y *  step, myPosition[3] + vectorPlayer.z *  step)
-         wait(movingSpeed)
-         if getDistanceBetweenCoords3d(tpc.private.x, tpc.private.y, tpc.private.z, myPosition[1], myPosition[2], myPosition[3]) < 2 then
-            local lastPosition = {getCharCoordinates(playerPed)}
-            setCharCoordinates(playerPed, lastPosition[1], lastPosition[2], lastPosition[3] + 0.02)
-            freezeCharPosition(playerPed, false)
-            smoothTeleport = false
-			tpcpos.x = lastPosition[1]
-			tpcpos.y = lastPosition[2]
-			tpcpos.z = lastPosition[3] + 0.02
+      if checkbox.freezechat.v then
+         local visible = sampIsChatInputActive()
+         if isChatFreezed ~= visible then
+		    isChatFreezed = visible
+            if not isChatFreezed then
+               for k, v in ipairs(chatbuffer) do
+                  local color = string.format('%X', v.color)
+                  sampAddChatMessage(v.text, tonumber('0x' .. string.sub(color, #color - 8, #color - 2)))
+               end
+            chatbuffer = {}
+            end
          end
-      end
+      end 
       -- END main
    end
 end
@@ -3357,7 +3342,7 @@ function imgui.OnDrawFrame()
 			   textbuffer.tpcz.v = string.format("%.1f", tpcpos.z)
 		    end
             imgui.SameLine()
-            imgui.TextQuestion("( ? )", u8"Активирует телепорт по заданным координатам")
+            imgui.TextQuestion("( ? )", u8"Активирует телепорт по заданным координатам (доступно только редактору мира)")
 		 
 		    if checkbox.teleportcoords.v then
 			   
@@ -3407,52 +3392,27 @@ function imgui.OnDrawFrame()
 			   
 			   if imgui.Button(u8"Телепорт по координатам", imgui.ImVec2(200, 25)) then
 			   	  freezeCharPosition(playerPed, false)
-				  smoothTeleport = false
 	              if isAbsolutePlay then
-                     if checkbox.tpcprotect.v then
-					    if isCharOnFoot(PLAYER_PED) then
-						   tpc.private.x, tpc.private.y, tpc.private.z = tpcpos.x, tpcpos.y, tpcpos.z;
-                           tpc.public.x, tpc.public.y, tpc.public.z = tpcpos.x, tpcpos.y, tpcpos.z;
-						   smoothTeleport = true
-						   --setCharCoordinates(PLAYER_PED, tpcpos.x, tpcpos.y, tpcpos.z)
-						end
-					 else
-                        if tpcpos.x then
-                           prepareTeleport = true
-                           sampSendChat(string.format("/ngr %f %f %f", tpcpos.x, tpcpos.y, tpcpos.z), 0x0FFFFFF)
-                           sampAddChatMessage(string.format("Телепорт на координаты: %.1f %.1f %.1f",
-                           tpcpos.x, tpcpos.y, tpcpos.z), 0x0FFFFFF)
-                        else
-                           prepareTeleport = false
-                           sampAddChatMessage("Координаты не были сохранены", 0x0FFFFFF)
-						end
-                     end
-		          else
-				     if checkbox.tpcprotect.v then
-					    if isCharOnFoot(PLAYER_PED) and tpcpos.x then
-						   setCharCoordinates(PLAYER_PED, tpcpos.x, tpcpos.y, tpcpos.z)
-						end
-						sampAddChatMessage(string.format("Телепорт на координаты: %.1f %.1f %.1f",
+                     if tpcpos.x then
+                        prepareTeleport = true
+                        sampSendChat(string.format("/ngr %f %f %f", tpcpos.x, tpcpos.y, tpcpos.z), 0x0FFFFFF)
+                        sampAddChatMessage(string.format("Телепорт на координаты: %.1f %.1f %.1f",
                         tpcpos.x, tpcpos.y, tpcpos.z), 0x0FFFFFF)
-					 else
-					    if isCharOnFoot(PLAYER_PED) and tpcpos.x then
-					       --local posX, posY, posZ = getCharCoordinates(PLAYER_PED)
-						   smoothTeleport = true
-						   tpc.private.x, tpc.private.y, tpc.private.z = tpcpos.x, tpcpos.y, tpcpos.z;
-                           tpc.public.x, tpc.public.y, tpc.public.z = tpcpos.x, tpcpos.y, tpcpos.z;
-					       --setCharCoordinates(PLAYER_PED, tpcpos.x, tpcpos.y, tpcpos.z)
-						   sampAddChatMessage(string.format("Телепорт на координаты: %.1f %.1f %.1f",
-                           tpcpos.x, tpcpos.y, tpcpos.z), 0x0FFFFFF)
-						end   
-					 end
+                     else
+                        prepareTeleport = false
+                        sampAddChatMessage("Координаты не были сохранены", 0x0FFFFFF)
+				     end
+                     
+		          --else
+					 --if isCharOnFoot(PLAYER_PED) and tpcpos.x then
+					    --tpc.private.x, tpc.private.y, tpc.private.z = tpcpos.x, tpcpos.y, tpcpos.z;
+                        --tpc.public.x, tpc.public.y, tpc.public.z = tpcpos.x, tpcpos.y, tpcpos.z;
+					    --setCharCoordinates(PLAYER_PED, tpcpos.x, tpcpos.y, tpcpos.z)
+					    --sampAddChatMessage(string.format("Телепорт на координаты: %.1f %.1f %.1f",
+                        --tpcpos.x, tpcpos.y, tpcpos.z), 0x0FFFFFF)
+					 --end   
 		          end
                end
-			   if not isAbsolutePlay then
-			      imgui.SameLine()
-			      imgui.Checkbox(u8("Снять защиту"), checkbox.tpcprotect)
-			      imgui.SameLine()
-                  imgui.TextQuestion("( ? )", u8"Снимет все ограничения (Триггерит античит)")
-			   end
 			   
 		    end
 			
@@ -3910,22 +3870,6 @@ function imgui.OnDrawFrame()
             memory.setfloat(13210352, ini.settings.fog, true)
          end
 		 
-		 if imgui.Checkbox(u8(nameTagWh and 'Вернуть' or 'Увеличить')..u8" прорисовку NameTags", checkbox.nametagwh) then 
-            if nameTagWh then
-			   nameTagWh = false
-               nameTagOn()
-            else
-			   nameTagWh = true
-               nameTagOn()
-            end
-	     end
-	     imgui.SameLine()
-         imgui.TextQuestion("( ? )", u8"Увеличит дальность прорисовки nameTag над игроком")
-         
-		 imgui.Checkbox(u8("Показать скрытые клисты"), checkbox.radarblips)
-	     imgui.SameLine()
-         imgui.TextQuestion("( ? )", u8"Показзывает на радаре скрытых игроков")
-		 
 		 if imgui.Checkbox(u8'Vehicle LODs', checkbox.vehloads) then
 		    if checkbox.vehloads.v then
 			   memory.write(5425646, 1, 1, false)
@@ -4284,6 +4228,27 @@ function imgui.OnDrawFrame()
          imgui.SameLine()
          imgui.TextQuestion("( ? )", u8"Выгружает скрипт при подключении не на Absolute Play")
 	     imgui.Spacing()
+         
+      elseif tabmenu.settings == 8 then
+         if imgui.Button(u8"Очистить чат (Для себя)", imgui.ImVec2(220, 25)) then
+            ClearChat()
+         end
+         if imgui.Button(u8"Открыть лог чата (chatlog.txt)", imgui.ImVec2(220, 25)) then
+	        os.execute('explorer '..getFolderPath(5) ..'\\GTA San Andreas User Files\\SAMP\\chatlog.txt')
+	     end
+         
+         if imgui.Checkbox(u8("Уведомлять при упоминании в чате"), checkbox.chatmentions) then
+            ini.settings.chatmentions = checkbox.chatmentions.v
+            save()
+         end
+         
+         if imgui.Checkbox(u8("Останавливать чат при открытии поля ввода"), checkbox.freezechat) then
+            if checkbox.freezechat.v then 
+               isChatFreezed = true 
+            else
+               isChatFreezed = false
+            end
+         end
       end -- end tabmenu.settings
       imgui.NextColumn()
 	  
@@ -4293,6 +4258,7 @@ function imgui.OnDrawFrame()
 	  if imgui.Button(u8"Прорисовка",imgui.ImVec2(150, 25)) then tabmenu.settings = 4 end 
 	  if imgui.Button(u8"Погода",imgui.ImVec2(150, 25)) then tabmenu.settings = 5 end 
 	  if imgui.Button(u8"Эффекты",imgui.ImVec2(150, 25)) then tabmenu.settings = 6 end 
+	  if imgui.Button(u8"Чатик",imgui.ImVec2(150, 25)) then tabmenu.settings = 8 end 
 	  if imgui.Button(u8"Прочее",imgui.ImVec2(150, 25)) then tabmenu.settings = 7 end 
 	  
       imgui.Spacing()
@@ -4433,21 +4399,6 @@ function imgui.OnDrawFrame()
           end
     
           imgui.Text(u8"Всего игроков в таблице: ".. playersTotal)
-      
-          if checkbox.heavyweaponwarn.v then
-             for k, v in ipairs(getAllChars()) do
-                local res, id = sampGetPlayerIdByCharHandle(v)
-                if res then
-                   local nick = sampGetPlayerNickname(id)
-                   if isCurrentCharWeapon(v, 38) then 
-                      imgui.TextColoredRGB(string.format("{FF0000}Игрок %s[%d] с миниганом!", nick, id))
-                   end
-                   if isCurrentCharWeapon(v, 35) then 
-                      imgui.TextColoredRGB(string.format("{FF0000}Игрок %s[%d] с RPG!", nick, id))
-                   end
-                end
-             end
-          end
       
 	  elseif combobox.selecttable.v == 1 then
          imgui.Columns(2, "vehtableheader", false)
@@ -5428,37 +5379,78 @@ function imgui.OnDrawFrame()
            end
 		end 
       elseif tabmenu.info == 8 then
-		 
 	     imgui.Text(u8"Интерфейс взаимодействия с сайтом")
 		 imgui.SameLine()
-	     imgui.Link("https://forum.gta-samp.ru/index.php?/forum/23-absolute-dm-play/", "Absolute Play DM")	  
+	     --imgui.Link("https://forum.gta-samp.ru/index.php?/forum/23-absolute-dm-play/", "Absolute Play DM")	  
 		 imgui.SameLine()
-		 imgui.TextQuestion("( ? )", u8"Все действия редиректит в браузер")
+         imgui.PushItemWidth(120)
+	     imgui.Combo(u8'##ComboBoxSelectSiteLogSrc', combobox.sitelogsource, absServersNames, 6)
+	     imgui.PopItemWidth()
+		 --imgui.TextQuestion("( ? )", u8"Все действия редиректит в браузер")
 		 
+         local serverprefix = ""
+         if combobox.sitelogsource.v == 0 then
+            serverprefix = string.lower(absServersNames[1])
+         elseif combobox.sitelogsource.v == 1 then
+            serverprefix = string.lower(absServersNames[2])
+         elseif combobox.sitelogsource.v == 2 then
+            serverprefix = string.lower(absServersNames[3])
+         elseif combobox.sitelogsource.v == 3 then
+            serverprefix = string.lower(absServersNames[4])
+         elseif combobox.sitelogsource.v == 4 then
+            serverprefix = string.lower(absServersNames[5])
+         elseif combobox.sitelogsource.v == 5 then
+            serverprefix = string.lower(absServersNames[6])
+         end
+         
 		 if imgui.Button(u8"Логи действий администрации",imgui.ImVec2(230, 25)) then
-		    os.execute('explorer https://gta-samp.ru/adminhistory-deathmatch')
+		    os.execute('explorer https://gta-samp.ru/adminhistory-'..serverprefix)
 		 end
          imgui.SameLine()
 		 if imgui.Button(u8"Логи смены никнеймов",imgui.ImVec2(230, 25)) then
-		    os.execute('explorer https://gta-samp.ru/nickchange-deathmatch')
+		    os.execute('explorer https://gta-samp.ru/nickchange-'..serverprefix)
 		 end 
 		 
 		 if imgui.Button(u8"История регистрации аккаунтов",imgui.ImVec2(230, 25)) then
-		    os.execute('explorer https://gta-samp.ru/reg-deathmatch')
+		    os.execute('explorer https://gta-samp.ru/reg-'..serverprefix)
 		 end
-		 imgui.SameLine()
-		 if imgui.Button(u8"Полный список правил",imgui.ImVec2(230, 25)) then
-		    os.execute('explorer https://forum.sa-mp.ru/index.php?/topic/802952-%D0%BF%D1%80%D0%B0%D0%B2%D0%B8%D0%BB%D0%B0-dm-%D1%81%D0%B5%D1%80%D0%B2%D0%B5%D1%80%D0%B0/')
+         imgui.SameLine()
+         if combobox.sitelogsource.v == 0 then
+		    if imgui.Button(u8"Полный список правил",imgui.ImVec2(230, 25)) then
+		       os.execute('explorer https://forum.sa-mp.ru/index.php?/topic/802952-%D0%BF%D1%80%D0%B0%D0%B2%D0%B8%D0%BB%D0%B0-dm-%D1%81%D0%B5%D1%80%D0%B2%D0%B5%D1%80%D0%B0/')
+            end
+         elseif combobox.sitelogsource.v == 1 then
+		    if imgui.Button(u8"Полный список правил",imgui.ImVec2(230, 25)) then
+		       os.execute('explorer https://forum.gta-samp.ru/index.php?/forum/125-%D0%B2%D0%B0%D0%B6%D0%BD%D0%BE-%D0%B7%D0%BD%D0%B0%D1%82%D1%8C/')
+            end
+         elseif combobox.sitelogsource.v == 2 then
+		    if imgui.Button(u8"Полный список правил",imgui.ImVec2(230, 25)) then
+		       os.execute('explorer https://forum.gta-samp.ru/index.php?/forum/108-%D0%B8%D0%BD%D1%84%D0%BE%D1%80%D0%BC%D0%B0%D1%86%D0%B8%D1%8F-%D0%B8-%D0%BF%D1%80%D0%B0%D0%B2%D0%B8%D0%BB%D0%B0/')
+            end
+         elseif combobox.sitelogsource.v == 3 then
+		    if imgui.Button(u8"Полный список правил",imgui.ImVec2(230, 25)) then
+		       os.execute('explorer https://forum.gta-samp.ru/index.php?/forum/177-%D0%B2%D0%B0%D0%B6%D0%BD%D0%BE-%D0%B7%D0%BD%D0%B0%D1%82%D1%8C/')
+            end
+         elseif combobox.sitelogsource.v == 4 then
+		    if imgui.Button(u8"Полный список правил",imgui.ImVec2(230, 25)) then
+		       os.execute('explorer https://forum.gta-samp.ru/index.php?/forum/200-%D0%B2%D0%B0%D0%B6%D0%BD%D0%BE-%D0%B7%D0%BD%D0%B0%D1%82%D1%8C/')
+            end
+         elseif combobox.sitelogsource.v == 5 then
+		    if imgui.Button(u8"Полный список правил",imgui.ImVec2(230, 25)) then
+		       os.execute('explorer https://forum.gta-samp.ru/index.php?/forum/392-%D0%B2%D0%B0%D0%B6%D0%BD%D0%BE-%D0%B7%D0%BD%D0%B0%D1%82%D1%8C/')
+            end
 		 end
 		 
 		 if imgui.Button(u8"Администрация онлайн",imgui.ImVec2(230, 25)) then
 		    sampSendChat("/admin")
 			dialog.main.v = not dialog.main.v 
 		 end
-		 imgui.SameLine()
-		 if imgui.Button(u8"Список администрации на сайте",imgui.ImVec2(230, 25)) then
-		    os.execute('explorer "https://forum.gta-samp.ru/index.php?/topic/655150-%D1%81%D0%BF%D0%B8%D1%81%D0%BE%D0%BA-%D0%B0%D0%B4%D0%BC%D0%B8%D0%BD%D0%BE%D0%B2/"') 
-		 end
+         if combobox.sitelogsource.v == 0 then
+		    imgui.SameLine()
+		    if imgui.Button(u8"Список администрации на сайте",imgui.ImVec2(230, 25)) then
+		       os.execute('explorer "https://forum.gta-samp.ru/index.php?/topic/655150-%D1%81%D0%BF%D0%B8%D1%81%D0%BE%D0%BA-%D0%B0%D0%B4%D0%BC%D0%B8%D0%BD%D0%BE%D0%B2/"') 
+		    end
+         end
          
          if imgui.Button(u8"Список транспорта и хвр-ки", imgui.ImVec2(230, 25)) then
 		    os.execute('explorer "https://forum.sa-mp.ru/index.php?/topic/1023608-faq-%D1%81%D0%BF%D0%B8%D1%81%D0%BE%D0%BA-%D1%82%D1%80%D0%B0%D0%BD%D1%81%D0%BF%D0%BE%D1%80%D1%82%D0%B0-%D1%81%D0%BA%D0%BE%D1%80%D0%BE%D1%81%D1%82%D1%8C-%D0%BD%D0%B5%D0%BE%D0%B1%D1%85%D0%BE%D0%B4%D0%B8%D0%BC%D1%8B%D0%B9-%D1%83%D1%80%D0%BE%D0%B2%D0%B5%D0%BD%D1%8C-%D1%86%D0%B5%D0%BD%D0%B0/"') 
@@ -5477,13 +5469,12 @@ function imgui.OnDrawFrame()
 		 imgui.SameLine()
 		 if imgui.Button(u8"Найти",imgui.ImVec2(70, 25)) then
      	    if string.len(textbuffer.findlog.v) > 0 then
-               local link = string.format('explorer "https://gta-samp.ru/adminhistory-deathmatch?year=%i&month=%i&searchtext=%s"',
+               local link = string.format('explorer "https://gta-samp.ru/adminhistory-'..serverprefix..'?year=%i&month=%i&searchtext=%s"',
 			   os.date('%Y'),os.date('%m'), u8:decode(textbuffer.findlog.v))
 			   os.execute(link)
 			   print(link)
 			end
 		 end
-		 --imgui.Text(os.date('%H:%M:%S'))
 		 
 		 imgui.Text(u8"Узнать историю аккаунта:")
 		 if chosenplayer then
@@ -5512,14 +5503,14 @@ function imgui.OnDrawFrame()
 		 imgui.SameLine()
 		 if imgui.Button(u8"по никнейму",imgui.ImVec2(150, 25)) then
 			if string.len(textbuffer.ckeckplayer.v) > 0 then
-               local link = 'explorer "https://gta-samp.ru/server-deathmatch?Nick='..u8:decode(textbuffer.ckeckplayer.v)..'"'
+               local link = 'explorer "https://gta-samp.ru/server-'..serverprefix..'?Nick='..u8:decode(textbuffer.ckeckplayer.v)..'"'
 			   os.execute(link)
 			end
 		 end 
 		 imgui.SameLine()
 		 if imgui.Button(u8"по номеру аккаунта",imgui.ImVec2(150, 25)) then
 			if string.len(textbuffer.ckeckplayer.v) > 0 and tonumber(textbuffer.ckeckplayer.v) then
-               local link = 'explorer "https://gta-samp.ru/server-deathmatch?Accid='..u8:decode(textbuffer.ckeckplayer.v)..'"'
+               local link = 'explorer "https://gta-samp.ru/server-'..serverprefix..'?Accid='..u8:decode(textbuffer.ckeckplayer.v)..'"'
 			   os.execute(link)
 			end
 		 end 
@@ -5562,7 +5553,7 @@ function imgui.OnDrawFrame()
       if imgui.Button(u8"Команды", imgui.ImVec2(100,25)) then tabmenu.info = 6 end
       if imgui.Button(u8"FAQ", imgui.ImVec2(100,25)) then tabmenu.info = 7 end
       if isAbsolutePlay then
-         if imgui.Button(u8"Админлог", imgui.ImVec2(100,25)) then tabmenu.info = 8 end
+         if imgui.Button(u8"Логи", imgui.ImVec2(100,25)) then tabmenu.info = 8 end
       end   
       if imgui.Button(u8"About", imgui.ImVec2(100, 25)) then tabmenu.info = 1 end
 
@@ -5586,11 +5577,15 @@ function imgui.OnDrawFrame()
          imgui.Spacing()
          
          if tabmenu.mp == 1 then
-            imgui.Text(u8"Мероприятие: ")
+            if combobox.profiles.v ~= 0 then
+               imgui.Text(u8"Выбрано мероприятие: ")
+            else
+               imgui.Text(u8"Выберите мероприятие: ")
+            end
+            
 	        imgui.SameLine()
 	        imgui.PushItemWidth(100)
-	        if imgui.Combo(u8'##ComboBoxProfiles', combobox.profiles, 
-	        {'Default', 'Race', 'Derby', 'Survival', 'PvP', 'Death-Roof', 'TDM', 'Hide-n-Seek', 'Quiz', 'King'}, 10) then
+	        if imgui.Combo(u8'##ComboBoxProfiles', combobox.profiles, profilesNames, #profilesNames) then
                if combobox.profiles.v then cleanBindsForm() end
                if combobox.profiles.v == 0 then
 	 	          reloadBindsFromConfig()
@@ -5602,9 +5597,6 @@ function imgui.OnDrawFrame()
                   textbuffer.bind3.v = u8("Разрешено в случае вылета за границы трассы, продолжить игру начиная от места вылета")
                   textbuffer.bind4.v = u8("Разрешено при поломке транспорта и невозможноcти починки, заказать его еще раз")
                   textbuffer.bind5.v = u8("Разрешено на данном мероприятии играть без samp addon и последней версии клиента")
-                  textbuffer.bind6.v = u8("Запрещено находиться в афк после начала мероприятия")
-                  textbuffer.bind7.v = u8("Запрещено использовать телепорт и текстурные баги")
-                  textbuffer.bind8.v = u8("За первое место приз - , за второе - , за третье -")
                   textbuffer.mpname.v = u8('Заходите на МП Гонки')
 	 	     	  sampAddChatMessage('Загружен профиль Race', -1)
                end
@@ -5620,22 +5612,15 @@ function imgui.OnDrawFrame()
                if combobox.profiles.v == 3 then
 	 	          textbuffer.bind1.v = u8("Запрещено создавать помеху игрокам при помощи багов и недоработок игры")
                   textbuffer.bind2.v = u8("Запрещены объединения более 2-х игроков")
-                  textbuffer.bind3.v = u8("Не мешаем другим игрокам, ждем начала")
-                  textbuffer.bind4.v = u8("")
-                  textbuffer.bind5.v = u8("Запрещено находиться в афк после начала мероприятия")
-                  textbuffer.bind6.v = u8("Начали! Желаю удачи всем игрокам")
-                  textbuffer.bind7.v = u8("Разрешены объеденения - не больше двух игроков")
-                  textbuffer.bind8.v = u8("Приз не может быть разделен при обоюдном согласии двух оставшихся команд")
+                  textbuffer.bind3.v = u8("Запрещено находиться в афк после начала мероприятия")
                   textbuffer.mpname.v = u8('Заходите на МП Выживание')
                   sampAddChatMessage('Загружен профиль Survival', -1)
                end
                if combobox.profiles.v == 4 then
 	 	          textbuffer.bind1.v = u8("Запрещено создавать помеху игрокам при помощи багов и недоработок игры")
-	 	          textbuffer.bind2.v = u8("После получения оружия ждем отсчета")
-	 	          textbuffer.bind3.v = u8("Начинаем только после окончания отсчета!")
-	 	          textbuffer.bind4.v = u8("Если вы выстрелили раньше отсчета - дисквалификация")
-	 	          textbuffer.bind5.v = u8("Если вы прошли во второй тур и находитесь афк - дисквалификация")
-	 	          textbuffer.bind6.v = u8("Обман организатора - черный список МП")
+	 	          textbuffer.bind2.v = u8("После получения оружия ждем отсчета, начинаем только после окончания отсчета!")
+	 	          textbuffer.bind3.v = u8("Если вы выстрелили раньше окончания отсчета - дисквалификация")
+	 	          textbuffer.bind4.v = u8("Если вы прошли во второй тур и находитесь афк - дисквалификация")
 	 	          textbuffer.mpname.v = u8('Заходите на МП Кемпа')
 	 	          sampAddChatMessage('Загружен профиль PvP', -1)
 	 	       end
@@ -5643,59 +5628,49 @@ function imgui.OnDrawFrame()
 	 	          textbuffer.bind1.v = u8("Запрещено создавать помеху игрокам при помощи багов и недоработок игры")
 	 	          textbuffer.bind2.v = u8("Игроки которые упали с крыши - выбывают")
 	 	          textbuffer.bind3.v = u8("Использование анимок и спец.действий запрещено!")
-	 	          textbuffer.bind4.v = u8("Кто хочет быть пилотом?")
-	 	          textbuffer.bind5.v = u8("Кто хочет быть водилой поливалки?")
-	 	          textbuffer.bind6.v = u8("Запрещено запрыгивать на транспорт организаторов")
+	 	          textbuffer.bind4.v = u8("Запрещено запрыгивать на транспорт организаторов")
 	 	          textbuffer.mpname.v = u8('Заходите на МП Смертельная крыша')
 	 	          sampAddChatMessage('Загружен профиль Death-Roof', -1)
 	 	       end
                if combobox.profiles.v == 6 then
 	 	          textbuffer.bind1.v = u8("Запрещено создавать помеху игрокам при помощи багов и недоработок игры")
-                  textbuffer.bind2.v = u8("За попытку обмана организатора - ЧС мероприятий")
-                  textbuffer.bind3.v = u8("Увидели лагера или нарушителя пишите в лс")
-                  textbuffer.bind4.v = u8("Не мешаем другим игрокам, ждем начала")
-                  textbuffer.bind5.v = u8("Запрещено находиться в афк после начала мероприятия")
-                  textbuffer.bind6.v = u8("Начали! Желаю удачи всем игрокам")
-                  textbuffer.bind7.v = u8("Всем вернуться на спавн!")
-                  textbuffer.bind8.v = u8("Приз выдается в равном размере каждому участнику победившей команды")
+                  textbuffer.bind2.v = u8("Не мешаем другим игрокам, ждем начала")
+                  textbuffer.bind3.v = u8("Приз выдается в равном размере каждому участнику победившей команды")
                   textbuffer.mpname.v = u8('Заходите на МП TDM')
                   sampAddChatMessage('Загружен профиль TDM', -1)
                end
 	 	       if combobox.profiles.v == 7 then
 	 	          textbuffer.bind1.v = u8("Запрещено прятаться в текстурах и объектах")
 	 	          textbuffer.bind2.v = u8("Запрещено использовать баги и недоработки игры для победы")
-	 	          textbuffer.bind3.v = u8("Увидели нарушителя пишите в лс организатору")
-	 	     	  textbuffer.bind4.v = u8("Не мешаем другим игрокам, ждем начала")
-                  textbuffer.bind5.v = u8("Запрещено находиться в афк после начала мероприятия")
-                  textbuffer.bind6.v = u8("Все спрятались?")
-                  textbuffer.bind7.v = u8("Начали! Желаю удачи всем игрокам")
-	 	     	  textbuffer.bind8.v = u8("Всем вернуться на спавн!")
 	 	          textbuffer.mpname.v = u8('Заходите на МП Прятки')
                   sampAddChatMessage('Загружен профиль Hide-n-Seek', -1)
 	 	       end
 	 	       if combobox.profiles.v == 8 then
-	 	          textbuffer.bind1.v = u8("Правила: организатор задает вопрос, а вы должны дать ответ быстрее всех")
+	 	          textbuffer.bind1.v = u8("Организатор задает вопрос, а вы должны дать ответ быстрее всех")
 	 	          textbuffer.bind2.v = u8("Кто первый ответ на заданный вопрос, получает балл")
 	 	          textbuffer.bind3.v = u8("Игра продолжается пока кто-либо не наберет 3 балла")
 	 	          textbuffer.bind4.v = u8("Не рекомендуется флудить и спамить в чат")
-	 	          textbuffer.bind5.v = u8("Вопросы будут на тему ")
-	 	          textbuffer.bind6.v = u8("Гугол, Яндекс и ChatGPT вам не помошники, вопросы специфические =)")
-	 	          textbuffer.bind7.v = u8("Все готовы?")
-	 	          textbuffer.mpname.v = u8('Проходит МП Викторина')
+	 	          textbuffer.bind5.v = u8("Гугол, Яндекс и ChatGPT вам не помошники, вопросы специфические =)")
+	 	          textbuffer.mpname.v = u8('Проходит МП Викторина на тему')
                   sampAddChatMessage('Загружен профиль Quiz', -1)
 	 	       end
                if combobox.profiles.v == 9 then
-	 	          textbuffer.bind1.v = u8("Правила: Победителем становится последний оставшийся в живых игрок")
-	 	          textbuffer.bind2.v = u8("Правила: Запрещено пополнять хп любыми способами")
-	 	          textbuffer.bind2.v = u8("Правила: Запрещено тимиться и уходить от боя багами")
+	 	          textbuffer.bind1.v = u8("Победителем становится последний оставшийся в живых игрок")
+	 	          textbuffer.bind2.v = u8("Запрещено пополнять хп любыми способами")
+	 	          textbuffer.bind3.v = u8("Запрещено тимиться и уходить от боя багами")
                   textbuffer.mpname.v = u8('Проходит МП Король')
                   sampAddChatMessage('Загружен профиль King', -1)
+	 	       end
+               if combobox.profiles.v == 10 then
+	 	          textbuffer.bind1.v = u8("Победителем становится игрок который убьет жертву")
+	 	          textbuffer.bind2.v = u8("Жертва будет активно передвигаться и хорошо охраняется")
+                  textbuffer.mpname.v = u8('Проходит МП Охота')
+                  sampAddChatMessage('Загружен профиль Hunt', -1)
 	 	       end
             end
 	        imgui.PopItemWidth()
             
-            --imgui.Text(u8"Мероприятие: ")
-            --imgui.SameLine()
+            imgui.Text(u8"Объявление: ")
             imgui.PushItemWidth(300)
             if imgui.InputText("##BindMpname", textbuffer.mpname) then 
             end
@@ -5708,7 +5683,7 @@ function imgui.OnDrawFrame()
             end
             imgui.PopItemWidth()
             
-            if imgui.Button(u8"Объявить МП", imgui.ImVec2(220, 25)) then
+            if imgui.TooltipButton(u8"Объявить МП", imgui.ImVec2(220, 25), u8"Аннонсировать МП в объявление (/об)") then
                if string.len(textbuffer.mpname.v) > 0 and string.len(textbuffer.mpprize.v) > 0 then 
                   sampSetChatInputEnabled(true)
                   sampSetChatInputText(string.format("/об %s, приз %s", u8:decode(textbuffer.mpname.v), u8:decode(textbuffer.mpprize.v)))
@@ -5729,13 +5704,14 @@ function imgui.OnDrawFrame()
                end
             end
             
-            if imgui.Button(mpStarted and u8("Остановить мероприятие") or u8("Начать мероприятие"), imgui.ImVec2(220, 25)) then
+            imgui.Spacing()
+            if imgui.TooltipButton(mpStarted and u8("Остановить мероприятие") or u8("Начать мероприятие"), imgui.ImVec2(220, 25), mpStarted and u8("Завершить МП") or u8("Готовы начать?")) then
                mpStarted = not mpStarted
                if mpStarted then
                   autoAnnounce = false
                   mpStartedDTime = os.date('%X')
-                  sampSetChatInputEnabled(true)
-                  sampSetChatInputText('* Начали! Желаю удачи всем игрокам')
+                  --sampSetChatInputEnabled(true)
+                  --sampSetChatInputText('* Начали! Желаю удачи всем игрокам')
                else
                   mpStartedDTime = nil
                   --sampSetChatInputEnabled(true)
@@ -5797,51 +5773,56 @@ function imgui.OnDrawFrame()
                end
             end
             
-            -- online stats
-            local totalonline = 0
-	 	    local olds = 0
-            local players = 0
-	 	    local newbies = 0
-            local bots = 0
-            
-	        for i = 0, sampGetMaxPlayerId(false) do
-               if sampIsPlayerConnected(i) then 
-	 	          totalonline = totalonline + 1
-	 	          local score = sampGetPlayerScore(i)
-                  local ping = sampGetPlayerPing(i)
-                  if ping <= 30 then
-                     if score < 10 or score < 1000 then
-                        bots = bots + 1
-                     end
-                  end
-	 	          if score > 1000 then
-	 	             olds = olds + 1
-	 	          elseif score >= 50 and score < 1000 then 
-                     players = players + 1
-                  else 
-                     newbies = newbies + 1
-	 	          end
-	 	       end
-            end
-	 	    imgui.Text(string.format(u8"Игроков в сети %i из них новички %i, постояльцы %i, олды %i (возможно боты %i)",
-            totalonline, newbies, players, olds, bots))
-            
          elseif tabmenu.mp == 2 then
+            imgui.Text(u8"Дать команду в чат:")
             if imgui.Button(u8"Выдаю оружие и броню!", imgui.ImVec2(220, 25)) then
                sampSetChatInputEnabled(true)
                sampSetChatInputText('* Выдаю оружие и броню! После выдачи начинаем МП!')
 	        end
+            imgui.SameLine()
             if imgui.Button(u8"Сменил спавн!", imgui.ImVec2(220, 25)) then
                sampSetChatInputEnabled(true)
                sampSetChatInputText('* Изменил спавн! Не умирайте, МП скоро начнется')
 	        end
+            
             if imgui.Button(u8"Не стоим на месте", imgui.ImVec2(220, 25)) then
                sampSetChatInputEnabled(true)
                sampSetChatInputText('* Не стоим на месте, неактивные будут удалены с МП!')
 	        end
+            imgui.SameLine()
             if imgui.Button(u8"Все в строй", imgui.ImVec2(220, 25)) then
                sampSetChatInputEnabled(true)
                sampSetChatInputText('* Все в строй! Кто не в строю будет удален с МП')
+	        end
+            
+            if imgui.Button(u8"Скоро начнем, приготовьтесь!", imgui.ImVec2(220, 25)) then
+               sampSetChatInputEnabled(true)
+               sampSetChatInputText('* Скоро начнем, занимайте позиции!')
+	        end
+            imgui.SameLine()
+            if imgui.Button(u8"Начали!", imgui.ImVec2(220, 25)) then
+               sampSetChatInputEnabled(true)
+               sampSetChatInputText('* Желаем всем удачи, иии Начали!!')
+	        end
+            
+            imgui.Text(u8"Предупреждения:")
+            if imgui.Button(u8"Не мешаем, ждем!", imgui.ImVec2(220, 25)) then
+               sampSetChatInputEnabled(true)
+               sampSetChatInputText('* Не мешаем другим игрокам, ждем начала!')
+	        end
+            imgui.SameLine()
+            if imgui.Button(u8"Обман = ЧС МП", imgui.ImVec2(220, 25)) then
+               sampSetChatInputEnabled(true)
+               sampSetChatInputText('* Обман организатора - черный список МП!')
+	        end
+            if imgui.Button(u8"АФКкик", imgui.ImVec2(220, 25)) then
+               sampSetChatInputEnabled(true)
+               sampSetChatInputText('* Игроки находящиеся в АФК будут удалены с МП')
+	        end
+            imgui.SameLine()
+            if imgui.Button(u8"Увидели нарушителя", imgui.ImVec2(220, 25)) then
+               sampSetChatInputEnabled(true)
+               sampSetChatInputText('* Увидели лагера или нарушителя > пишите в лс')
 	        end
             imgui.Text(u8"Выбор капитана:")
 	        if imgui.Button(u8"Игрок с наибольшим уровнем", imgui.ImVec2(220, 25)) then
@@ -5902,25 +5883,15 @@ function imgui.OnDrawFrame()
 	        end
             imgui.Spacing()
             imgui.Text(u8"Всего игроков рядом: ".. playersTotal)
-         elseif tabmenu.mp == 3 then
-            
-            if imgui.Button(u8"Очистить чат (Для себя)", imgui.ImVec2(220, 25)) then
-               ClearChat()
-            end
-            if imgui.Button(u8"Открыть лог чата (chatlog.txt)", imgui.ImVec2(220, 25)) then
-	           os.execute('explorer '..getFolderPath(5) ..'\\GTA San Andreas User Files\\SAMP\\chatlog.txt')
-	        end
-            
-            if imgui.Checkbox(u8("Уведомлять при упоминании в чате"), checkbox.chatmentions) then
-               ini.settings.chatmentions = checkbox.chatmentions.v
-               save()
-            end
+
+         -- elseif tabmenu.mp == 3 then
             
          elseif tabmenu.mp == 4 then
-             --imgui.Text(u8"Здесь вы можете настроить чат-бинды для мероприятия.     ")
              imgui.ColorEdit4("##ColorEdit4lite", color, imgui.ColorEditFlags.NoInputs)
              imgui.SameLine()
-             -- line 1
+             imgui.Text(u8"Профиль МП: "..profilesNames[combobox.profiles.v+1])
+             
+             imgui.SameLine()
              imgui.PushItemWidth(90)
              imgui.Combo('##ComboChatSelect', combobox.chatselect, {u8'мчат', u8'глобальный', u8"без префикса"}, 3)
              imgui.PopItemWidth()
@@ -5939,8 +5910,6 @@ function imgui.OnDrawFrame()
                 prefix = ""
              end
              
-             --imgui.Text(u8"Профиль: ")
-             --imgui.SameLine()
              -- line 1
              imgui.Text("1.")
              imgui.SameLine()
@@ -6070,7 +6039,6 @@ function imgui.OnDrawFrame()
                ini.binds.textbuffer7 = u8:decode(textbuffer.bind7.v)
                ini.binds.textbuffer8 = u8:decode(textbuffer.bind8.v)
                ini.binds.textbuffer9 = u8:decode(textbuffer.bind9.v)
-               ini.binds.adtextbuffer = u8:decode(textbuffer.bindad.v)
                save()          
                sampAddChatMessage("Бинды были успешно сохранены", -1)
              end
@@ -6079,31 +6047,48 @@ function imgui.OnDrawFrame()
                 cleanBindsForm()
              end
              imgui.SameLine()
-             imgui.Text("           ")
+             imgui.Text("            ")
              imgui.SameLine()
-             if imgui.TooltipButton(u8"All [>]", imgui.ImVec2(60, 25), u8:encode("Анонсировать все правила в чат (Задержка в 2с, пустые строки игнорируются)")) then
-                sampSendChat(prefix..u8:decode(textbuffer.bind9.v))
+             if imgui.TooltipButton(u8"Анонсировать правила", imgui.ImVec2(150, 25), u8:encode("Анонсировать все правила в чат (Задержка в 2с, пустые строки игнорируются)")) then
+                lua_thread.create(function()
+                if string.len(textbuffer.bind1.v) > 1 then
+                   sampSendChat(prefix..u8:decode(textbuffer.bind1.v))
+                end
+                wait(2000)
+                if string.len(textbuffer.bind2.v) > 1 then
+                   sampSendChat(prefix..u8:decode(textbuffer.bind2.v))
+                end
+                wait(2000)
+                if string.len(textbuffer.bind3.v) > 1 then
+                   sampSendChat(prefix..u8:decode(textbuffer.bind3.v))
+                end
+                wait(2000)
+                if string.len(textbuffer.bind4.v) > 1 then
+                   sampSendChat(prefix..u8:decode(textbuffer.bind4.v))
+                end
+                wait(2000)
+                if string.len(textbuffer.bind5.v) > 1 then
+                   sampSendChat(prefix..u8:decode(textbuffer.bind5.v))
+                end
+                wait(2000)
+                if string.len(textbuffer.bind6.v) > 1 then
+                   sampSendChat(prefix..u8:decode(textbuffer.bind6.v))
+                end
+                wait(2000)
+                if string.len(textbuffer.bind7.v) > 1 then
+                   sampSendChat(prefix..u8:decode(textbuffer.bind7.v))
+                end
+                wait(2000)
+                if string.len(textbuffer.bind8.v) > 1 then
+                   sampSendChat(prefix..u8:decode(textbuffer.bind8.v))
+                end
+                wait(2000)
+                if string.len(textbuffer.bind9.v) > 1 then
+                   sampSendChat(prefix..u8:decode(textbuffer.bind9.v))
+                end
+                wait(2000)
+                end)
              end
-             -- imgui.PushItemWidth(70)
-             -- imgui.Combo('    ', combobox.itemad, {u8'объявление', u8'общий', u8'мчат'}, 3)
-             -- imgui.PopItemWidth()
-             
-             -- imgui.SameLine()
-             -- if imgui.InputText("##BindAd", textbuffer.bindad) then 
-             -- end
-             
-             -- imgui.SameLine()
-             -- if imgui.Button(u8"[>]##SendchatBindAd") then
-                -- if combobox.itemad.v == 0 then
-                   -- sampSendChat(string.format("/об %s", u8:decode(textbuffer.bindad.v)))
-                -- end
-                -- if combobox.itemad.v == 1 then
-                   -- sampSendChat(string.format("* %s", u8:decode(textbuffer.bindad.v)))
-                -- end
-                -- if combobox.itemad.v == 2 then
-                   -- sampSendChat(string.format("/мчат %s", u8:decode(textbuffer.bindad.v)))
-                -- end
-             -- end
              
 	         --imgui.TextColoredRGB("* {00FF00}@ номер игрока - {bababa}заменит id на никнейм игрока.")
 	         --imgui.TextColoredRGB("Цветной текст указывать через скобки (FF0000)")
@@ -6161,7 +6146,7 @@ function imgui.OnDrawFrame()
             imgui.Spacing()
          elseif tabmenu.mp == 6 then
             
-            if imgui.Checkbox(u8("Уведомлять о дисконнекте игрока"), checkbox.disconnectreminder) then
+            if imgui.Checkbox(u8("Уведомлять о дисконнекте игроков"), checkbox.disconnectreminder) then
 	   	       if checkbox.disconnectreminder.v then
 	 	     	  sampAddChatMessage("При вылете игроков с сервера будет выводить уведомление", -1)
 	 	       else
@@ -6169,7 +6154,6 @@ function imgui.OnDrawFrame()
 	 	       end
 	        end
 	        
-	        imgui.Checkbox(u8("Уведомлять о тяжелом оружии"), checkbox.heavyweaponwarn)
 	        if imgui.Checkbox(u8("Уведомлять о пополнении хп игроком"), checkbox.healthcheck) then
                sampAddChatMessage("Недоступно в бета версии", -1)
             end
@@ -6212,13 +6196,63 @@ function imgui.OnDrawFrame()
 	 	      end
 	        end
             
+            if imgui.Button(u8"Статистика онлайна", imgui.ImVec2(220, 25)) then
+               local totalonline = 0
+	 	       local olds = 0
+               local players = 0
+	 	       local newbies = 0
+               local bots = 0
+               
+	           for i = 0, sampGetMaxPlayerId(false) do
+                  if sampIsPlayerConnected(i) then 
+	 	             totalonline = totalonline + 1
+	 	             local score = sampGetPlayerScore(i)
+                     local ping = sampGetPlayerPing(i)
+                     if ping <= 30 then
+                        if score < 10 or score < 1000 then
+                           bots = bots + 1
+                        end
+                     end
+	 	             if score > 1000 then
+	 	                olds = olds + 1
+	 	             elseif score >= 50 and score < 1000 then 
+                        players = players + 1
+                     else 
+                        newbies = newbies + 1
+	 	             end
+	 	          end
+               end
+	 	       sampAddChatMessage(string.format("Игроков в сети %i из них новички %i, постояльцы %i, олды %i (возможно боты %i)",
+               totalonline, newbies, players, olds, bots) ,-1)
+            end
+            
+            if imgui.Button(u8"Игроки с оружием", imgui.ImVec2(220, 25)) then
+               local armedplayerscounter = 0
+               for k, v in ipairs(getAllChars()) do
+                  local res, id = sampGetPlayerIdByCharHandle(v)
+                  if res then
+                     local nick = sampGetPlayerNickname(id)
+                     local weaponid = getCurrentCharWeapon(v)
+                     if weaponid ~= 0 and weaponid ~= 1 then
+                        armedplayerscounter = armedplayerscounter + 1
+                        sampAddChatMessage(string.format("{FF0000}Игрок %s[%d] с оружием (%d)!", nick, id, weaponid), -1)
+                     end
+                  end
+               end
+               if armedplayerscounter == 0 then
+                  sampAddChatMessage("Не найдено игроков с оружием", -1)
+               else
+                  sampAddChatMessage("Всего игроков с оружием: "..armedplayerscounter, -1)
+               end
+            end
+            
          end
          
          imgui.NextColumn()
          
          if imgui.Button(u8"Подготовка к МП",imgui.ImVec2(120, 25)) then tabmenu.mp = 1 end 
          if imgui.Button(u8"Управление МП",imgui.ImVec2(120, 25)) then tabmenu.mp = 2 end 
-         if imgui.Button(u8"Чатик",imgui.ImVec2(120, 25)) then tabmenu.mp = 3 end 
+         --if imgui.Button(u8"Чатик",imgui.ImVec2(120, 25)) then tabmenu.mp = 3 end 
          if imgui.Button(u8"Проверка игроков",imgui.ImVec2(120, 25)) then tabmenu.mp = 6 end 
          if imgui.Button(u8"Правила",imgui.ImVec2(120, 25)) then tabmenu.mp = 4 end 
          if imgui.Button(u8"Финал МП",imgui.ImVec2(120, 25)) then tabmenu.mp = 5 end 
@@ -6790,10 +6824,23 @@ function sampev.onServerMessage(color, text)
    local result, id = sampGetPlayerIdByCharHandle(playerPed)
    local nickname = sampGetPlayerNickname(id)
    
+   if isChatFreezed then
+      table.insert(chatbuffer, {color = color, text = text})
+      return false
+   end
+    
    if checkbox.chatmentions.v then
       -- mentions by nickname
       if text:find(nickname) then
-         if not text:find("Управляющий мира "..nickname) then
+         if text:find(":") then
+            local pointpos = text:find(":")
+            local cleartext = text:sub(pointpos, string.len(text))
+            if cleartext:find(nickname) then
+               printStyledString('You were mentioned in the chat', 2000, 4)
+               addOneOffSound(0.0, 0.0, 0.0, 1138) -- CHECKPOINT_GREEN
+               return true
+            end
+          else
             printStyledString('You were mentioned in the chat', 2000, 4)
             addOneOffSound(0.0, 0.0, 0.0, 1138) -- CHECKPOINT_GREEN
             return true
@@ -6883,10 +6930,6 @@ function sampev.onSendCommand(command)
 end
 
 function onExitScript()
-	if nameTagWh then
-	   nameTagWh = false
-	   nameTagOn()
-	end
 	if not sampIsDialogActive() then
 	   showCursor(false)
 	end
@@ -6993,15 +7036,6 @@ function sampev.onSendEnterEditObject(type, objectId, model, position)
    
    if checkbox.logobjects.v then
       print(type, objectId, model)
-   end
-end
-
-function sampev.onPlayerStreamIn(id, team, model, position, rotation, color, fight)
-   if checkbox.radarblips.v then
-	  local ucolor = sampGetPlayerColor(id)
-	  local aa, rr, gg, bb = explode_argb(ucolor)
-      newcolor = join_argb(0, rr, gg, bb)
-	  return {id, team, model, position, rotation, newcolor, fight}
    end
 end
 
@@ -7148,21 +7182,21 @@ function JumpForward()
 end
 
 function getClosestPlayerId()
-    local closestId = -1
-    mydist = 30
-    local x, y, z = getCharCoordinates(PLAYER_PED)
-    for i = 0, 999 do
-        local streamed, pedID = sampGetCharHandleBySampPlayerId(i)
-        if streamed and getCharHealth(pedID) > 0 and not sampIsPlayerPaused(pedID) then
-            local xi, yi, zi = getCharCoordinates(pedID)
-            local dist = getDistanceBetweenCoords3d(x, y, z, xi, yi, zi)
-            if dist <= mydist then
-                mydist = dist
-                closestId = i
-            end
-        end
-    end
-    return closestId
+   local closestId = -1
+   mydist = 30
+   local x, y, z = getCharCoordinates(PLAYER_PED)
+   for i = 0, 999 do
+       local streamed, pedID = sampGetCharHandleBySampPlayerId(i)
+       if streamed and getCharHealth(pedID) > 0 and not sampIsPlayerPaused(pedID) then
+           local xi, yi, zi = getCharCoordinates(pedID)
+           local dist = getDistanceBetweenCoords3d(x, y, z, xi, yi, zi)
+           if dist <= mydist then
+               mydist = dist
+               closestId = i
+           end
+       end
+   end
+   return closestId
 end
 
 function getClosestCar()
@@ -7187,55 +7221,73 @@ function getClosestCar()
 end
 
 function getVehicleInStream()
-    local stream = 0
-    for i = 0, 2000 do
-        local result, car = sampGetCarHandleBySampVehicleId(i)
-        if result then
-            stream = stream + 1
-        end
-    end
-    return stream
+   local stream = 0
+   for i = 0, 2000 do
+      local result, car = sampGetCarHandleBySampVehicleId(i)
+      if result then
+         stream = stream + 1
+      end
+   end
+   return stream
 end
 
 function getObjectsInStream()
-    local count = 0
-    for _ in pairs(getAllObject()) do count = count + 1 end
-    return count
+   local count = 0
+   for _ in pairs(getAllObject()) do count = count + 1 end
+   return count
 end
 
 function GetNearestObject(modelid)
-    local objects = {}
-    local x, y, z = getCharCoordinates(playerPed)
-    for i, obj in ipairs(getAllObjects()) do
-        if getObjectModel(obj) == modelid then
-            local result, ox, oy, oz = getObjectCoordinates(obj)
-            table.insert(objects, {getDistanceBetweenCoords3d(ox, oy, oz, x, y, z), ox, oy, oz})
-        end
-    end
-    if #objects <= 0 then return false end
-    table.sort(objects, function(a, b) return a[1] < b[1] end)
-    return true, unpack(objects[1])
+   local objects = {}
+   local x, y, z = getCharCoordinates(playerPed)
+   for i, obj in ipairs(getAllObjects()) do
+      if getObjectModel(obj) == modelid then
+         local result, ox, oy, oz = getObjectCoordinates(obj)
+         table.insert(objects, {getDistanceBetweenCoords3d(ox, oy, oz, x, y, z), ox, oy, oz})
+      end
+   end
+   if #objects <= 0 then return false end
+   table.sort(objects, function(a, b) return a[1] < b[1] end)
+   return true, unpack(objects[1])
 end
 
 function getNearestRoadCoordinates(radius)
-    local A = { getCharCoordinates(PLAYER_PED) }
-    local B = { getClosestStraightRoad(A[1], A[2], A[3], 0, radius or 600) }
-    if B[1] ~= 0 and B[2] ~= 0 and B[3] ~= 0 then
-        return true, B[1], B[2], B[3]
-    end
-    return false
+   local A = { getCharCoordinates(PLAYER_PED) }
+   local B = { getClosestStraightRoad(A[1], A[2], A[3], 0, radius or 600) }
+   if B[1] ~= 0 and B[2] ~= 0 and B[3] ~= 0 then
+       return true, B[1], B[2], B[3]
+   end
+   return false
+end
+
+function nameTagOn()
+   local pStSet = sampGetServerSettingsPtr();
+   NTdist = memory.getfloat(pStSet + 39)
+   NTwalls = memory.getint8(pStSet + 47)
+   NTshow = memory.getint8(pStSet + 56)
+   memory.setfloat(pStSet + 39, 70.0)
+   memory.setint8(pStSet + 56, 1)
+   nameTag = true
+end
+
+function nameTagOff()
+   local pStSet = sampGetServerSettingsPtr();
+   memory.setfloat(pStSet + 39, NTdist)
+   memory.setint8(pStSet + 47, NTwalls)
+   memory.setint8(pStSet + 56, NTshow)
+   nameTag = false
 end
 
 function setCameraDistanceActivated(activated) --KepchiK
-	memory.setuint8(0xB6F028 + 0x38, activated)
-	memory.setuint8(0xB6F028 + 0x39, activated)
+   memory.setuint8(0xB6F028 + 0x38, activated)
+   memory.setuint8(0xB6F028 + 0x39, activated)
 end
 
 function setCameraDistance(distance) -- KepchiK
-	memory.setfloat(0xB6F028 + 0xD4, distance)
-	memory.setfloat(0xB6F028 + 0xD8, distance)
-	memory.setfloat(0xB6F028 + 0xC0, distance)
-	memory.setfloat(0xB6F028 + 0xC4, distance)
+   memory.setfloat(0xB6F028 + 0xD4, distance)
+   memory.setfloat(0xB6F028 + 0xD8, distance)
+   memory.setfloat(0xB6F028 + 0xC0, distance)
+   memory.setfloat(0xB6F028 + 0xC4, distance)
 end
 
 function DisableUnderWaterEffects(bState) -- kin4stat
@@ -7348,7 +7400,6 @@ function cleanBindsForm()
    textbuffer.bind7.v = " "
    textbuffer.bind8.v = " "
    textbuffer.bind9.v = " "
-   textbuffer.bindad.v = " "
 end
 
 function reloadBindsFromConfig()
@@ -7361,30 +7412,6 @@ function reloadBindsFromConfig()
    textbuffer.bind7.v = u8(ini.binds.textbuffer7)
    textbuffer.bind8.v = u8(ini.binds.textbuffer8)
    textbuffer.bind9.v = u8(ini.binds.textbuffer9)
-   textbuffer.bindad.v = u8(ini.binds.adtextbuffer)
-end
-
-function nameTagOn()
-    local pStSet = sampGetServerSettingsPtr();
-    NTdist = memory.getfloat(pStSet + 39)
-    NTwalls = memory.getint8(pStSet + 47)
-    NTshow = memory.getint8(pStSet + 56)
-	if nameTagWh then
-		memory.setfloat(pStSet + 39, 1488.0)
-		memory.setint8(pStSet + 47, 0)
-	else 
-		memory.setfloat(pStSet + 39, 70.0)
-	end
-    memory.setint8(pStSet + 56, 1)
-    nameTag = true
-end
-
-function nameTagOff()
-    local pStSet = sampGetServerSettingsPtr();
-    memory.setfloat(pStSet + 39, NTdist)
-    memory.setint8(pStSet + 47, NTwalls)
-    memory.setint8(pStSet + 56, NTshow)
-    nameTag = false
 end
 
 function patch_samp_time_set(enable) -- by hnnssy and FYP
