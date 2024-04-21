@@ -2,7 +2,6 @@
 <p align="center">
     <img src="https://img.shields.io/badge/made%20for-GTA%20SA--MP-blue" >
     <img src="https://img.shields.io/badge/Server-Absolute%20Play-red">
-    <img src="https://img.shields.io/date/1531947600?label=released" >
 </p>
 
 ![logo](https://github.com/ins1x/AbsEventHelper/raw/main/moonloader/resource/abseventhelper/demo.gif)

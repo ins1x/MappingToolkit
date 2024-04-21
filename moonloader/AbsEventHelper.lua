@@ -4,7 +4,7 @@ script_description("Assistant for mappers and event makers on Absolute Play")
 script_dependencies('imgui', 'lib.samp.events', 'vkeys')
 script_properties("work-in-pause")
 script_url("https://github.com/ins1x/AbsEventHelper")
-script_version("2.6.0")
+script_version("2.6.0 R1")
 -- script_moonloader(16) moonloader v.0.26
 
 -- Activaton: ALT + X (show main menu)
@@ -20,7 +20,7 @@ local encoding = require 'encoding'
 encoding.default = 'CP1251'
 u8 = encoding.UTF8
 
-------------------------[ cfg ] -------------------
+-------------- [ cfg ] ---------------
 local inicfg = require 'inicfg'
 local configIni = "AbsEventHelper.ini"
 local ini = inicfg.load({
@@ -39,14 +39,14 @@ local ini = inicfg.load({
    },
    binds =
    {
-      textbuffer1 = " ",
-      textbuffer2 = " ",
-      textbuffer3 = " ",
-      textbuffer4 = " ",
-      textbuffer5 = " ",
-      textbuffer6 = " ",
-      textbuffer7 = " ",
-      textbuffer8 = " "
+      customrule1 = " ",
+      customrule2 = " ",
+      customrule3 = " ",
+      customrule4 = " ",
+      customrule5 = " ",
+      customrule6 = " ",
+      customrule7 = " ",
+      customrule8 = " "
    }
 }, configIni)
 inicfg.save(ini, configIni)
@@ -54,7 +54,7 @@ inicfg.save(ini, configIni)
 function save()
     inicfg.save(ini, configIni)
 end
----------------------------------------------------------
+--------------------------------------
 
 objectsrenderfont = renderCreateFont("Arial", 7, 5)
 local sizeX, sizeY = getScreenResolution()
@@ -169,6 +169,7 @@ local checkbox = {
    changemdo = imgui.ImBool(false),
    findveh = imgui.ImBool(false),
    healthcheck = imgui.ImBool(false),
+   donators = imgui.ImBool(false),
    freezechat = imgui.ImBool(false),
    chatmentions = imgui.ImBool(ini.settings.chatmentions),
    test = imgui.ImBool(false)
@@ -204,6 +205,7 @@ local textbuffer = {
    vehiclename = imgui.ImBuffer(128),
    mpname = imgui.ImBuffer(128),
    mpprize = imgui.ImBuffer(32),
+   mpdonators = imgui.ImBuffer(128),
    rule1 = imgui.ImBuffer(256),
    rule2 = imgui.ImBuffer(256),
    rule3 = imgui.ImBuffer(256),
@@ -264,8 +266,8 @@ absServersNames = {
 }
 
 profilesNames = {
-   'Default', 'Race', 'Derby', 'Survival', 'PvP', 'Death-Roof', 'TDM',
-   'Hide-n-Seek', 'Quiz', 'King', 'Hunt'
+   'Custom', 'Race', 'Derby', 'Survival', 'PvP', 'Death-Roof', 'TDM',
+   'Hide-n-Seek', 'Quiz', 'King', 'Hunt', 'Rodeo', 'Road Rash'
 }
 
 VehicleNames = {
@@ -5559,12 +5561,12 @@ function imgui.OnDrawFrame()
          local ip, port = sampGetCurrentServerAddress()
          local servername = sampGetCurrentServerName()
          
-         imgui.TextColoredRGB("Сервер: " .. servername)
+         imgui.TextColoredRGB("Сервер: {007DFF}" .. servername)
          imgui.SameLine()
-         imgui.TextColoredRGB("IP:  " .. tostring(ip) ..":".. tostring(port))
-         imgui.TextColoredRGB("Дата: " .. os.date('%d.%m.%Y %X'))
+         imgui.TextColoredRGB("IP:  {686868}" .. tostring(ip) ..":".. tostring(port))
+         imgui.TextColoredRGB("Дата: {686868}" .. os.date('%d.%m.%Y %X'))
          if mpStartedDTime ~= nil then
-            imgui.TextColoredRGB("Началось МП в " .. mpStartedDTime)
+            imgui.TextColoredRGB("Началось МП в {686868}" .. mpStartedDTime)
          end
          imgui.Spacing()
          
@@ -5581,7 +5583,7 @@ function imgui.OnDrawFrame()
                if combobox.profiles.v then cleanBindsForm() end
                if combobox.profiles.v == 0 then
 	 	          reloadBindsFromConfig()
-	 	          sampAddChatMessage('Загружен профиль Default из конфига', -1)
+	 	          sampAddChatMessage('Загружен профиль Custom из конфига', -1)
                end
                if combobox.profiles.v == 1 then
 	 	          textbuffer.rule1.v = u8("Разрешено использовать починку транспорта")
@@ -5659,6 +5661,19 @@ function imgui.OnDrawFrame()
                   textbuffer.mpname.v = u8('Проходит МП Охота')
                   sampAddChatMessage('Загружен профиль Hunt', -1)
 	 	       end
+               if combobox.profiles.v == 11 then
+	 	          textbuffer.rule1.v = u8("Победителем становится игрок который останется последним на самолете")
+	 	          textbuffer.rule2.v = u8("Разрешено использовать любые анимации")
+                  textbuffer.mpname.v = u8('Проходит МП Родео')
+                  sampAddChatMessage('Загружен профиль Rodeo', -1)
+	 	       end
+               if combobox.profiles.v == 12 then
+	 	          textbuffer.rule1.v = u8("Победителем становится последний выживший игрок")
+	 	          textbuffer.rule2.v = u8("Запрещено покидать транспорт во время МП")
+	 	          textbuffer.rule2.v = u8("Если водителя убили или он вышел, то пассажир должен сесть за руль и продолжать начатое. ")
+                  textbuffer.mpname.v = u8('Проходит МП Road Rash')
+                  sampAddChatMessage('Загружен профиль Road Rash', -1)
+	 	       end
             end
 	        imgui.PopItemWidth()
             
@@ -5676,7 +5691,10 @@ function imgui.OnDrawFrame()
             imgui.Text(u8"Приз: ")
             imgui.SameLine()
             imgui.PushItemWidth(90)
-            if imgui.InputText("##BindMpprize", textbuffer.mpprize) then 
+            if imgui.InputText("##BindMpprize", textbuffer.mpprize) then
+               if textbuffer.mpprize.v:find("$") then
+                  --local money = getPlayerMoney(Player player)
+               end
             end
             imgui.PopItemWidth()
             
@@ -5698,6 +5716,28 @@ function imgui.OnDrawFrame()
                   AutoAd()
                else
                   sampAddChatMessage("Сперва укажите название мероприятия и приз!", -1)
+               end
+            end
+            
+            if imgui.Checkbox(u8"Указать спонсоров", checkbox.donators) then
+            end
+            --imgui.SameLine()
+            --if imgui.Checkbox(u8"Указать время начала МП", checkbox.donators) then
+            --end
+            
+            if checkbox.donators.v then
+               imgui.Text(u8"Укажите ники спонсоров через запятую")
+               imgui.PushItemWidth(300)
+               if imgui.InputText("##BindMpdonators", textbuffer.mpdonators) then 
+               end
+               imgui.SameLine()
+               if imgui.Button(u8"Объявить спонсоров", imgui.ImVec2(140, 25)) then
+                  if string.len(textbuffer.mpdonators.v) > 0 then
+                     sampSetChatInputEnabled(true)
+                     sampSetChatInputText("/мчат Спонсоры мероприятия: "..u8:decode(textbuffer.mpdonators.v))
+                  else
+                     sampAddChatMessage("Сперва укажите спонсоров мероприятия!", -1)
+                  end                  
                end
             end
             
@@ -5755,6 +5795,9 @@ function imgui.OnDrawFrame()
                   end
                   sampSendChat("/time")
                   sampAddChatMessage("МП нвчато!", -1)
+                  -- if checkbox.donators.v then 
+                     -- sampSendChat("/мчат Спонсоры мероприятия: "..u8:decode(textbuffer.mpdonators.v))
+                  -- end 
                   --sampSetChatInputEnabled(true)
                   --sampSetChatInputText('* Начали! Желаю удачи всем игрокам')
                else
@@ -5851,17 +5894,11 @@ function imgui.OnDrawFrame()
          elseif tabmenu.mp == 4 then
              imgui.ColorEdit4("##ColorEdit4lite", color, imgui.ColorEditFlags.NoInputs)
              imgui.SameLine()
-             imgui.Text(u8"Профиль МП: "..profilesNames[combobox.profiles.v+1])
-             
-             imgui.SameLine()
-             imgui.PushItemWidth(90)
+             imgui.PushItemWidth(120)
              imgui.Combo('##ComboChatSelect', combobox.chatselect, {u8'мчат', u8'глобальный', u8"без префикса"}, 3)
              imgui.PopItemWidth()
-             
              imgui.SameLine()
-             if imgui.TooltipButton(u8"Правила сервера", imgui.ImVec2(150, 25), u8:encode("Полный список правил сервера")) then 
-		        os.execute('explorer https://forum.sa-mp.ru/index.php?/topic/802952-%D0%BF%D1%80%D0%B0%D0%B2%D0%B8%D0%BB%D0%B0-dm-%D1%81%D0%B5%D1%80%D0%B2%D0%B5%D1%80%D0%B0/')
-		     end
+             imgui.TextColoredRGB("МП: {696969}"..profilesNames[combobox.profiles.v+1])
              
              local prefix = ""
              if combobox.chatselect.v == 0 then
@@ -5981,14 +6018,14 @@ function imgui.OnDrawFrame()
              end
              imgui.SameLine()
 	         if imgui.TooltipButton("Save", imgui.ImVec2(60, 25), u8:encode("Сохранить бинды")) then 
-               ini.binds.textbuffer1 = u8:decode(textbuffer.rule1.v)
-               ini.binds.textbuffer2 = u8:decode(textbuffer.rule2.v)
-               ini.binds.textbuffer3 = u8:decode(textbuffer.rule3.v)
-               ini.binds.textbuffer4 = u8:decode(textbuffer.rule4.v)
-               ini.binds.textbuffer5 = u8:decode(textbuffer.rule5.v)
-               ini.binds.textbuffer6 = u8:decode(textbuffer.rule6.v)
-               ini.binds.textbuffer7 = u8:decode(textbuffer.rule7.v)
-               ini.binds.textbuffer8 = u8:decode(textbuffer.rule8.v)
+               ini.binds.customrule1 = u8:decode(textbuffer.rule1.v)
+               ini.binds.customrule2 = u8:decode(textbuffer.rule2.v)
+               ini.binds.customrule3 = u8:decode(textbuffer.rule3.v)
+               ini.binds.customrule4 = u8:decode(textbuffer.rule4.v)
+               ini.binds.customrule5 = u8:decode(textbuffer.rule5.v)
+               ini.binds.customrule6 = u8:decode(textbuffer.rule6.v)
+               ini.binds.customrule7 = u8:decode(textbuffer.rule7.v)
+               ini.binds.customrule8 = u8:decode(textbuffer.rule8.v)
                save()          
                sampAddChatMessage("Бинды были успешно сохранены", -1)
              end
@@ -5996,6 +6033,7 @@ function imgui.OnDrawFrame()
              if imgui.TooltipButton(u8"Clean", imgui.ImVec2(60, 25), u8:encode("Очистить бинды")) then
                 cleanBindsForm()
              end
+             
              imgui.SameLine()
              imgui.Text("            ")
              imgui.SameLine()
@@ -6250,7 +6288,7 @@ function imgui.OnDrawFrame()
          if imgui.Button(u8"Управление МП",imgui.ImVec2(120, 25)) then tabmenu.mp = 2 end 
          --if imgui.Button(u8"Сущности рядом",imgui.ImVec2(120, 25)) then tabmenu.mp = 3 end 
          if imgui.Button(u8"Проверка игроков",imgui.ImVec2(120, 25)) then tabmenu.mp = 6 end 
-         if imgui.Button(u8"Правила",imgui.ImVec2(120, 25)) then tabmenu.mp = 4 end 
+         if imgui.Button(u8"Правила МП",imgui.ImVec2(120, 25)) then tabmenu.mp = 4 end 
          if imgui.Button(u8"Финал МП",imgui.ImVec2(120, 25)) then tabmenu.mp = 5 end 
          
          imgui.Spacing()
@@ -7392,14 +7430,14 @@ function cleanBindsForm()
 end
 
 function reloadBindsFromConfig()
-   textbuffer.rule1.v = u8(ini.binds.textbuffer1)
-   textbuffer.rule2.v = u8(ini.binds.textbuffer2)
-   textbuffer.rule3.v = u8(ini.binds.textbuffer3)
-   textbuffer.rule4.v = u8(ini.binds.textbuffer4)
-   textbuffer.rule5.v = u8(ini.binds.textbuffer5)
-   textbuffer.rule6.v = u8(ini.binds.textbuffer6)
-   textbuffer.rule7.v = u8(ini.binds.textbuffer7)
-   textbuffer.rule8.v = u8(ini.binds.textbuffer8)
+   textbuffer.rule1.v = u8(ini.binds.customrule1)
+   textbuffer.rule2.v = u8(ini.binds.customrule2)
+   textbuffer.rule3.v = u8(ini.binds.customrule3)
+   textbuffer.rule4.v = u8(ini.binds.customrule4)
+   textbuffer.rule5.v = u8(ini.binds.customrule5)
+   textbuffer.rule6.v = u8(ini.binds.customrule6)
+   textbuffer.rule7.v = u8(ini.binds.customrule7)
+   textbuffer.rule8.v = u8(ini.binds.customrule8)
 end
 
 function patch_samp_time_set(enable) -- by hnnssy and FYP
