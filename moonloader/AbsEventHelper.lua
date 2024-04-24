@@ -4,7 +4,7 @@ script_description("Assistant for mappers and event makers on Absolute Play")
 script_dependencies('imgui', 'lib.samp.events', 'vkeys')
 script_properties("work-in-pause")
 script_url("https://github.com/ins1x/AbsEventHelper")
-script_version("2.6.0 R1")
+script_version("2.6.1")
 -- script_moonloader(16) moonloader v.0.26
 
 -- Activaton: ALT + X (show main menu)
@@ -95,6 +95,7 @@ local mpStartedDTime = nil
 local mpStarted = false
 local autoAnnounce = false
 local isChatFreezed = false
+local chosenplayerMarker = nil
 
 local fps = 0
 local fps_counter = 0
@@ -243,6 +244,7 @@ local combobox = {
    profiles = imgui.ImInt(0),
    selecttable = imgui.ImInt(0),
    objects = imgui.ImInt(6),
+   weaponselect = imgui.ImInt(0),
    itemad = imgui.ImInt(0),
    sitelogsource = imgui.ImInt(0),
    logs = imgui.ImInt(0)
@@ -268,6 +270,56 @@ absServersNames = {
 profilesNames = {
    'Custom', 'Race', 'Derby', 'Survival', 'PvP', 'Death-Roof', 'TDM',
    'Hide-n-Seek', 'Quiz', 'King', 'Hunt', 'Rodeo', 'Road Rash'
+}
+
+weaponNames = {
+	[0] = 'Fists',
+	[1] = 'Brass Knuckles',
+	[2] = 'Golf Club',
+	[3] = 'Nightstick',
+	[4] = 'Knife',
+	[5] = 'Baseball Bat	',
+	[6] = 'Shovel',
+	[7] = 'Pool Cue',
+	[8] = 'Katana',
+	[9] = 'Chainsaw',
+	[10] = 'Purple Dildo',
+	[11] = 'Dildo',
+	[12] = 'Vibrator',
+	[13] = 'Silver Vibrator',
+	[14] = 'Flowers',
+	[15] = 'Cane',
+	[16] = 'Grenade',
+	[17] = 'Tear Gas',
+	[18] = 'Molotov Cocktail',
+	[19] = '##',
+	[20] = '##',
+	[21] = '##',
+	[22] = 'Pistol',
+	[23] = 'Silent Pistol',
+	[24] = 'Desert Eagle',
+	[25] = 'Shotgun',
+	[26] = 'Sawnoff Shotgun',
+	[27] = 'Combat Shotgun',
+	[28] = 'Micro SMG/Uzi',
+	[29] = 'MP5',
+	[30] = 'AK-47',
+	[31] = 'M4',
+	[32] = 'Tec-9',
+	[33] = 'Contry Riffle',
+	[34] = 'Sniper Riffle',
+	[35] = 'RPG',
+	[36] = 'HS Rocket',
+	[37] = 'Flame Thrower',
+	[38] = 'Minigun',
+	[39] = 'Satchel charge',
+	[40] = 'Detonator',
+	[41] = 'Spraycan',
+	[42] = 'Fire Extiguisher',
+	[43] = 'Camera',
+	[44] = 'Nigh Vision Goggles',
+	[45] = 'Thermal Goggles',
+	[46] = 'Parachute'
 }
 
 VehicleNames = {
@@ -3245,7 +3297,7 @@ function imgui.OnDrawFrame()
 			
 			zone = getZoneName(positionX, positionY, positionZ)
 			if zone then 
-			   imgui.Text(string.format(u8"Район: %s", zone))
+			   imgui.TextColoredRGB(string.format("Район: {696969}%s", zone))
 			   if lastWorldNumber > 0 then
 			      imgui.SameLine()
 			      imgui.Text(string.format(u8"Последний мир: №%s", lastWorldNumber))
@@ -4229,6 +4281,9 @@ function imgui.OnDrawFrame()
          end
          if imgui.Button(u8"Открыть лог чата (chatlog.txt)", imgui.ImVec2(220, 25)) then
 	        os.execute('explorer '..getFolderPath(5) ..'\\GTA San Andreas User Files\\SAMP\\chatlog.txt')
+	     end
+         if imgui.Button(u8"Время в чате", imgui.ImVec2(220, 25)) then
+            sampProcessChatInput("/timestamp")
 	     end
          
          if imgui.Checkbox(u8("Уведомлять при упоминании в чате"), checkbox.chatmentions) then
@@ -5810,6 +5865,10 @@ function imgui.OnDrawFrame()
 	        imgui.Spacing()
             
          elseif tabmenu.mp == 2 then
+            -- imgui.PushItemWidth(120)
+            -- imgui.Combo('##ComboWeaponSelect', combobox.weaponselect, weaponNames)
+            -- imgui.PopItemWidth()
+             
             imgui.Text(u8"Дать команду в чат:")
             if imgui.Button(u8"Выдаю оружие и броню!", imgui.ImVec2(220, 25)) then
                sampSetChatInputEnabled(true)
@@ -6308,7 +6367,7 @@ function imgui.OnDrawFrame()
    
    -- Child dialogs
    if dialog.fastanswer.v then
-      imgui.SetNextWindowPos(imgui.ImVec2(sizeX / 4, sizeY / 4),
+      imgui.SetNextWindowPos(imgui.ImVec2(sizeX / 24, sizeY / 4),
       imgui.Cond.FirstUseEver, imgui.ImVec2(0.5, 0.5))
       imgui.Begin(u8"Быстрые ответы", dialog.fastanswer)
        
@@ -6335,9 +6394,6 @@ function imgui.OnDrawFrame()
       end
       if imgui.Button(u8"Займи свободный транспорт", imgui.ImVec2(250, 25)) then
          sampSendChat("/лс " .. chosenplayer .. " займи свободный транспорт")
-      end
-      if imgui.Button(u8"Садись в машину", imgui.ImVec2(250, 25)) then
-         sampSendChat("/лс " .. chosenplayer .. " садись в машину")
       end
       if imgui.Button(u8"Разрешил телепорт и починку", imgui.ImVec2(250, 25)) then
          sampSendChat("/лс " .. chosenplayer .. " разрешил телепорт и починку")
@@ -6425,7 +6481,7 @@ function imgui.OnDrawFrame()
 	  imgui.TextColoredRGB(string.format("Дистанция: %.1f m.", distance))
 	  
 	  if zone then 
-	     imgui.Text(string.format(u8"Район: %s", zone))
+	     imgui.TextColoredRGB(string.format("Район: {696969}%s", zone))
 	  end
 	  
       if imgui.Button(u8"статистика", imgui.ImVec2(150, 25)) then
@@ -6475,9 +6531,26 @@ function imgui.OnDrawFrame()
           dialog.fastanswer.v = not dialog.fastanswer.v
        end
 	   
-	  imgui.End()
+       if imgui.Button(u8"метка на игрока", imgui.ImVec2(150, 25)) then
+          if chosenplayerMarker ~= nil then
+             removeBlip(chosenplayerMarker)
+             chosenplayerMarker = nil
+             sampAddChatMessage("Метка удалена с игрока",-1)
+          else
+             for k, v in ipairs(getAllChars()) do
+                local res, id = sampGetPlayerIdByCharHandle(v)
+                if res then
+                   if id == chosenplayer then
+                      chosenplayerMarker = addBlipForChar(v)
+                      sampAddChatMessage("Метка установлена на игрока",-1)
+                   end
+                end
+             end
+          end
+       end
+	   
+	   imgui.End()
    end
-   
    
    if dialog.vehstat.v then
       imgui.SetNextWindowPos(imgui.ImVec2(sizeX / 1.25, sizeY / 4),
@@ -6865,10 +6938,11 @@ function sampev.onServerMessage(color, text)
     
    if checkbox.chatmentions.v then
       -- mentions by nickname
-      if text:find(nickname) then
+      if text:find(nickname) and color ~= -1029514497 then
          if text:find(":") then
             local pointpos = text:find(":")
             local cleartext = text:sub(pointpos, string.len(text))
+             --print(color, text)
             if cleartext:find(nickname) then
                printStyledString('You were mentioned in the chat', 2000, 4)
                addOneOffSound(0.0, 0.0, 0.0, 1138) -- CHECKPOINT_GREEN
@@ -6887,6 +6961,7 @@ function sampev.onServerMessage(color, text)
          addOneOffSound(0.0, 0.0, 0.0, 1138) -- CHECKPOINT_GREEN
          return true
       end
+      
    end
    
    if text:find('Добро пожаловать на Arizona Role Play!') then
@@ -7364,7 +7439,7 @@ function Restream()
    else
       setCharCoordinates(PLAYER_PED, tpcpos.x, tpcpos.y, tpcpos.z)
    end
-   sampAddChatMessage('рестрим завершен', -1)
+   sampAddChatMessage('Рестрим завершен', -1)
    end)
 end
 
@@ -7460,21 +7535,10 @@ function setWeather(weatherId)
     memory.write(0xC81320, weatherId, 2, false)
 end
 
--- https://www.blast.hk/threads/13380/post-1110222
 function getMDO(id_obj) -- by Gorskin 
-   -- print(memory.getfloat(getMDO(objectid), true))
    local mem_obj = callFunction(4210080, 1, 1, id_obj)
    return mem_obj + 24
 end
-
--- https://www.blast.hk/threads/13380/post-376878
--- ampRegisterChatCommand("editobject", function(param)  editObjectBySampId(tonumber(param), false)
--- function editObjectBySampId(id, playerobj) 
-   -- if isSampAvailable() then
-   -- local ffi = require("ffi")
-      -- ffi.cast("void (__thiscall*)(unsigned long, short int, unsigned long)", sampGetBase() + 0x6DE40)(readMemory(sampGetBase() + 0x21A0C4, 4), id, playerobj and 1 or 0)
-   -- end
--- end
 
 function cyrillic(text)
       local convtbl = {[230]=155,[231]=159,[247]=164,[234]=107,[250]=144,[251]=168,[254]=171,[253]=170,[255]=172,[224]=97,[240]=112,[241]=99,[226]=162,[228]=154,[225]=151,[227]=153,[248]=165,[243]=121,[184]=101,[235]=158,[238]=111,[245]=120,[233]=157,[242]=166,[239]=163,[244]=63,[237]=174,[229]=101,[246]=36,[236]=175,[232]=156,[249]=161,[252]=169,[215]=141,[202]=75,[204]=77,[220]=146,[221]=147,[222]=148,[192]=65,[193]=128,[209]=67,[194]=139,[195]=130,[197]=69,[206]=79,[213]=88,[168]=69,[223]=149,[207]=140,[203]=135,[201]=133,[199]=136,[196]=131,[208]=80,[200]=133,[198]=132,[210]=143,[211]=89,[216]=142,[212]=129,[214]=137,[205]=72,[217]=138,[218]=167,[219]=145}
