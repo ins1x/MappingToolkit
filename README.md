@@ -10,7 +10,7 @@
 Lua script Assistant for mappers and event makers on [Absolute Play](https://sa-mp.ru/) servers.   
 The main task of this script - is make the mapping process in the in-game map editor as pleasant  
 as possible, and to give more opportunities to event organizers.  
-Find more about mapping on server at [forum.gta-samp.ru](https://forum.gta-samp.ru/index.php?/topic/1016832-%D0%BC%D0%B8%D1%80%D1%8B-%D0%BE%D0%BF%D0%B8%D1%81%D0%B0%D0%BD%D0%B8%D0%B5-%D1%80%D0%B0%D0%B1%D0%BE%D1%82%D1%8B-%D1%80%D0%B5%D0%B4%D0%B0%D0%BA%D1%82%D0%BE%D1%80%D0%B0-%D0%BA%D0%B0%D1%80%D1%82/).  
+Find more about mapping on server at wiki https://github.com/ins1x/AbsEventHelper/wiki.  
 The following description is in Russian, because it is the main language of the user base.   
 
 #### RUS
@@ -18,7 +18,7 @@ LUA ассистент для мапперов и организаторов м�
 Основная задача данного скрипта - сделать процесс маппинга в внутриигровом редакторе карт максимально приятным, и дать больше возможностей организаторам мероприятий. 
 
 Скрипт дополняет возможности редактора карт и дает множество новых функций. Потенциально читерские возможности не используются - это не мультичит!   
-Больше информации по маппингу и редактору карт на сервере [forum.gta-samp.ru](https://forum.gta-samp.ru/index.php?/topic/1016832-%D0%BC%D0%B8%D1%80%D1%8B-%D0%BE%D0%BF%D0%B8%D1%81%D0%B0%D0%BD%D0%B8%D0%B5-%D1%80%D0%B0%D0%B1%D0%BE%D1%82%D1%8B-%D1%80%D0%B5%D0%B4%D0%B0%D0%BA%D1%82%D0%BE%D1%80%D0%B0-%D0%BA%D0%B0%D1%80%D1%82/).   
+Больше информации по маппингу и редактору карт в wiki https://github.com/ins1x/AbsEventHelper/wiki.   
 
 > Рекомендуется использовать совместно с [AbsoluteFix](https://github.com/ins1x/useful-samp-stuff/tree/main/luascripts/absolutefix)
 
@@ -135,4 +135,5 @@ LUA ассистент для мапперов и организаторов м�
 
 blasthk: https://www.blast.hk/threads/200619/  
 git: https://github.com/ins1x/AbsEventHelper/  
-forum: https://forum.gta-samp.ru/index.php?/topic/1101593-absolute-event-helper/  
+forum: https://forum.gta-samp.ru/index.php?/topic/1101593-absolute-event-helper/ 
+wiki: https://github.com/ins1x/AbsEventHelper/wiki
