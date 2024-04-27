@@ -4,7 +4,7 @@ script_description("Assistant for mappers and event makers on Absolute Play")
 script_dependencies('imgui', 'lib.samp.events', 'vkeys')
 script_properties("work-in-pause")
 script_url("https://github.com/ins1x/AbsEventHelper")
-script_version("2.6.1")
+script_version("2.6.2")
 -- script_moonloader(16) moonloader v.0.26
 
 -- Activaton: ALT + X (show main menu)
@@ -95,6 +95,7 @@ local mpStartedDTime = nil
 local mpStarted = false
 local autoAnnounce = false
 local isChatFreezed = false
+local isWarningsActive = false
 local chosenplayerMarker = nil
 
 local fps = 0
@@ -111,6 +112,7 @@ vehiclesTotal = 0
 playersTotal = 0
 streamedObjects = 0 
 
+local legalweapons = {0, 1}
 local fixcam = {x = 0.0, y = 0.0, z = 0.0}
 local tpcpos = {x = 0.0, y = 0.0, z = 0.0}
 local tpc = { 
@@ -172,8 +174,18 @@ local checkbox = {
    healthcheck = imgui.ImBool(false),
    donators = imgui.ImBool(false),
    freezechat = imgui.ImBool(false),
+   playerwarnings = imgui.ImBool(false),
    chatmentions = imgui.ImBool(ini.settings.chatmentions),
    test = imgui.ImBool(false)
+}
+
+local warnings = {
+   undermap = true,
+   hprefill = true,
+   laggers = true,
+   afk = true,
+   illegalweapons = true,
+   heavyweapons = true
 }
 
 local input = {
@@ -2927,11 +2939,18 @@ function commandparser(args)
 			   return
 	        end
             if cmd:find("recon") then
-               Recon()
+               Recon(5000)
 			   return
 	        end
             if cmd:find("restream") then
                Restream()
+			   return
+	        end
+            if cmd:find("warnings") then
+               isWarningsActive = not isWarningsActive
+               if isWarningsActive then
+                  PlayerWarnings()
+               end
 			   return
 	        end
 	        if cmd:find("help") then
@@ -4262,7 +4281,7 @@ function imgui.OnDrawFrame()
 	     
 		 imgui.SameLine()
 		 if imgui.Button(u8"Реконнект (5 сек)", imgui.ImVec2(150, 25)) then
-		    Recon()
+		    Recon(5000)
 	     end
 		 
          if imgui.Checkbox(u8("Выгружать скрипт на других серверах"), checkbox.noabsunload) then
@@ -5617,8 +5636,8 @@ function imgui.OnDrawFrame()
          local servername = sampGetCurrentServerName()
          
          imgui.TextColoredRGB("Сервер: {007DFF}" .. servername)
-         imgui.SameLine()
-         imgui.TextColoredRGB("IP:  {686868}" .. tostring(ip) ..":".. tostring(port))
+         --imgui.SameLine()
+         --imgui.TextColoredRGB("IP:  {686868}" .. tostring(ip) ..":".. tostring(port))
          imgui.TextColoredRGB("Дата: {686868}" .. os.date('%d.%m.%Y %X'))
          if mpStartedDTime ~= nil then
             imgui.TextColoredRGB("Началось МП в {686868}" .. mpStartedDTime)
@@ -5627,13 +5646,13 @@ function imgui.OnDrawFrame()
          
          if tabmenu.mp == 1 then
             if combobox.profiles.v ~= 0 then
-               imgui.Text(u8"Выбрано мероприятие: ")
+               imgui.Text(u8" Выбрано мероприятие: ")
             else
                imgui.Text(u8"Выберите мероприятие: ")
             end
             
 	        imgui.SameLine()
-	        imgui.PushItemWidth(100)
+	        imgui.PushItemWidth(140)
 	        if imgui.Combo(u8'##ComboBoxProfiles', combobox.profiles, profilesNames, #profilesNames) then
                if combobox.profiles.v then cleanBindsForm() end
                if combobox.profiles.v == 0 then
@@ -5865,10 +5884,45 @@ function imgui.OnDrawFrame()
 	        imgui.Spacing()
             
          elseif tabmenu.mp == 2 then
-            -- imgui.PushItemWidth(120)
-            -- imgui.Combo('##ComboWeaponSelect', combobox.weaponselect, weaponNames)
-            -- imgui.PopItemWidth()
-             
+            imgui.Text(u8"Разрешенное оружие: ")
+            if #legalweapons > 2 then
+               for k, v in pairs(legalweapons) do
+                  if v > 1 then
+                     imgui.SameLine()
+                     imgui.Text(""..weaponNames[v]) 
+                  end
+               end
+            end
+            imgui.PushItemWidth(150)
+            imgui.Combo('##ComboWeaponSelect', combobox.weaponselect, weaponNames)
+            imgui.PopItemWidth()
+            imgui.SameLine()
+            if imgui.TooltipButton(u8"Добавить", imgui.ImVec2(70, 25), u8"Добавить в список разрешенных на МП") then
+               if combobox.weaponselect.v == 1 or combobox.weaponselect.v == 0 then
+                  sampAddChatMessage("Кулаки разрешены по-умолчанию", -1)
+               elseif legalweapons[#legalweapons] == combobox.weaponselect.v then
+                  sampAddChatMessage(string.format("Это оружие %s уже было добавлено в список разрешенных на МП",
+                  weaponNames[combobox.weaponselect.v]),-1)
+               elseif combobox.weaponselect.v == 19 or combobox.weaponselect.v == 20
+               or combobox.weaponselect.v == 21 then
+                  sampAddChatMessage("Пустой слот не может быть добавлен", -1)
+               else
+                 legalweapons[#legalweapons+1] = combobox.weaponselect.v
+                 sampAddChatMessage(string.format("Оружие %s добавлено в список разрешенных на МП",
+                 weaponNames[combobox.weaponselect.v]), -1)
+               end
+            end
+            imgui.SameLine()
+            if imgui.TooltipButton(u8"Удалить", imgui.ImVec2(70, 25), u8"Удалить последнее выбранное оружие со списка разрешенных на МП") then
+               legalweapons[#legalweapons] = nil
+               sampAddChatMessage("Удалено последнее выбранное оружие со списка разрешенных", -1)
+            end
+            imgui.SameLine()
+            if imgui.TooltipButton(u8"Очистить", imgui.ImVec2(70, 25), u8"Очистить список разрешенного на МП оружия") then
+               legalweapons = {0, 1}
+               sampAddChatMessage("Список разрешенного на МП оружия обнулен", -1)
+            end
+            
             imgui.Text(u8"Дать команду в чат:")
             if imgui.Button(u8"Выдаю оружие и броню!", imgui.ImVec2(220, 25)) then
                sampSetChatInputEnabled(true)
@@ -6197,6 +6251,17 @@ function imgui.OnDrawFrame()
 	 	       end
 	        end
 	        
+            if imgui.Checkbox(u8("Предупреждения на подозрительных игроков"), checkbox.playerwarnings) then
+	   	       if checkbox.playerwarnings.v then
+	 	     	  sampAddChatMessage("Предупреждения включены", -1)
+                  isWarningsActive = true
+                  PlayerWarnings()
+	 	       else
+	 	     	  sampAddChatMessage("Предупреждения отключены", -1)
+                  isWarningsActive = false
+	 	       end
+	        end
+            
 	        -- if imgui.Checkbox(u8("Уведомлять о пополнении хп игроком"), checkbox.healthcheck) then
                -- sampAddChatMessage("Недоступно в бета версии", -1)
             -- end
@@ -6278,15 +6343,15 @@ function imgui.OnDrawFrame()
 	 	       else
 	              for k, v in pairs(playersTable) do
                      local nickname = sampGetPlayerNickname(v)
-	 	            if sampIsPlayerPaused(v) then
-	 	     	      counter = counter + 1
+	 	             if sampIsPlayerPaused(v) then
+	 	     	        counter = counter + 1
 	                    sampAddChatMessage(string.format("AFK %s(%i)", nickname, v), 0xFF0000)
 	                 end
-	 	         end
-	 	         if counter == 0 then
-	 	            sampAddChatMessage("АФКашники не найдены", -1)
-	 	         end
-	 	      end
+	 	          end
+	 	          if counter == 0 then
+	 	             sampAddChatMessage("АФКашники не найдены", -1)
+	 	          end
+	 	       end
 	        end
             
             if imgui.Button(u8"Статистика онлайна", imgui.ImVec2(220, 25)) then
@@ -6328,7 +6393,7 @@ function imgui.OnDrawFrame()
                      local weaponid = getCurrentCharWeapon(v)
                      if weaponid ~= 0 and weaponid ~= 1 then
                         armedplayerscounter = armedplayerscounter + 1
-                        sampAddChatMessage(string.format("{FF0000}Игрок %s[%d] с оружием (%d)!", nick, id, weaponid), -1)
+                        sampAddChatMessage(string.format("{FF0000}Игрок %s[%d] с оружием %s (id:%d)!", nick, id, weaponNames[weaponid], weaponid), -1)
                      end
                   end
                end
@@ -6336,6 +6401,47 @@ function imgui.OnDrawFrame()
                   sampAddChatMessage("Не найдено игроков с оружием", -1)
                else
                   sampAddChatMessage("Всего игроков с оружием: "..armedplayerscounter, -1)
+               end
+            end
+            
+            if imgui.Button(u8"Игроки с NonRP никами", imgui.ImVec2(220, 25)) then
+               local nonrp = 0
+               for i = 0, sampGetMaxPlayerId(false) do
+                  if sampIsPlayerConnected(i) then 
+		             local nickname = sampGetPlayerNickname(i)
+                     if not nickname:find("_") then
+                        nonrp = nonrp + 1
+                        sampAddChatMessage(string.format("{FF0000}Игрок %s[%d] с NonRP ником", nickname, i), -1)
+                     end
+                  end 
+               end
+               if nonrp == 0 then
+                  sampAddChatMessage("Не найдено игроков с оружием", -1)
+               else
+                  sampAddChatMessage("Всего игроков с оружием: "..nonrp, -1)
+               end
+            end
+            imgui.SameLine()
+            if imgui.Button(u8"Игроки с малым уровнем", imgui.ImVec2(220, 25)) then
+               local minscore = 5
+               local noobs = 0
+
+               for i = 0, sampGetMaxPlayerId(false) do
+                  if sampIsPlayerConnected(i) then 
+		             local nickname = sampGetPlayerNickname(i)
+                     local score = sampGetPlayerScore(i)
+                     
+                     if score < minscore then
+                        noobs = noobs + 1
+                        sampAddChatMessage(string.format("{FF0000}Игрок %s[%d] с малым уровнем %d", nickname, i, score), -1)
+                     end
+                  end
+                  
+                  if noobs == 0 then
+                     sampAddChatMessage("Не найдено игроков с оружием", -1)
+                  else
+                     sampAddChatMessage("Всего игроков с оружием: "..noobs, -1)
+                  end
                end
             end
             
@@ -6956,8 +7062,9 @@ function sampev.onServerMessage(color, text)
       end
       
       -- mentions by id
-      if text:find(id) and text:match("(%d+)(%d+)%s") then
+      if text:match("(%s"..id.."%s)") then
          printStyledString('You were mentioned in the chat', 2000, 4)
+         print(color, text, "id")
          addOneOffSound(0.0, 0.0, 0.0, 1138) -- CHECKPOINT_GREEN
          return true
       end
@@ -7008,6 +7115,31 @@ function sampev.onServerMessage(color, text)
 end
 
 function sampev.onSendCommand(command)
+    -- tips for those who are used to using Texture Studio syntax
+   if isAbsolutePlay then
+      if command:find("texture") then
+         sampAddChatMessage("Для ретекстура используйте:", 0x000FF00)
+         sampAddChatMessage("N - Редактировать объект - Выделить объект - Перекарсить объект", 0x000FF00)
+         return false
+      end
+      if command:find("edit") then
+         sampAddChatMessage("Для редактирования используйте:", 0x000FF00)
+         sampAddChatMessage("N - Редактировать объект", 0x000FF00)
+         return false
+      end
+   end
+   
+   if isAbsolutePlay then
+      if command:find("vfibye2") or command:find("машину2") then 
+         isTexturesListOpened = false
+         isSanpObjectsListOpened = false
+      end
+   end
+   
+   if command:find("ds[jl") or command:find("exit") or command:find("выход") then
+	  lastWorldNumber = 0
+   end
+      
    if command:find('(.+) (.+)') then
       local cmd, arg = command:match('(.+) (.+)')
       
@@ -7019,15 +7151,6 @@ function sampev.onSendCommand(command)
 		       lastWorldNumber = id
 			end
 	     end
-	  end
-	  
-      if cmd:find("vfibye2") or cmd:find("машину2") then 
-         isTexturesListOpened = false
-         isSanpObjectsListOpened = false
-      end
-      
-	  if cmd:find("ds[jl") or cmd:find("exit") or cmd:find("выход") then
-		 lastWorldNumber = 0
 	  end
    end
    
@@ -7407,18 +7530,80 @@ function AutoAd()
    lua_thread.create(function()
    while autoAnnounce do
       wait(1000*60)
-      sampAddChatMessage(" "..u8:decode(textbuffer.mpname.v)..", приз "..u8:decode(textbuffer.mpprize.v), -1)
-      --sampSendChat("/об "..u8:decode(textbuffer.mpname.v)..", приз "..u8:decode(textbuffer.mpprize.v), -1)
+      --sampAddChatMessage(" "..u8:decode(textbuffer.mpname.v)..", приз "..u8:decode(textbuffer.mpprize.v), -1)
+      sampSendChat("/об "..u8:decode(textbuffer.mpname.v)..", приз "..u8:decode(textbuffer.mpprize.v), -1)
    end   
    end)
 end
 
-function Recon()
+function Recon(delay)
    lua_thread.create(function()
    sampDisconnectWithReason(quit)
-   wait(5000)
+   wait(delay)
    local ip, port = sampGetCurrentServerAddress()
    sampConnectToServer(ip, port) 
+   end)
+end
+
+function PlayerWarnings()
+   lua_thread.create(function()
+   while isWarningsActive do
+      wait(1000*30)
+      for k, v in ipairs(getAllChars()) do
+         local res, id = sampGetPlayerIdByCharHandle(v)
+         if res then
+            local nickname = sampGetPlayerNickname(id)
+            local weaponid = getCurrentCharWeapon(v)
+            local px, py, pz = getCharCoordinates(v)
+            local health = sampGetPlayerHealth(v)
+            local armor = sampGetPlayerArmor(v)
+            local ping = sampGetPlayerPing(v)
+            local afk = sampIsPlayerPaused(v)
+            
+            if warnings.undermap then
+               if pz < 0.5 then
+                  sampAddChatMessage(string.format("{FF0000}Игрок %s[%d] возможно находится под картой",
+                  nickname, id), -1)
+               elseif pz > 1000.0 then
+                  sampAddChatMessage(string.format("{FF0000}Игрок %s[%d] длит в небе (высота: %d)",
+                  nickname, id, pz), -1)
+               end
+            end
+            
+            if warnings.heavyweapons then
+               if weaponid == 38 or weaponid == 35 or weaponid == 36 then
+                  sampAddChatMessage(string.format("{FF0000}Игрок %s[%d] держит в руках тяжелое оружие! (%s [%d])",
+                  nickname, id, weaponNames[weaponid], weaponid), -1)
+               end
+            end
+            
+            -- if warnings.illegalweapons then
+               -- --print(weaponid)
+               -- for key, value in pairs(legalweapons) do
+                  -- if value ~= weaponid then
+                     -- sampAddChatMessage(string.format("{FF0000}Игрок %s[%d] держит в руках нелегальное оружие! (%s [%d])",
+                     -- nickname, id, weaponNames[weaponid], weaponid), -1)
+                     -- break
+                  -- end
+               -- end
+            -- end
+            
+            if warnings.laggers then
+               if ping > 100 then
+                  sampAddChatMessage(string.format("{FF0000}Игрок %s[%d] лагер! (ping %d)",
+                  nickname, id, ping), -1)
+               end
+            end
+            
+            if warnings.afk then
+               if afk then
+                  sampAddChatMessage(string.format("{FF0000}Игрок %s[%d] в AFK",
+                  nickname, id), -1)
+               end
+            end
+         end
+      end
+   end   
    end)
 end
 
