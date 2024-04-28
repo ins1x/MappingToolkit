@@ -1,10 +1,10 @@
 script_author("1NS")
 script_name("Absolute Events Helper")
 script_description("Assistant for mappers and event makers on Absolute Play")
-script_dependencies('imgui', 'lib.samp.events', 'vkeys')
+script_dependencies('imgui', 'lib.samp.events')
 script_properties("work-in-pause")
 script_url("https://github.com/ins1x/AbsEventHelper")
-script_version("2.6.2")
+script_version("2.6.3")
 -- script_moonloader(16) moonloader v.0.26
 
 -- Activaton: ALT + X (show main menu)
@@ -12,7 +12,6 @@ script_version("2.6.2")
 -- Blast.hk thread: https://www.blast.hk/threads/200619/
 
 require 'lib.moonloader'
-local keys = require 'vkeys'
 local sampev = require 'lib.samp.events'
 local imgui = require 'imgui'
 local memory = require 'memory'
@@ -33,6 +32,7 @@ local ini = inicfg.load({
       usecustomcamdist = false,
 	  showobjectrot = false,
       chatmentions = false,
+      debug = false,
       drawdist = "450",
       fog = "200",
 	  camdist = "1",
@@ -3037,7 +3037,7 @@ function main()
 	  end
 	  
       -- Hide dialogs on ESC
-      if isKeyJustPressed(VK_ESCAPE) and not sampIsChatInputActive() 
+      if isKeyJustPressed(0x1B) and not sampIsChatInputActive() 
       and not sampIsDialogActive() and not isPauseMenuActive() 
       and not isSampfuncsConsoleActive() then 
          if dialog.main.v then dialog.main.v = false end
@@ -3050,7 +3050,7 @@ function main()
       end 
       
 	  -- In onSendEditObject copy object modelid on RMB
-	  if isKeyJustPressed(VK_RBUTTON) and currentEditmode == 2 and not sampIsChatInputActive() 
+	  if isKeyJustPressed(0x02) and currentEditmode == 2 and not sampIsChatInputActive() 
       and not sampIsDialogActive() and not isPauseMenuActive() 
       and not isSampfuncsConsoleActive() then 
 	     setClipboardText(LastObjectData.modelid)
@@ -3058,7 +3058,7 @@ function main()
 	  end
 	  
 	  -- hide edited object on hold ALT key
-      if isKeyDown(VK_MENU) and currentEditmode > 0 and not sampIsChatInputActive() 
+      if isKeyDown(0x12) and currentEditmode > 0 and not sampIsChatInputActive() 
       and not sampIsDialogActive() and not isPauseMenuActive() 
       and not isSampfuncsConsoleActive() then
 	     hideEditObject = true
@@ -3067,7 +3067,7 @@ function main()
 	  end
 	  
 	  -- upscale edited object on hold CTRL key
-	  if isKeyDown(VK_CONTROL) and currentEditmode > 0 and not sampIsChatInputActive() 
+	  if isKeyDown(0x11) and currentEditmode > 0 and not sampIsChatInputActive() 
       and not sampIsDialogActive() and not isPauseMenuActive() 
       and not isSampfuncsConsoleActive() then
 	     scaleEditObject = true
@@ -3075,7 +3075,7 @@ function main()
 		 scaleEditObject = false
 	  end
 	  
-	  -- if isKeyJustPressed(VK_N) and not sampIsChatInputActive() 
+	  -- if isKeyJustPressed(0x4E) and not sampIsChatInputActive() 
       -- and not sampIsDialogActive() and not isPauseMenuActive() 
       -- and not isSampfuncsConsoleActive() then 
 	     -- if LastObjectData.handle then
@@ -3085,14 +3085,14 @@ function main()
 	  --end
 	 
       -- ALT+X (Main menu activation)
-      if isKeyDown(VK_MENU) and isKeyJustPressed(VK_X) 
+      if isKeyDown(0x12) and isKeyJustPressed(0x58) 
 	  and not sampIsChatInputActive() and not sampIsDialogActive()
 	  and not isPauseMenuActive() and not isSampfuncsConsoleActive() then 
          dialog.main.v = not dialog.main.v 
       end
       
       -- CTRL+O (Objects render activation)
-      if isKeyDown(VK_CONTROL) and isKeyJustPressed(VK_O)
+      if isKeyDown(0x11) and isKeyJustPressed(0x4F)
 	  and not sampIsChatInputActive() and not isPauseMenuActive()
 	  and not isSampfuncsConsoleActive() then 
          checkbox.showobjects.v= not checkbox.showobjects.v
@@ -3100,22 +3100,22 @@ function main()
       
 	  if not isAbsfixInstalled then
 	     -- Switching textdraws with arrow buttons, mouse buttons, pgup-pgdown keys
-	     if isKeyJustPressed(VK_LEFT) or isKeyJustPressed(VK_XBUTTON1) 
-		 or isKeyJustPressed(VK_PRIOR) and sampIsCursorActive() 
+	     if isKeyJustPressed(0x25) or isKeyJustPressed(0x05) 
+		 or isKeyJustPressed(0x21) and sampIsCursorActive() 
 		 and not sampIsChatInputActive() and not sampIsDialogActive() 
 		 and not isPauseMenuActive() and not isSampfuncsConsoleActive() then
 		    sampSendClickTextdraw(36)
 		 end
 	  
-	     if isKeyJustPressed(VK_RIGHT) or isKeyJustPressed(VK_XBUTTON2) 
-		 or isKeyJustPressed(VK_NEXT) and sampIsCursorActive()
+	     if isKeyJustPressed(0x27) or isKeyJustPressed(0x05) 
+		 or isKeyJustPressed(0x22) and sampIsCursorActive()
 		 and not sampIsChatInputActive() and not sampIsDialogActive()
 		 and not isPauseMenuActive() and not isSampfuncsConsoleActive() then 
 		    sampSendClickTextdraw(37)
 		 end
 	  end
 	  
-      if isKeyJustPressed(VK_K) and not sampIsChatInputActive() and not sampIsDialogActive()
+      if isKeyJustPressed(0x4B) and not sampIsChatInputActive() and not sampIsDialogActive()
 	  and not isPauseMenuActive() and not isSampfuncsConsoleActive() then 
          isTexturesListOpened = false
          isSanpObjectsListOpened = false
@@ -3254,7 +3254,7 @@ function imgui.OnDrawFrame()
       --imgui.TextColoredRGB("{424242}( ? )")
       imgui.TextQuestion("( ? )", u8"О скрипте")
       if imgui.IsItemClicked() then 
-         tabmenu.main = 4
+         tabmenu.main = 3
          tabmenu.info = 1
       end
       imgui.Columns(1)
@@ -3471,16 +3471,7 @@ function imgui.OnDrawFrame()
                      else
                         prepareTeleport = false
                         sampAddChatMessage("Координаты не были сохранены", 0x0FFFFFF)
-				     end
-                     
-		          --else
-					 --if isCharOnFoot(PLAYER_PED) and tpcpos.x then
-					    --tpc.private.x, tpc.private.y, tpc.private.z = tpcpos.x, tpcpos.y, tpcpos.z;
-                        --tpc.public.x, tpc.public.y, tpc.public.z = tpcpos.x, tpcpos.y, tpcpos.z;
-					    --setCharCoordinates(PLAYER_PED, tpcpos.x, tpcpos.y, tpcpos.z)
-					    --sampAddChatMessage(string.format("Телепорт на координаты: %.1f %.1f %.1f",
-                        --tpcpos.x, tpcpos.y, tpcpos.z), 0x0FFFFFF)
-					 --end   
+				     end  
 		          end
                end
 			   
@@ -3488,14 +3479,15 @@ function imgui.OnDrawFrame()
 			
 			imgui.Spacing()
 			imgui.Text(isPlayerSpectating and u8('В наблюдении: Да') or u8('В наблюдении: Нет'))
-            --imgui.SameLine()
+            
 			if imgui.Button(u8'Выйти из спектатора', imgui.ImVec2(200, 25)) then
 		       if isAbsolutePlay then
 			      if isPlayerSpectating then 
-			         setVirtualKeyDown(VK_RETURN, true)
+			         setVirtualKeyDown(0x0D, true)
 			      end
-			   end
-               sampSendChat("/spec")
+			   else
+                  sampSendChat("/spec")
+               end
             end
             
             imgui.SameLine()
@@ -3940,40 +3932,28 @@ function imgui.OnDrawFrame()
             memory.setfloat(13210352, ini.settings.fog, true)
          end
 		 
-		 if imgui.Checkbox(u8'Vehicle LODs', checkbox.vehloads) then
-		    if checkbox.vehloads.v then
-			   memory.write(5425646, 1, 1, false)
-			else
-			   memory.write(5425646, 0, 1, false)
-			end
-		 end
-		 imgui.SameLine()
-         imgui.TextQuestion("( ? )", u8"Отображение лодов транспорта")
-		 
-	     if imgui.Button(u8(hide3dtexts and 'Показать' or 'Скрыть')..u8" 3D тексты", 
-         imgui.ImVec2(250, 25)) then
+         imgui.Spacing()
+         imgui.Spacing()
+         if imgui.TooltipButton(u8(hide3dtexts and 'Показать' or 'Скрыть')..u8" 3D тексты",
+         imgui.ImVec2(200, 25), u8:encode("Скрывает 3d тексты из стрима (для скринов)")) then
             hide3dtexts = not hide3dtexts
 		    sampAddChatMessage("Изменения видны после респавна либо обновления зоны стрима", -1)
          end
-	     imgui.SameLine()
-         imgui.TextQuestion("( ? )", u8"Скрывает 3d тексты из стрима (для скринов)")
 		 
-	     if imgui.Button(u8(nameTag and 'Скрыть' or 'Показать')..u8" NameTags", 
-         imgui.ImVec2(250, 25)) then
+         if imgui.TooltipButton(u8(nameTag and 'Показать' or 'Скрыть')..u8" NameTags",
+         imgui.ImVec2(200, 25), u8:encode("Скрывает никнейм и информацию над игроком (nameTag)")) then
             if nameTag then
                nameTagOff()
             else
                nameTagOn()
             end
          end
-		 imgui.SameLine()
-         imgui.TextQuestion("( ? )", u8"Скрывает никнейм и информацию над игроком (nameTag)")
 		 
-         if imgui.Button(u8"Рестрим", imgui.ImVec2(250, 25)) then
+         if imgui.TooltipButton(u8"Рестрим", imgui.ImVec2(200, 25),
+         u8:encode("Обновить зону стрима путем выхода из зоны стрима, и возврата через 5 сек")) then
             Restream()
 		 end
-		 imgui.SameLine()
-         imgui.TextQuestion("( ? )", u8"Обновить зону стрима путем выхода из зоны стрима, и возврата через 5 сек")
+         
 		 imgui.Spacing()
 		 
 	  elseif tabmenu.settings == 5 then
@@ -4231,6 +4211,16 @@ function imgui.OnDrawFrame()
 		 imgui.SameLine()
          imgui.TextQuestion("( ? )", u8"Отключает все эффекты накладываемые игрой под водой")
          
+         if imgui.Checkbox(u8'Vehicle LODs', checkbox.vehloads) then
+		    if checkbox.vehloads.v then
+			   memory.write(5425646, 1, 1, false)
+			else
+			   memory.write(5425646, 0, 1, false)
+			end
+		 end
+		 imgui.SameLine()
+         imgui.TextQuestion("( ? )", u8"Отображение лодов транспорта")
+         
 		 imgui.Spacing()
 	  elseif tabmenu.settings == 7 then
 	     
@@ -4238,8 +4228,9 @@ function imgui.OnDrawFrame()
 		 local score = sampGetPlayerScore(id)
 		 local ip, port = sampGetCurrentServerAddress()
          
-	     imgui.Text(u8'Ваш текущий Gamestate: '..gamestates[sampGetGamestate() + 1])
-		 imgui.PushItemWidth(200)
+	     imgui.Text(u8'Текущий Gamestate: '..gamestates[sampGetGamestate() + 1])
+		 imgui.PushItemWidth(120)
+         imgui.SameLine()
 		 imgui.Combo(u8'##Gamestates', gamestate, gamestates)
 		 imgui.SameLine()
 		 if imgui.Button(u8'Сменить') then
@@ -4283,16 +4274,6 @@ function imgui.OnDrawFrame()
 		 if imgui.Button(u8"Реконнект (5 сек)", imgui.ImVec2(150, 25)) then
 		    Recon(5000)
 	     end
-		 
-         if imgui.Checkbox(u8("Выгружать скрипт на других серверах"), checkbox.noabsunload) then
-            if checkbox.noabsunload.v then
-               ini.settings.noabsunload = not ini.settings.noabsunload
-               save()
-            end
-         end
-         imgui.SameLine()
-         imgui.TextQuestion("( ? )", u8"Выгружает скрипт при подключении не на Absolute Play")
-	     imgui.Spacing()
          
       elseif tabmenu.settings == 8 then
          if imgui.Button(u8"Очистить чат (Для себя)", imgui.ImVec2(220, 25)) then
@@ -4327,7 +4308,9 @@ function imgui.OnDrawFrame()
 	  if imgui.Button(u8"Погода",imgui.ImVec2(150, 25)) then tabmenu.settings = 5 end 
 	  if imgui.Button(u8"Эффекты",imgui.ImVec2(150, 25)) then tabmenu.settings = 6 end 
 	  if imgui.Button(u8"Чатик",imgui.ImVec2(150, 25)) then tabmenu.settings = 8 end 
-	  if imgui.Button(u8"Прочее",imgui.ImVec2(150, 25)) then tabmenu.settings = 7 end 
+      if ini.settings.debug then
+	     if imgui.Button(u8"Прочее",imgui.ImVec2(150, 25)) then tabmenu.settings = 7 end 
+      end
 	  
       imgui.Spacing()
       imgui.Columns(1)
@@ -4681,11 +4664,23 @@ function imgui.OnDrawFrame()
 		 imgui.SameLine()
 		 imgui.Link("https://www.youtube.com/@1nsanemapping", "1nsanemapping")
 		 
+         imgui.Spacing()
+         imgui.Spacing()
+         imgui.Spacing()
+         
 		 if imgui.Button(u8"Check updates",imgui.ImVec2(150, 25)) then
 		    os.execute('explorer https://github.com/ins1x/AbsEventHelper/releases')
 		 end
+         imgui.SameLine()
+         if imgui.Checkbox(u8("Выгружать скрипт на других серверах"), checkbox.noabsunload) then
+            if checkbox.noabsunload.v then
+               ini.settings.noabsunload = not ini.settings.noabsunload
+               save()
+            end
+         end
+         imgui.SameLine()
+         imgui.TextQuestion("( ? )", u8"Выгружает скрипт при подключении не на Absolute Play")
          imgui.Spacing()
-		--imgui.Text(u8"Disclaimer: Автор не является частью команды проекта Absolute Play")
       elseif tabmenu.info == 2 then
          if isAbsolutePlay then
             imgui.Text(u8"Каждый игрок от 20 уровня может при наличии свободных слотов создать мир.")
@@ -5120,7 +5115,7 @@ function imgui.OnDrawFrame()
 		          os.execute(link)
 		       end
 	        end 
-	  
+	        
 	        if imgui.Button(u8"Найти объекты рядом по текущей позиции",imgui.ImVec2(300, 25)) then
 		       if sampIsLocalPlayerSpawned() then
                   local posX, posY, posZ = getCharCoordinates(PLAYER_PED)
@@ -5187,10 +5182,6 @@ function imgui.OnDrawFrame()
             imgui.TextColoredRGB("{00FF00}/nametagstatus{FFFFFF} - вкл/выкл показ песочных часов во время AFK.")
             imgui.TextColoredRGB("{00FF00}/hudscalefix{FFFFFF} - Исправляет размер HUD'a, ссылаясь на разрешение экрана клиента")
 			imgui.TextColoredRGB("{00FF00}/quit (/q){FFFFFF} - вернуться в суровую реальность")
-						
-            --imgui.Text(u8"Оригинал темы на")
-            --imgui.SameLine()
-	        --imgui.Link("https://www.open.mp/ru/docs/client/ClientCommands", "open.mp")
 		 end
          if imgui.CollapsingHeader(u8"Серверные команды:") then
             imgui.TextColoredRGB("{00FF00}/menu{FFFFFF} — вызвать главное меню")
@@ -5449,12 +5440,10 @@ function imgui.OnDrawFrame()
       elseif tabmenu.info == 8 then
 	     imgui.Text(u8"Интерфейс взаимодействия с сайтом")
 		 imgui.SameLine()
-	     --imgui.Link("https://forum.gta-samp.ru/index.php?/forum/23-absolute-dm-play/", "Absolute Play DM")	  
 		 imgui.SameLine()
          imgui.PushItemWidth(120)
 	     imgui.Combo(u8'##ComboBoxSelectSiteLogSrc', combobox.sitelogsource, absServersNames, 6)
 	     imgui.PopItemWidth()
-		 --imgui.TextQuestion("( ? )", u8"Все действия редиректит в браузер")
 		 
          local serverprefix = ""
          if combobox.sitelogsource.v == 0 then
