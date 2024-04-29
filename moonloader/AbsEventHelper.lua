@@ -4,7 +4,7 @@ script_description("Assistant for mappers and event makers on Absolute Play")
 script_dependencies('imgui', 'lib.samp.events')
 script_properties("work-in-pause")
 script_url("https://github.com/ins1x/AbsEventHelper")
-script_version("2.6.3")
+script_version("2.6.4")
 -- script_moonloader(16) moonloader v.0.26
 
 -- Activaton: ALT + X (show main menu)
@@ -97,6 +97,7 @@ local autoAnnounce = false
 local isChatFreezed = false
 local isWarningsActive = false
 local chosenplayerMarker = nil
+local selectedtxdpos = 2055
 
 local fps = 0
 local fps_counter = 0
@@ -2891,79 +2892,6 @@ sampObjectModelNames =
    [19999] = "CutsceneChair2", [0] = "N/A"
 }
 
-function commandparser(args)
-   if args:find('(.+) (.+)') then
-      -- local cmd, name = args:match('(.+) (.+)')
-	  -- if cmd:find("add") then
-	     -- if name and string.len(name) < 3 then 
-		    -- local id = tonumber(name)
-		    -- if sampIsPlayerConnected(id) then
-		       -- local nickname = sampGetPlayerNickname(id)
-			   -- addfriend(nickname)
-			   -- return
-			-- end
-		 -- end
-	     -- addfriend(name)
-	  -- end
-   else
-      if args:find('(.+)') then
-	     local cmd = args:match('(.+)')
-         if cmd then
-	  	    if cmd:find("slap") then
-               if sampIsLocalPlayerSpawned() then
-                  local posX, posY, posZ = getCharCoordinates(PLAYER_PED)
-                  setCharCoordinates(PLAYER_PED, posX, posY, posZ+1.0)
-               end
-			   return
-	        end
-            if cmd:find("savepos") then
-               if sampIsLocalPlayerSpawned() then
-                  local x, y, z = getCharCoordinates(PLAYER_PED)
-		          setClipboardText(string.format("%.2f %.2f %.2f", x, y, z))
-		          sampAddChatMessage("Позиция скопирована в буфер обмена", -1)
-               end
-               return
-            end
-            if cmd:find("jump") then
-               if sampIsLocalPlayerSpawned() then
-                  JumpForward()
-               end
-			   return
-	        end
-            if cmd:find("cc") then
-               ClearChat()
-			   return
-	        end
-            if cmd:find("render") then
-               checkbox.showobjects.v = not checkbox.showobjects.v
-			   return
-	        end
-            if cmd:find("recon") then
-               Recon(5000)
-			   return
-	        end
-            if cmd:find("restream") then
-               Restream()
-			   return
-	        end
-            if cmd:find("warnings") then
-               isWarningsActive = not isWarningsActive
-               if isWarningsActive then
-                  PlayerWarnings()
-               end
-			   return
-	        end
-	        if cmd:find("help") then
-			   return
-	        end
-	     end
-	  else
-         dialog.main.v = not dialog.main.v
-      end
-      dialog.main.v = not dialog.main.v
-   end
-end
-
 function main()
    if not isSampLoaded() or not isSampfuncsLoaded() then return end
       while not isSampAvailable() do wait(100) end
@@ -3008,7 +2936,7 @@ function main()
          favfile:close()
       end
       
-      sampRegisterChatCommand("abs", commandparser)
+      sampRegisterChatCommand("abs", function() dialog.main.v = not dialog.main.v end)
 	  
       -- set drawdist and figdist
       memory.setfloat(12044272, ini.settings.drawdist, true)
@@ -3121,12 +3049,25 @@ function main()
          isSanpObjectsListOpened = false
       end
       
+      -- if isKeyJustPressed(0x46) and isTexturesListOpened and not sampIsChatInputActive() and not sampIsDialogActive()
+	  -- and not isPauseMenuActive() and not isSampfuncsConsoleActive() then 
+         -- if selectedtxdpos == 2099 then
+            -- sampSendClickTextdraw(37)
+         -- elseif selectedtxdpos == 2053 then
+            -- sampSendClickTextdraw(36)
+         -- else
+            -- sampSendClickTextdraw(selectedtxdpos)
+            -- sampTextdrawSetShadow(selectedtxdpos, 1, 0x00000000)
+            -- selectedtxdpos = selectedtxdpos + 2
+         -- end
+      -- end
+      
 	  -- Count streamed obkects
 	  if countobjects then
 	     streamedObjects = 0
 	     for _, v in pairs(getAllObjects()) do
 		    if isObjectOnScreen(v) then
-			   streamedObjects = streamedObjects + 1
+			   streamedObjects = streamedObjects + 2
 			end
 		 end
 	  end
@@ -5158,13 +5099,12 @@ function imgui.OnDrawFrame()
 		 imgui.Spacing()
          if imgui.CollapsingHeader(u8"Основные команды:") then
             imgui.TextColoredRGB("{00FF00}/abs{FFFFFF} - открыть главное меню хелпера")
-            imgui.TextColoredRGB("{00FF00}/abs {FFFF00}slap{FFFFFF} - слапнуть себя")
-            imgui.TextColoredRGB("{00FF00}/abs {FFFF00}jump{FFFFFF} - прыгнуть вперед")
-            imgui.TextColoredRGB("{00FF00}/abs {FFFF00}cc{FFFFFF} - очистить себе чат")
-            imgui.TextColoredRGB("{00FF00}/abs {FFFF00}render{FFFFFF} - показывать ид объектов (CTRL+O)")
-            imgui.TextColoredRGB("{00FF00}/abs {FFFF00}recon{FFFFFF} - рекконект")
-            imgui.TextColoredRGB("{00FF00}/abs {FFFF00}restream{FFFFFF} - рестрим")
-            imgui.TextColoredRGB("{00FF00}/abs {FFFF00}savepos{FFFFFF} - сохранить позицию")
+            imgui.TextColoredRGB("{00FF00}/slapme{FFFFFF} - слапнуть себя")
+            imgui.TextColoredRGB("{00FF00}/jump{FFFFFF} - прыгнуть вперед")
+            imgui.TextColoredRGB("{00FF00}/savepos{FFFFFF} - сохранить позицию")
+            imgui.TextColoredRGB("{00FF00}/tsearch{FFFFFF} - поиск текстуры по названию")
+            imgui.TextColoredRGB("{00FF00}/osearch{FFFFFF} - поиск объекта по названию")
+            imgui.TextColoredRGB("{00FF00}/ogoto{FFFFFF} - тп к текущему объекту")
          end
 	     if imgui.CollapsingHeader(u8"Клиентские команды:") then
             imgui.TextColoredRGB("{00FF00}/headmove{FFFFFF} - вкл/выкл поворот головы скина по направлению камеры")
@@ -5180,7 +5120,7 @@ function imgui.OnDrawFrame()
             imgui.TextColoredRGB("{00FF00}/mem{FFFFFF} - отображает сколько использует памяти SA-MP")
             imgui.TextColoredRGB("{00FF00}/audiomsg{FFFFFF} - отключает сведения об URL песни(звука) в чате")
             imgui.TextColoredRGB("{00FF00}/nametagstatus{FFFFFF} - вкл/выкл показ песочных часов во время AFK.")
-            imgui.TextColoredRGB("{00FF00}/hudscalefix{FFFFFF} - Исправляет размер HUD'a, ссылаясь на разрешение экрана клиента")
+            imgui.TextColoredRGB("{00FF00}/hudscalefix{FFFFFF} - исправляет размер HUD'a, ссылаясь на разрешение экрана клиента")
 			imgui.TextColoredRGB("{00FF00}/quit (/q){FFFFFF} - вернуться в суровую реальность")
 		 end
          if imgui.CollapsingHeader(u8"Серверные команды:") then
@@ -7116,6 +7056,10 @@ function sampev.onSendCommand(command)
          sampAddChatMessage("N - Редактировать объект", 0x000FF00)
          return false
       end
+      if command:find("flymode") then
+         sampSendChat("/полет")
+         return false
+      end
    end
    
    if isAbsolutePlay then
@@ -7128,18 +7072,125 @@ function sampev.onSendCommand(command)
    if command:find("ds[jl") or command:find("exit") or command:find("выход") then
 	  lastWorldNumber = 0
    end
-      
-   if command:find('(.+) (.+)') then
-      local cmd, arg = command:match('(.+) (.+)')
-      
-	  -- Get world id (not virtual world id)
-	  if cmd:find("vbh") or cmd:find("мир") then
-	     local id = tonumber(arg)
-		 if id then 
-		    if id > 0 and id <= 500 then 
+   
+   if command:find("savepos") then
+      if sampIsLocalPlayerSpawned() then
+         local x, y, z = getCharCoordinates(PLAYER_PED)
+	     setClipboardText(string.format("%.2f %.2f %.2f", x, y, z))
+	     sampAddChatMessage("Позиция скопирована в буфер обмена", -1)
+      end
+      return false
+   end
+   
+   if command:find("jump") then
+      if sampIsLocalPlayerSpawned() then
+         JumpForward()
+      end
+      return false
+   end
+   
+   if command:find("slapme") then
+      if sampIsLocalPlayerSpawned() then
+         local posX, posY, posZ = getCharCoordinates(PLAYER_PED)
+         setCharCoordinates(PLAYER_PED, posX, posY, posZ+1.0)
+      end
+      return false
+   end
+   
+   if command:find("ogoto") then
+      if LastObjectData.handle and doesObjectExist(LastObjectData.handle) then
+      	 if isAbsolutePlay then
+		    sampSendChat(string.format("/тпк %f %f %f",
+		    LastObjectData.position.x, LastObjectData.position.y, LastObjectData.position.z), 0x0FFFFFF)
+		 else
+		    setCharCoordinates(PLAYER_PED, LastObjectData.position.x, LastObjectData.position.x, LastObjectData.position.z+0.2)
+		 end
+		 sampAddChatMessage("Вы телепортировались на координаты к послед.объекту "..LastObjectData.modelid, -1)
+      else
+         sampAddChatMessage("Последний созданный объект не найден", -1)
+      end
+      return false
+   end
+   
+   if command:find("tsearch") then
+      if command:find('(.+) (.+)') then
+         local cmd, arg = command:match('(.+) (.+)')
+         local searchtxd = tostring(arg)
+         if string.len(searchtxd) < 2 then
+            sampAddChatMessage("Минимальное кол-во символов для поиска текстуры = 2", -1)
+            return false
+         end
+         
+         local findedtxd = 0
+         if searchtxd and searchtxd ~= nil then 
+            for k, txdname in pairs(AbsTxdNames) do
+               if txdname:find(searchtxd) then
+                  findedtxd = findedtxd + 1
+                  sampAddChatMessage(string.format("{696969}%d. {FFFFFF}%s", k-1, txdname), -1)
+                  if findedtxd >= 50 then
+                     break
+                  end
+               end
+            end
+            
+            if findedtxd > 0 then
+               sampAddChatMessage("Найдено совпадений: "..findedtxd, -1)
+            else
+               sampAddChatMessage("Совпадений не найдено.", -1)
+            end
+            return false
+         end
+      else 
+         sampAddChatMessage("Введите название текстуры для поиска", -1)
+         sampAddChatMessage("Например: /tsearch wood", -1)
+         return false
+      end
+   end
+   
+   if command:find("osearch") then
+      if command:find('(.+) (.+)') then
+         local cmd, arg = command:match('(.+) (.+)')
+         local searchobj = tostring(arg)
+         if string.len(searchobj) < 3 then
+            sampAddChatMessage("Минимальное кол-во символов для поиска = 3", -1)
+            return false
+         end
+         
+         local findedobj = 0
+         if searchobj and searchobj ~= nil then 
+            for k, model in pairs(sampObjectModelNames) do
+               if model:find(searchobj) then
+                  findedobj = findedobj + 1
+                  sampAddChatMessage(string.format("{696969}%d. {FFFFFF}%s", k, model), -1)
+                  if findedobj >= 75 then
+                     break
+                  end
+               end
+            end
+            
+            if findedobj > 0 then
+               sampAddChatMessage("Найдено совпадений: "..findedobj, -1)
+            else
+               sampAddChatMessage("Совпадений не найдено.", -1)
+            end
+            return false
+         end
+      else 
+         sampAddChatMessage("Введите название объекта для поиска", -1)
+         sampAddChatMessage("Например: /osearch wall", -1)
+         return false
+      end
+   end
+   
+   if command:find("vbh") or command:find("мир") then
+      if command:find('(.+) (.+)') then
+         local cmd, arg = command:match('(.+) (.+)')
+         local id = tonumber(arg)
+         if id then 
+	        if id > 0 and id <= 500 then 
 		       lastWorldNumber = id
-			end
-	     end
+	        end
+         end
 	  end
    end
    
@@ -7315,6 +7366,7 @@ function sampev.onShowTextDraw(id, data)
 end
 
 function sampev.onSendClickTextDraw(textdrawId)
+   selectedtxdpos = textdrawId
    if checkbox.logtextdraws.v then
       local posX, posY = sampTextdrawGetPos(textdrawId)
       sampfuncsLog(("Textdraw ID: %s, Model: %s, x : %s, y: %s,"):format(textdrawId, sampTextdrawGetModelRotationZoomVehColor(textdrawId), posX, posY))
