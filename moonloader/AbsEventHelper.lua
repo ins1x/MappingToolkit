@@ -4,7 +4,7 @@ script_description("Assistant for mappers and event makers on Absolute Play")
 script_dependencies('imgui', 'lib.samp.events')
 script_properties("work-in-pause")
 script_url("https://github.com/ins1x/AbsEventHelper")
-script_version("2.6.4")
+script_version("2.6.5")
 -- script_moonloader(16) moonloader v.0.26
 
 -- Activaton: ALT + X (show main menu)
@@ -67,7 +67,7 @@ local gamestate = imgui.ImInt(0)
 -- If the server changes IP, change it here
 local ipAbsolutePlay = "193.84.90.23"
 local isAbsolutePlay = false
-
+local isTextureStudio = false
 local isSampAddonInstalled = false
 local isAbsfixInstalled = false
 local isPlayerSpectating = false
@@ -97,7 +97,7 @@ local autoAnnounce = false
 local isChatFreezed = false
 local isWarningsActive = false
 local chosenplayerMarker = nil
-local selectedtxdpos = 2055
+local selectedtxdpos = 2053
 
 local fps = 0
 local fps_counter = 0
@@ -116,6 +116,7 @@ streamedObjects = 0
 local legalweapons = {0, 1}
 local fixcam = {x = 0.0, y = 0.0, z = 0.0}
 local tpcpos = {x = 0.0, y = 0.0, z = 0.0}
+local worldspawnpos = {x = 0.0, y = 0.0, z = 0.0}
 local tpc = { 
    public = {x = 0, y = 0, z = 0},
    private = {x = 0, y = 0, z = 0},
@@ -239,6 +240,7 @@ local textbuffer = {
    tpcx = imgui.ImBuffer(12),
    tpcy = imgui.ImBuffer(12),
    tpcz = imgui.ImBuffer(12),
+   sms = imgui.ImBuffer(256),
    note = imgui.ImBuffer(1024)
 }
 
@@ -260,6 +262,7 @@ local combobox = {
    weaponselect = imgui.ImInt(0),
    itemad = imgui.ImInt(0),
    sitelogsource = imgui.ImInt(0),
+   fastanswers = imgui.ImInt(0),
    logs = imgui.ImInt(0)
 }
 
@@ -284,6 +287,16 @@ profilesNames = {
    'Custom', 'Race', 'Derby', 'Survival', 'PvP', 'Death-Roof', 'TDM',
    'Hide-n-Seek', 'Quiz', 'King', 'Hunt', 'Rodeo', 'Road Rash'
 }
+
+fastAnswers = {
+   u8"Мероприятие уже начато - вход на МП был закрыт",
+   u8"Вынужден был удалить вас с МП из-за ваших лагов",
+   u8"Не мешайте игрокам - кикну",
+   u8"Не мешайте проведению МП - кикну",
+   u8"Вам необходимо перезайти в мир",
+   u8"Займите свободный транспорт",
+   u8"Вы тут?"
+}  
 
 weaponNames = {
 	[0] = 'Fists',
@@ -2896,6 +2909,12 @@ function main()
    if not isSampLoaded() or not isSampfuncsLoaded() then return end
       while not isSampAvailable() do wait(100) end
       local ip, port = sampGetCurrentServerAddress()
+      local servername = sampGetCurrentServerName()
+      
+      if servername:find("Texture Studio") or servername:find("TRAINING") then
+         isTextureStudio = true
+      end
+      
       if not ip:find(ipAbsolutePlay) then
 	     isAbsolutePlay = false
          if ini.settings.noabsunload then
@@ -3049,18 +3068,17 @@ function main()
          isSanpObjectsListOpened = false
       end
       
-      -- if isKeyJustPressed(0x46) and isTexturesListOpened and not sampIsChatInputActive() and not sampIsDialogActive()
-	  -- and not isPauseMenuActive() and not isSampfuncsConsoleActive() then 
-         -- if selectedtxdpos == 2099 then
-            -- sampSendClickTextdraw(37)
-         -- elseif selectedtxdpos == 2053 then
-            -- sampSendClickTextdraw(36)
-         -- else
-            -- sampSendClickTextdraw(selectedtxdpos)
-            -- sampTextdrawSetShadow(selectedtxdpos, 1, 0x00000000)
-            -- selectedtxdpos = selectedtxdpos + 2
-         -- end
-      -- end
+      -- Select texture on F key
+      if isKeyJustPressed(0x66) and isTexturesListOpened and not sampIsChatInputActive() and not sampIsDialogActive()
+	  and not isPauseMenuActive() and not isSampfuncsConsoleActive() then 
+         if selectedtxdpos == 2099 then
+            sampSendClickTextdraw(37)
+            selectedtxdpos = 2053
+         else
+            sampSendClickTextdraw(selectedtxdpos)
+            selectedtxdpos = selectedtxdpos + 2
+         end
+      end
       
 	  -- Count streamed obkects
 	  if countobjects then
@@ -3229,9 +3247,24 @@ function imgui.OnDrawFrame()
                     setClipboardText(string.format(u8"%.1f, %.1f, %.1f", tpcpos.x, tpcpos.y, tpcpos.z))
                     sampAddChatMessage("Позиция скопирована в буфер обмена", -1)
                   end
+                  
+                  imgui.SameLine()
+                  imgui.TextColoredRGB(string.format("dist. %.1f m.",
+                  getDistanceBetweenCoords3d(positionX, positionY, positionZ, tpcpos.x, tpcpos.y, tpcpos.z)))
 			   end
 			end
 			
+            if worldspawnpos.x then
+			   if worldspawnpos.x ~= 0 then
+                  imgui.TextColoredRGB(string.format("Позиция спавна в мире x: %.1f, y: %.1f, z: %.1f",
+                  worldspawnpos.x, worldspawnpos.y, worldspawnpos.z))
+	              if imgui.IsItemClicked() then
+                    setClipboardText(string.format(u8"%.1f, %.1f, %.1f", worldspawnpos.x, worldspawnpos.y, worldspawnpos.z))
+                    sampAddChatMessage("Позиция скопирована в буфер обмена", -1)
+                  end
+			   end
+			end
+            
 		    local bTargetResult, bX, bY, bZ = getTargetBlipCoordinates()
 		    if bTargetResult then
 		       imgui.Text(string.format(u8"Позиция метки на карте x: %.1f, y: %.1f, z: %.1f",
@@ -3240,18 +3273,9 @@ function imgui.OnDrawFrame()
 			      setClipboardText(string.format(u8"%.1f, %.1f, %.1f", bX, bY, bZ))
 				  sampAddChatMessage("Позиция скопирована в буфер обмена", -1)
 			   end
-		    end 
 		    
-			if tpcpos.x then
-			   if tpcpos.x ~= 0 then
-			      imgui.TextColoredRGB(string.format("Расстояние до сохраненной позиции %.1f m.",
-                  getDistanceBetweenCoords3d(positionX, positionY, positionZ, tpcpos.x, tpcpos.y, tpcpos.z)))
-			   end	  
-			end
-			
-			local bTargetResult, bX, bY, bZ = getTargetBlipCoordinates()
-		    if bTargetResult then
-		       imgui.Text(string.format(u8"Расстояние до метки на карте %.1f m.",
+               imgui.SameLine()
+		       imgui.Text(string.format(u8"dist. %.1f m.",
                getDistanceBetweenCoords3d(positionX, positionY, positionZ, bX, bY, bZ)))
 		    end 
 			
@@ -5105,6 +5129,7 @@ function imgui.OnDrawFrame()
             imgui.TextColoredRGB("{00FF00}/tsearch{FFFFFF} - поиск текстуры по названию")
             imgui.TextColoredRGB("{00FF00}/osearch{FFFFFF} - поиск объекта по названию")
             imgui.TextColoredRGB("{00FF00}/ogoto{FFFFFF} - тп к текущему объекту")
+            imgui.TextColoredRGB("{00FF00}/оt, /от{FFFFFF} - быстрые ответы")
          end
 	     if imgui.CollapsingHeader(u8"Клиентские команды:") then
             imgui.TextColoredRGB("{00FF00}/headmove{FFFFFF} - вкл/выкл поворот головы скина по направлению камеры")
@@ -6402,37 +6427,45 @@ function imgui.OnDrawFrame()
    
    -- Child dialogs
    if dialog.fastanswer.v then
-      imgui.SetNextWindowPos(imgui.ImVec2(sizeX / 24, sizeY / 4),
+      imgui.SetNextWindowPos(imgui.ImVec2(sizeX / 4, sizeY / 18),
       imgui.Cond.FirstUseEver, imgui.ImVec2(0.5, 0.5))
-      imgui.Begin(u8"Быстрые ответы", dialog.fastanswer)
+      imgui.Begin(u8"Сообщения", dialog.fastanswer)
        
       local nickname = sampGetPlayerNickname(chosenplayer)
       local ucolor = sampGetPlayerColor(chosenplayer)
-          
+      
       imgui.TextColoredRGB(string.format("Ответить игроку: {%0.6x} %s[%d]",
       bit.band(ucolor,0xffffff), nickname, chosenplayer))
-         
-      if imgui.Button(u8"Мир закрыт", imgui.ImVec2(250, 25)) then
-         sampSendChat("/лс " .. chosenplayer .. " мероприятие уже началось - мир закрыт")
+      imgui.SameLine()
+      imgui.Text("                              ")
+      imgui.SameLine()
+      imgui.TextColoredRGB("{696969} "..string.len(u8:decode(textbuffer.sms.v)).."/128")
+      
+      imgui.PushItemWidth(420)
+      if imgui.InputText("##SMSBuffer", textbuffer.sms) then
+         -- if string.len(u8:decode(textbuffer.sms.v) > 128 then
+         -- end
       end
-      if imgui.Button(u8"Пароль от мира", imgui.ImVec2(250, 25)) then
-         sampSendChat("/лс " .. chosenplayer .. " пароль от мира - 666 заходи")
+      imgui.PopItemWidth()
+      imgui.SameLine()
+      if imgui.Button(u8" > ", imgui.ImVec2(30, 25)) then
+         sampSendChat("/pm "..chosenplayer.." "..u8:decode(textbuffer.sms.v))
       end
-      if imgui.Button(u8"Перезайди в мир", imgui.ImVec2(250, 25)) then
-         sampSendChat("/лс " .. chosenplayer .. " перезайди в мир")
-      end
-      if imgui.Button(u8"Не мешай игрокам - кикну", imgui.ImVec2(250, 25)) then
-         sampSendChat("/лс " .. chosenplayer .. " не мешай игрокам  - кикну")
-      end
-      if imgui.Button(u8"Не мешай организаторам мп", imgui.ImVec2(250, 25)) then
-         sampSendChat("/лс " .. chosenplayer .. " не мешай организаторам мп")
-      end
-      if imgui.Button(u8"Займи свободный транспорт", imgui.ImVec2(250, 25)) then
-         sampSendChat("/лс " .. chosenplayer .. " займи свободный транспорт")
-      end
-      if imgui.Button(u8"Разрешил телепорт и починку", imgui.ImVec2(250, 25)) then
-         sampSendChat("/лс " .. chosenplayer .. " разрешил телепорт и починку")
-      end
+      
+      imgui.Spacing()
+      -- if imgui.Button(u8"Перевести", imgui.ImVec2(100, 25)) then
+      -- end
+      -- imgui.SameLine()
+      -- if imgui.Button(u8"Скопировать в буффер", imgui.ImVec2(100, 25)) then
+      -- end
+      
+      imgui.Text(u8"Быстрые ответы: ")
+      imgui.PushItemWidth(420)
+      
+      if imgui.Combo(u8'##ComboBoxFastAnswers', combobox.fastanswers, fastAnswers, #fastAnswers) then
+         textbuffer.sms.v = fastAnswers[combobox.fastanswers.v+1]
+      end            
+      imgui.PopItemWidth()
       imgui.End()
    end
    
@@ -6506,8 +6539,11 @@ function imgui.OnDrawFrame()
 	     imgui.Text(u8"Нет оружия на руках")
 	  else
 	     if ammo then 
-	        imgui.TextColoredRGB(string.format("Оружие в руках: %d (%d)", 
-	        weapon, ammo))
+	        imgui.TextColoredRGB(string.format("Оружие в руках: %s (id: %d)", 
+	        weaponNames[weapon], weapon))
+            if weapon > 15 and weapon < 44 then
+               imgui.TextColoredRGB(string.format("Патроны: %d", ammo)) 
+            end
 	     end
 	  end
 	  
@@ -6519,7 +6555,7 @@ function imgui.OnDrawFrame()
 	     imgui.TextColoredRGB(string.format("Район: {696969}%s", zone))
 	  end
 	  
-      if imgui.Button(u8"статистика", imgui.ImVec2(150, 25)) then
+      if imgui.TooltipButton(u8"Статистика", imgui.ImVec2(220, 25), u8"Открыть серверную статистику игрока") then
 		 if isAbsolutePlay then
             sampSendChat("/стат " .. chosenplayer)
 		 else
@@ -6527,8 +6563,8 @@ function imgui.OnDrawFrame()
 		 end
 		 dialog.main.v = false
       end
-          
-      if imgui.Button(u8"наблюдать", imgui.ImVec2(150, 25)) then
+      
+      if imgui.TooltipButton(u8"Наблюдать", imgui.ImVec2(220, 25), u8"Наблюдать за игроком") then      
 	     if isAbsolutePlay then
             sampSendChat("/набл " .. chosenplayer)
 	     else
@@ -6536,14 +6572,14 @@ function imgui.OnDrawFrame()
 		 end
       end
           
-      if imgui.Button(u8"меню игрока", imgui.ImVec2(150, 25)) then
+      if imgui.TooltipButton(u8"Меню игрока", imgui.ImVec2(220, 25), u8"Открыть серверное меню взаимодействия с игроком") then
 	     if isAbsolutePlay then
             sampSendChat("/и " .. chosenplayer)
 		 end
 		 dialog.main.v = false
       end
-          
-      if imgui.Button(u8"тп к игроку", imgui.ImVec2(150, 25)) then
+      
+      if imgui.TooltipButton(u8"ТП к Игроку", imgui.ImVec2(220, 25), u8"Телепортироваться к игроку") then
          for k, v in ipairs(getAllChars()) do
             local res, id = sampGetPlayerIdByCharHandle(v)
             if res then
@@ -6562,11 +6598,11 @@ function imgui.OnDrawFrame()
           end
        end
           
-       if imgui.Button(u8"ответ", imgui.ImVec2(150, 25)) then
+       if imgui.TooltipButton(u8"Ответить", imgui.ImVec2(220, 25), u8"Быстро ответить игроку") then
           dialog.fastanswer.v = not dialog.fastanswer.v
        end
 	   
-       if imgui.Button(u8"метка на игрока", imgui.ImVec2(150, 25)) then
+       if imgui.TooltipButton(u8(chosenplayerMarker and 'Снять' or 'Установить')..u8" метку", imgui.ImVec2(220, 25), u8"Установить/Снять метку с игрока") then
           if chosenplayerMarker ~= nil then
              removeBlip(chosenplayerMarker)
              chosenplayerMarker = nil
@@ -6801,12 +6837,14 @@ function sampev.onSendDialogResponse(dialogId, button, listboxId, input)
       -- if player wxit from world without command drop lastWorldNumber var 
       if dialogId == 1405 and listboxId == 5 and button == 1 then
          lastWorldNumber = 0
+         worldspawnpos.x, worldspawnpos.y, worldspawnpos.z = getCharCoordinates(PLAYER_PED)
       end
        
 	  -- Get current world number from server dialogs
 	  if dialogId == 1426 and listboxId == 65535 and button == 1 then
          if tonumber(input) > 0 and tonumber(input) < 500 then
 		    lastWorldNumber = tonumber(input)
+            worldspawnpos.x, worldspawnpos.y, worldspawnpos.z = getCharCoordinates(PLAYER_PED)
 	     end
       end
 	  
@@ -6814,6 +6852,7 @@ function sampev.onSendDialogResponse(dialogId, button, listboxId, input)
 	     local world = tonumber(string.sub(input, 0, 3))
 	     if world then
 		    lastWorldNumber = world
+            worldspawnpos.x, worldspawnpos.y, worldspawnpos.z = getCharCoordinates(PLAYER_PED)
 		 end
 	  end
 	  
@@ -6851,18 +6890,24 @@ function sampev.onSendDialogResponse(dialogId, button, listboxId, input)
          isSampObjectsListOpened = true
       end
       
+      if dialogId == 1412 and listboxId == 2 and button == 1 then
+	     sampAddChatMessage("Вы изменили разрешение на редактирование мира для всех игроков!", 0xFF0000)
+	  end
+      
+      if dialogId == 1419 and button == 1 then
+         worldspawnpos.x, worldspawnpos.y, worldspawnpos.z = getCharCoordinates(PLAYER_PED)
+      end
+      
 	  if dialogId == 1429 and button == 1 then
 		 local startpos = input:find("№")
 		 local endpos = startpos + 3
 		 local world = tonumber(string.sub(input, startpos+1, endpos))
 	     if world then
 		    lastWorldNumber = world
+            worldspawnpos.x, worldspawnpos.y, worldspawnpos.z = getCharCoordinates(PLAYER_PED)
 		 end
 	  end
       
-	  if dialogId == 1412 and listboxId == 2 and button == 1 then
-	     sampAddChatMessage("Вы изменили разрешение на редактирование мира для всех игроков!", 0xFF0000)
-	  end
 	  
 	  -- if dialogId == 1403 or dialogId == 1411 and button == 1 then
 	     -- if LastObjectData.modelid then 
@@ -7045,7 +7090,7 @@ end
 
 function sampev.onSendCommand(command)
     -- tips for those who are used to using Texture Studio syntax
-   if isAbsolutePlay then
+   if not isTextureStudio then
       if command:find("texture") then
          sampAddChatMessage("Для ретекстура используйте:", 0x000FF00)
          sampAddChatMessage("N - Редактировать объект - Выделить объект - Перекарсить объект", 0x000FF00)
@@ -7054,6 +7099,16 @@ function sampev.onSendCommand(command)
       if command:find("edit") then
          sampAddChatMessage("Для редактирования используйте:", 0x000FF00)
          sampAddChatMessage("N - Редактировать объект", 0x000FF00)
+         return false
+      end
+      if command:find("showtext3d") then
+         sampAddChatMessage("Информация о объектах показана", 0x000FF00)
+         checkbox.showobjects.v = true 
+         return false
+      end
+      if command:find("hidetext3d") then
+         sampAddChatMessage("Информация о объектах скрыта", 0x000FF00)
+         checkbox.showobjects.v = false
          return false
       end
       if command:find("flymode") then
@@ -7069,8 +7124,31 @@ function sampev.onSendCommand(command)
       end
    end
    
+   if command:find("/от") or command:find("/ответ") or command:find("/ot") then
+      if command:find('(.+) (.+)') then
+         local cmd, arg = command:match('(.+) (.+)')
+         local id = tonumber(arg)
+         if sampIsPlayerConnected(id) then 
+            chosenplayer = id
+      end
+      end
+         
+      if not chosenplayer then
+         sampAddChatMessage("Не выбран игрок", -1)
+         return false
+      end
+      
+      dialog.fastanswer.v = true
+      dialog.main.v = true
+      return false
+   end
+   
+   
    if command:find("ds[jl") or command:find("exit") or command:find("выход") then
 	  lastWorldNumber = 0
+      worldspawnpos.x = 0
+      worldspawnpos.y = 0
+      worldspawnpos.z = 0
    end
    
    if command:find("savepos") then
@@ -7097,7 +7175,7 @@ function sampev.onSendCommand(command)
       return false
    end
    
-   if command:find("ogoto") then
+   if command:find("ogoto") and not isTextureStudio then
       if LastObjectData.handle and doesObjectExist(LastObjectData.handle) then
       	 if isAbsolutePlay then
 		    sampSendChat(string.format("/тпк %f %f %f",
@@ -7112,7 +7190,7 @@ function sampev.onSendCommand(command)
       return false
    end
    
-   if command:find("tsearch") then
+   if command:find("tsearch") and not isTextureStudio then
       if command:find('(.+) (.+)') then
          local cmd, arg = command:match('(.+) (.+)')
          local searchtxd = tostring(arg)
@@ -7147,7 +7225,7 @@ function sampev.onSendCommand(command)
       end
    end
    
-   if command:find("osearch") then
+   if command:find("osearch") and not isTextureStudio then
       if command:find('(.+) (.+)') then
          local cmd, arg = command:match('(.+) (.+)')
          local searchobj = tostring(arg)
@@ -7189,6 +7267,7 @@ function sampev.onSendCommand(command)
          if id then 
 	        if id > 0 and id <= 500 then 
 		       lastWorldNumber = id
+               worldspawnpos.x, worldspawnpos.y, worldspawnpos.z = getCharCoordinates(PLAYER_PED)
 	        end
          end
 	  end
@@ -7346,12 +7425,9 @@ function sampev.onShowTextDraw(id, data)
       if id >= 2053 and id <= 2100 then
          local modelid = tonumber(string.sub(data.text, 0, 5))
          if modelid ~= nil then
-            --print(cyrillic(tostring(AbsParticleNames[modelid])))
             local particlename = tostring(AbsParticleNames[modelid])
 		    local particlename = string.gsub(particlename, " ", "~n~")
-            
             local txdlabel = modelid.."~n~~n~"..cyrillic(particlename)
-            --print(string.len(txdlabel))
             if string.len(txdlabel) > 14 then data.text = txdlabel end
             data.letterWidth = 0.18
             data.letterHeight = 0.9
