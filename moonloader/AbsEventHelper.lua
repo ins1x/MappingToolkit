@@ -6207,7 +6207,7 @@ function imgui.OnDrawFrame()
 	        
             if imgui.Checkbox(u8("Предупреждения на подозрительных игроков"), checkbox.playerwarnings) then
 	   	       if checkbox.playerwarnings.v then
-	 	     	  sampAddChatMessage("Предупреждения включены", -1)
+                  sampAddChatMessage("Предупреждения включены", -1)
                   isWarningsActive = true
                   PlayerWarnings()
 	 	       else
@@ -6225,48 +6225,77 @@ function imgui.OnDrawFrame()
             if imgui.Button(u8"Обновить список игроков МП", imgui.ImVec2(220, 25)) then
                playersTable = {}       
                playersTotal = 0
-            
+               playersfile = io.open("moonloader/resource/abseventhelper/players.txt", "w")
+               
                for k, v in ipairs(getAllChars()) do
                   local res, id = sampGetPlayerIdByCharHandle(v)
+                  local nickname = sampGetPlayerNickname(id)
                   if res then
                      table.insert(playersTable, id)
                      playersTotal = playersTotal + 1
+                     playersfile:write(nickname .. "\n")
                   end
                end
-               sampAddChatMessage("Список игроков на МП обновлен", -1)
+               playersfile:close()
+               sampAddChatMessage("Список игроков на МП обновлен. Всего игроков "..playersTotal, -1)
             end
             imgui.SameLine()
             if imgui.Button(u8"Вывести список игроков", imgui.ImVec2(220, 25)) then
-               if next(playersTable) == nil then -- if playersTable is empty
-                  sampAddChatMessage("Сперва обновите список игроков", -1)
-               else
-                  for k, v in pairs(playersTable) do
-                     local nickname = sampGetPlayerNickname(v)
-                     if sampIsPlayerConnected(k) then
-                        sampAddChatMessage(string.format("%s(%d)", nickname, k), -1)
-                     -- else
-                        -- sampAddChatMessage(string.format("%s - {E61920}[OFFLINE]", nickname), -1)
+               -- if next(playersTable) == nil then -- if playersTable is empty
+                  -- sampAddChatMessage("Сперва обновите список игроков", -1)
+               -- else
+                  -- for k, v in pairs(playersTable) do
+                     -- local nickname = sampGetPlayerNickname(v)
+                     -- if sampIsPlayerConnected(k) then
+                        -- sampAddChatMessage(string.format("%s(%d)", nickname, k), -1)
+                     -- -- else
+                        -- -- sampAddChatMessage(string.format("%s - {E61920}[OFFLINE]", nickname), -1)
+                     -- end
+                  -- end
+                  
+               sampAddChatMessage("Список игроков:", 0xFFFFFF)
+               playersList = {}
+               playersfile = io.open("moonloader/resource/abseventhelper/players.txt", "r")
+               for name in playersfile:lines() do
+                  table.insert(playersList, name:lower())
+               end
+               playersfile:close()
+               maxPlayerOnline = sampGetMaxPlayerId(false)
+               s = 1
+               for i = 0, maxPlayerOnline do
+                  if sampIsPlayerConnected(i) then
+                     name = sampGetPlayerNickname(i)
+                     c = 1
+                     for k,n in pairs(playersList) do
+                        if(name:lower() == n:lower()) then
+                           sampAddChatMessage("{FFFFFF}" .. s .. ". {34EB46}" .. name .. " (" .. i .. ")", 0xFFFFFF)
+                           table.remove(playersList,c)
+                           s = s + 1
+                        end
+	                    c = c + 1
                      end
                   end
                end
+               
+               for k,n in pairs(playersList) do
+                  sampAddChatMessage("{FFFFFF}" .. s .. ". {CDCDCD}" .. n .. " {E61920}(OFFLINE)", 0xFFFFFF)
+                  s = s + 1
+               end
+               --end
             end
             
-            if imgui.Button(u8"Сохранить список игроков в файл", imgui.ImVec2(220, 25)) then 
-               if next(playersTable) == nil then -- if playersTable is empty
-                  sampAddChatMessage("Сперва обновите список игроков", -1)
-               else
-                  ptablefile = io.open(getGameDirectory().."/moonloader/resource/abseventhelper/players.txt", "a")
-                  ptablefile:write("\n")
-                  ptablefile:write(string.format("%s \n", os.date("%d.%m.%y %H:%M:%S")))
-                  local counter = 0
-                  for k, v in pairs(playersTable) do
-                     ptablefile:write(string.format("%d [id:%d] %s lvl: %i \n",
-                     counter + 1, v, sampGetPlayerNickname(v), sampGetPlayerScore(v)))
-                     counter = counter + 1
-                  end
-                  ptablefile:write(string.format("Total: %d \n", counter))
-                  ptablefile:close()
-                  sampAddChatMessage("Список игроков сохранен в moonloader/resource/abseventhelper/players.txt", -1)
+            if imgui.Button(u8"Черный список игроков", imgui.ImVec2(220, 25)) then
+               sampAddChatMessage("Черный список:", -1)
+               blacklist = {}
+               blacklistfile = io.open("moonloader/resource/abseventhelper/blacklist.txt", "r")
+               for name in blacklistfile:lines() do
+                  table.insert(blacklist, name:lower())
+               end
+               io.close(blacklistfile)
+               s = 1
+               for k, n in pairs(blacklist) do
+                  sampAddChatMessage("{363636}" .. s .. ". {FF0000}" .. n, 0xFFFFFF)
+                  s = s + 1
                end
             end
             
@@ -6277,11 +6306,12 @@ function imgui.OnDrawFrame()
 	 	          sampAddChatMessage("Сперва обнови список игроков!", -1) 
 	 	       else
 	              for k, v in pairs(playersTable) do
-	 	            local ping = sampGetPlayerPing(v)
+                    --local res, handle = sampGetCharHandleBySampPlayerId(v)
+                    local ping = sampGetPlayerPing(v)
                     local nickname = sampGetPlayerNickname(v)
-	 	     	   if(ping > 70) then
-	 	     	      counter = counter + 1
-	 	     	     sampAddChatMessage(string.format("Лагер %s(%i) ping: %i", nickname, v, ping), 0xFF0000)
+	 	     	    if(ping > 70) then
+	 	     	       counter = counter + 1
+	 	     	       sampAddChatMessage(string.format("Лагер %s(%i) ping: %i", nickname, v, ping), 0xFF0000)
                     end
 	 	         end
 	 	         if counter == 0 then
@@ -6940,8 +6970,32 @@ function sampev.onShowDialog(dialogId, style, title, button1, button2, text)
       -- end
       
       if dialogId == 1407 then
-         return {dialogId, style, title, button1, button2,
-         text.."\nПодробнее на https://forum.sa-mp.ru/index.php?/topic/1016828-миры-редактор-карт-faq"}
+         local newtext = 
+         "{FFFFFF}Внутриигровой редактор карт позволяет любому игроку создать уникальный мир.\n"..
+         "Каждый игрок от 20 уровня может создать свой мир, или редактировать открытый мир.\n"..
+         "По умолчанию в мире можно строить только 50 объектов, и расширить до 300 объектов.\n"..
+         "Любого игрока можно пригласить в открытый мир, или позволить ему редактировать ваш мир.\n"..
+         "В радиусе 150 метров нельзя создавать более 200 объектов.\n"..
+         "\nВозможности редактора карт:\n"..
+         "- Удобное меню редактора на диалогах. Вам не нужно запоминать десятки команд для управления, все доступно через единое меню.\n"..
+         "- Визуальный выбор объектов в меню. Вы видите объекты через предпросмотр, вам не нужно искать номера объектов на сторонних ресурсах.\n".. 
+         "- Создание пикапов. Создавайте пикапы оружия, здоровья, брони и другие предметы. Включая выпадение пикапов после убийства противника.\n"..
+         "- Оружие и здоровье по умолчанию. Настройка изначальных характеристик, с которыми игрок войдёт в редактор карт.\n"..
+         "- Создание транспорта. Создавайте любой транспорт в мире, включая уникальный и военную технику.\n"..
+         "- Создание гонок. Использование разных машин, мотоциклов, лодок и воздушной техники для проведения соревнований с возможностью выбора маршрутов.\n"..
+         "- Возможность совместного редактирования. Приглашайте друзей на помощь.\n"..
+         "- Организаторские опции управления. Возможность гибкой настройки параметров мира для проведения различного рода мероприятий.\n"..
+         "- Управление камерой. Вы можете работать в режиме полета свободной камерой, либо зафиксировать камеру над собой.\n"..
+         "- Смена текстур. Применяйте ретекстур к различным объектам чтобы преобразить их до неузнаваемости.\n"..
+         "- Настройка доступа. Ваш мир может быть открыт для всех игроков 24/7. Либо же вы можете задать пароль на вход, или вовсе сделать мир персональным.\n"..
+         "\n{FFD700}VIP игроки{FFFFFF} могут:\n"..
+         "- телепортироваться по метке на карте в ESC\n"..
+         "- расширять мир до 2000 объектов\n"..
+         "- выбирать шрифт и цвет текста\n"..
+         "- выбирать точку появления в мире\n"
+        
+         sampAddChatMessage("Подробнее на https://forum.sa-mp.ru/index.php?/topic/1016832-миры-описание-работы-редактора-карт", -1)
+         return {dialogId, style, title, button1, button2, newtext}
       end
       
       if dialogId == 1498 then
@@ -7666,16 +7720,18 @@ function PlayerWarnings()
    lua_thread.create(function()
    while isWarningsActive do
       wait(1000*30)
-      for k, v in ipairs(getAllChars()) do
-         local res, id = sampGetPlayerIdByCharHandle(v)
+      --for k, v in ipairs(getAllChars()) do
+      for k, v in pairs(playersTable) do
+         --local res, id = sampGetPlayerIdByCharHandle(v)
+         local res, handle = sampGetCharHandleBySampPlayerId(v)
          if res then
-            local nickname = sampGetPlayerNickname(id)
-            local weaponid = getCurrentCharWeapon(v)
-            local px, py, pz = getCharCoordinates(v)
-            local health = sampGetPlayerHealth(v)
-            local armor = sampGetPlayerArmor(v)
-            local ping = sampGetPlayerPing(v)
-            local afk = sampIsPlayerPaused(v)
+            local nickname = sampGetPlayerNickname(v)
+            local weaponid = getCurrentCharWeapon(handle)
+            local px, py, pz = getCharCoordinates(handle)
+            local health = sampGetPlayerHealth(handle)
+            local armor = sampGetPlayerArmor(handle)
+            local ping = sampGetPlayerPing(handle)
+            local afk = sampIsPlayerPaused(handle)
             
             if warnings.undermap then
                if pz < 0.5 then
@@ -7706,7 +7762,7 @@ function PlayerWarnings()
             -- end
             
             if warnings.laggers then
-               if ping > 100 then
+               if ping > 50 then
                   sampAddChatMessage(string.format("{FF0000}Игрок %s[%d] лагер! (ping %d)",
                   nickname, id, ping), -1)
                end
