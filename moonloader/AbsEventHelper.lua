@@ -4,7 +4,7 @@ script_description("Assistant for mappers and event makers on Absolute Play")
 script_dependencies('imgui', 'lib.samp.events')
 script_properties("work-in-pause")
 script_url("https://github.com/ins1x/AbsEventHelper")
-script_version("2.6.6")
+script_version("2.6.7")
 -- script_moonloader(16) moonloader v.0.26
 
 -- Activaton: ALT + X (show main menu)
@@ -2915,29 +2915,9 @@ sampObjectModelNames =
 function main()
    if not isSampLoaded() or not isSampfuncsLoaded() then return end
       while not isSampAvailable() do wait(100) end
-
-      local servername = sampGetCurrentServerName()
-      if servername:find("Texture Studio") then
-         isTextureStudio = true
-      end
-      if servername:find("TRAINING") then
-         isTraining = true
-         isTextureStudio = true
-      end
-      
-      if not servername:find("Absolute") then
-	     isAbsolutePlay = false
-         if ini.settings.noabsunload then
-            thisScript():unload()
-		 end
-      else
-	     isAbsolutePlay = true
-      end
-      
-      if isTraining or isAbsolutePlay or isTextureStudio then
-         sampAddChatMessage("{880000}Absolute Events Helper.\
-		 {FFFFFF}Открыть меню: {CDCDCD}ALT + X", 0xFFFFFF)
-      end
+ 
+      sampAddChatMessage("{880000}Absolute Events Helper.\
+	  {FFFFFF}Открыть меню: {CDCDCD}ALT + X", 0xFFFFFF)
       
 	  reloadBindsFromConfig()
 	  
@@ -2979,6 +2959,26 @@ function main()
       --- END init
       while true do
       wait(0)
+      
+      -- sampGetCurrentServerName() returns a value with a long delay
+      -- unlike receiving the IP and port. Therefore, for correct operation, the code is placed here      
+      local servername = sampGetCurrentServerName()
+      
+      if servername:find("Texture Studio") then
+         isTextureStudio = true
+      end
+      if servername:find("TRAINING") then
+         isTraining = true
+         isTextureStudio = true
+      end
+      if not servername:find("Absolute") then
+	     isAbsolutePlay = false
+         if ini.settings.noabsunload then
+            thisScript():unload()
+		 end
+      else
+	     isAbsolutePlay = true
+      end
       
       -- Imgui menu
       if not ENBSeries then imgui.Process = dialog.main.v end
@@ -3744,6 +3744,13 @@ function imgui.OnDrawFrame()
 			imgui.PopItemWidth()
 		 end
 		 
+         -- if imgui.Button("camtest") then
+            -- local X, Y, Z = getActiveCameraCoordinates()
+            -- local rX, rY, rZ = getActiveCameraPointAt()
+            -- sampAddChatMessage(string.format("X:%.1f Y%.1f, Z%.1f, rX%.1f, rY%.1f, rZ%.1f", 
+            -- X, Y, Z, rX, rY, rZ), -1)
+         -- end
+         
 		 if imgui.Checkbox(u8("Разблокировать изменение дистанции камеры"), checkbox.usecustomcamdist) then 
 		    ini.settings.usecustomcamdist = not ini.settings.usecustomcamdist
             if ini.settings.usecustomcamdist then
@@ -5173,7 +5180,7 @@ function imgui.OnDrawFrame()
            
       elseif tabmenu.info == 6 then
 		 imgui.Spacing()
-         if imgui.CollapsingHeader(u8"Основные команды:") then
+         if imgui.CollapsingHeader(u8"Дополнительные команды:") then
             imgui.TextColoredRGB("{00FF00}/abs{FFFFFF} - открыть главное меню хелпера")
             imgui.TextColoredRGB("{00FF00}/slapme{FFFFFF} - слапнуть себя")
             imgui.TextColoredRGB("{00FF00}/jump{FFFFFF} - прыгнуть вперед")
@@ -5181,6 +5188,10 @@ function imgui.OnDrawFrame()
             imgui.TextColoredRGB("{00FF00}/tsearch{FFFFFF} - поиск текстуры по названию")
             imgui.TextColoredRGB("{00FF00}/osearch{FFFFFF} - поиск объекта по названию")
             imgui.TextColoredRGB("{00FF00}/ogoto{FFFFFF} - тп к текущему объекту")
+            imgui.TextColoredRGB("{00FF00}/oalpha{FFFFFF} - сделать объект полупрозрачным")
+            imgui.TextColoredRGB("{00FF00}/sindex /rindex{FFFFFF} - вкл-откл визуальный просмотр индексов")
+            imgui.TextColoredRGB("{00FF00}/showtext3d /hidetext3d{FFFFFF} - показать id объектов (CTRL + O)")
+            imgui.TextColoredRGB("{00FF00}/csel /editobject{FFFFFF} - включить режим выбора объекта")
             imgui.TextColoredRGB("{00FF00}/оt, /от{FFFFFF} - быстрые ответы")
          end
 	     if imgui.CollapsingHeader(u8"Клиентские команды:") then
@@ -5859,7 +5870,61 @@ function imgui.OnDrawFrame()
 	 	          sampAddChatMessage("Случайный игрок: ".. sampGetPlayerNickname(playersTable[rand]), -1)
 	 	       end
 	        end
-            
+            imgui.Text(u8"Список игроков:")
+            if imgui.Button(u8"Обновить список игроков МП", imgui.ImVec2(220, 25)) then
+               playersTable = {}       
+               playersTotal = 0
+               playersfile = io.open("moonloader/resource/abseventhelper/players.txt", "w")
+               
+               for k, v in ipairs(getAllChars()) do
+                  local res, id = sampGetPlayerIdByCharHandle(v)
+                  local nickname = sampGetPlayerNickname(id)
+                  if res then
+                     table.insert(playersTable, id)
+                     playersTotal = playersTotal + 1
+                     playersfile:write(nickname .. "\n")
+                  end
+               end
+               playersfile:close()
+               sampAddChatMessage("Список игроков на МП обновлен. Всего игроков "..playersTotal, -1)
+            end
+            imgui.SameLine()
+            if imgui.Button(u8"Вывести список игроков", imgui.ImVec2(220, 25)) then
+               sampAddChatMessage("Список игроков:", 0xFFFFFF)
+               playersList = {}
+               playersfile = io.open("moonloader/resource/abseventhelper/players.txt", "r")
+               for name in playersfile:lines() do
+                  table.insert(playersList, name:lower())
+               end
+               playersfile:close()
+               maxPlayerOnline = sampGetMaxPlayerId(false)
+               s = 1
+               local res, playerId = sampGetPlayerIdByCharHandle(playerPed)
+               for i = 0, maxPlayerOnline do
+                  if sampIsPlayerConnected(i) then
+                     name = sampGetPlayerNickname(i)
+                     c = 1
+                     for k,n in pairs(playersList) do
+                        if(name:lower() == n:lower()) then
+                           sampAddChatMessage("{FFFFFF}" .. s .. ". {34EB46}" .. name .. " (" .. i .. ")", 0xFFFFFF)
+                           table.remove(playersList, c)
+                           s = s + 1
+                        end 
+	                    c = c + 1
+                     end
+                  end
+               end
+               
+               for k, n in pairs(playersList) do
+                  name = sampGetPlayerNickname(playerId)
+                  if(name:lower() == n:lower()) then
+                     sampAddChatMessage("{FFFFFF}" .. s .. ". {CDCDCD}" .. n .. " {FFD700}(EVENTMAKER)", 0xFFFFFF)
+                  else
+                     sampAddChatMessage("{FFFFFF}" .. s .. ". {CDCDCD}" .. n .. " {E61920}(OFFLINE)", 0xFFFFFF)
+                  end
+                  s = s + 1
+               end
+            end
             imgui.Spacing()
             imgui.Spacing()
             imgui.Spacing()
@@ -5901,9 +5966,7 @@ function imgui.OnDrawFrame()
 	        imgui.Spacing()
             
          elseif tabmenu.mp == 2 then
-            if isAbsolutePlay then
-               imgui.TextColoredRGB("{FF0000}На Absolute Play большинство функции в этом меню доступно только админам")
-            end
+
             imgui.PushItemWidth(150)
             imgui.Combo('##ComboWeaponSelect', combobox.weaponselect, weaponNames)
             imgui.PopItemWidth()
@@ -5945,6 +6008,7 @@ function imgui.OnDrawFrame()
             end
             if imgui.Button(u8"Заморозить", imgui.ImVec2(220, 25)) then
             end
+            
          elseif tabmenu.mp == 3 then
          
             imgui.Text(u8"Дать команду в чат:")
@@ -6322,55 +6386,7 @@ function imgui.OnDrawFrame()
             -- end
             
             imgui.Spacing()
-            imgui.Text(u8"Список игроков:")
-            if imgui.Button(u8"Обновить список игроков МП", imgui.ImVec2(220, 25)) then
-               playersTable = {}       
-               playersTotal = 0
-               playersfile = io.open("moonloader/resource/abseventhelper/players.txt", "w")
-               
-               for k, v in ipairs(getAllChars()) do
-                  local res, id = sampGetPlayerIdByCharHandle(v)
-                  local nickname = sampGetPlayerNickname(id)
-                  if res then
-                     table.insert(playersTable, id)
-                     playersTotal = playersTotal + 1
-                     playersfile:write(nickname .. "\n")
-                  end
-               end
-               playersfile:close()
-               sampAddChatMessage("Список игроков на МП обновлен. Всего игроков "..playersTotal, -1)
-            end
-            imgui.SameLine()
-            if imgui.Button(u8"Вывести список игроков", imgui.ImVec2(220, 25)) then
-               sampAddChatMessage("Список игроков:", 0xFFFFFF)
-               playersList = {}
-               playersfile = io.open("moonloader/resource/abseventhelper/players.txt", "r")
-               for name in playersfile:lines() do
-                  table.insert(playersList, name:lower())
-               end
-               playersfile:close()
-               maxPlayerOnline = sampGetMaxPlayerId(false)
-               s = 1
-               for i = 0, maxPlayerOnline do
-                  if sampIsPlayerConnected(i) then
-                     name = sampGetPlayerNickname(i)
-                     c = 1
-                     for k,n in pairs(playersList) do
-                        if(name:lower() == n:lower()) then
-                           sampAddChatMessage("{FFFFFF}" .. s .. ". {34EB46}" .. name .. " (" .. i .. ")", 0xFFFFFF)
-                           table.remove(playersList, c)
-                           s = s + 1
-                        end 
-	                    c = c + 1
-                     end
-                  end
-               end
-               
-               for k, n in pairs(playersList) do
-                  sampAddChatMessage("{FFFFFF}" .. s .. ". {CDCDCD}" .. n .. " {E61920}(OFFLINE)", 0xFFFFFF)
-                  s = s + 1
-               end
-            end
+            
             
             if imgui.Button(u8"Черный список игроков", imgui.ImVec2(220, 25)) then
                sampAddChatMessage("Черный список:", -1)
@@ -7180,7 +7196,6 @@ function sampev.onServerMessage(color, text)
       -- mentions by id
       if text:match("(%s"..id.."%s)") then
          printStyledString('You were mentioned in the chat', 2000, 4)
-         print(color, text, "id")
          addOneOffSound(0.0, 0.0, 0.0, 1138) -- CHECKPOINT_GREEN
          return true
       end
@@ -7236,11 +7251,6 @@ function sampev.onSendCommand(command)
       if command:find("texture") then
          sampAddChatMessage("Для ретекстура используйте:", 0x000FF00)
          sampAddChatMessage("N - Редактировать объект - Выделить объект - Перекарсить объект", 0x000FF00)
-         return false
-      end
-      if command:find("edit") then
-         sampAddChatMessage("Для редактирования используйте:", 0x000FF00)
-         sampAddChatMessage("N - Редактировать объект", 0x000FF00)
          return false
       end
       if command:find("showtext3d") then
@@ -7333,19 +7343,28 @@ function sampev.onSendCommand(command)
    end
    
    if command:find("csel") or command:find("editobject") and not isTextureStudio then
-      sampAddChatMessage("Включен режим редактирования объекта", -1)
+      sampAddChatMessage("Включен режим редактирования объекта", 0x000FF00)
       enterEditObject()
       return false
    end
    
    if command:find("sindex") and not isTextureStudio then
       if LastObjectData.handle and doesObjectExist(LastObjectData.handle) then
-         --setMaterialObject(LastObjectData.id, 1, 0, 8839, "vgsecarshow", "lightgreen2_32", 0xFFFFFFFF)
-         --setMaterialObject(LastObjectData.id, 1, 1, 8839, "vgsecarshow", "lightgreen2_32", 0xFFFFFFFF)
-         setMaterialObject(LastObjectData.id, 1, 0, 8839, "vgsecarshow", "lightgreen2_32", 0xFFFFFFFF)
-         setMaterialObjectText(LastObjectData.id, 2, 0, 100, "Arial", 255, 0, 0xFFFFFF00, 0xFF00FF00, 1, "0")
-         setMaterialObjectText(LastObjectData.id, 2, 1, 100, "Arial", 255, 0, 0xFFFFFF00, 0xFF00FF00, 1, "1")
-         setMaterialObjectText(LastObjectData.id, 2, 2, 100, "Arial", 255, 0, 0xFFFFFF00, 0xFF00FF00, 1, "2")
+         setMaterialObject(LastObjectData.id, 1, 0, 18646, "MatColours", "red", 0xFFFFFFFF) 
+         setMaterialObject(LastObjectData.id, 1, 1, 18646, "MatColours", "green", 0xFFFFFFFF)         
+         setMaterialObject(LastObjectData.id, 1, 2, 18646, "MatColours", "blue", 0xFFFFFFFF)
+         setMaterialObject(LastObjectData.id, 1, 3, 18646, "MatColours", "yellow", 0xFFFFFFFF)
+         setMaterialObject(LastObjectData.id, 1, 4, 18646, "MatColours", "lightblue", 0xFFFFFFFF)
+         setMaterialObject(LastObjectData.id, 1, 5, 18646, "MatColours", "orange", 0xFFFFFFFF)
+         setMaterialObject(LastObjectData.id, 1, 6, 18646, "MatColours", "redlaser", 0xFFFFFFFF)
+         setMaterialObject(LastObjectData.id, 1, 7, 18646, "MatColours", "grey", 0xFFFFFFFF)
+         setMaterialObject(LastObjectData.id, 1, 8, 18646, "MatColours", "white", 0xFFFFFFFF)
+         setMaterialObject(LastObjectData.id, 1, 9, 7910, "vgnusedcar", "lightpurple2_32", 0xFFFFFFFF)
+         setMaterialObject(LastObjectData.id, 1, 10, 19271, "MapMarkers", "green-2", 0xFFFFFFFF) -- dark green
+         --setMaterialObject(LastObjectData.id, 1, 11, 18979, "MatClothes", "darkblue", 0xFFFFFFFF) -- dark blue
+         --setMaterialObjectText(LastObjectData.id, 2, 0, 100, "Arial", 255, 0, 0xFFFFFF00, 0xFF00FF00, 1, "0")
+         sampAddChatMessage("Режим визуального просмотра индексов включен. Каждый индекс соответсвует цвету с таблицы.", 0x000FF00)
+         sampAddChatMessage("{FF0000}0 {008000}1 {0000FF}2 {FFFF00}3 {00FFFF}4 {FF4FF0}5 {dc143c}6 {808080}7 {FFFFFF}8 {800080}9 {006400}10", -1)
       else
          sampAddChatMessage("Последний созданный объект не найден", -1)
       end
@@ -7354,10 +7373,23 @@ function sampev.onSendCommand(command)
    
    if command:find("rindex") and not isTextureStudio then
       if LastObjectData.handle and doesObjectExist(LastObjectData.handle) then
-         for index = 0, 16 do 
+         for index = 0, 15 do 
             setMaterialObject(LastObjectData.id, 1, index, LastObjectData.modelid, "none", "none", 0xFFFFFFFF)
          end
          --sampAddChatMessage("Индексы скрыты", -1)
+         sampAddChatMessage("Режим визуального просмотра индексов отключен", 0x000FF00)
+      else
+         sampAddChatMessage("Последний созданный объект не найден", -1)
+      end
+      return false
+   end
+   
+   if command:find("oalpha") and not isTextureStudio then
+      if LastObjectData.handle and doesObjectExist(LastObjectData.handle) then
+         for index = 0, 15 do 
+            setMaterialObject(LastObjectData.id, 1, index, LastObjectData.modelid, "none", "none", 0x99FFFFFF)
+         end
+         sampAddChatMessage("Установлена полупрозрачность последнему созданному объекту", 0x000FF00)
       else
          sampAddChatMessage("Последний созданный объект не найден", -1)
       end
@@ -7369,10 +7401,13 @@ function sampev.onSendCommand(command)
       	 if isAbsolutePlay then
 		    sampSendChat(string.format("/тпк %f %f %f",
 		    LastObjectData.position.x, LastObjectData.position.y, LastObjectData.position.z), 0x0FFFFFF)
+         elseif isTraining then
+		    sampSendChat(string.format("/xyz %f %f %f",
+		    LastObjectData.position.x, LastObjectData.position.y, LastObjectData.position.z), 0x0FFFFFF)   
 		 else
 		    setCharCoordinates(PLAYER_PED, LastObjectData.position.x, LastObjectData.position.x, LastObjectData.position.z+0.2)
 		 end
-		 sampAddChatMessage("Вы телепортировались на координаты к послед.объекту "..LastObjectData.modelid, -1)
+		 sampAddChatMessage("Вы телепортировались на координаты к послед.объекту "..LastObjectData.modelid, 0x000FF00)
       else
          sampAddChatMessage("Последний созданный объект не найден", -1)
       end
@@ -7478,12 +7513,6 @@ function onExitScript()
 	patch_samp_time_set(false)
 end
 
-function sampev.onScriptTerminate(script, quitGame)
-    if script == thisScript() then
-       sampAddChatMessage("Скрипт AbsEventHelper аварийно завершил свою работу. Для перезагрузки нажмите CTRL + R.", -1)
-    end
-end
-
 function sampev.onCreateObject(objectId, data)
    if not AbsoluteFix then
       -- Fix Crash the game when creating a crane object 1382
@@ -7496,7 +7525,6 @@ function sampev.onCreateObject(objectId, data)
           if data.modelId == hiddenObjects[i] then return false end
       end
    end
-   
 end
 
 function sampev.onSetObjectMaterial(id, data)
@@ -7930,6 +7958,9 @@ function Restream()
    if isAbsolutePlay then
       sampSendChat(string.format("/ngr %f %f %f",
       tpcpos.x, tpcpos.y, tpcpos.z+1000.0), 0x0FFFFFF)
+   elseif isTraining then
+      sampSendChat(string.format("/xyz %f %f %f",
+      tpcpos.x, tpcpos.y, tpcpos.z+1000.0), 0x0FFFFFF)
    else
       setCharCoordinates(PLAYER_PED, tpcpos.x, tpcpos.y, tpcpos.z+1000.0)
    end
@@ -7937,6 +7968,9 @@ function Restream()
    if isAbsolutePlay then
       sampSendChat(string.format("/ngr %f %f %f",
       tpcpos.x, tpcpos.y, tpcpos.z), 0x0FFFFFF)
+   elseif isTraining then
+      sampSendChat(string.format("/xyz %f %f %f",
+      tpcpos.x, tpcpos.y, tpcpos.z+1000.0), 0x0FFFFFF)
    else
       setCharCoordinates(PLAYER_PED, tpcpos.x, tpcpos.y, tpcpos.z)
    end
