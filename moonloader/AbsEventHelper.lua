@@ -4305,13 +4305,13 @@ function imgui.OnDrawFrame()
 	     end
          
       elseif tabmenu.settings == 8 then
-         if imgui.Button(u8"Очистить чат (Для себя)", imgui.ImVec2(220, 25)) then
+         if imgui.Button(u8"Очистить чат (Для себя)", imgui.ImVec2(300, 25)) then
             ClearChat()
          end
-         if imgui.Button(u8"Открыть лог чата (chatlog.txt)", imgui.ImVec2(220, 25)) then
+         if imgui.Button(u8"Открыть лог чата (chatlog.txt)", imgui.ImVec2(300, 25)) then
 	        os.execute('explorer '..getFolderPath(5) ..'\\GTA San Andreas User Files\\SAMP\\chatlog.txt')
 	     end
-         if imgui.Button(u8"Время в чате", imgui.ImVec2(220, 25)) then
+         if imgui.Button(u8"Отображать время в чате", imgui.ImVec2(300, 25)) then
             sampProcessChatInput("/timestamp")
 	     end
          if imgui.Checkbox(u8(checkbox.hidechat.v and 'Показать чат' or 'Скрыть чат'), checkbox.hidechat) then
@@ -4337,7 +4337,7 @@ function imgui.OnDrawFrame()
          
          imgui.Spacing()
          imgui.Text(u8"Копировать в буфер:")
-	     if imgui.Button(u8"Получить id и ники игроков рядом", imgui.ImVec2(220, 25)) then
+	     if imgui.Button(u8"Получить id и ники игроков рядом", imgui.ImVec2(300, 25)) then
 	 	    local pidtable = {}
 	 	    local resulstring
 	 	    for k, v in ipairs(getAllChars()) do
@@ -4352,7 +4352,7 @@ function imgui.OnDrawFrame()
 	 	   end
 	     end
 	     
-         if imgui.Button(u8"Последний кликнутый игрок в TAB", imgui.ImVec2(220, 25)) then
+         if imgui.Button(u8"Последний кликнутый игрок в TAB", imgui.ImVec2(300, 25)) then
 	 	   if tabselectedplayer ~= nil then
                setClipboardText(tabselectedplayer)
                sampAddChatMessage("id последнего кликнутого игрока в TAB скопирован в буфер обмена", -1)
@@ -5237,6 +5237,8 @@ function imgui.OnDrawFrame()
                imgui.TextColoredRGB("{00FF00}/slapme{FFFFFF} - слапнуть себя")
                imgui.TextColoredRGB("{00FF00}/spawnme{FFFFFF} - заспавнить себя")
                imgui.TextColoredRGB("{00FF00}/savepos{FFFFFF} - сохранить позицию")
+               imgui.TextColoredRGB("{00FF00}/setweather{FFFFFF} - установить погоду")
+               imgui.TextColoredRGB("{00FF00}/settime{FFFFFF} - установить время")
                imgui.TextColoredRGB("{00FF00}/gopos{FFFFFF} - телепорт на сохраненную позицию")
             end
          end
@@ -5281,11 +5283,9 @@ function imgui.OnDrawFrame()
                imgui.TextColoredRGB("{00FF00}/menu | /mm{FFFFFF} -  игровое меню")
                imgui.TextColoredRGB("{00FF00}/vw{FFFFFF} -  управление игровым миром")
                imgui.TextColoredRGB("{00FF00}/givevw{FFFFFF} -  передать виртуальный мир игроку")
-               imgui.TextColoredRGB("{00FF00}/sellworld <id> <count>{FFFFFF} -  продать игроку игровой мир")
-               imgui.TextColoredRGB("{00FF00}/buyworld <code>{FFFFFF} -  купить игровой мир")
                imgui.TextColoredRGB("{00FF00}/cancel{FFFFFF} -  отменить покупку игрового мира")
                imgui.TextColoredRGB("{00FF00}/rules{FFFFFF} -  правила сервера")
-               imgui.TextColoredRGB("{00FF00}/stats <*id>{FFFFFF} -  посмотреть статистику игрока")
+               imgui.TextColoredRGB("{00FF00}/stats <id>{FFFFFF} -  посмотреть статистику игрока")
                imgui.TextColoredRGB("{00FF00}/list | /world <1 пункт>{FFFFFF} -  список игровых миров")
                imgui.TextColoredRGB("{00FF00}/exit{FFFFFF} -  отправиться на спаун сервера")
                imgui.TextColoredRGB("{00FF00}/id <name|id>{FFFFFF} -  поиск игроков по части ника | по id")
@@ -5294,7 +5294,6 @@ function imgui.OnDrawFrame()
                imgui.TextColoredRGB("{00FF00}/savepos{FFFFFF} -  сохранить текущую позицию и угол поворота")
                imgui.TextColoredRGB("{00FF00}/gopos{FFFFFF} -  телепортироваться на сохраненную позицию")
                imgui.TextColoredRGB("{00FF00}/xyz <x> <y> <z> <fa> {FFFFFF} -  телепортироваться на координаты")
-               imgui.TextColoredRGB("{00FF00}/swalk <0-14>{FFFFFF} -  установить походку (анимация)")
                imgui.TextColoredRGB("{00FF00}/taser{FFFFFF} -  взять/убрать тайзер")
                imgui.TextColoredRGB("{00FF00}/accept{FFFFFF} -  принять приглашение в игровой мир")
                imgui.TextColoredRGB("{00FF00}/adminlist{FFFFFF} -  список модератов СЕРВЕРА")
@@ -5879,6 +5878,7 @@ function imgui.OnDrawFrame()
          --imgui.TextColoredRGB("IP:  {686868}" .. tostring(ip) ..":".. tostring(port))
          imgui.TextColoredRGB("Дата: {686868}" .. os.date('%d.%m.%Y %X'))
          if mpStartedDTime ~= nil then
+            imgui.SameLine()
             imgui.TextColoredRGB("Началось МП в {686868}" .. mpStartedDTime)
          end
          imgui.Spacing()
@@ -7479,7 +7479,7 @@ end
 
 function sampev.onSendCommand(command)
     -- tips for those who are used to using Texture Studio syntax
-   if not isAbsolutePlay then
+   if isAbsolutePlay then
       if command:find("texture") then
          sampAddChatMessage("Для ретекстура используйте:", 0x000FF00)
          sampAddChatMessage("N - Редактировать объект - Выделить объект - Перекарсить объект", 0x000FF00)
@@ -7504,7 +7504,42 @@ function sampev.onSendCommand(command)
          return false
       end
    end
-  
+   
+   if isAbsolutePlay then
+      if command:find("/setweather") then
+         if command:find('(.+) (.+)') then
+            local cmd, arg = command:match('(.+) (.+)')
+            local id = tonumber(arg)
+            if id >= 0 and id <= 45 then
+               ini.settings.lockserverweather = true
+               patch_samp_time_set(true)
+               slider.weather.v = id
+               setWeather(slider.weather.v)
+               sampAddChatMessage("Вы установили погоду - "..id, 0x000FF00)
+            end
+         else
+            sampAddChatMessage("Укажите верный ид погоды от 0 до 45", -1)
+         end
+         return false
+      end
+      
+      if command:find("/settime") then
+         if command:find('(.+) (.+)') then
+            local cmd, arg = command:match('(.+) (.+)')
+            local id = tonumber(arg)
+            if id >= 0 and id <= 12 then
+               ini.settings.lockserverweather = true
+               patch_samp_time_set(true)
+               slider.time.v = id
+               setTime(slider.time.v)
+               sampAddChatMessage("Вы установили время - "..id, 0x000FF00)
+            end
+         else
+            sampAddChatMessage("Укажите время от 0 до 12", -1)
+         end
+         return false
+      end
+   end
    
    if isAbsolutePlay then
       if command:find("vfibye2") or command:find("машину2") then 
