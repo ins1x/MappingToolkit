@@ -4,7 +4,7 @@ script_description("Assistant for mappers and event makers on Absolute Play")
 script_dependencies('imgui', 'lib.samp.events')
 script_properties("work-in-pause")
 script_url("https://github.com/ins1x/AbsEventHelper")
-script_version("2.7.0 alpha 2")
+script_version("2.7.0")
 -- script_moonloader(16) moonloader v.0.26
 -- Activaton: ALT + X (show main menu)
 -- Blast.hk thread: https://www.blast.hk/threads/200619/
@@ -4701,7 +4701,7 @@ function imgui.OnDrawFrame()
       
       if tabmenu.info == 1 then
          imgui.Text(u8"Absolute Events Helper v".. thisScript().version)
-         imgui.TextColoredRGB("Ассистент для мапперов и организаторов мероприятий на серверах {007DFF}Absolute Play.")
+         imgui.TextColoredRGB("Ассистент для мапперов и организаторов мероприятий.")
          imgui.Text(u8"Скрипт позволит сделать процесс маппинга в внутриигровом редакторе карт")
          imgui.Text(u8"максимально приятным, и даст больше возможностей организаторам мероприятий")
          imgui.Text(u8"Скрипт распостраняется только с открытым исходным кодом")
@@ -4802,17 +4802,19 @@ function imgui.OnDrawFrame()
             end
          end
          if imgui.CollapsingHeader(u8"Лимиты высоты:") then
-            imgui.TextColoredRGB("На карте GTA-SA средней высотой дорог считается ~ 20:")
-            imgui.TextColoredRGB("В Лос-Сантосе: ~10-15")
-            imgui.TextColoredRGB("В Лас-Вентурасе: ~10")
-            imgui.TextColoredRGB("В Сан-Фиерро: ~7-80")
-            imgui.TextColoredRGB("Округ: ~ -45(Карьер возле ЛВ) - 527(Высшая точка горы Чиллиад)")
-            imgui.TextColoredRGB("Уровень океана всегда равен 0")
-            imgui.TextColoredRGB("Приемлимой высотой для создания интерьеров считается высота в 1000")
-            imgui.TextColoredRGB("Максимальной отрицательной высотой является значение в -99")
+            imgui.TextColoredRGB("На карте GTA-SA средней высотой дорог считается {00FF00}~ 20:")
+            imgui.TextColoredRGB("- В Лос-Сантосе: {00FF00}~10-15")
+            imgui.TextColoredRGB("- В Лас-Вентурасе: {00FF00}~10")
+            imgui.TextColoredRGB("- В Сан-Фиерро: {00FF00}~7-80")
+            imgui.TextColoredRGB("- Округ: {00FF00}~ -45(Карьер возле ЛВ)")
+            imgui.Spacing()
+            imgui.TextColoredRGB("Уровень океана всегда равен {00FF00}0")
+            imgui.TextColoredRGB("Высшая точка на карте это горы Чиллиад {00FF00}~527")
+            imgui.TextColoredRGB("Максимальной отрицательной высотой является значение в {00FF00}-99")
             imgui.TextColoredRGB("(Если высота будет ниже, игрока просто телепортирует на поверхность)")
-            imgui.TextColoredRGB("Максимальная высота джетпака 100 (с модами 200)")
-            imgui.TextColoredRGB("Максимальная высота воздушного транспорта 800 (с модами 2000)")
+            imgui.TextColoredRGB("Интерьеры принято размещать на высоте в {00FF00}1000")
+            imgui.TextColoredRGB("Максимальная высота джетпака {00FF00}100 (с модами 200)")
+            imgui.TextColoredRGB("Максимальная высота воздушного транспорта {00FF00}800 (с модами 2000)")
             imgui.Spacing()
             imgui.Link("https://forum.training-server.com/d/18361-prostranstvennaya-orientatsiya-po-karte-gtasa", u8"Пространственная ориентация по карте GTA:SA")
             imgui.Spacing()
@@ -5651,9 +5653,25 @@ function imgui.OnDrawFrame()
         if isTraining then
            imgui.Text(u8"TRAINING FAQ")
            imgui.Spacing()
-           if imgui.CollapsingHeader(u8'Как рассчитывается угол поворота') then
+           
+           if imgui.CollapsingHeader(u8'Как рассчитывается угол поворота?') then
 	          imgui.Text(u8"Угол поворота используется для позиционирования вращений объекта.\n0 значением, как и в компасе является Север.\nДиапазоном является обычный круг 0-359.9 градусов\nИспользуя например /rz в положительном значении,\nвы всегда будете поворачивать объект против часовой стрелки,\nсоответственно в отрицательном - против.\n")
 	       end
+           
+           if imgui.CollapsingHeader(u8'Как сделать "картинку" в /otext?') then
+	          imgui.Text(u8"Ввести букву/цифру в текст с использованием шрифта: GTAWeapon3, Webdings и Wingdings")
+	       end
+           
+           if imgui.CollapsingHeader(u8'Как изменить спавн в мире?') then
+	          imgui.Text(u8"Необходимо создать установить и настроить тиму через /team\nВ появившемся диалоге выбрать слот под тиму, далее указать название и нажать спаун.\nПосле этого в меню /vw появится пункт 'Команда по-умолчанию'.\nВ котором и задается тима (и спавн) по-умолчанию")
+	       end
+           
+           if imgui.CollapsingHeader(u8'Как сделать мир статичным?') then
+              imgui.Link("https://forum.training-server.com/d/10501-kak-sdelat-mir-statichnym", u8"Внимательно ознакомиться с темой на форуме")
+              imgui.Text(u8"Привести мир в соответвие с требованиями:")
+              imgui.Text(u8"-Мир должен быть полностью автономным.\n-На протяжение 3х дней после подачи заявки, в теме должен быть отчет\nскрины или видео с онлайном мира и игроками.\n(Скрины подойдут любые из игрового процесса.)\n-Все изменения / обновления мира должны сообщаться в теме.")
+           end
+           
         end
         
         if isAbsolutePlay then
@@ -7612,6 +7630,11 @@ function sampev.onSendCommand(command)
       end
       if command:find("flymode") then
          sampSendChat("/полет")
+         return false
+      end
+      if command:find("team") or command:find("setteam") then
+         sampSendChat("Нельзя менять тимы. Если вы хотели изменить спавн используйте:",0x000FF00)
+         sampSendChat("Y - Редактор карт - Управление миром - Выбрать точку появления",0x000FF00)
          return false
       end
       if command:find("jetpack")then
