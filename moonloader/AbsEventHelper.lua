@@ -4,7 +4,7 @@ script_description("Assistant for mappers and event makers on Absolute Play")
 script_dependencies('imgui', 'lib.samp.events')
 script_properties("work-in-pause")
 script_url("https://github.com/ins1x/AbsEventHelper")
-script_version("2.7.0 alpha")
+script_version("2.7.0 alpha 2")
 -- script_moonloader(16) moonloader v.0.26
 -- Activaton: ALT + X (show main menu)
 -- Blast.hk thread: https://www.blast.hk/threads/200619/
@@ -3046,6 +3046,13 @@ function main()
 		 scaleEditObject = false
 	  end
 	  
+      if isTraining and isCharInAnyCar(PLAYER_PED) then
+	     if isKeyJustPressed(0x4C) and not sampIsChatInputActive() 
+         and not sampIsDialogActive() and not isPauseMenuActive() 
+         and not isSampfuncsConsoleActive() then 
+            sampSendChat("/lock")
+         end
+      end
 	  -- if isKeyJustPressed(0x4E) and not sampIsChatInputActive() 
       -- and not sampIsDialogActive() and not isPauseMenuActive() 
       -- and not isSampfuncsConsoleActive() then 
@@ -3330,6 +3337,13 @@ function imgui.OnDrawFrame()
 			   end
 			end
 			
+            if positionX > 3000 or positionY > 3000
+            or positionX < -3000 or positionY < -3000 then
+               imgui.TextColoredRGB("{FF0000}Вы находитесь за предедлами игровой зоны!")
+               imgui.SameLine()
+               imgui.TextQuestion("( ? )", u8"Нахождение вне игровой зоны, вызывает игровые аномалии (Рассинхронизация транспорта/игроков, отсутствие урона от ближнего боя, аномальное поведение объектов маппинга)")
+            end
+            
 			imgui.Spacing()
 			imgui.Spacing()
             
@@ -4787,6 +4801,22 @@ function imgui.OnDrawFrame()
                imgui.TextColoredRGB("Транспорт: {00FF00}30 (VIP 80)")
             end
          end
+         if imgui.CollapsingHeader(u8"Лимиты высоты:") then
+            imgui.TextColoredRGB("На карте GTA-SA средней высотой дорог считается ~ 20:")
+            imgui.TextColoredRGB("В Лос-Сантосе: ~10-15")
+            imgui.TextColoredRGB("В Лас-Вентурасе: ~10")
+            imgui.TextColoredRGB("В Сан-Фиерро: ~7-80")
+            imgui.TextColoredRGB("Округ: ~ -45(Карьер возле ЛВ) - 527(Высшая точка горы Чиллиад)")
+            imgui.TextColoredRGB("Уровень океана всегда равен 0")
+            imgui.TextColoredRGB("Приемлимой высотой для создания интерьеров считается высота в 1000")
+            imgui.TextColoredRGB("Максимальной отрицательной высотой является значение в -99")
+            imgui.TextColoredRGB("(Если высота будет ниже, игрока просто телепортирует на поверхность)")
+            imgui.TextColoredRGB("Максимальная высота джетпака 100 (с модами 200)")
+            imgui.TextColoredRGB("Максимальная высота воздушного транспорта 800 (с модами 2000)")
+            imgui.Spacing()
+            imgui.Link("https://forum.training-server.com/d/18361-prostranstvennaya-orientatsiya-po-karte-gtasa", u8"Пространственная ориентация по карте GTA:SA")
+            imgui.Spacing()
+         end
          imgui.Text(u8"В радиусе 150 метров нельзя создавать более 200 объектов.")
          imgui.TextColoredRGB("Максимальная длина текста на объектах в редакторе миров - {00FF00}50 символов")
          
@@ -4981,6 +5011,66 @@ function imgui.OnDrawFrame()
             end
 		 end
 		 
+         if imgui.CollapsingHeader(u8'Популярные текстуры') then
+            if isTraining then
+               imgui.TextColoredRGB("{00FF00}8660{FFFFFF} - невидимая текстура")
+               imgui.TextColoredRGB("{00FF00}2643 или 64{FFFFFF} - двойной цвет (бело-чёрный)")
+               imgui.TextColoredRGB("{00FF00}121{FFFFFF} - песок")
+               imgui.TextColoredRGB("{00FF00}388{FFFFFF} - прозрачная текстура")
+               imgui.TextColoredRGB("{00FF00}89{FFFFFF} - вода")
+               imgui.TextColoredRGB("{00FF00}56 и 4853{FFFFFF} - трава")
+               imgui.TextColoredRGB("{00FF00}1165 и 3123{FFFFFF} - дерево")
+               imgui.TextColoredRGB("{00FF00}2864 и 3035{FFFFFF} - стекло")
+               imgui.TextColoredRGB("{00FF00}2921 и 4062{FFFFFF} - белая текстура")
+               imgui.TextColoredRGB("{00FF00}300{FFFFFF} - чёрная текстурка")
+               imgui.TextColoredRGB("{00FF00}7838 - 7807 - 7808 - 8405 - 8406 - 8407 - 8408 - 5440 - 5441 - 5442 - 5443{FFFFFF}")
+               imgui.TextColoredRGB("разные цвета (зелёный, красный, синий и т.д)")
+               imgui.TextColoredRGB("{00FF00}235{FFFFFF} - стрелки")
+               imgui.TextColoredRGB("{00FF00}6510{FFFFFF} - затемнение")
+               imgui.TextColoredRGB("{00FF00}6439{FFFFFF} - прозрачная дверь")
+               imgui.TextColoredRGB("{00FF00}6289{FFFFFF} - деревянные балки")
+               imgui.TextColoredRGB("{00FF00}6239{FFFFFF} - окно")
+               imgui.TextColoredRGB("{00FF00}6006{FFFFFF} - экран TВ")
+               imgui.TextColoredRGB("{00FF00}4812{FFFFFF} - гараж")
+               imgui.TextColoredRGB("{00FF00}4741{FFFFFF} - вентиляция")
+               imgui.TextColoredRGB("{00FF00}4700{FFFFFF} - разбитое окно или двери")
+               imgui.TextColoredRGB("{00FF00}3321{FFFFFF} - окно в магазинах")
+               imgui.TextColoredRGB("{00FF00}3223{FFFFFF} - газета")
+               imgui.TextColoredRGB("{00FF00}3124{FFFFFF} - люди, просто люди")
+               imgui.TextColoredRGB("{00FF00}2519{FFFFFF} - занавес")
+               imgui.TextColoredRGB("{00FF00}2410{FFFFFF} - флаги")
+               imgui.TextColoredRGB("{00FF00}1847{FFFFFF} - дверь")
+               imgui.TextColoredRGB("{00FF00}1665{FFFFFF} - сетка прозрачная")
+               imgui.Spacing()
+               imgui.TextColoredRGB("{00FF00}/tsearch <objectid> <slot> <name>{FFFFFF} - наложение текстуры по поиску")
+               imgui.TextColoredRGB("{00FF00}/stexture <objectid> <slot> <index>{FFFFFF} - наложить текстуру на объект по индексу")
+               imgui.TextColoredRGB("{00FF00}/untexture <objectid>{FFFFFF} - обнулить наложенные текстуры (и /ocolor)")
+            end
+            if isAbsolutePlay then
+               imgui.TextColoredRGB("{00FF00}90{FFFFFF} - Вода из ViceCity")
+               imgui.TextColoredRGB("{00FF00}118{FFFFFF} - белый цвет, {00FF00}204{FFFFFF} - Черный цвет")
+               imgui.TextColoredRGB("{00FF00}98, 101, 178{FFFFFF} - Ящики")
+               imgui.TextColoredRGB("{00FF00}121, 122, 125{FFFFFF} - Песок")
+               imgui.TextColoredRGB("{00FF00}13, 59, 176, 234, 243, 273, 277, 283, 298{FFFFFF} - Дерево")
+               imgui.TextColoredRGB("{00FF00}64, 73{FFFFFF} - Трава")
+               imgui.TextColoredRGB("{00FF00}217-221 и 265-269{FFFFFF} - Подарки")
+               imgui.TextColoredRGB("{00FF00}212 - 216{FFFFFF} Цвета")
+               imgui.TextColoredRGB("{00FF00}129{FFFFFF} - Военный камуфляж")
+               imgui.TextColoredRGB("{00FF00}244, 232{FFFFFF} - Ржавчина")
+               imgui.TextColoredRGB("{00FF00}168, 170, 49, 230, 233{FFFFFF} - Металл")
+               imgui.TextColoredRGB("{00FF00}256{FFFFFF} - Лава")
+               imgui.TextColoredRGB("{00FF00}257{FFFFFF} - Мусор")
+               imgui.TextColoredRGB("{00FF00}8{FFFFFF} - Снег")
+               imgui.TextColoredRGB("{00FF00}65{FFFFFF} - Финиш (Флаг)")
+               imgui.TextColoredRGB("{00FF00}107{FFFFFF} - Скайбокс")
+               imgui.Spacing()
+               imgui.TextColoredRGB("Используйте {00FF00}/tsearch{FFFFFF} для поиска тексуры")
+            end
+            imgui.TextColoredRGB("Топлист текстур онлайн:")
+		    imgui.SameLine()
+            imgui.Link("https://textures.xyin.ws/?page=toplist", "https://textures.xyin.ws/?page=toplist")
+         end
+         
 		 if imgui.CollapsingHeader(u8'Популярные шрифты') then
             
             local fontlink
@@ -5551,8 +5641,21 @@ function imgui.OnDrawFrame()
        if imgui.CollapsingHeader(u8'Создание прозрачных/Невидимых объектов') then
 	      imgui.Text(u8"Создаются через функцию SetObjectMaterial.\nУказываем имя библиотеки с текстурой и текстуры как 'none'.\nПараметр materialcolor устанавливаем в 0x00000000 (0).\nMaterialIndex - обозначает ID слоя материала объекта.\nИногда объекты имеют 2 и более различных типов текстур.\nЭто означает, что есть 2 и более слотов (слоёв) в индексах.\nВ таком случае необходимо указывать прозрачность каждому слою.")
 	   end
+       
+       if imgui.CollapsingHeader(u8'Почему не стоит размещать объекты за пределами игровой зоны') then
+	      imgui.Text(u8"Игровой зоной считается диапазон от -3000 до 3000 по координатам X, Y.\nНахождение вне этих координат, вызывает игровые аномалии, такие как:\nРассинхронизация транспорта/игроков\nОтсутствие урона от ближнего боя\nАномальное поведение объектов маппинга и пикапов, аномальные блики экрана\nнеправильное позиционирование камеры игрока\n")
+	   end
+       
 
 	   imgui.Spacing()
+        if isTraining then
+           imgui.Text(u8"TRAINING FAQ")
+           imgui.Spacing()
+           if imgui.CollapsingHeader(u8'Как рассчитывается угол поворота') then
+	          imgui.Text(u8"Угол поворота используется для позиционирования вращений объекта.\n0 значением, как и в компасе является Север.\nДиапазоном является обычный круг 0-359.9 градусов\nИспользуя например /rz в положительном значении,\nвы всегда будете поворачивать объект против часовой стрелки,\nсоответственно в отрицательном - против.\n")
+	       end
+        end
+        
         if isAbsolutePlay then
            imgui.Text(u8"Редактор карт на Absolute Play")
            imgui.Spacing()
@@ -7438,43 +7541,55 @@ function sampev.onServerMessage(color, text)
       thisScript():unload()
    end
    
-   if text:find("У тебя нет прав") then
-      if prepareJump then 
-         JumpForward()
-         prepareJump = false
+   if isAbsolutePlay then
+      if text:find("У тебя нет прав") then
+         if prepareJump then 
+            JumpForward()
+            prepareJump = false
+         end
+         if prepareTeleport then sampAddChatMessage("В мире телепортация отключена", 0x00FF00) end
+         return false
       end
-      if prepareTeleport then sampAddChatMessage("В мире телепортация отключена", 0x00FF00) end
-      return false
+      
+      if text:find("Последнего созданного объекта не существует") then
+         if LastObjectData.modelid then
+            sampAddChatMessage("Последний использованный объект: "..LastObjectData.modelid, 0x00FF00)
+	     end
+      end
+      
+      if text:find("Управляющим мира смертельный урон не наносится") then
+         sampAddChatMessage("N - Оружие - Отключить сужающуюся зону урона", -1)
+      end
+      
+      if text:find("Установи 0.3DL чтобы включать полёт в этом месте") then
+         sampAddChatMessage("Необходимо уходить в полет с другой точки где мало объектов рядом (выйти из зоны стрима)", 0x00FF00)
+      end
+      
+      if text:find("Ты уже находишься в редакторе миров") then
+         sampSendChat("/exit")
+      end
+      
+      if text:find("В этой области создано слишком много объектов") then
+         sampAddChatMessage("Вы создали много объектов в одной области.", 0x00FF00)
+         sampAddChatMessage("В радиусе 150 метров нельзя создавать больше 200 объектов.", 0x00FF00)
+         return false
+      end
+      
+      if text:find("Это не твой мир, редактировать его ты не можешь") then
+         return false
+      end
    end
    
-   if text:find("Последнего созданного объекта не существует") then
-      if LastObjectData.modelid then
-         sampAddChatMessage("Последний использованный объект: "..LastObjectData.modelid, 0x00FF00)
-	  end
+   if isTraining then
+      if text:find("Виртуальный мир успешно создан") 
+      or text:find("Вы создали пробный VIP мир") then
+         sampSendChat("/weather "..slider.weather.v)
+         lua_thread.create(function()
+            wait(1000)
+            sampSendChat("/time "..slider.time.v)
+         end)
+      end
    end
-   
-   if text:find("Управляющим мира смертельный урон не наносится") then
-      sampAddChatMessage("N - Оружие - Отключить сужающуюся зону урона", -1)
-   end
-   
-   if text:find("Установи 0.3DL чтобы включать полёт в этом месте") then
-      sampAddChatMessage("Необходимо уходить в полет с другой точки где мало объектов рядом (выйти из зоны стрима)", 0x00FF00)
-   end
-   
-   if text:find("Ты уже находишься в редакторе миров") then
-      sampSendChat("/exit")
-   end
-   
-   if text:find("В этой области создано слишком много объектов") then
-      sampAddChatMessage("Вы создали много объектов в одной области.", 0x00FF00)
-      sampAddChatMessage("В радиусе 150 метров нельзя создавать больше 200 объектов.", 0x00FF00)
-      return false
-   end
-   
-   if text:find("Это не твой мир, редактировать его ты не можешь") then
-      return false
-   end
-
 end
 
 function sampev.onSendCommand(command)
