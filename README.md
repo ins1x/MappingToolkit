@@ -1,8 +1,8 @@
 <h1 align="center">Absolute Event Helper</h1>
 <p align="center">
-    <img src="https://img.shields.io/badge/made%20for-GTA%20SA--MP-blue" >
-    <img src="https://img.shields.io/badge/Server-Absolute%20Play-red">
-    <img src="https://img.shields.io/badge/Server-TRAINING%20-yellow">
+    <a href="https://www.sa-mp.mp/"><img src="https://img.shields.io/badge/made%20for-GTA%20SA--MP-blue"></a>
+    <a href="https://gta-samp.ru/"><img src="https://img.shields.io/badge/Server-Absolute%20Play-red"></a>
+    <a href="https://training-server.com/"><img src="https://img.shields.io/badge/Server-TRAINING%20-yellow"></a>
 </p>
 
 ![logo](https://github.com/ins1x/AbsEventHelper/raw/main/moonloader/resource/abseventhelper/demo.gif)
