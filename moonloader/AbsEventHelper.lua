@@ -4,7 +4,7 @@ script_description("Assistant for mappers and event makers")
 script_dependencies('imgui', 'lib.samp.events')
 script_properties("work-in-pause")
 script_url("https://github.com/ins1x/AbsEventHelper")
-script_version("2.7.0")
+script_version("2.7.0 R1")
 -- script_moonloader(16) moonloader v.0.26
 -- sa-mp version: 0.3.7 R1
 -- Activaton: ALT + X (show main menu) or command /abs
@@ -2976,13 +2976,16 @@ function main()
       if servername:find("TRAINING") then
          isTraining = true
       end
+      if servername:find("Absolute") then
+         isAbsolutePlay = true
+      end
+      if servername:find("Абсолют") then
+         isAbsolutePlay = true
+      end
       if not servername:find("Absolute") then
-	     isAbsolutePlay = false
          if ini.settings.noabsunload then
             thisScript():unload()
 		 end
-      else
-	     isAbsolutePlay = true
       end
       
       -- Imgui menu
