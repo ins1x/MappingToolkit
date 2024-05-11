@@ -4,7 +4,7 @@ script_description("Assistant for mappers and event makers")
 script_dependencies('imgui', 'lib.samp.events')
 script_properties("work-in-pause")
 script_url("https://github.com/ins1x/AbsEventHelper")
-script_version("2.7.0 R1")
+script_version("2.7.1")
 -- script_moonloader(16) moonloader v.0.26
 -- sa-mp version: 0.3.7 R1
 -- Activaton: ALT + X (show main menu) or command /abs
@@ -68,6 +68,7 @@ local isTraining = false
 local isSampAddonInstalled = false
 local isAbsfixInstalled = false
 local isPlayerSpectating = false
+local isWorldHoster = false
 local disableObjectCollision = false
 local prepareTeleport = false
 local prepareJump = false
@@ -176,6 +177,7 @@ local checkbox = {
    freezechat = imgui.ImBool(false),
    globalchatoff = imgui.ImBool(false),
    playerwarnings = imgui.ImBool(false),
+   objectscale = imgui.ImBool(false),
    chatmentions = imgui.ImBool(ini.settings.chatmentions),
    test = imgui.ImBool(false)
 }
@@ -205,6 +207,7 @@ local slider = {
    weather = imgui.ImInt(0),
    time = imgui.ImInt(12),
    fov = imgui.ImInt(0),
+   scale = imgui.ImFloat(1.0),
    camdist = imgui.ImInt(ini.settings.camdist)
 }
 
@@ -273,6 +276,7 @@ local LastObjectData = {
    handle = nil,
    id = nil,
    modelid = nil,
+   localid = nil,
    txdname = nil,
    txdlibname = nil,
    txdmodel = nil,
@@ -3097,10 +3101,21 @@ function main()
 		 end
 	  end
 	  
-      if isTraining then -- N key menu /vw
+      if isTraining then
+         -- M key menu /vw and /world 
+         if isKeyJustPressed(0x4D) and not sampIsChatInputActive() and not sampIsDialogActive()
+		 and not isPauseMenuActive() and not isSampfuncsConsoleActive() then 
+            if isWorldHoster then 
+               sampSendChat("/vw")
+            else 
+               sampSendChat("/world")
+            end   
+         end
+         
+         -- N key edit object
          if isKeyJustPressed(0x4E) and not sampIsChatInputActive() and not sampIsDialogActive()
 		 and not isPauseMenuActive() and not isSampfuncsConsoleActive() then 
-            sampSendChat("/vw")
+            if isWorldHoster then sampSendChat("/csel") end
          end
       end
       
@@ -3398,18 +3413,22 @@ function imgui.OnDrawFrame()
 	        imgui.SameLine()
 	        if imgui.Button(u8"Вернуться на поверхность", imgui.ImVec2(200, 25)) then
                local result, x, y, z = getNearestRoadCoordinates()
-		       local anticheatMaxAllowedDist = 10.0
                if result then
                   local dist = getDistanceBetweenCoords3d(x, y, z, getCharCoordinates(PLAYER_PED))
-                  if dist < anticheatMaxAllowedDist then 
-			         setCharCoordinates(PLAYER_PED, x, y, z + 3.0)
-			         --sampAddChatMessage(("(%i %i %i)"):format(x,y,z), -1)
-                     sampAddChatMessage("Вы телепортированны на ближайшую поверхность", -1)
-			      else
-			         sampAddChatMessage(("Ближайшая поверхность слишком далеко (%d m.)"):format(dist), 0x0FF0000)
-			         local posX, posY, posZ = getCharCoordinates(PLAYER_PED)
-                     setCharCoordinates(PLAYER_PED, posX, posY, posZ+3.0)
-			      end
+                  if isAbsolutePlay then
+                     if dist < 10.0 then 
+			            setCharCoordinates(PLAYER_PED, x, y, z + 3.0)
+			            --sampAddChatMessage(("(%i %i %i)"):format(x,y,z), -1)
+                        sampAddChatMessage("Вы телепортированы на ближайшую поверхность", -1)
+			         else
+			            sampAddChatMessage(("Ближайшая поверхность слишком далеко (%d m.)"):format(dist), 0x0FF0000)
+			            local posX, posY, posZ = getCharCoordinates(PLAYER_PED)
+                        setCharCoordinates(PLAYER_PED, posX, posY, posZ+3.0)
+			         end
+                  else
+                     setCharCoordinates(PLAYER_PED, x, y, z + 3.0)
+                     sampAddChatMessage("Вы телепортированы на ближайшую поверхность", -1)
+                  end
                else
                   sampAddChatMessage("Не нашлось ни одной поверхности рядом", 0x0FF0000)
 			      local posX, posY, posZ = getCharCoordinates(PLAYER_PED)
@@ -3478,17 +3497,24 @@ function imgui.OnDrawFrame()
 			   
 			   if imgui.Button(u8"Телепорт по координатам", imgui.ImVec2(200, 25)) then
 			   	  freezeCharPosition(playerPed, false)
-	              if isAbsolutePlay then
+	              
                      if tpcpos.x then
                         prepareTeleport = true
-                        sampSendChat(string.format("/ngr %f %f %f", tpcpos.x, tpcpos.y, tpcpos.z), 0x0FFFFFF)
-                        sampAddChatMessage(string.format("Телепорт на координаты: %.1f %.1f %.1f",
-                        tpcpos.x, tpcpos.y, tpcpos.z), 0x0FFFFFF)
+                        if isAbsolutePlay then
+                           sampSendChat(string.format("/ngr %f %f %f", tpcpos.x, tpcpos.y, tpcpos.z), -1)
+                           sampAddChatMessage(string.format("Телепорт на координаты: %.1f %.1f %.1f",
+                           tpcpos.x, tpcpos.y, tpcpos.z), 0x000FF00)
+                        end
+                        if isTraining then
+                           sampSendChat(string.format("/xyz %f %f %f", tpcpos.x, tpcpos.y, tpcpos.z), -1)
+                           sampAddChatMessage(string.format("Телепорт на координаты: %.1f %.1f %.1f",
+                           tpcpos.x, tpcpos.y, tpcpos.z), 0x000FF00)
+                        end
                      else
                         prepareTeleport = false
-                        sampAddChatMessage("Координаты не были сохранены", 0x0FFFFFF)
+                        sampAddChatMessage("Координаты не были сохранены", -1)
 				     end  
-		          end
+                 
                end
 			   
 		    end
@@ -3668,19 +3694,36 @@ function imgui.OnDrawFrame()
               end
            end		
         end
-        
         imgui.SameLine()
         imgui.TextQuestion("( ? )", u8"Применимо только для объектов в области стрима")
-		
+           
+        imgui.Checkbox(u8("Изменить размер объекта"), checkbox.objectscale)
+        if checkbox.objectscale.v then
+           if LastObjectData.handle then
+              if imgui.SliderFloat(u8"##scaleobject", slider.scale, 0.0, 50.0) then
+                 setObjectScale(LastObjectData.handle, slider.scale.v)
+              end
+		   else 
+		      imgui.Text(u8"Последний объект не найден")
+           end
+        end
+        imgui.SameLine()
+        imgui.TextQuestion("( ? )", u8"Визуально изменяет масштаб объекта, и растягивает его. (как в МТА)")
+        
 		if imgui.Button(u8"ТП к последнему объекту", imgui.ImVec2(250, 25)) then
 		   if LastObjectData.modelid and LastObjectData.position.x ~= 0 and doesObjectExist(LastObjectData.handle) then
 		      if isAbsolutePlay then
 		         sampSendChat(string.format("/ngr %f %f %f",
 			     LastObjectData.position.x, LastObjectData.position.y, LastObjectData.position.z), 0x0FFFFFF)
+                 sampAddChatMessage("Вы телепортировались на координаты к послед.объекту "..LastObjectData.modelid, -1)
+              elseif isTraining then
+                 sampSendChat(string.format("/xyz %f %f %f",
+			     LastObjectData.position.x, LastObjectData.position.y, LastObjectData.position.z), 0x0FFFFFF)
+                 sampAddChatMessage("Вы телепортировались на координаты к послед.объекту "..LastObjectData.modelid, -1)
 			  else
-			     setCharCoordinates(PLAYER_PED, LastObjectData.position.x, LastObjectData.position.x, LastObjectData.position.z+0.2)
+                 sampAddChatMessage("Недосутпно для этого сервера!", -1)
+			     --setCharCoordinates(PLAYER_PED, LastObjectData.position.x, LastObjectData.position.x, LastObjectData.position.z+0.2)
 			  end
-			  sampAddChatMessage("Вы телепортировались на координаты к послед.объекту "..LastObjectData.modelid, -1)
 		   else
 		      sampAddChatMessage("Не найден последний объект", -1)
 		   end
@@ -4389,7 +4432,7 @@ function imgui.OnDrawFrame()
 	  if imgui.Button(u8"Эффекты",imgui.ImVec2(150, 25)) then tabmenu.settings = 6 end 
 	  if imgui.Button(u8"Чатик",imgui.ImVec2(150, 25)) then tabmenu.settings = 8 end 
       if ini.settings.debug then
-	     if imgui.Button(u8"Прочее",imgui.ImVec2(150, 25)) then tabmenu.settings = 7 end 
+	     if imgui.Button(u8"Дебаг",imgui.ImVec2(150, 25)) then tabmenu.settings = 7 end 
       end
 	  
       imgui.Spacing()
@@ -4457,7 +4500,7 @@ function imgui.OnDrawFrame()
              imgui.TextColoredRGB(string.format("Выбран игрок: {%0.6x} %s[%d]",
              bit.band(ucolor,0xffffff), nickname, chosenplayer))
           else
-		     imgui.TextColoredRGB("{FF0000}Красным{CDCDCD} в таблице отмечены подозрительные игроки (малый лвл, большой пинг)")
+		     imgui.TextColoredRGB("{FF0000}Красным{CDCDCD} в таблице отмечены подозрительные игроки")
 		  end
        
           --imgui.Spacing()
@@ -4503,15 +4546,19 @@ function imgui.OnDrawFrame()
              end
              imgui.SetColumnWidth(-1, 250)
              imgui.NextColumn()
-             if (score < 20) then
-                imgui.TextColoredRGB(string.format("{FF0000}%i", score))
-             else 
+             if isAbsolutePlay then
+                if score < 10 then
+                   imgui.TextColoredRGB(string.format("{FF0000}%i", score))
+                else 
+                   imgui.TextColoredRGB(string.format("%i", score))
+                end
+             else
                 imgui.TextColoredRGB(string.format("%i", score))
              end
              imgui.SetColumnWidth(-1, 70)
              imgui.NextColumn()
-             if health >= 9000 then
-             imgui.TextColoredRGB("{FF0000}Бессмертный")
+             if health >= 5000 then
+                imgui.TextColoredRGB("{FF0000}Бессмертный")
              elseif health <= 100 then
                 imgui.TextColoredRGB(string.format("%i (%i)", health, armor))
              else
@@ -5328,7 +5375,7 @@ function imgui.OnDrawFrame()
          if imgui.CollapsingHeader(u8"Дополнительные команды:") then
             imgui.TextColoredRGB("{00FF00}/abs{FFFFFF} - открыть главное меню хелпера")
             imgui.TextColoredRGB("{00FF00}/jump{FFFFFF} - прыгнуть вперед")
-            imgui.TextColoredRGB("{00FF00}/оt, /от{FFFFFF} - быстрые ответы")
+            imgui.TextColoredRGB("{00FF00}/от, /ответ{FFFFFF} - быстрые ответы")
             if isAbsolutePlay then
                imgui.TextColoredRGB("{00FF00}/slapme{FFFFFF} - слапнуть себя")
                imgui.TextColoredRGB("{00FF00}/spawnme{FFFFFF} - заспавнить себя")
@@ -7309,7 +7356,7 @@ end
 
 function sampev.onSendDialogResponse(dialogId, button, listboxId, input)
    if checkbox.logdialogresponse.v then
-      print(dialogId, button, listboxId, input)
+      print(string.format("dialogId: %d, button: %d, listboxId: %d, input: %s", dialogId, button, listboxId, input))
    end
    
    if isAbsolutePlay then
@@ -7319,6 +7366,7 @@ function sampev.onSendDialogResponse(dialogId, button, listboxId, input)
       -- if player wxit from world without command drop lastWorldNumber var 
       if dialogId == 1405 and listboxId == 5 and button == 1 then
          lastWorldNumber = 0
+         isWorldHoster = false
          worldspawnpos.x, worldspawnpos.y, worldspawnpos.z = getCharCoordinates(PLAYER_PED)
       end
        
@@ -7409,6 +7457,21 @@ function sampev.onSendDialogResponse(dialogId, button, listboxId, input)
 	  -- end
 
    end
+   
+   -- All Training dialogId has id 32700
+   if isTraining and dialogId == 32700 then
+      
+      if listboxId == 3 and button == 1 and input:find("Вернуться в свой мир") then
+         if worldspawnpos.x and worldspawnpos.x ~= 0 then
+            sampSendChat(string.format("/xyz %f %f %f",
+		    worldspawnpos.x, worldspawnpos.y, worldspawnpos.z), 0x0FFFFFF)
+         else
+            sampSendChat("/spawnme")
+         end
+      end
+      
+   end
+   
 end
 
 function sampev.onShowDialog(dialogId, style, title, button1, button2, text)
@@ -7563,6 +7626,18 @@ function sampev.onServerMessage(color, text)
       thisScript():unload()
    end
    
+   if isTraining then
+      if text:find("Невозможно создать новый мир, за вами уже есть закрепленный мир") then
+         isWorldHoster = true
+         sampSendChat("/vw")
+         return false
+      end
+      if text:find("Меню управления миром") then
+         sampAddChatMessage("[SERVER]: {FFFFFF}Меню управления миром - /vw или клавиша - M", 0x0ff4f00)
+         return false
+      end
+   end
+   
    if isAbsolutePlay then
       if text:find("У тебя нет прав") then
          if prepareJump then 
@@ -7605,11 +7680,28 @@ function sampev.onServerMessage(color, text)
    if isTraining then
       if text:find("Виртуальный мир успешно создан") 
       or text:find("Вы создали пробный VIP мир") then
+         isWorldHoster = true
+         worldspawnpos.x, worldspawnpos.y, worldspawnpos.z = getCharCoordinates(PLAYER_PED)
          sampSendChat("/weather "..slider.weather.v)
          lua_thread.create(function()
             wait(1000)
             sampSendChat("/time "..slider.time.v)
+            wait(1000)
+            sampSendChat("/gm")
          end)
+      end
+      
+      if text:find('Создан объект: (%d+)') then
+         LastObjectData.localid = text:match('Создан объект: (%d+)')
+      end
+      
+      if text:find('Вы отправлены на спаун!') then
+         isWorldHoster = false
+         sampSendChat("/spawnme")
+      end
+      
+      if text:find('Удален объект: (%d+)') then
+         LastObjectData.localid = nil
       end
    end
 end
@@ -7644,6 +7736,21 @@ function sampev.onSendCommand(command)
       if command:find("jetpack")then
          sampAddChatMessage("Джетпак можно взять в меню: N - Оружие - Выдать себе оружие", 0x000FF00)
          return false
+      end
+   end
+   
+   if isTraining then
+      if command:find("/omenu") then
+         if command:find('(.+) (.+)') then
+            local cmd, arg = command:match('(.+) (.+)')
+            local id = tonumber(arg)
+            --sampSendChat("/omenu "..id)
+         else
+            if LastObjectData.localid then
+               sampSendChat("/omenu "..LastObjectData.localid)
+               return false
+            end
+         end
       end
    end
    
@@ -7690,7 +7797,7 @@ function sampev.onSendCommand(command)
       end
    end
    
-   if command:find("/от") or command:find("/ответ") or command:find("/ot") then
+   if command:find("от") or command:find("ответ") then
       if command:find('(.+) (.+)') then
          local cmd, arg = command:match('(.+) (.+)')
          local id = tonumber(arg)
@@ -7710,6 +7817,7 @@ function sampev.onSendCommand(command)
    end
    
    if command:find("exit") or command:find("выход") then
+      isWorldHoster = false
 	  lastWorldNumber = 0
       worldspawnpos.x = 0
       worldspawnpos.y = 0
@@ -7885,7 +7993,11 @@ function sampev.onSendCommand(command)
 		 end
 		 sampAddChatMessage("Вы телепортировались на координаты к послед.объекту "..LastObjectData.modelid, 0x000FF00)
       else
-         sampAddChatMessage("Последний созданный объект не найден", -1)
+         if isTraining then
+            sampAddChatMessage("Используйте /tpo <id>", -1)
+         else
+            sampAddChatMessage("Последний созданный объект не найден", -1)
+         end
       end
       return false
    end
@@ -8125,6 +8237,10 @@ end
 
 function sampev.onSendClickPlayer(playerId, source)
    tabselectedplayer = playerId
+   if isTraining then
+      setClipboardText(tabselectedplayer)
+      sampAddChatMessage("id "..playerId.." кликнутого в TAB игрока "..sampGetPlayerNickname(playerId).." скопирован в буфер", 0x000FF00)
+   end
 end
 
 function sampev.onShowTextDraw(id, data)
