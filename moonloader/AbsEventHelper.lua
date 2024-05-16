@@ -155,6 +155,7 @@ local checkbox = {
    logobjects = imgui.ImBool(false),
    log3dtexts = imgui.ImBool(false),
    logtxd = imgui.ImBool(false),
+   logmessages = imgui.ImBool(false),
    pickeduppickups = imgui.ImBool(false),
    showtextdrawsid = imgui.ImBool(false),
    vehloads = imgui.ImBool(false),
@@ -3512,30 +3513,28 @@ function imgui.OnDrawFrame()
 		          if bTargetResult then
 			         textbuffer.tpcx.v = string.format("%.1f", bX)
 			         textbuffer.tpcy.v = string.format("%.1f", bY)
-			         textbuffer.tpcz.v = string.format("%.1f", bZ)
+			         textbuffer.tpcz.v = string.format("%.1f", bZ+2.0)
 			      end
 			   end
 			   
 			   if imgui.Button(u8"Телепорт по координатам", imgui.ImVec2(200, 25)) then
 			   	  freezeCharPosition(playerPed, false)
-	              
-                     if tpcpos.x then
-                        prepareTeleport = true
-                        if isAbsolutePlay then
-                           sampSendChat(string.format("/ngr %f %f %f", tpcpos.x, tpcpos.y, tpcpos.z), -1)
-                           sampAddChatMessage(string.format("Телепорт на координаты: %.1f %.1f %.1f",
-                           tpcpos.x, tpcpos.y, tpcpos.z), 0x000FF00)
-                        end
-                        if isTraining then
-                           sampSendChat(string.format("/xyz %f %f %f", tpcpos.x, tpcpos.y, tpcpos.z), -1)
-                           sampAddChatMessage(string.format("Телепорт на координаты: %.1f %.1f %.1f",
-                           tpcpos.x, tpcpos.y, tpcpos.z), 0x000FF00)
-                        end
-                     else
-                        prepareTeleport = false
-                        sampAddChatMessage("Координаты не были сохранены", -1)
-				     end  
-                 
+                  if textbuffer.tpcx.v then
+                     prepareTeleport = true
+                     if isAbsolutePlay then
+                        sampSendChat(string.format("/ngr %f %f %f", textbuffer.tpcx.v, textbuffer.tpcy.v, textbuffer.tpcz.v), -1)
+                        sampAddChatMessage(string.format("Телепорт на координаты: %.1f %.1f %.1f",
+                        textbuffer.tpcx.v, textbuffer.tpcy.v, textbuffer.tpcz.v), 0x000FF00)
+                     end
+                     if isTraining then
+                        sampSendChat(string.format("/xyz %f %f %f", textbuffer.tpcx.v, textbuffer.tpcy.v, textbuffer.tpcz.v), -1)
+                        sampAddChatMessage(string.format("Телепорт на координаты: %.1f %.1f %.1f",
+                        textbuffer.tpcx.v, textbuffer.tpcy.v, textbuffer.tpcz.v), 0x000FF00)
+                     end
+                  else
+                     prepareTeleport = false
+                     sampAddChatMessage("Координаты не были сохранены", -1)
+				  end  
                end
 			   
 		    end
@@ -3964,7 +3963,7 @@ function imgui.OnDrawFrame()
             save()
             memory.setfloat(13210352, ini.settings.fog, true)
          end
-		 
+         
          imgui.Spacing()
          imgui.Spacing()
          if imgui.TooltipButton(u8(hide3dtexts and 'Показать' or 'Скрыть')..u8" 3D тексты",
@@ -4276,6 +4275,7 @@ function imgui.OnDrawFrame()
             imgui.Checkbox(u8'Логгировать в консоли выбранные объекты', checkbox.logobjects)
             imgui.Checkbox(u8'Логгировать в консоли 3d тексты', checkbox.log3dtexts)
             imgui.Checkbox(u8'Логгировать в консоли установку текстуры', checkbox.logtxd)
+            imgui.Checkbox(u8'Логгировать в консоли сообщения в чате', checkbox.logmessages)
          end
          
          if imgui.CollapsingHeader(u8"Текстдравы:") then
@@ -4899,6 +4899,7 @@ function imgui.OnDrawFrame()
                imgui.TextColoredRGB("макс. транспорта: {00FF00}50")
                imgui.TextColoredRGB("макс. слотов под гонки: {00FF00}5")
                imgui.TextColoredRGB("макс. виртуальных миров: {00FF00}500")
+               imgui.TextColoredRGB("макс. длина текста при ретекстуре {00FF00}50")
             end
             if isTraining then
                imgui.TextColoredRGB("Слоты сохранения игровы миров: {00FF00}3 (VIP 10)")
@@ -7789,6 +7790,10 @@ end
 function sampev.onServerMessage(color, text)
    local result, id = sampGetPlayerIdByCharHandle(playerPed)
    local nickname = sampGetPlayerNickname(id)
+   
+   if checkbox.logmessages.v then
+      print(string.format("%s, %s", color, text))
+   end
    
    if checkbox.globalchatoff.v then
       -- disable global chat, but write information to chatlog
