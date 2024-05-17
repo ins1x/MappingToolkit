@@ -4,7 +4,7 @@ script_description("Assistant for mappers and event makers")
 script_dependencies('imgui', 'lib.samp.events')
 script_properties("work-in-pause")
 script_url("https://github.com/ins1x/AbsEventHelper")
-script_version("2.7.2")
+script_version("2.7.3")
 -- script_moonloader(16) moonloader v.0.26
 -- sa-mp version: 0.3.7 R1
 -- Activaton: ALT + X (show main menu) or command /abs
@@ -89,6 +89,7 @@ local isSampObjectsListOpened = false
 local hideEditObject = false
 local scaleEditObject = false
 local lastWorldNumber = 0 -- is not same GetVirtualWorldId
+local lastClickedTextdrawId = 0
 local removedBuildings = 0
 local mpStartedDTime = nil
 local mpStarted = false
@@ -96,7 +97,6 @@ local autoAnnounce = false
 local isChatFreezed = false
 local isWarningsActive = false
 local chosenplayerMarker = nil
-local selectedtxdpos = 2053
 
 local fps = 0
 local fps_counter = 0
@@ -182,6 +182,8 @@ local checkbox = {
    globalchatoff = imgui.ImBool(false),
    playerwarnings = imgui.ImBool(false),
    objectscale = imgui.ImBool(false),
+   stepteleport = imgui.ImBool(false),
+   freezepos = imgui.ImBool(false),
    chatmentions = imgui.ImBool(ini.settings.chatmentions),
    test = imgui.ImBool(false)
 }
@@ -251,6 +253,7 @@ local textbuffer = {
    tpcy = imgui.ImBuffer(12),
    tpcz = imgui.ImBuffer(12),
    sms = imgui.ImBuffer(256),
+   tpstep = imgui.ImBuffer(2),
    note = imgui.ImBuffer(1024)
 }
 
@@ -3150,12 +3153,12 @@ function main()
       -- Select texture on F key
       if isKeyJustPressed(0x66) and isTexturesListOpened and not sampIsChatInputActive() and not sampIsDialogActive()
 	  and not isPauseMenuActive() and not isSampfuncsConsoleActive() then 
-         if selectedtxdpos == 2099 then
+         if lastClickedTextdrawId == 2099 then
             sampSendClickTextdraw(37)
-            selectedtxdpos = 2053
+            lastClickedTextdrawId = 2053
          else
-            sampSendClickTextdraw(selectedtxdpos)
-            selectedtxdpos = selectedtxdpos + 2
+            sampSendClickTextdraw(lastClickedTextdrawId)
+            lastClickedTextdrawId = lastClickedTextdrawId + 2
          end
       end
       
@@ -3297,7 +3300,7 @@ function imgui.OnDrawFrame()
       end
       imgui.Columns(1)
 
-      -- Child form (Change main window size here)
+      -- (Change main window size here)
       imgui.BeginChild('##main',imgui.ImVec2(640, 430),true)
       
       if tabmenu.main == 1 then
@@ -3536,10 +3539,82 @@ function imgui.OnDrawFrame()
                      sampAddChatMessage("Координаты не были сохранены", -1)
 				  end  
                end
-			   
 		    end
-			
-		 imgui.Spacing()
+            if imgui.Checkbox(u8("Пошаговый телепорт"), checkbox.stepteleport) then
+               textbuffer.tpstep.v = "3"
+            end
+            imgui.SameLine()
+            imgui.TextQuestion("( ? )", u8"Активирует пошаговый телепорт по заданным значениям")
+            if checkbox.stepteleport.v then
+               imgui.Spacing()
+               imgui.Text("       ")
+               imgui.SameLine()
+               if imgui.Button(" ^ ") then
+                  if sampIsLocalPlayerSpawned() then
+                     local posX, posY, posZ = getCharCoordinates(PLAYER_PED)
+                     setCharCoordinates(PLAYER_PED, posX, posY, posZ+tonumber(textbuffer.tpstep.v))
+                  end
+               end
+               imgui.SameLine()
+               imgui.Text("            ")
+               imgui.SameLine()
+               
+               imgui.Text(u8"Шаг: ")
+               imgui.SameLine()
+               imgui.PushItemWidth(25)
+			   if imgui.InputText("##TpStepBuffer", textbuffer.tpstep) then
+                  if textbuffer.tpstep.v ~= nil and tonumber(textbuffer.tpstep.v) ~= nil then 
+                     if tonumber(textbuffer.tpstep.v) > 10 then
+                        textbuffer.tpstep.v = "3" 
+                     end
+                  end
+			   end
+			   imgui.PopItemWidth()
+               imgui.SameLine()
+               imgui.Text("m.")
+               
+               if imgui.Button(" < ") then
+                  if sampIsLocalPlayerSpawned() then
+                     local posX, posY, posZ = getCharCoordinates(PLAYER_PED)
+                     setCharCoordinates(PLAYER_PED, posX+tonumber(textbuffer.tpstep.v), posY, posZ)
+                  end
+               end
+               imgui.SameLine()
+               if imgui.Button(" o ") then
+                  if sampIsLocalPlayerSpawned() then
+				     JumpForward()
+			      end
+               end
+               imgui.SameLine()
+               if imgui.Button(" > ") then
+                  if sampIsLocalPlayerSpawned() then
+                     local posX, posY, posZ = getCharCoordinates(PLAYER_PED)
+                     setCharCoordinates(PLAYER_PED, posX, posY+tonumber(textbuffer.tpstep.v), posZ)
+                  end
+               end
+               imgui.SameLine()
+               imgui.Text("  ")
+               imgui.SameLine()
+               if imgui.Checkbox(checkbox.freezepos.v and u8"Позиция: Заморожена" or u8"Позиция: Разморожена", checkbox.freezepos) then
+	              if checkbox.freezepos.v and sampIsLocalPlayerSpawned() then
+                     freezeCharPosition(PLAYER_PED, true)
+                  else
+                     freezeCharPosition(PLAYER_PED, false)
+	                 setPlayerControl(PLAYER_HANDLE, true)
+	                 clearCharTasksImmediately(PLAYER_PED)
+                  end
+	           end
+               imgui.Text("       ")
+               imgui.SameLine()
+               if imgui.Button(" v ") then
+                  if sampIsLocalPlayerSpawned() then
+                     local posX, posY, posZ = getCharCoordinates(PLAYER_PED)
+                     setCharCoordinates(PLAYER_PED, posX, posY, posZ-tonumber(textbuffer.tpstep.v))
+                  end
+               end
+               imgui.Spacing()                 
+             end
+		     imgui.Spacing()
 		
 	  elseif tabmenu.settings == 2 then
 		 
@@ -4268,7 +4343,8 @@ function imgui.OnDrawFrame()
 		 if imgui.Button(u8'Сменить') then
 			sampSetGamestate(gamestate.v)
 		 end
-		 if imgui.CollapsingHeader(u8"Логгировать в консоли:") then
+		 if imgui.CollapsingHeader(u8"Логи:") then
+            imgui.Text(u8"Логгировать в консоли:")
             imgui.Checkbox(u8'Логгировать в консоли нажатые текстдравы', checkbox.logtextdraws)
             imgui.Checkbox(u8'Логгировать в консоли поднятые пикапы', checkbox.pickeduppickups)
             imgui.Checkbox(u8'Логгировать в консоли ответы на диалоги', checkbox.logdialogresponse)
@@ -4276,9 +4352,39 @@ function imgui.OnDrawFrame()
             imgui.Checkbox(u8'Логгировать в консоли 3d тексты', checkbox.log3dtexts)
             imgui.Checkbox(u8'Логгировать в консоли установку текстуры', checkbox.logtxd)
             imgui.Checkbox(u8'Логгировать в консоли сообщения в чате', checkbox.logmessages)
+            
+            imgui.Spacing()
+            imgui.Text(u8"Стандартные логи:")
+		    
+		    imgui.PushItemWidth(150)
+		    imgui.Combo(u8'##ComboBoxLogslist', combobox.logs,
+            {"moonloader.log", "modloader.log", "sampfuncs.log", "chatlog.txt", "cleo.log"})
+		    
+		    imgui.SameLine()
+		    if imgui.Button(u8"показать",imgui.ImVec2(110, 25)) then
+		       local file
+		   	   if combobox.logs.v == 0 then
+		             file = getGameDirectory().. "\\moonloader\\moonloader.log"
+		   	   elseif combobox.logs.v == 1 then
+		   	      file = getGameDirectory().. "\\modloader\\modloader.log"
+		   	   elseif combobox.logs.v == 2 then
+		   	      file = getGameDirectory().. "\\SAMPFUNCS\\SAMPFUNCS.log"
+		   	   elseif combobox.logs.v == 3 then
+		   	      file = getFolderPath(5)..'\\GTA San Andreas User Files\\SAMP\\chatlog.txt'
+		   	   elseif combobox.logs.v == 4 then
+		   	      file = getGameDirectory().. "\\cleo.log"
+		   	   end
+		   	   
+		          if doesFileExist(file) then
+                     os.execute('explorer '.. file)
+		   	   end
+		    end
          end
          
          if imgui.CollapsingHeader(u8"Текстдравы:") then
+            if lastClickedTextdrawId then
+               imgui.Text(u8"Последний нажатый текстдрав: "..lastClickedTextdrawId)
+            end
          	imgui.Checkbox(u8'Отображать ID текстдравов', checkbox.showtextdrawsid)
 		    if imgui.Checkbox(u8'Скрыть все текстдравы', checkbox.hidealltextdraws) then
 		       for i = 0, 2048 do
@@ -4368,33 +4474,7 @@ function imgui.OnDrawFrame()
 	        setPlayerControl(PLAYER_HANDLE, true)
 	        clearCharTasksImmediately(PLAYER_PED)
 	     end
-      
-	     imgui.Spacing()
-         imgui.Text(u8"Стандартные логи:")
-		 
-		 imgui.PushItemWidth(150)
-		 imgui.Combo(u8'##ComboBoxLogslist', combobox.logs,
-         {"moonloader.log", "modloader.log", "sampfuncs.log", "chatlog.txt", "cleo.log"})
-		 
-		 imgui.SameLine()
-		 if imgui.Button(u8"показать",imgui.ImVec2(110, 25)) then
-		    local file
-			if combobox.logs.v == 0 then
-		       file = getGameDirectory().. "\\moonloader\\moonloader.log"
-			elseif combobox.logs.v == 1 then
-			   file = getGameDirectory().. "\\modloader\\modloader.log"
-			elseif combobox.logs.v == 2 then
-			   file = getGameDirectory().. "\\SAMPFUNCS\\SAMPFUNCS.log"
-			elseif combobox.logs.v == 3 then
-			   file = getFolderPath(5)..'\\GTA San Andreas User Files\\SAMP\\chatlog.txt'
-			elseif combobox.logs.v == 4 then
-			   file = getGameDirectory().. "\\cleo.log"
-			end
-			
-		    if doesFileExist(file) then
-               os.execute('explorer '.. file)
-			end
-		 end
+
          imgui.Spacing()
          if imgui.Button(u8"Выгрузить скрипт", imgui.ImVec2(130, 25)) then
             sampAddChatMessage("AbsEventHelper успешно выгружен.", -1)
@@ -8556,7 +8636,7 @@ function sampev.onShowTextDraw(id, data)
 end
 
 function sampev.onSendClickTextDraw(textdrawId)
-   selectedtxdpos = textdrawId
+   lastClickedTextdrawId = textdrawId
    if checkbox.logtextdraws.v then
       local posX, posY = sampTextdrawGetPos(textdrawId)
       sampfuncsLog(("Textdraw ID: %s, Model: %s, x : %s, y: %s,"):format(textdrawId, sampTextdrawGetModelRotationZoomVehColor(textdrawId), posX, posY))
