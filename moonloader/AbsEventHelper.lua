@@ -4,7 +4,7 @@ script_description("Assistant for mappers and event makers")
 script_dependencies('imgui', 'lib.samp.events')
 script_properties("work-in-pause")
 script_url("https://github.com/ins1x/AbsEventHelper")
-script_version("2.7.6")
+script_version("2.7.7")
 -- script_moonloader(16) moonloader v.0.26
 -- sa-mp version: 0.3.7 R1
 -- Activaton: ALT + X (show main menu) or command /abs
@@ -36,7 +36,7 @@ local ini = inicfg.load({
       freezechat = false,
       playerwarnings = false,
       worldsavereminder = false,
-      reminderdelay = 30,
+      reminderdelay = 15,
       setskin = 27,
       debug = false,
       drawdist = "450",
@@ -80,6 +80,7 @@ local isSampAddonInstalled = false
 local isAbsfixInstalled = false
 local isPlayerSpectating = false
 local isWorldHoster = false
+local isWorldJoinUnavailable = false
 local disableObjectCollision = false
 local prepareTeleport = false
 local prepareJump = false
@@ -269,7 +270,6 @@ local textbuffer = {
    tpcz = imgui.ImBuffer(12),
    sms = imgui.ImBuffer(256),
    tpstep = imgui.ImBuffer(2),
-   worldsaveremind = imgui.ImBuffer(3),
    note = imgui.ImBuffer(1024)
 }
 
@@ -2999,6 +2999,9 @@ function main()
       textbuffer.mpprize.v = '1.000.000$'
       --textbuffer.mpname.v = u8'Проходит МП "<название>" '
      
+      if ini.settings.worldsavereminder then
+         SaveReminder()
+      end
       --- END init
       while true do
       wait(0)
@@ -3442,12 +3445,17 @@ function imgui.OnDrawFrame()
             if imgui.Button(u8"Получить координаты", imgui.ImVec2(200, 25)) then
                if not sampIsChatInputActive() and not sampIsDialogActive() 
 			   and not isPauseMenuActive() and not isSampfuncsConsoleActive() then 
-               -- if isAbsolutePlay then sampSendChat("/коорд") end
 			      tpcpos.x, tpcpos.y, tpcpos.z = getCharCoordinates(PLAYER_PED)
                   setClipboardText(string.format("%.1f %.1f %.1f", tpcpos.x, tpcpos.y, tpcpos.z))
                   sampAddChatMessage("Координаты скопированы в буфер обмена", -1)
-                  sampAddChatMessage(string.format("Интерьер: %i Координаты: %.1f %.1f %.1f",
-			      getActiveInterior(), tpcpos.x, tpcpos.y, tpcpos.z), 0x0FFFFFF)
+                  local posA = getCharHeading(PLAYER_PED)
+                  sampAddChatMessage(string.format("Ваши координаты: {696969}%.2f %.2f %.2f {FFFFFF}Угол поворота: {696969}%.2f", tpcpos.x, tpcpos.y, tpcpos.z, posA), -1)
+                  if isAbsolutePlay and isWorldHoster then
+                     sampAddChatMessage(string.format("Используйте: /тпк {696969}%.2f %.2f %.2f", tpcpos.x, tpcpos.y, tpcpos.z), -1)
+                  end
+                  if isTraining and isWorldHoster then
+                     sampAddChatMessage(string.format("Используйте: /xyz {696969}%.2f %.2f %.2f", tpcpos.x, tpcpos.y, tpcpos.z), -1)
+                  end
                end
             end
             imgui.SameLine()
@@ -3455,12 +3463,12 @@ function imgui.OnDrawFrame()
 			   tpcpos.x = positionX
 			   tpcpos.y = positionY
 			   tpcpos.z = positionZ
-			   textbuffer.tpcx.v = string.format("%.1f", tpcpos.x)
-			   textbuffer.tpcy.v = string.format("%.1f", tpcpos.y)
-			   textbuffer.tpcz.v = string.format("%.1f", tpcpos.z)
+			   textbuffer.tpcx.v = string.format("%.2f", tpcpos.x)
+			   textbuffer.tpcy.v = string.format("%.2f", tpcpos.y)
+			   textbuffer.tpcz.v = string.format("%.2f", tpcpos.z)
 			   tpcpos.x, tpcpos.y, tpcpos.z = getCharCoordinates(PLAYER_PED)
-			   setClipboardText(string.format(u8"%.1f %.1f %.1f", tpcpos.x, tpcpos.y, tpcpos.z))
-			   sampAddChatMessage(string.format("Координаты сохранены. %.1f %.1f %.1f", tpcpos.x, tpcpos.y, tpcpos.z), -1)
+			   setClipboardText(string.format(u8"%.2f %.2f %.2f", tpcpos.x, tpcpos.y, tpcpos.z))
+			   sampAddChatMessage(string.format("Координаты сохранены: {696969}%.2f %.2f %.2f", tpcpos.x, tpcpos.y, tpcpos.z), -1)
             end
             
 			if imgui.Button(u8"Прыгнуть вперед", imgui.ImVec2(200, 25)) then
@@ -3663,7 +3671,7 @@ function imgui.OnDrawFrame()
                imgui.Spacing()                 
              end
              
-             if imgui.Checkbox(u8'Дополнителная панель', checkbox.showpanel) then
+             if imgui.Checkbox(u8'Дополнительная панель', checkbox.showpanel) then
                 ini.panel.showpanel = checkbox.showpanel.v
 		        inicfg.save(ini, configIni)
              end
@@ -4591,35 +4599,12 @@ function imgui.OnDrawFrame()
          end
          
          if not isAbsolutePlay then
-         
             if imgui.Checkbox(u8("Напоминать о необходимости сохранить мир"), checkbox.worldsavereminder) then
                if checkbox.worldsavereminder.v then
-                  textbuffer.worldsaveremind.v = tostring(ini.settings.reminderdelay)
+                  SaveReminder()
                end
                ini.settings.worldsavereminder = checkbox.worldsavereminder.v
 		       inicfg.save(ini, configIni)
-            end
-            
-            if checkbox.worldsavereminder.v then
-               imgui.Text(u8"Введите время через которое выводить напоминание")
-               imgui.PushItemWidth(35)
-		   	   if imgui.InputText("##TimeReminderBuffer", textbuffer.worldsaveremind) then
-                  lua_thread.create(function()
-                     while checkbox.worldsavereminder.v do
-                        local delay = tonumber(ini.settings.reminderdelay)
-                        local min = 60000 -- 1 minute in miliseconds
-                        if delay < 0 or delay > 100 then 
-                           delay = 30
-                        else
-                           wait(delay*min)
-                           sampAddChatMessage("Вы давно не сохраняли мир. Сохраните его во избежание потери прогресса.", -1)
-                        end
-                     end   
-                  end)
-		   	   end
-               imgui.SameLine()
-               imgui.Text(u8"  минут")
-		   	   imgui.PopItemWidth()
             end
          end 
          
@@ -5627,8 +5612,10 @@ function imgui.OnDrawFrame()
             imgui.TextColoredRGB("{00FF00}/abs{FFFFFF} - открыть главное меню хелпера")
             imgui.TextColoredRGB("{00FF00}/jump{FFFFFF} - прыгнуть вперед")
             imgui.TextColoredRGB("{00FF00}/ответ <id>{FFFFFF} - быстрые ответы")
+            imgui.TextColoredRGB("{00FF00}/коорд{FFFFFF} - получить текущую позицию")
             if not isAbsolutePlay then
-               imgui.TextColoredRGB("{00FF00}/отсчет <1-10>{FFFFFF} - быстрые ответы")
+               imgui.TextColoredRGB("{00FF00}/отсчет <1-10>{FFFFFF} - запустить отсчет")
+               imgui.TextColoredRGB("{00FF00}/killme{FFFFFF} - умереть (применять если вы зависли в стадии смерти)")
             end
             if isAbsolutePlay then
                imgui.TextColoredRGB("{00FF00}/slapme{FFFFFF} - слапнуть себя")
@@ -5676,74 +5663,74 @@ function imgui.OnDrawFrame()
                imgui.TextColoredRGB("{00FF00}/машину2{FFFFFF} - заказать транспорт к себе($ зависит от стоимости транспорта)")
             end
             if isTraining then
-               imgui.TextColoredRGB("{00FF00}/world{FFFFFF} -  создать игровой мир")
-               imgui.TextColoredRGB("{00FF00}/menu | /mm{FFFFFF} -  игровое меню")
-               imgui.TextColoredRGB("{00FF00}/vw{FFFFFF} -  управление игровым миром")
-               imgui.TextColoredRGB("{00FF00}/rules{FFFFFF} -  правила сервера")
-               imgui.TextColoredRGB("{00FF00}/list | /world <1 пункт>{FFFFFF} -  список игровых миров")
-               imgui.TextColoredRGB("{00FF00}/exit{FFFFFF} -  отправиться на спаун сервера")
-               imgui.TextColoredRGB("{00FF00}/stats <id>{FFFFFF} -  посмотреть статистику игрока")
-               imgui.TextColoredRGB("{00FF00}/id <name|id>{FFFFFF} -  поиск игроков по части ника | по id")
-               imgui.TextColoredRGB("{00FF00}/time <0-23>{FFFFFF} -  сменить игровое время (локально)")
-               imgui.TextColoredRGB("{00FF00}/weather <0-20>{FFFFFF} -  установить погоду (локально)")
-               imgui.TextColoredRGB("{00FF00}/savepos{FFFFFF} -  сохранить текущую позицию и угол поворота")
-               imgui.TextColoredRGB("{00FF00}/gopos{FFFFFF} -  телепортироваться на сохраненную позицию")
-               imgui.TextColoredRGB("{00FF00}/xyz <x> <y> <z> <fa> {FFFFFF} -  телепортироваться на координаты")
-               imgui.TextColoredRGB("{00FF00}/taser{FFFFFF} -  взять/убрать тайзер")
-               imgui.TextColoredRGB("{00FF00}/accept{FFFFFF} -  принять приглашение в игровой мир")
-               imgui.TextColoredRGB("{00FF00}/adminlist{FFFFFF} -  список модератов СЕРВЕРА")
-               imgui.TextColoredRGB("{00FF00}/verify{FFFFFF} -  список верифицированных игроков сервера")
-               imgui.TextColoredRGB("{00FF00}/nameon | /nameoff{FFFFFF} -  выключить/включить ники над головами игроков")
-               imgui.TextColoredRGB("{00FF00}/slapme{FFFFFF} -  подбросить себя")
-               imgui.TextColoredRGB("{00FF00}/spawnme{FFFFFF} -  заспавнить себя")
-               imgui.TextColoredRGB("{00FF00}/jetpack{FFFFFF} -  [VIP] взять реактивный ранец")
-               imgui.TextColoredRGB("{00FF00}/gm{FFFFFF} -  включить ГМ")
-               imgui.TextColoredRGB("{00FF00}/rm{FFFFFF} -  обнулить деньги")
-               imgui.TextColoredRGB("{00FF00}/rw{FFFFFF} -  обнулить оружие")
-               imgui.TextColoredRGB("{00FF00}/pay <id> <money>{FFFFFF} -  передать деньги игроку")
-               imgui.TextColoredRGB("{00FF00}/skill <0-999>{FFFFFF} -  установить скилл текущему оружию | > 999 -  одна рука")
-               imgui.TextColoredRGB("{00FF00}/attachinfo | /attinfo <slot 0-10>{FFFFFF} - получить информацию про прикрепленный объект")
-               imgui.TextColoredRGB("{00FF00}/fadd <id>{FFFFFF} - добавить игрока в список друзей")
-               imgui.TextColoredRGB("{00FF00}/flist{FFFFFF} - список ваших друзей")
+               imgui.TextColoredRGB("{FF6600}/world{FFFFFF} -  создать игровой мир")
+               imgui.TextColoredRGB("{FF6600}/menu | /mm{FFFFFF} -  игровое меню")
+               imgui.TextColoredRGB("{FF6600}/vw{FFFFFF} -  управление игровым миром")
+               imgui.TextColoredRGB("{FF6600}/rules{FFFFFF} -  правила сервера")
+               imgui.TextColoredRGB("{FF6600}/list | /world <1 пункт>{FFFFFF} -  список игровых миров")
+               imgui.TextColoredRGB("{FF6600}/exit{FFFFFF} -  отправиться на спаун сервера")
+               imgui.TextColoredRGB("{FF6600}/stats <id>{FFFFFF} -  посмотреть статистику игрока")
+               imgui.TextColoredRGB("{FF6600}/id <name|id>{FFFFFF} -  поиск игроков по части ника | по id")
+               imgui.TextColoredRGB("{FF6600}/time <0-23>{FFFFFF} -  сменить игровое время (локально)")
+               imgui.TextColoredRGB("{FF6600}/weather <0-20>{FFFFFF} -  установить погоду (локально)")
+               imgui.TextColoredRGB("{FF6600}/savepos{FFFFFF} -  сохранить текущую позицию и угол поворота")
+               imgui.TextColoredRGB("{FF6600}/gopos{FFFFFF} -  телепортироваться на сохраненную позицию")
+               imgui.TextColoredRGB("{FF6600}/xyz <x> <y> <z> <fa> {FFFFFF} -  телепортироваться на координаты")
+               imgui.TextColoredRGB("{FF6600}/taser{FFFFFF} -  взять/убрать тайзер")
+               imgui.TextColoredRGB("{FF6600}/accept{FFFFFF} -  принять приглашение в игровой мир")
+               imgui.TextColoredRGB("{FF6600}/adminlist{FFFFFF} -  список модератов СЕРВЕРА")
+               imgui.TextColoredRGB("{FF6600}/verify{FFFFFF} -  список верифицированных игроков сервера")
+               imgui.TextColoredRGB("{FF6600}/nameon | /nameoff{FFFFFF} -  выключить/включить ники над головами игроков")
+               imgui.TextColoredRGB("{FF6600}/slapme{FFFFFF} -  подбросить себя")
+               imgui.TextColoredRGB("{FF6600}/spawnme{FFFFFF} -  заспавнить себя")
+               imgui.TextColoredRGB("{FF6600}/jetpack{FFFFFF} -  [VIP] взять реактивный ранец")
+               imgui.TextColoredRGB("{FF6600}/gm{FFFFFF} -  включить ГМ")
+               imgui.TextColoredRGB("{FF6600}/rm{FFFFFF} -  обнулить деньги")
+               imgui.TextColoredRGB("{FF6600}/rw{FFFFFF} -  обнулить оружие")
+               imgui.TextColoredRGB("{FF6600}/pay <id> <money>{FFFFFF} -  передать деньги игроку")
+               imgui.TextColoredRGB("{FF6600}/skill <0-999>{FFFFFF} -  установить скилл текущему оружию | > 999 -  одна рука")
+               imgui.TextColoredRGB("{FF6600}/attachinfo | /attinfo <slot 0-10>{FFFFFF} - получить информацию про прикрепленный объект")
+               imgui.TextColoredRGB("{FF6600}/fadd <id>{FFFFFF} - добавить игрока в список друзей")
+               imgui.TextColoredRGB("{FF6600}/flist{FFFFFF} - список ваших друзей")
             end
             imgui.Spacing()
          end
          if imgui.CollapsingHeader(u8"Объекты:") then
             if isTraining then
-               imgui.TextColoredRGB("{00FF00}/gate{FFFFFF} -  управление перемещаемыми объектами")
-               imgui.TextColoredRGB("{00FF00}/pass <*passid>{FFFFFF} -  установить проход | <passid> редактировать")
-               imgui.TextColoredRGB("{00FF00}/tpp <passid>{FFFFFF} -  телепортироваться к проходу")
-               imgui.TextColoredRGB("{00FF00}/delpass <passid>{FFFFFF} -  удалить проход")
-               imgui.TextColoredRGB("{00FF00}/passinfo{FFFFFF} -  редактирование ближайшего прохода")
-               imgui.TextColoredRGB("{00FF00}/action{FFFFFF} -  создать 3D текст")
-               imgui.TextColoredRGB("{00FF00}/editaction <actionid>{FFFFFF} -  редактировать 3D текст")
-               imgui.TextColoredRGB("{00FF00}/tpaction <actoinid>{FFFFFF} -  телепортироваться к 3D тексту")
-               imgui.TextColoredRGB("{00FF00}/delaction <actionid>{FFFFFF} -  удалить 3D текст")
-               imgui.TextColoredRGB("{00FF00}/sel <objectid>{FFFFFF} -  выделить объект")
-               imgui.TextColoredRGB("{00FF00}/oa(dd) <modelid>{FFFFFF} -  создать объект")
-               imgui.TextColoredRGB("{00FF00}/od(ell) <*objectid>{FFFFFF} -  удалить объект | id только при /sel")
-               imgui.TextColoredRGB("{00FF00}/ogh(ethere) <*objectid>{FFFFFF} -  телепортировать объект к себе | id при /sel")
-               imgui.TextColoredRGB("{00FF00}/oinfo <*objectid>{FFFFFF} -  информация о объекте | id только при /sel")
-               imgui.TextColoredRGB("{00FF00}/oswap <objectid> <modelid>{FFFFFF} -  изменить модель объекта")
-               imgui.TextColoredRGB("{00FF00}/rx <objectid> <0-360>{FFFFFF} -  повернуть объект по координате X")
-               imgui.TextColoredRGB("{00FF00}/ry <objectid> <0-360>{FFFFFF} -  повернуть объект по координате Y")
-               imgui.TextColoredRGB("{00FF00}/rz <objectid> <0-360>{FFFFFF} -  повернуть объект по координате Z")
-               imgui.TextColoredRGB("{00FF00}/ox <objectid> <m>{FFFFFF} -  сдвинуть объект по координате X")
-               imgui.TextColoredRGB("{00FF00}/oy <objectid> <m>{FFFFFF} -  сдвинуть объект по координате Y")
-               imgui.TextColoredRGB("{00FF00}/oz <objectid> <m>{FFFFFF} -  сдвинуть объект по координате Z")
-               imgui.TextColoredRGB("{00FF00}/tpo <*objectid>{FFFFFF} -  телепортироваться к объекту | <*objectid> только при /sel")
-               imgui.TextColoredRGB("{00FF00}/clone <*objectid>{FFFFFF} -  клонировать объект | <*objectid> только при /sel")
-               imgui.TextColoredRGB("{00FF00}/oe(dit) <*objectid>{FFFFFF} -  редактировать объект | <*objectid> только при /sel")
-               imgui.TextColoredRGB("{00FF00}/olist{FFFFFF} -  управление всеми объектами в мире")
-               imgui.TextColoredRGB("{00FF00}/omenu <objectid>{FFFFFF} -  управление определенным объектом")
-               imgui.TextColoredRGB("{00FF00}/osearch <name>{FFFFFF} -  поиск объекта по части имени")
-               imgui.TextColoredRGB("{00FF00}/ocolor <objectid> <slot> <0xAARGBRGB>{FFFFFF} - сменить цвет объекта")
-               imgui.TextColoredRGB("{00FF00}/texture <objectid> <slot> <page>{FFFFFF} - список текстур для наложения на объект")
-               imgui.TextColoredRGB("{00FF00}/sindex <objectid>{FFFFFF} - перекрасить объект в зеленую текстуру и обозначить слоты")
-               imgui.TextColoredRGB("{00FF00}/tsearch <objectid> <slot> <name>{FFFFFF} - наложение текстуры по поиску")
-               imgui.TextColoredRGB("{00FF00}/stexture <objectid> <slot> <index>{FFFFFF} - наложить текстуру на объект по индексу")
-               imgui.TextColoredRGB("{00FF00}/untexture <objectid>{FFFFFF} - обнулить наложенные текстуры (и /ocolor)")
-               imgui.TextColoredRGB("{00FF00}/otext{FFFFFF} - наложение текста на слот объекта")
+               imgui.TextColoredRGB("{FF6600}/gate{FFFFFF} -  управление перемещаемыми объектами")
+               imgui.TextColoredRGB("{FF6600}/pass <*passid>{FFFFFF} -  установить проход | <passid> редактировать")
+               imgui.TextColoredRGB("{FF6600}/tpp <passid>{FFFFFF} -  телепортироваться к проходу")
+               imgui.TextColoredRGB("{FF6600}/delpass <passid>{FFFFFF} -  удалить проход")
+               imgui.TextColoredRGB("{FF6600}/passinfo{FFFFFF} -  редактирование ближайшего прохода")
+               imgui.TextColoredRGB("{FF6600}/action{FFFFFF} -  создать 3D текст")
+               imgui.TextColoredRGB("{FF6600}/editaction <actionid>{FFFFFF} -  редактировать 3D текст")
+               imgui.TextColoredRGB("{FF6600}/tpaction <actoinid>{FFFFFF} -  телепортироваться к 3D тексту")
+               imgui.TextColoredRGB("{FF6600}/delaction <actionid>{FFFFFF} -  удалить 3D текст")
+               imgui.TextColoredRGB("{FF6600}/sel <objectid>{FFFFFF} -  выделить объект")
+               imgui.TextColoredRGB("{FF6600}/oa(dd) <modelid>{FFFFFF} -  создать объект")
+               imgui.TextColoredRGB("{FF6600}/od(ell) <*objectid>{FFFFFF} -  удалить объект | id только при /sel")
+               imgui.TextColoredRGB("{FF6600}/ogh(ethere) <*objectid>{FFFFFF} -  телепортировать объект к себе | id при /sel")
+               imgui.TextColoredRGB("{FF6600}/oinfo <*objectid>{FFFFFF} -  информация о объекте | id только при /sel")
+               imgui.TextColoredRGB("{FF6600}/oswap <objectid> <modelid>{FFFFFF} -  изменить модель объекта")
+               imgui.TextColoredRGB("{FF6600}/rx <objectid> <0-360>{FFFFFF} -  повернуть объект по координате X")
+               imgui.TextColoredRGB("{FF6600}/ry <objectid> <0-360>{FFFFFF} -  повернуть объект по координате Y")
+               imgui.TextColoredRGB("{FF6600}/rz <objectid> <0-360>{FFFFFF} -  повернуть объект по координате Z")
+               imgui.TextColoredRGB("{FF6600}/ox <objectid> <m>{FFFFFF} -  сдвинуть объект по координате X")
+               imgui.TextColoredRGB("{FF6600}/oy <objectid> <m>{FFFFFF} -  сдвинуть объект по координате Y")
+               imgui.TextColoredRGB("{FF6600}/oz <objectid> <m>{FFFFFF} -  сдвинуть объект по координате Z")
+               imgui.TextColoredRGB("{FF6600}/tpo <*objectid>{FFFFFF} -  телепортироваться к объекту | <*objectid> только при /sel")
+               imgui.TextColoredRGB("{FF6600}/clone <*objectid>{FFFFFF} -  клонировать объект | <*objectid> только при /sel")
+               imgui.TextColoredRGB("{FF6600}/oe(dit) <*objectid>{FFFFFF} -  редактировать объект | <*objectid> только при /sel")
+               imgui.TextColoredRGB("{FF6600}/olist{FFFFFF} -  управление всеми объектами в мире")
+               imgui.TextColoredRGB("{FF6600}/omenu <objectid>{FFFFFF} -  управление определенным объектом")
+               imgui.TextColoredRGB("{FF6600}/osearch <name>{FFFFFF} -  поиск объекта по части имени")
+               imgui.TextColoredRGB("{FF6600}/ocolor <objectid> <slot> <0xAARGBRGB>{FFFFFF} - сменить цвет объекта")
+               imgui.TextColoredRGB("{FF6600}/texture <objectid> <slot> <page>{FFFFFF} - список текстур для наложения на объект")
+               imgui.TextColoredRGB("{FF6600}/sindex <objectid>{FFFFFF} - перекрасить объект в зеленую текстуру и обозначить слоты")
+               imgui.TextColoredRGB("{FF6600}/tsearch <objectid> <slot> <name>{FFFFFF} - наложение текстуры по поиску")
+               imgui.TextColoredRGB("{FF6600}/stexture <objectid> <slot> <index>{FFFFFF} - наложить текстуру на объект по индексу")
+               imgui.TextColoredRGB("{FF6600}/untexture <objectid>{FFFFFF} - обнулить наложенные текстуры (и /ocolor)")
+               imgui.TextColoredRGB("{FF6600}/otext{FFFFFF} - наложение текста на слот объекта")
             end
             if isAbsolutePlay then
                imgui.TextColoredRGB("{00FF00}/tsearch{FFFFFF} - поиск текстуры по названию")
@@ -5758,49 +5745,49 @@ function imgui.OnDrawFrame()
          end
          if isTraining then
             if imgui.CollapsingHeader(u8"Управление миром:") then
-               imgui.TextColoredRGB("{00FF00}/vw{FFFFFF} -  управление игровым миром")
-               imgui.TextColoredRGB("{00FF00}/int | /op{FFFFFF} -  список интерьеров для телепорта")
-               imgui.TextColoredRGB("{00FF00}/team{FFFFFF} - управление командами мира")
-               imgui.TextColoredRGB("{00FF00}/givevw{FFFFFF} -  передать виртуальный мир игроку")
-               imgui.TextColoredRGB("{00FF00}/cancel{FFFFFF} -  отменить покупку игрового мира")
-               imgui.TextColoredRGB("{00FF00}/invite <id>{FFFFFF} - пригласить игрока в мир")
-               imgui.TextColoredRGB("{00FF00}/armour <0-100>{FFFFFF} - пополнить уровень брони")
-               imgui.TextColoredRGB("{00FF00}/health <0-100>{FFFFFF} - пополнить уровень здоровья")
-               imgui.TextColoredRGB("{00FF00}/sethp <id> <0-100>{FFFFFF} - установить игроку уровень здоровья")
-               imgui.TextColoredRGB("{00FF00}/setarm <id> <0-100>{FFFFFF} - установить игроку уровень брони")
-               imgui.TextColoredRGB("{00FF00}/rsethp <hp 0-100> <armour 0-100> <radius>{FFFFFF} - выдать HP и ARMOUR в радиусе")
-               imgui.TextColoredRGB("{00FF00}/ress <playerid>{FFFFFF} - воскресить игрока в RP стадии")
-               imgui.TextColoredRGB("{00FF00}/ressall{FFFFFF} - воскресить всех игроков в RP стадии")
-               imgui.TextColoredRGB("{00FF00}/vkick <id> <*reason>{FFFFFF} - исключить игрока из мира")
-               imgui.TextColoredRGB("{00FF00}/vmute <id> <time (m)> <*reason>{FFFFFF} - замутить игрока в мире")
-               imgui.TextColoredRGB("{00FF00}/vban <id> <time (m) | 0 - навсегда> <*reason>{FFFFFF} - забанить игрока в мире")
-               imgui.TextColoredRGB("{00FF00}/setteam <id> <teamid>{FFFFFF} - установить игроку команду")
-               imgui.TextColoredRGB("{00FF00}/unteam <id>{FFFFFF} - исключить игрока из команды")
-               imgui.TextColoredRGB("{00FF00}/bring, /gethere <id>{FFFFFF} - Телепортировать игрока к себе")
-               imgui.TextColoredRGB("{00FF00}/goto <id>{FFFFFF} - Телепортироваться к игроку")
-               imgui.TextColoredRGB("{00FF00}/vgethere <id>{FFFFFF} - Телепортировать игрока к себе вместе с машиной")
-               imgui.TextColoredRGB("{00FF00}/stream | /music | /boombox{FFFFFF} - управление аудиопотоками в мире")
+               imgui.TextColoredRGB("{FF6600}/vw{FFFFFF} -  управление игровым миром")
+               imgui.TextColoredRGB("{FF6600}/int | /op{FFFFFF} -  список интерьеров для телепорта")
+               imgui.TextColoredRGB("{FF6600}/team{FFFFFF} - управление командами мира")
+               imgui.TextColoredRGB("{FF6600}/givevw{FFFFFF} -  передать виртуальный мир игроку")
+               imgui.TextColoredRGB("{FF6600}/cancel{FFFFFF} -  отменить покупку игрового мира")
+               imgui.TextColoredRGB("{FF6600}/invite <id>{FFFFFF} - пригласить игрока в мир")
+               imgui.TextColoredRGB("{FF6600}/armour <0-100>{FFFFFF} - пополнить уровень брони")
+               imgui.TextColoredRGB("{FF6600}/health <0-100>{FFFFFF} - пополнить уровень здоровья")
+               imgui.TextColoredRGB("{FF6600}/sethp <id> <0-100>{FFFFFF} - установить игроку уровень здоровья")
+               imgui.TextColoredRGB("{FF6600}/setarm <id> <0-100>{FFFFFF} - установить игроку уровень брони")
+               imgui.TextColoredRGB("{FF6600}/rsethp <hp 0-100> <armour 0-100> <radius>{FFFFFF} - выдать HP и ARMOUR в радиусе")
+               imgui.TextColoredRGB("{FF6600}/ress <playerid>{FFFFFF} - воскресить игрока в RP стадии")
+               imgui.TextColoredRGB("{FF6600}/ressall{FFFFFF} - воскресить всех игроков в RP стадии")
+               imgui.TextColoredRGB("{FF6600}/vkick <id> <*reason>{FFFFFF} - исключить игрока из мира")
+               imgui.TextColoredRGB("{FF6600}/vmute <id> <time (m)> <*reason>{FFFFFF} - замутить игрока в мире")
+               imgui.TextColoredRGB("{FF6600}/vban <id> <time (m) | 0 - навсегда> <*reason>{FFFFFF} - забанить игрока в мире")
+               imgui.TextColoredRGB("{FF6600}/setteam <id> <teamid>{FFFFFF} - установить игроку команду")
+               imgui.TextColoredRGB("{FF6600}/unteam <id>{FFFFFF} - исключить игрока из команды")
+               imgui.TextColoredRGB("{FF6600}/bring, /gethere <id>{FFFFFF} - Телепортировать игрока к себе")
+               imgui.TextColoredRGB("{FF6600}/goto <id>{FFFFFF} - Телепортироваться к игроку")
+               imgui.TextColoredRGB("{FF6600}/vgethere <id>{FFFFFF} - Телепортировать игрока к себе вместе с машиной")
+               imgui.TextColoredRGB("{FF6600}/stream | /music | /boombox{FFFFFF} - управление аудиопотоками в мире")
             end
             if imgui.CollapsingHeader(u8"Командные блоки и массивы:") then
                imgui.Text(u8"Командные блоки:")
-               imgui.TextColoredRGB("{00FF00}/cb{FFFFFF} - создать командный блокам")
-               imgui.TextColoredRGB("{00FF00}/cbdell{FFFFFF} - удалить блок")
-               imgui.TextColoredRGB("{00FF00}/cbtp{FFFFFF} - телепортрт к блоку")
-               imgui.TextColoredRGB("{00FF00}/cbedit{FFFFFF} - открыть меню блока")
-               imgui.TextColoredRGB("{00FF00}/timers{FFFFFF} - список таймеров мира")
-               imgui.TextColoredRGB("{00FF00}/oldcb{FFFFFF} - включить устарелые текстовые команды")
-               imgui.TextColoredRGB("{00FF00}/cmb | //<text>{FFFFFF} - активировать КБ аллиас")
-               imgui.TextColoredRGB("{00FF00}/cblist{FFFFFF} - список всех командных блоков в мире")
-               imgui.TextColoredRGB("{00FF00}/tb{FFFFFF} - список триггер блоков в мире")
-               imgui.TextColoredRGB("{00FF00}/shopmenu{FFFFFF} - управление магазинами мира для КБ")
+               imgui.TextColoredRGB("{FF6600}/cb{FFFFFF} - создать командный блокам")
+               imgui.TextColoredRGB("{FF6600}/cbdell{FFFFFF} - удалить блок")
+               imgui.TextColoredRGB("{FF6600}/cbtp{FFFFFF} - телепортрт к блоку")
+               imgui.TextColoredRGB("{FF6600}/cbedit{FFFFFF} - открыть меню блока")
+               imgui.TextColoredRGB("{FF6600}/timers{FFFFFF} - список таймеров мира")
+               imgui.TextColoredRGB("{FF6600}/oldcb{FFFFFF} - включить устарелые текстовые команды")
+               imgui.TextColoredRGB("{FF6600}/cmb | //<text>{FFFFFF} - активировать КБ аллиас")
+               imgui.TextColoredRGB("{FF6600}/cblist{FFFFFF} - список всех командных блоков в мире")
+               imgui.TextColoredRGB("{FF6600}/tb{FFFFFF} - список триггер блоков в мире")
+               imgui.TextColoredRGB("{FF6600}/shopmenu{FFFFFF} - управление магазинами мира для КБ")
                imgui.Text(u8"Массивы и переменные:")
-               imgui.TextColoredRGB("{00FF00}/data <id>{FFFFFF} - посмотреть массивы игрока")
-               imgui.TextColoredRGB("{00FF00}/setdata <id> <array 0-26> <value>{FFFFFF} - установить значение массива игроку")
-               imgui.TextColoredRGB("{00FF00}/server{FFFFFF} - посмотреть серверные массивы мира")
-               imgui.TextColoredRGB("{00FF00}/setserver <array 0-49> <value>{FFFFFF} - установить значение серверному массиву")
-               imgui.TextColoredRGB("{00FF00}/varlist{FFFFFF} - список серверных переменных мира")
-               imgui.TextColoredRGB("{00FF00}/pvarlist{FFFFFF} - список пользовательских переменных мира")
-               imgui.TextColoredRGB("{00FF00}/pvar <id>{FFFFFF} - управление пользовательскими переменными игрока")
+               imgui.TextColoredRGB("{FF6600}/data <id>{FFFFFF} - посмотреть массивы игрока")
+               imgui.TextColoredRGB("{FF6600}/setdata <id> <array 0-26> <value>{FFFFFF} - установить значение массива игроку")
+               imgui.TextColoredRGB("{FF6600}/server{FFFFFF} - посмотреть серверные массивы мира")
+               imgui.TextColoredRGB("{FF6600}/setserver <array 0-49> <value>{FFFFFF} - установить значение серверному массиву")
+               imgui.TextColoredRGB("{FF6600}/varlist{FFFFFF} - список серверных переменных мира")
+               imgui.TextColoredRGB("{FF6600}/pvarlist{FFFFFF} - список пользовательских переменных мира")
+               imgui.TextColoredRGB("{FF6600}/pvar <id>{FFFFFF} - управление пользовательскими переменными игрока")
 
                imgui.Spacing()
 		       
@@ -5824,45 +5811,45 @@ function imgui.OnDrawFrame()
                imgui.TextColoredRGB("{00FF00}/лс[ид игрока] <текст>{FFFFFF} — дать объявление")
             end
             if isTraining then
-               imgui.TextColoredRGB("{00FF00}/!text{FFFFFF} - глобальный чат (оранжевый)")
-               imgui.TextColoredRGB("{00FF00}/@ | ;text{FFFFFF} - чат игрового мира (зеленый)")
-               imgui.TextColoredRGB("{00FF00}/v | $ | ;text{FFFFFF} - чат модераторов мира")
-               imgui.TextColoredRGB("{00FF00}/low | /l <text>{FFFFFF} - сказать шепотом")
-               imgui.TextColoredRGB("{00FF00}/whisper | /w <text>{FFFFFF} - сказать шепотом игроку")
-               imgui.TextColoredRGB("{00FF00}/try <text>{FFFFFF} - случайная вероятность действия")
-               imgui.TextColoredRGB("{00FF00}/todo <text>{FFFFFF} - совмещение действия /me и публичного чата")
-               imgui.TextColoredRGB("{00FF00}/dice{FFFFFF} - бросить кости")
-               imgui.TextColoredRGB("{00FF00}/coin{FFFFFF} - бросить монетку")
-               imgui.TextColoredRGB("{00FF00}/shout | /s <text>{FFFFFF} - крикнуть")
-               imgui.TextColoredRGB("{00FF00}/me <text>{FFFFFF} - отыграть действие")
-               imgui.TextColoredRGB("{00FF00}/ame <text>{FFFFFF} - отыграть действие (текст над персонажем)")
-               imgui.TextColoredRGB("{00FF00}/do <text>{FFFFFF} - описать событие")
-               imgui.TextColoredRGB("{00FF00}/b <text>{FFFFFF} - OOC чат")
-               imgui.TextColoredRGB("{00FF00}/m <text>{FFFFFF} - сказать что то в мегафон")
-               imgui.TextColoredRGB("{00FF00}/channel <0-500>{FFFFFF} - установить радио канал")
-               imgui.TextColoredRGB("{00FF00}/setchannel <0-500>{FFFFFF} - установить радио канал по умолчанию в мире")
-               imgui.TextColoredRGB("{00FF00}/r <text>{FFFFFF} - отправить сообщение в рацию")
-               imgui.TextColoredRGB("{00FF00}/f <text>{FFFFFF} - отправить сообщение в чат команды /team")
-               imgui.TextColoredRGB("{00FF00}/pm <id> <text>{FFFFFF} - отправить игроку приватное сообщение")
-               imgui.TextColoredRGB("{00FF00}/reply | /rep <text>{FFFFFF} - ответить на последнее приватное сообщение")
-               imgui.TextColoredRGB("{00FF00}/pchat <create|invite|accept|leave|kick>{FFFFFF} - управление персональным чатом")
-               imgui.TextColoredRGB("{00FF00}/c <text>{FFFFFF} - отправить сообщение в персональный чат")
-               imgui.TextColoredRGB("{00FF00}/ask <text>{FFFFFF} - задать вопрос по функционалу сервера для всех игроков")
-               imgui.TextColoredRGB("{00FF00}/mute{FFFFFF} - выключить определенный чат")
-               imgui.TextColoredRGB("{00FF00}/ignore <id>{FFFFFF} - занести игрока в черный список")
-               imgui.TextColoredRGB("{00FF00}/unignore <id | all>{FFFFFF} - вынести игрока из черного списка | all - очистить черный список")
-               imgui.TextColoredRGB("{00FF00}/ignorelist{FFFFFF} - посмотреть черный список")
+               imgui.TextColoredRGB("{FF6600}/!text{FFFFFF} - глобальный чат (оранжевый)")
+               imgui.TextColoredRGB("{FF6600}/@ | ;text{FFFFFF} - чат игрового мира (зеленый)")
+               imgui.TextColoredRGB("{FF6600}/v | $ | ;text{FFFFFF} - чат модераторов мира")
+               imgui.TextColoredRGB("{FF6600}/low | /l <text>{FFFFFF} - сказать шепотом")
+               imgui.TextColoredRGB("{FF6600}/whisper | /w <text>{FFFFFF} - сказать шепотом игроку")
+               imgui.TextColoredRGB("{FF6600}/try <text>{FFFFFF} - случайная вероятность действия")
+               imgui.TextColoredRGB("{FF6600}/todo <text>{FFFFFF} - совмещение действия /me и публичного чата")
+               imgui.TextColoredRGB("{FF6600}/dice{FFFFFF} - бросить кости")
+               imgui.TextColoredRGB("{FF6600}/coin{FFFFFF} - бросить монетку")
+               imgui.TextColoredRGB("{FF6600}/shout | /s <text>{FFFFFF} - крикнуть")
+               imgui.TextColoredRGB("{FF6600}/me <text>{FFFFFF} - отыграть действие")
+               imgui.TextColoredRGB("{FF6600}/ame <text>{FFFFFF} - отыграть действие (текст над персонажем)")
+               imgui.TextColoredRGB("{FF6600}/do <text>{FFFFFF} - описать событие")
+               imgui.TextColoredRGB("{FF6600}/b <text>{FFFFFF} - OOC чат")
+               imgui.TextColoredRGB("{FF6600}/m <text>{FFFFFF} - сказать что то в мегафон")
+               imgui.TextColoredRGB("{FF6600}/channel <0-500>{FFFFFF} - установить радио канал")
+               imgui.TextColoredRGB("{FF6600}/setchannel <0-500>{FFFFFF} - установить радио канал по умолчанию в мире")
+               imgui.TextColoredRGB("{FF6600}/r <text>{FFFFFF} - отправить сообщение в рацию")
+               imgui.TextColoredRGB("{FF6600}/f <text>{FFFFFF} - отправить сообщение в чат команды /team")
+               imgui.TextColoredRGB("{FF6600}/pm <id> <text>{FFFFFF} - отправить игроку приватное сообщение")
+               imgui.TextColoredRGB("{FF6600}/reply | /rep <text>{FFFFFF} - ответить на последнее приватное сообщение")
+               imgui.TextColoredRGB("{FF6600}/pchat <create|invite|accept|leave|kick>{FFFFFF} - управление персональным чатом")
+               imgui.TextColoredRGB("{FF6600}/c <text>{FFFFFF} - отправить сообщение в персональный чат")
+               imgui.TextColoredRGB("{FF6600}/ask <text>{FFFFFF} - задать вопрос по функционалу сервера для всех игроков")
+               imgui.TextColoredRGB("{FF6600}/mute{FFFFFF} - выключить определенный чат")
+               imgui.TextColoredRGB("{FF6600}/ignore <id>{FFFFFF} - занести игрока в черный список")
+               imgui.TextColoredRGB("{FF6600}/unignore <id | all>{FFFFFF} - вынести игрока из черного списка | all - очистить черный список")
+               imgui.TextColoredRGB("{FF6600}/ignorelist{FFFFFF} - посмотреть черный список")
             end
          end
 		 if imgui.CollapsingHeader(u8"Горячие клавиши:") then
-            imgui.TextColoredRGB("{00FF00}CTRL + O{FFFFFF} — скрыть-показать ид объектов рядом")
+            imgui.TextColoredRGB("{FF6600}CTRL + O{FFFFFF} — скрыть-показать ид объектов рядом")
             if isTraining then
-               imgui.TextColoredRGB("{00FF00}Клавиша M{FFFFFF} — меню управления миром")
-               imgui.TextColoredRGB("{00FF00}Клавиша N{FFFFFF} — включить режим редактирования")
+               imgui.TextColoredRGB("{FF6600}Клавиша M{FFFFFF} — меню управления миром")
+               imgui.TextColoredRGB("{FF6600}Клавиша N{FFFFFF} — включить режим редактирования")
                imgui.TextColoredRGB("В режиме ретекстур:")
-               imgui.TextColoredRGB("Управление: {00FF00}Y{FFFFFF} - Текстура наверх {00FF00}N{FFFFFF} - текстура вниз")
-               imgui.TextColoredRGB("{00FF00}Num4{FFFFFF} Предыдущая страница, {00FF00}Num6{FFFFFF} Следующая страница")
-               imgui.TextColoredRGB("{00FF00}Пробел{FFFFFF} - принять.")
+               imgui.TextColoredRGB("Управление: {FF6600}Y{FFFFFF} - Текстура наверх {FF6600}N{FFFFFF} - текстура вниз")
+               imgui.TextColoredRGB("{FF6600}Num4{FFFFFF} Предыдущая страница, {FF6600}Num6{FFFFFF} Следующая страница")
+               imgui.TextColoredRGB("{FF6600}Пробел{FFFFFF} - принять.")
             end
             if isAbsolutePlay then
 		       imgui.TextColoredRGB("{00FF00}Клавиша N{FFFFFF} — меню редактора карт (в полете)")
@@ -6576,12 +6563,23 @@ function imgui.OnDrawFrame()
             end
             imgui.PopItemWidth()
             
-            if imgui.TooltipButton(u8"Объявить МП", imgui.ImVec2(220, 25), u8"Аннонсировать МП в объявление (/об)") then
-               if string.len(textbuffer.mpname.v) > 0 and string.len(textbuffer.mpprize.v) > 0 then 
-                  sampSetChatInputEnabled(true)
-                  sampSetChatInputText(string.format("/об %s, приз %s", u8:decode(textbuffer.mpname.v), u8:decode(textbuffer.mpprize.v)))
-               else
-                  sampAddChatMessage("Сперва укажите название мероприятия и приз!", -1)
+            if isAbsolutePlay then
+               if imgui.TooltipButton(u8"Объявить МП", imgui.ImVec2(220, 25), u8"Аннонсировать МП в объявление (/об)") then
+                  if string.len(textbuffer.mpname.v) > 0 and string.len(textbuffer.mpprize.v) > 0 then 
+                     sampSetChatInputEnabled(true)
+                     sampSetChatInputText(string.format("/об %s, приз %s", u8:decode(textbuffer.mpname.v), u8:decode(textbuffer.mpprize.v)))
+                  else
+                     sampAddChatMessage("Сперва укажите название мероприятия и приз!", -1)
+                  end
+               end
+            elseif isTraining then
+               if imgui.TooltipButton(u8"Объявить МП", imgui.ImVec2(220, 25), u8"Аннонсировать МП в объявление (/ads)") then
+                  if string.len(textbuffer.mpname.v) > 0 and string.len(textbuffer.mpprize.v) > 0 then 
+                     sampSetChatInputEnabled(true)
+                     sampSetChatInputText(string.format("/ads %s, приз %s", u8:decode(textbuffer.mpname.v), u8:decode(textbuffer.mpprize.v)))
+                  else
+                     sampAddChatMessage("Сперва укажите название мероприятия и приз!", -1)
+                  end
                end
             end
             imgui.SameLine()
@@ -7845,9 +7843,13 @@ function sampev.onSendDialogResponse(dialogId, button, listboxId, input)
       
       -- if player wxit from world without command drop lastWorldNumber var 
       if dialogId == 1405 and listboxId == 5 and button == 1 then
-         lastWorldNumber = 0
-         isWorldHoster = false
-         worldspawnpos.x, worldspawnpos.y, worldspawnpos.z = getCharCoordinates(PLAYER_PED)
+         if input:find("Войти в свой мир") then
+            isWorldHoster = true
+            worldspawnpos.x, worldspawnpos.y, worldspawnpos.z = getCharCoordinates(PLAYER_PED)
+         else
+            lastWorldNumber = 0
+            isWorldHoster = false
+         end
       end
        
 	  -- Get current world number from server dialogs
@@ -7949,7 +7951,9 @@ function sampev.onSendDialogResponse(dialogId, button, listboxId, input)
             end
          end
       end
-	  
+	  if dialogId == 1409 and button == 1 then
+         editMode = 1
+      end
 	  -- if dialogId == 1401 and button == 1 then
 	     -- if undoMode then
 		    -- if LastObject.handle and doesObjectExist(LastObject.handle) then
@@ -7972,10 +7976,18 @@ function sampev.onSendDialogResponse(dialogId, button, listboxId, input)
          if listboxId == 3 and input:find("Вернуться в свой мир") then
             if worldspawnpos.x and worldspawnpos.x ~= 0 then
                sampSendChat(string.format("/xyz %f %f %f",
-	 	      worldspawnpos.x, worldspawnpos.y, worldspawnpos.z), 0x0FFFFFF)
+	 	       worldspawnpos.x, worldspawnpos.y, worldspawnpos.z), 0x0FFFFFF)
             else
                sampSendChat("/spawnme")
             end
+         end
+         
+         -- if listboxId == 2 and input:find("Создать игровой мир") then
+         -- end
+         -- if listboxId == 3 and input:find("Создать пробный VIP мир") then
+         -- end
+         if listboxId == 4 and input:find("Отправиться на спаун") then
+            editMode = 0
          end
          
          -- Added new features to /omenu
@@ -8004,7 +8016,23 @@ function sampev.onSendDialogResponse(dialogId, button, listboxId, input)
          if listboxId == 6 and input:find("Информация") then
             sampSendChat("/oinfo")
          end
-      
+         
+         -- Extend main /menu
+         if input:find("Взять Jetpack") then
+            sampSendChat("/jetpack")
+         end
+         if input:find("Сменить скин") then
+            sampSendChat("/skin")
+         end
+         if input:find("Заспавнить себя") then
+            sampSendChat("/spawnme")
+         end
+         if input:find("Слапнуть себя") then
+            sampSendChat("/slapme")
+         end
+         if input:find("Список друзей") then
+            sampSendChat("/flist")
+         end
          -- Extend main /vw menu
          if input:find("Настройки для команд") then
             sampSendChat("/team")
@@ -8051,6 +8079,9 @@ function sampev.onShowDialog(dialogId, style, title, button1, button2, text)
 		 -- printStringNow("color "..randomcolor.." copied to clipboard",1000)
 	     -- setClipboardText(randomcolor)
       -- end
+      if dialogId == 1400 and title:find("Управление мира") then
+         isWorldHoster = true
+      end
       
       if dialogId == 1407 then
          local newtext = 
@@ -8164,7 +8195,6 @@ function sampev.onShowDialog(dialogId, style, title, button1, button2, text)
          " - Интерьеры\n"
          return {dialogId, style, title, button1, button2, text..newitems}
       end
-      
       -- Extend world manage menu
       if text:find("Обнулить все оружие") and style == 4 then
          local newitems = "\n"..
@@ -8177,6 +8207,27 @@ function sampev.onShowDialog(dialogId, style, title, button1, button2, text)
          "- Список переменных игрока\n"..
          "- Список аудиостримов\n"
          return {dialogId, style, title, button1, button2, text..newitems}
+      end
+      -- Extend main /menu
+      if title:find("Меню") then
+         local newitems = "\n"..
+         "Заспавнить себя\n"..
+         "Слапнуть себя\n"..
+         "Взять Jetpack\n"..
+         "Список друзей\n"
+         return {dialogId, style, title, button1, button2, text..newitems}
+      end
+      if title:find("Настройки игрока") then
+         local newitems = "\n"..
+         "15. Сменить скин\n"
+         return {dialogId, style, title, button1, button2, text..newitems}
+      end
+      if text:find("Создать игровой мир") then
+         if text:find("сек") then
+            isWorldJoinUnavailable = true
+         else
+            isWorldJoinUnavailable = false
+         end
       end
    end
    
@@ -8256,12 +8307,16 @@ function sampev.onServerMessage(color, text)
    
    if isTraining then
       if text:find("Невозможно создать новый мир, за вами уже есть закрепленный мир") then
-         isWorldHoster = true
-         sampSendChat("/vw")
+         -- "Создать игровой мир"
+         if not isWorldJoinUnavailable then
+            isWorldHoster = true
+            sampSendChat("/vw")
+         end
          return false
       end
       if text:find("Меню управления миром") then
-         sampAddChatMessage("[SERVER]: {FFFFFF}Меню управления миром - /vw или клавиша - M", 0x0ff4f00)
+         isWorldHoster = true
+         sampAddChatMessage("[SERVER]: {FFFFFF}Меню управления миром - /vw или клавиша - M", 0x0FF6600)
          return false
       end
    end
@@ -8451,6 +8506,19 @@ function sampev.onSendCommand(command)
       end
    end
    
+   if command:find("коорд") or command:find("coord") then
+      local posX, posY, posZ = getCharCoordinates(PLAYER_PED)
+      local posA = getCharHeading(PLAYER_PED)
+      sampAddChatMessage(string.format("Ваши координаты: {696969}%.2f %.2f %.2f {FFFFFF}Угол поворота: {696969}%.2f", posX, posY, posZ, posA), -1)
+      if isAbsolutePlay and isWorldHoster then
+         sampAddChatMessage(string.format("Используйте: /тпк {696969}%.2f %.2f %.2f", posX, posY, posZ), -1)
+      end
+      if isTraining and isWorldHoster then
+         sampAddChatMessage(string.format("Используйте: /xyz {696969}%.2f %.2f %.2f", posX, posY, posZ), -1)
+      end
+      return false
+   end
+   
    if command:find("ответ") then
       if command:find('(.+) (.+)') then
          local cmd, arg = command:match('(.+) (.+)')
@@ -8505,6 +8573,7 @@ function sampev.onSendCommand(command)
    
    if command:find("exit") or command:find("выход") then
       isWorldHoster = false
+      editMode = 0
 	  lastWorldNumber = 0
       worldspawnpos.x = 0
       worldspawnpos.y = 0
@@ -8649,6 +8718,12 @@ function sampev.onSendCommand(command)
    
    if isTraining and command:find("spint") then
       sampSendChat("/int")
+      return false
+   end
+   
+   if not isAbsolutePlay and command:find("killme") then
+      sampAddChatMessage("[SCRIPT]{FFFFFF} Если вы остались живы, отключите режим бога {696969}/gm ", 0x0FF6600)
+      setCharHealth(PLAYER_PED, 0.0)
       return false
    end
    
@@ -9270,11 +9345,27 @@ function ClearChat()
    memory.write(sampGetChatInfoPtr() + 0x63DA, 1, 1)
 end
 
+function SaveReminder()
+   lua_thread.create(function()
+      while checkbox.worldsavereminder.v do
+         local delay = tonumber(ini.settings.reminderdelay)
+         wait(1000*60*delay)
+         sampAddChatMessage("{FF6600}[SCRIPT]{FFFFFF} Вы давно не сохраняли мир. Сохраните его во избежание потери прогресса.", 0x0FF6600)
+      end   
+   end)
+end
+
 function AutoAd()
    lua_thread.create(function()
    while autoAnnounce do
       wait(1000*60)
-      sampSendChat("/об "..u8:decode(textbuffer.mpname.v)..", приз "..u8:decode(textbuffer.mpprize.v), -1)
+      if isAbsolutePlay then
+         sampSendChat("/об "..u8:decode(textbuffer.mpname.v)..", приз "..u8:decode(textbuffer.mpprize.v), -1)
+      elseif isTraining then
+         sampSendChat("/ads "..u8:decode(textbuffer.mpname.v)..", приз "..u8:decode(textbuffer.mpprize.v), -1)
+      else
+         sampSendChat(" "..u8:decode(textbuffer.mpname.v)..", приз "..u8:decode(textbuffer.mpprize.v), -1)
+      end
    end   
    end)
 end
