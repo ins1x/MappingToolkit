@@ -4,7 +4,7 @@ script_description("Assistant for mappers and event makers")
 script_dependencies('imgui', 'lib.samp.events')
 script_properties("work-in-pause")
 script_url("https://github.com/ins1x/AbsEventHelper")
-script_version("2.7.7")
+script_version("2.7.8")
 -- script_moonloader(16) moonloader v.0.26
 -- sa-mp version: 0.3.7 R1
 -- Activaton: ALT + X (show main menu) or command /abs
@@ -36,6 +36,8 @@ local ini = inicfg.load({
       freezechat = false,
       playerwarnings = false,
       worldsavereminder = false,
+      renderfont = "Arial",
+      renderfontsize = 7,
       reminderdelay = 15,
       setskin = 27,
       debug = false,
@@ -48,6 +50,8 @@ local ini = inicfg.load({
       showpanel = false,
       position = 0, -- position (0 = bottom pos, 1 = upper pos)
       background = true,
+      fontname = "Tahoma",
+      fontsize = 7,
    },
    binds =
    {
@@ -64,29 +68,22 @@ local ini = inicfg.load({
 inicfg.save(ini, configIni)
 --------------------------------------
 
-objectsrenderfont = renderCreateFont("Arial", 7, 5)
-backgroundfont = renderCreateFont("Tahoma", 7, 5)
+objectsrenderfont = renderCreateFont(ini.settings.renderfont, ini.settings.renderfontsize, 5)
+backgroundfont = renderCreateFont(ini.panel.fontname, ini.panel.fontsize, 5)
 
 local sizeX, sizeY = getScreenResolution()
 local v = nil
 local color = imgui.ImFloat4(1, 0, 0, 1)
-local gamestates = {'None', 'Wait Connect', 'Await Join', 'Connected', 'Restarting', 'Disconnected'}
-local editmodes = {"None", "Edit", "Clone", "Remove", "Retexture"}
-local gamestate = imgui.ImInt(0)
 
 local isAbsolutePlay = false
 local isTraining = false
-local isSampAddonInstalled = false
 local isAbsfixInstalled = false
 local isPlayerSpectating = false
 local isWorldHoster = false
 local isWorldJoinUnavailable = false
 local disableObjectCollision = false
-local prepareTeleport = false
-local prepareJump = false
 local showobjects = false
 local countobjects = true
-local ENBSeries = false
 local chosenplayer = nil
 local chosenvehicle = nil
 local tabselectedplayer = nil
@@ -128,11 +125,6 @@ local legalweapons = {0, 1}
 local fixcam = {x = 0.0, y = 0.0, z = 0.0}
 local tpcpos = {x = 0.0, y = 0.0, z = 0.0}
 local worldspawnpos = {x = 0.0, y = 0.0, z = 0.0}
-local tpc = { 
-   public = {x = 0, y = 0, z = 0},
-   private = {x = 0, y = 0, z = 0},
-   static = {x = 0, y = 0, z = 0}
-}
 
 local dialog = {
    main = imgui.ImBool(false),
@@ -287,11 +279,12 @@ local combobox = {
    chatselect = imgui.ImInt(0),
    profiles = imgui.ImInt(0),
    selecttable = imgui.ImInt(0),
-   objects = imgui.ImInt(6),
+   objects = imgui.ImInt(0),
    weaponselect = imgui.ImInt(0),
    itemad = imgui.ImInt(0),
    sitelogsource = imgui.ImInt(0),
    fastanswers = imgui.ImInt(0),
+   gamestate = imgui.ImInt(0),
    logs = imgui.ImInt(0)
 }
 
@@ -314,6 +307,15 @@ local LastRemovedObject = {
    modelid = nil,
    position = {x=0.0, y=0.0, z=0.0},
    rotation = {x=0.0, y=0.0, z=0.0}
+}
+
+local gamestates = {
+   'None', 'Wait Connect', 'Await Join', 
+   'Connected', 'Restarting', 'Disconnected'
+}
+
+local editmodes = {
+   "None", "Edit", "Clone", "Remove", "Retexture"
 }
 
 absServersNames = {
@@ -2951,7 +2953,14 @@ sampObjectModelNames =
 function main()
    if not isSampLoaded() or not isSampfuncsLoaded() then return end
       while not isSampAvailable() do wait(100) end
- 
+      
+      -- ENB check
+      if doesFileExist(getGameDirectory() .. "\\enbseries.asi") or 
+      doesFileExist(getGameDirectory() .. "\\d3d9.dll") then
+         print("You have ENB installed, imgui does not work with ENB.")
+         thisScript():unload()
+      end
+      
       sampAddChatMessage("{880000}Absolute Events Helper.\
 	  {FFFFFF}Открыть меню: {CDCDCD}ALT + X", 0xFFFFFF)
       
@@ -2962,17 +2971,6 @@ function main()
       end
       if string.len(textbuffer.rule1.v) < 1 then
          textbuffer.rule1.v = u8("Введите свои правила для мероприятия сюда")
-      end
-      
-      -- ENB check
-      if doesFileExist(getGameDirectory() .. "\\enbseries.asi") or 
-      doesFileExist(getGameDirectory() .. "\\d3d9.dll") then
-         ENBSeries = true
-      end
-      
-	  -- simple SAMP Addon check
-	  if doesFileExist(getGameDirectory() .. "\\samp.asi") then
-         isSampAddonInstalled = true
       end
 	  
 	  if doesFileExist(getGameDirectory() .. "\\moonloader\\AbsoluteFix.lua") then
@@ -2998,7 +2996,7 @@ function main()
 	
       textbuffer.mpprize.v = '1.000.000$'
       --textbuffer.mpname.v = u8'Проходит МП "<название>" '
-     
+      
       if ini.settings.worldsavereminder then
          SaveReminder()
       end
@@ -3021,7 +3019,7 @@ function main()
       end
       
       -- Imgui menu
-      if not ENBSeries then imgui.Process = dialog.main.v end
+      imgui.Process = dialog.main.v
       
       -- chatfix
       if isTraining then
@@ -3196,7 +3194,7 @@ function main()
          end
       end
       
-	  -- Count streamed obkects
+	  -- Count streamed objects
 	  if countobjects then
 	     streamedObjects = 0
 	     for _, v in pairs(getAllObjects()) do
@@ -3472,7 +3470,6 @@ function imgui.OnDrawFrame()
             end
             
 			if imgui.Button(u8"Прыгнуть вперед", imgui.ImVec2(200, 25)) then
-               prepareJump = true
 			   if sampIsLocalPlayerSpawned() then
 				  JumpForward()
 			   end
@@ -3704,6 +3701,13 @@ function imgui.OnDrawFrame()
 		    imgui.Text(u8"Последний modelid объекта: не выбран")
          end
 		 
+         local closestObjectId = getClosestObjectId()
+         if closestObjectId then
+            local model = getObjectModel(closestObjectId)
+            local modelName = tostring(sampObjectModelNames[model])
+            imgui.Text(u8"Ближайший объект: "..model.." ("..modelName..") ")
+         end
+      
 		 imgui.Text(string.format(u8"Удаленные стандартные объекты (removeBuilding): %i", removedBuildings))
 		 if countobjects then
             imgui.Text(string.format(u8"Объектов в области в стрима: %i", streamedObjects))
@@ -4402,10 +4406,10 @@ function imgui.OnDrawFrame()
 	     imgui.Text(u8'Текущий Gamestate: '..gamestates[sampGetGamestate() + 1])
 		 imgui.PushItemWidth(120)
          imgui.SameLine()
-		 imgui.Combo(u8'##Gamestates', gamestate, gamestates)
+		 imgui.Combo(u8'##Gamestates', combobox.gamestate, gamestates)
 		 imgui.SameLine()
 		 if imgui.Button(u8'Сменить') then
-			sampSetGamestate(gamestate.v)
+			sampSetGamestate(combobox.gamestate.v)
 		 end
 		 if imgui.CollapsingHeader(u8"Логи:") then
             imgui.Text(u8"Логгировать в консоли:")
@@ -5001,18 +5005,14 @@ function imgui.OnDrawFrame()
          imgui.Text("Homepage:")
 		 imgui.SameLine()
 		 imgui.Link("https://github.com/ins1x/AbsEventHelper", "ins1x/AbsEventHelper")
-		 
-		 imgui.Text(u8"Сайт Absolute Play:")
-		 imgui.SameLine()
-		 imgui.Link("https://gta-samp.ru", "gta-samp.ru")
          
 		 imgui.Text(u8"Blast.hk thread:")
 		 imgui.SameLine()
 		 imgui.Link("https://www.blast.hk/threads/200619/", "https://www.blast.hk")
 		 
-		 imgui.Text(u8"YouTube:")
-		 imgui.SameLine()
-		 imgui.Link("https://www.youtube.com/@1nsanemapping", "1nsanemapping")
+		 -- imgui.Text(u8"YouTube:")
+		 -- imgui.SameLine()
+		 -- imgui.Link("https://www.youtube.com/@1nsanemapping", "1nsanemapping")
 		 
          imgui.Spacing()
          if imgui.Button(u8"Check updates",imgui.ImVec2(150, 25)) then
@@ -5458,10 +5458,9 @@ function imgui.OnDrawFrame()
          
 		 imgui.Text(u8"Выберите категорию: ")
 		 imgui.SameLine()
-         if imgui.Combo(u8'##ComboBoxObjects', combobox.objects, 
-	     {u8'Основные', u8'Специальные', u8'Эффекты', u8'Освещение',
-		 u8'Интерьер', u8'Избранные', u8'Поиск (Онлайн)'}, 7) then
-		 end
+         local comboboxitems = {u8'Основные', u8'Специальные', u8'Эффекты', 
+         u8'Освещение', u8'Интерьер', u8'Пользовательские'}
+         imgui.Combo(u8'##ComboBoxObjects', combobox.objects, comboboxitems, #comboboxitems)
          
 		 imgui.Spacing()
 		 
@@ -5535,64 +5534,14 @@ function imgui.OnDrawFrame()
                textbuffer.note.v = favfile:read('*a')
                favfile:close()
             end
-         elseif combobox.objects.v == 6 then
-	        imgui.TextColoredRGB("Поиск на {007DFF}Prineside DevTools (Online)")
-			imgui.SameLine()
-            imgui.TextQuestion("( ? )", u8"Все запросы перенаправляет в ваш браузер")
-		    imgui.Text(u8"Введите ключевое слово, ID или название модели:")
-	        imgui.PushItemWidth(220)
-	        if imgui.InputText("##CheckObject", textbuffer.objectid) then
-            end
-            imgui.PopItemWidth()
-		 
-		    imgui.SameLine()
-	        if imgui.Button(u8"Найти",imgui.ImVec2(65, 25)) then
-		       if string.len(textbuffer.objectid.v) > 3 then
-                  local link = 'explorer "https://dev.prineside.com/ru/gtasa_samp_model_id/search/?q='.. u8:decode(textbuffer.objectid.v)..'"'
-		          os.execute(link)
-		       end
-	        end 
-            
-            if LastObject.modelid then
-               imgui.SameLine()
-               if imgui.TooltipButton(u8"Вставить", imgui.ImVec2(65, 25), u8"Вставить последний объект id: "..LastObject.modelid) then
-	              textbuffer.objectid.v = tostring(LastObject.modelid)
-		       end
-	        end
-            
-            if imgui.Button(u8"Найти объекты рядом по текущей позиции",imgui.ImVec2(300, 25)) then
-		       if sampIsLocalPlayerSpawned() then
-                  local posX, posY, posZ = getCharCoordinates(PLAYER_PED)
-                  local link = string.format('explorer "https://dev.prineside.com/ru/gtasa_samp_model_id/mapsearch/?x=%i&y=%i', posX, posY)
-		          os.execute(link)
-		       end
-	        end
-            
-            imgui.Checkbox(u8'Найти объект с особым поведением', checkbox.searchobjectsext)
-            if checkbox.searchobjectsext.v then
-               if imgui.Button(u8"Все объекты без коллизии",imgui.ImVec2(220, 25)) then
-                  os.execute('explorer "https://dev.prineside.com/ru/gtasa_samp_model_id/customsearch/?c%5B%5D=1&s=id-asc&bc=0&bb=-1&bt=-1&ba=-1"')
-               end
-               imgui.SameLine()
-               if imgui.Button(u8"Все разрушаемые объекты",imgui.ImVec2(220, 25)) then
-                  os.execute('explorer "https://dev.prineside.com/ru/gtasa_samp_model_id/customsearch/?c%5B%5D=1&s=id-asc&bc=-1&bb=1&bt=-1&ba=-1"')
-               end
-               if imgui.Button(u8"Все отображаемые по времени",imgui.ImVec2(220, 25)) then
-                  os.execute('explorer "https://dev.prineside.com/ru/gtasa_samp_model_id/customsearch/?c%5B%5D=1&s=id-asc&bc=-1&bb=-1&bt=1&ba=-1"')
-               end
-               imgui.SameLine()
-               if imgui.Button(u8"Все объекты с анимацией",imgui.ImVec2(220, 25)) then
-                  os.execute('explorer "https://dev.prineside.com/ru/gtasa_samp_model_id/customsearch/?c%5B%5D=1&s=id-asc&bc=-1&bb=-1&bt=-1&ba=1"')
-               end
-            end
          end
 	
          imgui.Text(u8"______________________________________________________________________")
-	     if isAbsolutePlay then
- 	        imgui.TextColoredRGB("Описание работы редактора карт ")
-            imgui.SameLine()
-			imgui.Link("https://forum.gta-samp.ru/index.php?/topic/1016832-миры-описание-работы-редактора-карт/", "forum.gta-samp.ru")
-         end
+	     -- if isAbsolutePlay then
+ 	        -- imgui.TextColoredRGB("Описание работы редактора карт ")
+            -- imgui.SameLine()
+			-- imgui.Link("https://forum.gta-samp.ru/index.php?/topic/1016832-миры-описание-работы-редактора-карт/", "forum.gta-samp.ru")
+         -- end
 		 
          imgui.TextColoredRGB("Не нашли нужный объект? посмотрите на")
 		 imgui.SameLine()
@@ -6393,11 +6342,62 @@ function imgui.OnDrawFrame()
             imgui.Spacing()
          end
 		 imgui.Spacing()
+      elseif tabmenu.info == 9 then
+      	 imgui.TextColoredRGB("Поиск на {007DFF}Prineside DevTools (Online)")
+         imgui.SameLine()
+         imgui.TextQuestion("( ? )", u8"Все запросы перенаправляет в ваш браузер")
+		 imgui.Text(u8"Введите ключевое слово, ID или название модели:")
+	     imgui.PushItemWidth(220)
+	     if imgui.InputText("##CheckObject", textbuffer.objectid) then
+         end
+         imgui.PopItemWidth()
+		 
+		 imgui.SameLine()
+	     if imgui.Button(u8"Найти",imgui.ImVec2(65, 25)) then
+		    if string.len(textbuffer.objectid.v) > 3 then
+               local link = 'explorer "https://dev.prineside.com/ru/gtasa_samp_model_id/search/?q='.. u8:decode(textbuffer.objectid.v)..'"'
+		       os.execute(link)
+		    end
+	     end 
+         
+         if LastObject.modelid then
+            imgui.SameLine()
+            if imgui.TooltipButton(u8"Вставить", imgui.ImVec2(65, 25), u8"Вставить последний объект id: "..LastObject.modelid) then
+	           textbuffer.objectid.v = tostring(LastObject.modelid)
+		    end
+	     end
+         
+         if imgui.Button(u8"Найти объекты рядом по текущей позиции",imgui.ImVec2(300, 25)) then
+		    if sampIsLocalPlayerSpawned() then
+               local posX, posY, posZ = getCharCoordinates(PLAYER_PED)
+               local link = string.format('explorer "https://dev.prineside.com/ru/gtasa_samp_model_id/mapsearch/?x=%i&y=%i', posX, posY)
+		       os.execute(link)
+		    end
+	     end
+         
+         imgui.Checkbox(u8'Найти объект с особым поведением', checkbox.searchobjectsext)
+         if checkbox.searchobjectsext.v then
+            if imgui.Button(u8"Все объекты без коллизии",imgui.ImVec2(220, 25)) then
+               os.execute('explorer "https://dev.prineside.com/ru/gtasa_samp_model_id/customsearch/?c%5B%5D=1&s=id-asc&bc=0&bb=-1&bt=-1&ba=-1"')
+            end
+            imgui.SameLine()
+            if imgui.Button(u8"Все разрушаемые объекты",imgui.ImVec2(220, 25)) then
+               os.execute('explorer "https://dev.prineside.com/ru/gtasa_samp_model_id/customsearch/?c%5B%5D=1&s=id-asc&bc=-1&bb=1&bt=-1&ba=-1"')
+            end
+            if imgui.Button(u8"Все отображаемые по времени",imgui.ImVec2(220, 25)) then
+               os.execute('explorer "https://dev.prineside.com/ru/gtasa_samp_model_id/customsearch/?c%5B%5D=1&s=id-asc&bc=-1&bb=-1&bt=1&ba=-1"')
+            end
+            imgui.SameLine()
+            if imgui.Button(u8"Все объекты с анимацией",imgui.ImVec2(220, 25)) then
+               os.execute('explorer "https://dev.prineside.com/ru/gtasa_samp_model_id/customsearch/?c%5B%5D=1&s=id-asc&bc=-1&bb=-1&bt=-1&ba=1"')
+            end
+         end
       end -- end tabmenu.info
 		 
       imgui.NextColumn()
 
-      if imgui.Button(u8"Объекты", imgui.ImVec2(100,25)) then tabmenu.info = 5 end
+      if imgui.Button(u8"Поиск", imgui.ImVec2(100,25)) then tabmenu.info = 9 end
+      if imgui.Button(u8"Избранные", imgui.ImVec2(100,25)) then tabmenu.info = 5 end
       if imgui.Button(u8"Лимиты", imgui.ImVec2(100,25)) then tabmenu.info = 2 end
       if imgui.Button(u8"Цвета", imgui.ImVec2(100,25)) then tabmenu.info = 3 end
       if imgui.Button(u8"Ретекстур", imgui.ImVec2(100,25)) then tabmenu.info = 4 end
@@ -7108,10 +7108,12 @@ function imgui.OnDrawFrame()
 	         --imgui.TextColoredRGB("Цветной текст указывать через скобки (FF0000)")
              -- --imgui.Separator()
          elseif tabmenu.mp == 5 then
-            imgui.Text(u8"Не забудьте после завершения мероприятия:")
-            imgui.Text(u8"- Вернуть точку спавна на исходное положение")
-            imgui.Text(u8"- Открыть мир для входа")
-            imgui.Text(u8"- Вернуть пак оружия на стандартный")
+            if isAbsolutePlay then
+               imgui.Text(u8"Не забудьте после завершения мероприятия:")
+               imgui.Text(u8"- Вернуть точку спавна на исходное положение")
+               imgui.Text(u8"- Открыть мир для входа")
+               imgui.Text(u8"- Вернуть пак оружия на стандартный")
+            end
             imgui.Spacing()
             imgui.Text(u8"Оставшиеся игроки рядом:")
             for k, v in ipairs(getAllChars()) do
@@ -7974,11 +7976,13 @@ function sampev.onSendDialogResponse(dialogId, button, listboxId, input)
       if button == 1 then -- if dialog response
          -- Corrects spawn item on /world menu
          if listboxId == 3 and input:find("Вернуться в свой мир") then
-            if worldspawnpos.x and worldspawnpos.x ~= 0 then
-               sampSendChat(string.format("/xyz %f %f %f",
-	 	       worldspawnpos.x, worldspawnpos.y, worldspawnpos.z), 0x0FFFFFF)
-            else
-               sampSendChat("/spawnme")
+            if not isWorldJoinUnavailable then
+               if worldspawnpos.x and worldspawnpos.x ~= 0 then
+                  sampSendChat(string.format("/xyz %f %f %f",
+	 	          worldspawnpos.x, worldspawnpos.y, worldspawnpos.z), 0x0FFFFFF)
+               else
+                  sampSendChat("/spawnme")
+               end
             end
          end
          
@@ -8118,10 +8122,13 @@ function sampev.onShowDialog(dialogId, style, title, button1, button2, text)
       end
       
       if dialogId == 1401 then
+         local closestObjectId = getClosestObjectId()
+         
          local newtext = 
          "{FFD700}615-18300       {FFFFFF}GTA-SA \n{FFD700}18632-19521{FFFFFF}   SA-MP\n"..
-         (LastObject.modelid and "\n{FFFFFF}Последний {FFFF00}использованный объект: "..LastObject.modelid or " ")..
-         (LastRemovedObject.modelid and "\n{FFFFFF}Последний {FF0000}удаленный объект: "..LastRemovedObject.modelid or " ")..
+         (LastObject.modelid and "\n{FFFFFF}Последний {FFFF00}использованный объект: "..LastObject.modelid.." ("..tostring(sampObjectModelNames[LastObject.modelid])..") " or " ")..
+         (LastRemovedObject.modelid and "\n{FFFFFF}Последний {FF0000}удаленный объект: "..LastRemovedObject.modelid.." ("..tostring(sampObjectModelNames[LastRemovedObject.modelid])..") " or " ")..
+         (closestObjectId and "\n{FFFFFF}Ближайший {696969}объект: "..getObjectModel(closestObjectId).." ("..tostring(sampObjectModelNames[getObjectModel(closestObjectId)])..") \n" or " ")..
          "\n{FFFFFF}Введи номер объекта: \n"
          return {dialogId, style, title, button1, button2, newtext}
       end
@@ -8229,6 +8236,10 @@ function sampev.onShowDialog(dialogId, style, title, button1, button2, text)
             isWorldJoinUnavailable = false
          end
       end
+      if text:find("После подтверждения Вы отправитесь в") then
+         sampSendDialogResponse(32700, 1, nil, nil)
+         sampCloseCurrentDialogWithButton(1)
+      end
    end
    
    -- Skip olist when exit from /omenu
@@ -8262,36 +8273,6 @@ function sampev.onServerMessage(color, text)
       table.insert(chatbuffer, {color = color, text = text})
       return false
    end
-    
-   if checkbox.chatmentions.v then
-      -- ignore system messages by color
-      if color ~= -793842689 and color ~= -1029514497 then
-         -- mentions by nickname
-         if text:find(nickname) then
-            if text:find(":") then
-               local pointpos = text:find(":")
-               local cleartext = text:sub(pointpos, string.len(text))
-               if cleartext:find(nickname) then
-                  printStyledString('You were mentioned in the chat', 2000, 4)
-                  addOneOffSound(0.0, 0.0, 0.0, 1138) -- CHECKPOINT_GREEN
-                  return true
-               end
-             else
-               printStyledString('You were mentioned in the chat', 2000, 4)
-               addOneOffSound(0.0, 0.0, 0.0, 1138) -- CHECKPOINT_GREEN
-               return true
-            end
-         end
-         
-         -- mentions by id
-         if text:match("(%s"..id.."%s)") then
-            printStyledString('You were mentioned in the chat', 2000, 4)
-            addOneOffSound(0.0, 0.0, 0.0, 1138) -- CHECKPOINT_GREEN
-            return true
-         end
-      end
-      
-   end
    
    -- TODO optimize shitcode
    if isAbsolutePlay and text:find('ЛС') and text:find('от') then
@@ -8321,16 +8302,7 @@ function sampev.onServerMessage(color, text)
       end
    end
    
-   if isAbsolutePlay then
-      if text:find("У тебя нет прав") then
-         if prepareJump then 
-            JumpForward()
-            prepareJump = false
-         end
-         if prepareTeleport then sampAddChatMessage("В мире телепортация отключена", 0x00FF00) end
-         return false
-      end
-      
+   if isAbsolutePlay then   
       if text:find("Последнего созданного объекта не существует") then
          if LastObject.modelid then
             sampAddChatMessage("Последний использованный объект: "..LastObject.modelid, 0x00FF00)
@@ -8342,7 +8314,7 @@ function sampev.onServerMessage(color, text)
       end
       
       if text:find("Установи 0.3DL чтобы включать полёт в этом месте") then
-         sampAddChatMessage("Необходимо уходить в полет с другой точки где мало объектов рядом (выйти из зоны стрима)", 0x00FF00)
+         sampAddChatMessage("Необходимо уходить в полет с другой точки, где мало объектов рядом (выйти из зоны стрима)", 0x00FF00)
       end
       
       if text:find("Ты уже находишься в редакторе миров") then
@@ -8358,29 +8330,20 @@ function sampev.onServerMessage(color, text)
       if text:find("Это не твой мир, редактировать его ты не можешь") then
          return false
       end
+      
+      if text:find("использовал телепорт") and isWorldHoster then
+         return false
+      end
    end
    
    if isTraining then
       if text:find("Виртуальный мир успешно создан") 
       or text:find("Вы создали пробный VIP мир") then
-         isWorldHoster = true
-         worldspawnpos.x, worldspawnpos.y, worldspawnpos.z = getCharCoordinates(PLAYER_PED)
-         sampSendChat("/weather "..slider.weather.v)
-         lua_thread.create(function()
-            wait(1000)
-            sampSendChat("/time "..slider.time.v)
-            wait(1000)
-            sampSendChat("/gm")
-            if ini.settings.debug then
-               wait(500)
-               if sampIsLocalPlayerSpawned() then
-                  if ini.settings.setskin > 0 and ini.settings.setskin < 311 
-                  and ini.settings.setskin ~= 74 then
-                     sampSendChat("/skin "..ini.settings.setskin)
-                  end
-               end
-            end
-         end)
+         WorldJoinInit()
+      end
+      
+      if text:find("Хост "..nickname) and text:find("вернулся в мир") then
+         WorldJoinInit()
       end
       
       if text:find('Создан объект: (%d+)') then
@@ -8398,6 +8361,37 @@ function sampev.onServerMessage(color, text)
       
       if text:find('Удален объект: (%d+)') then
          LastObject.localid = nil
+      end
+   end
+   
+   if checkbox.chatmentions.v then
+      -- ignore system messages by color
+      if color ~= -793842689 -- lime color abs
+      and color ~= -1029514497 -- puprple color
+      and color ~= -10092289 then --orange color training
+         -- mentions by nickname
+         if text:find(nickname) then
+            if text:find(":") then
+               local pointpos = text:find(":")
+               local cleartext = text:sub(pointpos, string.len(text))
+               if cleartext:find(nickname) then
+                  printStyledString('You were mentioned in the chat', 2000, 4)
+                  addOneOffSound(0.0, 0.0, 0.0, 1138) -- CHECKPOINT_GREEN
+                  return true
+               end
+             else
+               printStyledString('You were mentioned in the chat', 2000, 4)
+               addOneOffSound(0.0, 0.0, 0.0, 1138) -- CHECKPOINT_GREEN
+               return true
+            end
+         end
+         
+         -- mentions by id
+         if text:match("(%s"..id.."%s)") then
+            printStyledString('You were mentioned in the chat', 2000, 4)
+            addOneOffSound(0.0, 0.0, 0.0, 1138) -- CHECKPOINT_GREEN
+            return true
+         end
       end
    end
 end
@@ -8504,6 +8498,18 @@ function sampev.onSendCommand(command)
          isTexturesListOpened = false
          isSanpObjectsListOpened = false
       end
+   end
+   
+   if command:find("closest") then
+      local closestObjectId = getClosestObjectId()
+      if closestObjectId then
+         local model = getObjectModel(closestObjectId)
+         local modelName = tostring(sampObjectModelNames[model])
+         sampAddChatMessage("Ближайший объект: {696969}"..model.." ("..modelName..") ", -1)
+      else
+         sampAddChatMessage("Не найден ближайший объект", -1)
+      end
+      return false
    end
    
    if command:find("коорд") or command:find("coord") then
@@ -9080,7 +9086,7 @@ function sampev.onSendClickPlayer(playerId, source)
       local nickname = sampGetPlayerNickname(playerId)
       local buffer = string.format("%s[%d]", nickname, playerId)
       setClipboardText(buffer)
-      sampAddChatMessage("Ник "..nickname.." кликнутого в TAB игрока ".. playerId.." скопирован в буфер", 0x000FF00)
+      sampAddChatMessage("Ник {696969}"..nickname.." {FFFFFF}кликнутого в TAB игрока {696969}".. playerId.."{FFFFFF} скопирован в буфер", -1)
    end
 end
 
@@ -9212,20 +9218,37 @@ function JumpForward()
    end
 end
 
+function getClosestObjectId()
+   local closestId = nil
+   mydist = 20
+   local px, py, pz = getCharCoordinates(PLAYER_PED)
+   for _, v in ipairs(getAllObjects()) do
+      if isObjectOnScreen(v) then
+         local _, x, y, z = getObjectCoordinates(v)
+         local dist = getDistanceBetweenCoords3d(x, y, z, px, py, pz)
+         if dist <= mydist and dist >= 1.0 then -- 1.0 to ignore attached objects
+            mydist = dist
+            closestId = v
+         end
+      end
+   end
+   return closestId
+end
+
 function getClosestPlayerId()
    local closestId = -1
    mydist = 30
    local x, y, z = getCharCoordinates(PLAYER_PED)
    for i = 0, 999 do
-       local streamed, pedID = sampGetCharHandleBySampPlayerId(i)
-       if streamed and getCharHealth(pedID) > 0 and not sampIsPlayerPaused(pedID) then
-           local xi, yi, zi = getCharCoordinates(pedID)
-           local dist = getDistanceBetweenCoords3d(x, y, z, xi, yi, zi)
-           if dist <= mydist then
-               mydist = dist
-               closestId = i
-           end
-       end
+      local streamed, pedID = sampGetCharHandleBySampPlayerId(i)
+      if streamed and getCharHealth(pedID) > 0 and not sampIsPlayerPaused(pedID) then
+         local xi, yi, zi = getCharCoordinates(pedID)
+         local dist = getDistanceBetweenCoords3d(x, y, z, xi, yi, zi)
+         if dist <= mydist then
+            mydist = dist
+            closestId = i
+         end
+      end
    end
    return closestId
 end
@@ -9264,7 +9287,7 @@ end
 
 function getObjectsInStream()
    local count = 0
-   for _ in pairs(getAllObject()) do count = count + 1 end
+   for _ in pairs(getAllObjects()) do count = count + 1 end
    return count
 end
 
@@ -9273,20 +9296,6 @@ function getNearestObjectByModel(modelid)
    local x, y, z = getCharCoordinates(playerPed)
    for i, obj in ipairs(getAllObjects()) do
       if getObjectModel(obj) == modelid then
-         local result, ox, oy, oz = getObjectCoordinates(obj)
-         table.insert(objects, {getDistanceBetweenCoords3d(ox, oy, oz, x, y, z), ox, oy, oz})
-      end
-   end
-   if #objects <= 0 then return false end
-   table.sort(objects, function(a, b) return a[1] < b[1] end)
-   return true, unpack(objects[1])
-end
-
-function getNearestObjectModel()
-   local objects = {}
-   local x, y, z = getCharCoordinates(playerPed)
-   for i, obj in ipairs(getAllObjects()) do
-      if isObjectOnScreen(obj) then
          local result, ox, oy, oz = getObjectCoordinates(obj)
          table.insert(objects, {getDistanceBetweenCoords3d(ox, oy, oz, x, y, z), ox, oy, oz})
       end
@@ -9352,6 +9361,25 @@ function SaveReminder()
          wait(1000*60*delay)
          sampAddChatMessage("{FF6600}[SCRIPT]{FFFFFF} Вы давно не сохраняли мир. Сохраните его во избежание потери прогресса.", 0x0FF6600)
       end   
+   end)
+end
+
+function WorldJoinInit()
+   isWorldHoster = true
+   worldspawnpos.x, worldspawnpos.y, worldspawnpos.z = getCharCoordinates(PLAYER_PED)
+   sampSendChat("/weather "..slider.weather.v)
+   lua_thread.create(function()
+      wait(1000)
+      sampSendChat("/time "..slider.time.v)
+      wait(1000)
+      sampSendChat("/gm")
+      wait(500)
+      if sampIsLocalPlayerSpawned() then
+         if ini.settings.setskin > 0 and ini.settings.setskin < 311 
+         and ini.settings.setskin ~= 74 then
+            sampSendChat("/skin "..ini.settings.setskin)
+         end
+      end
    end)
 end
 
