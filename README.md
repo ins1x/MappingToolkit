@@ -164,6 +164,6 @@ LUA ассистент для мапперов и организаторов м�
 
 ---------------------------------------------
 
-blasthk: https://www.blast.hk/threads/200619/  
-forum: https://forum.gta-samp.ru/index.php?/topic/1101593-absolute-event-helper/  
-wiki: https://github.com/ins1x/MappingToolkit/wiki  
+[![blast.hk](https://img.shields.io/badge/Homepage-blasthk-blue)](https://www.blast.hk/threads/200619/)
+[![forum](https://img.shields.io/badge/Forum-Absolute_Play-red)](https://forum.gta-samp.ru/index.php?/topic/1101593-mapping-toolkit/)
+[![github](https://img.shields.io/badge/Wiki-Github-black)](https://github.com/ins1x/MappingToolkit/wiki)
