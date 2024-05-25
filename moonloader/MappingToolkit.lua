@@ -4,11 +4,11 @@ script_description("In-game assistant for mappers and event makers")
 script_dependencies('imgui', 'lib.samp.events')
 script_properties("work-in-pause")
 script_url("https://github.com/ins1x/MappingToolkit")
-script_version("3.0")
+-- Blast.hk thread: https://www.blast.hk/threads/200619/
+script_version("3.0 beta")
 -- script_moonloader(16) moonloader v.0.26
 -- sa-mp version: 0.3.7 R1
 -- Activaton: ALT + X (show main menu) or command /toolkit
--- Blast.hk thread: https://www.blast.hk/threads/200619/
 
 require 'lib.moonloader'
 local sampev = require 'lib.samp.events'
@@ -2962,7 +2962,7 @@ function main()
          thisScript():unload()
       end
       
-      sampAddChatMessage("{880000}Ingame Mapping Toolkit.\
+      sampAddChatMessage("{696969}Mapping Toolkit.\
 	  {FFFFFF}Открыть меню: {CDCDCD}ALT + X", 0xFFFFFF)
       
 	  reloadBindsFromConfig()
@@ -3311,7 +3311,7 @@ function imgui.OnDrawFrame()
    if dialog.main.v then
       imgui.SetNextWindowPos(imgui.ImVec2(sizeX / 4, sizeY / 4),
       imgui.Cond.FirstUseEver, imgui.ImVec2(0.5, 0.5))
-      imgui.Begin("Ingame Mapping Toolkit", dialog.main)
+      imgui.Begin("Mapping Toolkit", dialog.main)
       
       imgui.Columns(2, "mainmenucolumns", false)
       imgui.SetColumnWidth(-1, 440)
@@ -4500,7 +4500,7 @@ function imgui.OnDrawFrame()
 
          imgui.Spacing()
          if imgui.Button(u8"Выгрузить скрипт", imgui.ImVec2(130, 25)) then
-            sampAddChatMessage("Ingame Mapping Toolkit успешно выгружен.", -1)
+            sampAddChatMessage("Mapping Toolkit успешно выгружен.", -1)
             sampAddChatMessage("Для запуска используйте комбинацию клавиш CTRL + R.", -1)
             thisScript():unload()
          end
@@ -4940,7 +4940,7 @@ function imgui.OnDrawFrame()
       imgui.SetColumnWidth(-1, 510)
       
       if tabmenu.info == 1 then
-         imgui.Text(u8"Ingame Mapping Toolkit v".. thisScript().version)
+         imgui.Text(u8"Mapping Toolkit v".. thisScript().version)
          imgui.TextColoredRGB("Ассистент для мапперов и организаторов мероприятий.")
          imgui.Text(u8"Скрипт позволит сделать процесс маппинга в внутриигровом редакторе карт")
          imgui.Text(u8"максимально приятным, и даст больше возможностей организаторам мероприятий")
@@ -6301,9 +6301,14 @@ function imgui.OnDrawFrame()
          end
 		 imgui.Spacing()
       elseif tabmenu.info == 9 then
-      	 imgui.TextColoredRGB("Поиск на {007DFF}Prineside DevTools (Online)")
+      	 imgui.TextColoredRGB("{007DFF}Prineside DevTools (Online)")
+         imgui.Text(u8"В этом разделе вы можете найти объекты через сайт")
+         imgui.SameLine()
+         imgui.Link("https://dev.prineside.com/ru/gtasa_samp_model_id/", "dev.prineside.com")
          imgui.SameLine()
          imgui.TextQuestion("( ? )", u8"Все запросы перенаправляет в ваш браузер")
+         imgui.Spacing()
+         
 		 imgui.Text(u8"Введите ключевое слово, ID или название модели:")
 	     imgui.PushItemWidth(220)
 	     if imgui.InputText("##CheckObject", textbuffer.objectid) then
@@ -6318,12 +6323,26 @@ function imgui.OnDrawFrame()
 		    end
 	     end 
          
-         if LastObject.modelid then
+         local closestObjectId = getClosestObjectId()
+         if closestObjectId then
+            local model = getObjectModel(closestObjectId)
+            local modelName = tostring(sampObjectModelNames[model])
+            imgui.TextColoredRGB("Ближайший объект: {007DFF}"..model.." ("..modelName..") ")
+            if imgui.IsItemClicked() then
+               textbuffer.objectid.v = tostring(model)
+            end
             imgui.SameLine()
-            if imgui.TooltipButton(u8"Вставить", imgui.ImVec2(65, 25), u8"Вставить последний объект id: "..LastObject.modelid) then
-	           textbuffer.objectid.v = tostring(LastObject.modelid)
-		    end
-	     end
+            imgui.TextQuestion("( ? )", u8"Нажмите на текст чтобы вставить в поиск")
+         end
+         if LastObject.modelid then
+            local modelName = tostring(sampObjectModelNames[LastObject.modelid])
+            imgui.TextColoredRGB("Последний modelid объекта: {007DFF}"..LastObject.modelid.." ("..modelName..") ")
+            if imgui.IsItemClicked() then
+               textbuffer.objectid.v = tostring(LastObject.modelid)
+            end
+            imgui.SameLine()
+            imgui.TextQuestion("( ? )", u8"Нажмите на текст чтобы вставить в поиск")
+		 end
          
          if imgui.Button(u8"Найти объекты рядом по текущей позиции",imgui.ImVec2(300, 25)) then
 		    if sampIsLocalPlayerSpawned() then
@@ -6333,22 +6352,21 @@ function imgui.OnDrawFrame()
 		    end
 	     end
          
-         imgui.Checkbox(u8'Найти объект с особым поведением', checkbox.searchobjectsext)
-         if checkbox.searchobjectsext.v then
-            if imgui.Button(u8"Все объекты без коллизии",imgui.ImVec2(220, 25)) then
-               os.execute('explorer "https://dev.prineside.com/ru/gtasa_samp_model_id/customsearch/?c%5B%5D=1&s=id-asc&bc=0&bb=-1&bt=-1&ba=-1"')
-            end
-            imgui.SameLine()
-            if imgui.Button(u8"Все разрушаемые объекты",imgui.ImVec2(220, 25)) then
-               os.execute('explorer "https://dev.prineside.com/ru/gtasa_samp_model_id/customsearch/?c%5B%5D=1&s=id-asc&bc=-1&bb=1&bt=-1&ba=-1"')
-            end
-            if imgui.Button(u8"Все отображаемые по времени",imgui.ImVec2(220, 25)) then
-               os.execute('explorer "https://dev.prineside.com/ru/gtasa_samp_model_id/customsearch/?c%5B%5D=1&s=id-asc&bc=-1&bb=-1&bt=1&ba=-1"')
-            end
-            imgui.SameLine()
-            if imgui.Button(u8"Все объекты с анимацией",imgui.ImVec2(220, 25)) then
-               os.execute('explorer "https://dev.prineside.com/ru/gtasa_samp_model_id/customsearch/?c%5B%5D=1&s=id-asc&bc=-1&bb=-1&bt=-1&ba=1"')
-            end
+         imgui.Spacing()
+         imgui.Spacing()
+         if imgui.Button(u8"Все объекты без коллизии",imgui.ImVec2(220, 25)) then
+            os.execute('explorer "https://dev.prineside.com/ru/gtasa_samp_model_id/customsearch/?c%5B%5D=1&s=id-asc&bc=0&bb=-1&bt=-1&ba=-1"')
+         end
+         imgui.SameLine()
+         if imgui.Button(u8"Все разрушаемые объекты",imgui.ImVec2(220, 25)) then
+            os.execute('explorer "https://dev.prineside.com/ru/gtasa_samp_model_id/customsearch/?c%5B%5D=1&s=id-asc&bc=-1&bb=1&bt=-1&ba=-1"')
+         end
+         if imgui.Button(u8"Все отображаемые по времени",imgui.ImVec2(220, 25)) then
+            os.execute('explorer "https://dev.prineside.com/ru/gtasa_samp_model_id/customsearch/?c%5B%5D=1&s=id-asc&bc=-1&bb=-1&bt=1&ba=-1"')
+         end
+         imgui.SameLine()
+         if imgui.Button(u8"Все объекты с анимацией",imgui.ImVec2(220, 25)) then
+            os.execute('explorer "https://dev.prineside.com/ru/gtasa_samp_model_id/customsearch/?c%5B%5D=1&s=id-asc&bc=-1&bb=-1&bt=-1&ba=1"')
          end
       end -- end tabmenu.info
 		 
