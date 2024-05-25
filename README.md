@@ -1,17 +1,17 @@
-<h1 align="center">Absolute Event Helper</h1>
+<h1 align="center">Mapping Toolkit</h1>
 <p align="center">
     <a href="https://www.sa-mp.mp/"><img src="https://img.shields.io/badge/made%20for-GTA%20SA--MP-blue"></a>
     <a href="https://gta-samp.ru/"><img src="https://img.shields.io/badge/Server-Absolute%20Play-red"></a>
     <a href="https://training-server.com/"><img src="https://img.shields.io/badge/Server-TRAINING%20-yellow"></a>
 </p>
 
-![logo](https://github.com/ins1x/AbsEventHelper/raw/main/moonloader/resource/abseventhelper/demo.gif)
+![logo](https://github.com/ins1x/MappingToolkit/raw/main/moonloader/resource/mappingtoolkit/demo.gif)
 
 #### ENGLISH
 Lua script Assistant for mappers and event makers.   
 The main task of this script - is make the mapping process in the in-game map editor as pleasant  
 as possible, and to give more opportunities to event organizers.  
-Find more about mapping on server at [wiki](https://github.com/ins1x/AbsEventHelper/wiki).  
+Find more about mapping on server at [wiki](https://github.com/ins1x/MappingToolkit/wiki).  
 The following description is in Russian, because it is the main language of the user base.   
 
 #### RUS
@@ -19,7 +19,7 @@ LUA ассистент для мапперов и организаторов м�
 Основная задача данного скрипта - сделать процесс маппинга в внутриигровом редакторе карт максимально приятным, и дать больше возможностей организаторам мероприятий. 
 
 Скрипт дополняет возможности редактора карт и дает множество новых функций. Потенциально читерские возможности не используются - это не мультичит!   
-Больше информации по маппингу и редактору карт в [wiki](https://github.com/ins1x/AbsEventHelper/wiki).   
+Больше информации по маппингу и редактору карт в [wiki](https://github.com/ins1x/MappingToolkit/wiki).   
 
 > Для **Absolute Play** рекомендуется использовать совместно с [AbsoluteFix](https://github.com/ins1x/useful-samp-stuff/tree/main/luascripts/absolutefix)
 
@@ -151,8 +151,8 @@ LUA ассистент для мапперов и организаторов м�
 * lib.samp.events - https://github.com/THE-FYP/SAMP.Lua
 
 ## Как использовать
-* Скопировать содержимое архива AbsEventHelper.zip в папку moonloader в корне игры
-* Запустить GTA. В игре нажмите **ALT + X** или введите команду **/abs**
+* Скопировать содержимое архива MappingToolkit.zip в папку moonloader в корне игры
+* Запустить GTA. В игре нажмите **ALT + X** или введите команду **/toolkit**
 * Если скрипт не запустился, в папке moonloader есть файл moonloader.log с информацией о проблеме
 
 ## Disclaimer 
@@ -162,4 +162,4 @@ LUA ассистент для мапперов и организаторов м�
 
 blasthk: https://www.blast.hk/threads/200619/  
 forum: https://forum.gta-samp.ru/index.php?/topic/1101593-absolute-event-helper/  
-wiki: https://github.com/ins1x/AbsEventHelper/wiki  
+wiki: https://github.com/ins1x/MappingToolkit/wiki  

@@ -1,13 +1,13 @@
 script_author("1NS")
-script_name("Absolute Events Helper")
-script_description("Assistant for mappers and event makers")
+script_name("MappingToolkit")
+script_description("In-game assistant for mappers and event makers")
 script_dependencies('imgui', 'lib.samp.events')
 script_properties("work-in-pause")
-script_url("https://github.com/ins1x/AbsEventHelper")
-script_version("2.7.8")
+script_url("https://github.com/ins1x/MappingToolkit")
+script_version("3.0")
 -- script_moonloader(16) moonloader v.0.26
 -- sa-mp version: 0.3.7 R1
--- Activaton: ALT + X (show main menu) or command /abs
+-- Activaton: ALT + X (show main menu) or command /toolkit
 -- Blast.hk thread: https://www.blast.hk/threads/200619/
 
 require 'lib.moonloader'
@@ -20,7 +20,7 @@ u8 = encoding.UTF8
 
 -------------- [ cfg ] ---------------
 local inicfg = require 'inicfg'
-local configIni = "AbsEventHelper.ini"
+local configIni = "mappingtoolkit.ini"
 local ini = inicfg.load({
    settings =
    {
@@ -83,7 +83,6 @@ local isWorldHoster = false
 local isWorldJoinUnavailable = false
 local disableObjectCollision = false
 local showobjects = false
-local countobjects = true
 local chosenplayer = nil
 local chosenvehicle = nil
 local tabselectedplayer = nil
@@ -192,6 +191,7 @@ local checkbox = {
    objectscale = imgui.ImBool(false),
    stepteleport = imgui.ImBool(false),
    freezepos = imgui.ImBool(false),
+   chathideip = imgui.ImBool(false),
    searchobjectsext = imgui.ImBool(false),
    test = imgui.ImBool(false)
 }
@@ -335,6 +335,7 @@ fastAnswers = {
    u8"Заходите в мир №10",
    u8"Вам необходимо перезайти в мир",
    u8"Займите свободный транспорт",
+   u8"Ожидайте",
    u8"Вы тут?"
 }  
 
@@ -2961,7 +2962,7 @@ function main()
          thisScript():unload()
       end
       
-      sampAddChatMessage("{880000}Absolute Events Helper.\
+      sampAddChatMessage("{880000}Ingame Mapping Toolkit.\
 	  {FFFFFF}Открыть меню: {CDCDCD}ALT + X", 0xFFFFFF)
       
 	  reloadBindsFromConfig()
@@ -2977,18 +2978,18 @@ function main()
 	     isAbsfixInstalled = true
 	  end
 	  
-      if not doesDirectoryExist("moonloader/resource/abseventhelper") then 
-         createDirectory("moonloader/resource/abseventhelper")
+      if not doesDirectoryExist("moonloader/resource/mappingtoolkit") then 
+         createDirectory("moonloader/resource/mappingtoolkit")
       end
       
-      if doesFileExist(getGameDirectory() .. '\\moonloader\\resource\\abseventhelper\\objects.txt') then
+      if doesFileExist(getGameDirectory() .. '\\moonloader\\resource\\mappingtoolkit\\objects.txt') then
          favfile = io.open(getGameDirectory() ..
-         "//moonloader//resource//abseventhelper//objects.txt", "r")
+         "//moonloader//resource//mappingtoolkit//objects.txt", "r")
          textbuffer.note.v = favfile:read('*a')
          favfile:close()
       end
       
-      sampRegisterChatCommand("abs", function() dialog.main.v = not dialog.main.v end)
+      sampRegisterChatCommand("toolkit", function() dialog.main.v = not dialog.main.v end)
 	  
       -- set drawdist and figdist
       memory.setfloat(12044272, ini.settings.drawdist, true)
@@ -3195,14 +3196,12 @@ function main()
       end
       
 	  -- Count streamed objects
-	  if countobjects then
-	     streamedObjects = 0
-	     for _, v in pairs(getAllObjects()) do
-		    if isObjectOnScreen(v) then
-			   streamedObjects = streamedObjects + 2
-			end
-		 end
-	  end
+      streamedObjects = 0
+      for _, v in pairs(getAllObjects()) do
+         if isObjectOnScreen(v) then
+            streamedObjects = streamedObjects + 2
+         end
+      end
 	  
       -- Objects render
       if checkbox.showobjects.v and not isPauseMenuActive() then
@@ -3312,7 +3311,7 @@ function imgui.OnDrawFrame()
    if dialog.main.v then
       imgui.SetNextWindowPos(imgui.ImVec2(sizeX / 4, sizeY / 4),
       imgui.Cond.FirstUseEver, imgui.ImVec2(0.5, 0.5))
-      imgui.Begin("Absolute Events Helper", dialog.main)
+      imgui.Begin("Ingame Mapping Toolkit", dialog.main)
       
       imgui.Columns(2, "mainmenucolumns", false)
       imgui.SetColumnWidth(-1, 440)
@@ -3681,18 +3680,21 @@ function imgui.OnDrawFrame()
 		 
          if LastObject.handle and doesObjectExist(LastObject.handle) then
             if dialog.objectinfo.v then 
-               if imgui.Button("(>>)") then
+               --if imgui.Button("(>>)") then
+               if imgui.TooltipButton("(>>)", imgui.ImVec2(30, 25), u8"Скрыть параметры последнего объекта") then
                   dialog.objectinfo.v = not dialog.objectinfo.v
                end
             else
-               if imgui.Button("(<<)") then
+               --if imgui.Button("(<<)") then
+               if imgui.TooltipButton("(<<)", imgui.ImVec2(30, 25), u8"Показать параметры последнего объекта") then
                   dialog.objectinfo.v = not dialog.objectinfo.v
                end
             end             
             imgui.SameLine()
          end   
          if LastObject.modelid then
-            imgui.Text(string.format(u8"Последний modelid объекта: %i", LastObject.modelid))
+            local modelName = tostring(sampObjectModelNames[LastObject.modelid])
+            imgui.Text(u8"Последний modelid объекта: "..LastObject.modelid.." ("..modelName..") ")
             if imgui.IsItemClicked() then
                setClipboardText(LastObject.modelid)
 			   sampAddChatMessage("modelid скопирован в буфер обмена", -1)
@@ -3707,11 +3709,11 @@ function imgui.OnDrawFrame()
             local modelName = tostring(sampObjectModelNames[model])
             imgui.Text(u8"Ближайший объект: "..model.." ("..modelName..") ")
          end
-      
-		 imgui.Text(string.format(u8"Удаленные стандартные объекты (removeBuilding): %i", removedBuildings))
-		 if countobjects then
-            imgui.Text(string.format(u8"Объектов в области в стрима: %i", streamedObjects))
+         
+         if removedBuildings > 0 then
+		    imgui.Text(string.format(u8"Удаленные стандартные объекты (removeBuilding): %i", removedBuildings))
          end
+         imgui.Text(string.format(u8"Объектов в области в стрима: %i", streamedObjects))
          
          imgui.Spacing()
 		 
@@ -3886,51 +3888,6 @@ function imgui.OnDrawFrame()
         imgui.SameLine()
         imgui.TextQuestion("( ? )", u8"Визуально изменяет масштаб объекта, и растягивает его. (как в МТА)")
         
-		if imgui.Button(u8"ТП к последнему объекту", imgui.ImVec2(250, 25)) then
-		   if LastObject.modelid and LastObject.position.x ~= 0 and doesObjectExist(LastObject.handle) then
-		      if isAbsolutePlay then
-		         sampSendChat(string.format("/ngr %f %f %f",
-			     LastObject.position.x, LastObject.position.y, LastObject.position.z), 0x0FFFFFF)
-                 sampAddChatMessage("Вы телепортировались на координаты к послед.объекту "..LastObject.modelid, -1)
-              elseif isTraining then
-                 sampSendChat(string.format("/xyz %f %f %f",
-			     LastObject.position.x, LastObject.position.y, LastObject.position.z), 0x0FFFFFF)
-                 sampAddChatMessage("Вы телепортировались на координаты к послед.объекту "..LastObject.modelid, -1)
-			  else
-                 sampAddChatMessage("Недосутпно для этого сервера!", -1)
-			     --setCharCoordinates(PLAYER_PED, LastObject.position.x, LastObject.position.x, LastObject.position.z+0.2)
-			  end
-		   else
-		      sampAddChatMessage("Не найден последний объект", -1)
-		   end
-		end
-		
-		if imgui.Button(u8(LastObject.blip and "Убрать метку с объекта" or "Метку на последний объект"), imgui.ImVec2(250, 25)) then
-		   if LastObject.handle and doesObjectExist(LastObject.handle) then
-		       if LastObject.blip then
-			      removeBlip(LastObject.blip)
-				  LastObject.blip = nil
-			   else
-		          LastObject.blip = addBlipForObject(LastObject.handle)
-			   end
-		   else
-		      sampAddChatMessage("Не найден последний объект", -1)
-		   end
-		end
-		
-	    if imgui.Button(u8(LastObject.hidden and "Скрыть" or "Показать")..u8" последний объект", imgui.ImVec2(250, 25)) then
-		   if LastObject.handle and doesObjectExist(LastObject.handle) then
-		      if LastObject.hidden then
-		         setObjectVisible(LastObject.handle, false)
-				 LastObject.hidden = false
-			  else
-			     setObjectVisible(LastObject.handle, true)
-				 LastObject.hidden = true
-			  end
-		   else
-		      sampAddChatMessage("Не найден последний объект", -1)
-		   end
-		end
               
 		-- if imgui.Button(u8"Восстановить удаленный объект", imgui.ImVec2(250, 25)) then
 		   -- if isAbsolutePlay then
@@ -4075,9 +4032,7 @@ function imgui.OnDrawFrame()
 		 imgui.Spacing()
 	  elseif tabmenu.settings == 4 then
 	  
-	     if countobjects then
-            imgui.Text(string.format(u8"Объектов в области в стрима: %i", streamedObjects))
-         end
+         imgui.Text(string.format(u8"Объектов в области в стрима: %i", streamedObjects))
          imgui.Text(string.format(u8"Игроков в области стрима: %i",
          sampGetPlayerCount(true) - 1))
       
@@ -4545,7 +4500,7 @@ function imgui.OnDrawFrame()
 
          imgui.Spacing()
          if imgui.Button(u8"Выгрузить скрипт", imgui.ImVec2(130, 25)) then
-            sampAddChatMessage("AbsEventHelper успешно выгружен.", -1)
+            sampAddChatMessage("Ingame Mapping Toolkit успешно выгружен.", -1)
             sampAddChatMessage("Для запуска используйте комбинацию клавиш CTRL + R.", -1)
             thisScript():unload()
          end
@@ -4593,6 +4548,9 @@ function imgui.OnDrawFrame()
             ini.settings.freezechat = checkbox.freezechat.v
             inicfg.save(ini, configIni)
          end
+         
+         if imgui.Checkbox(u8("Скрывать IP адреса игроков в чате"), checkbox.chathideip) then
+         end    
          
          if imgui.Checkbox(u8("Отключить глобальный чат"), checkbox.globalchatoff) then
          end     
@@ -4647,7 +4605,7 @@ function imgui.OnDrawFrame()
          
          imgui.Spacing()
          if imgui.Button(u8"Check updates",imgui.ImVec2(150, 25)) then
-		    os.execute('explorer https://github.com/ins1x/AbsEventHelper/releases')
+		    os.execute('explorer https://github.com/ins1x/MappingToolkit/releases')
 		 end
          imgui.Spacing()
       end -- end tabmenu.settings
@@ -4982,7 +4940,7 @@ function imgui.OnDrawFrame()
       imgui.SetColumnWidth(-1, 510)
       
       if tabmenu.info == 1 then
-         imgui.Text(u8"Absolute Events Helper v".. thisScript().version)
+         imgui.Text(u8"Ingame Mapping Toolkit v".. thisScript().version)
          imgui.TextColoredRGB("Ассистент для мапперов и организаторов мероприятий.")
          imgui.Text(u8"Скрипт позволит сделать процесс маппинга в внутриигровом редакторе карт")
          imgui.Text(u8"максимально приятным, и даст больше возможностей организаторам мероприятий")
@@ -5004,7 +4962,7 @@ function imgui.OnDrawFrame()
 		 
          imgui.Text("Homepage:")
 		 imgui.SameLine()
-		 imgui.Link("https://github.com/ins1x/AbsEventHelper", "ins1x/AbsEventHelper")
+		 imgui.Link("https://github.com/ins1x/MappingToolkit", "ins1x/MappingToolkit")
          
 		 imgui.Text(u8"Blast.hk thread:")
 		 imgui.SameLine()
@@ -5016,7 +4974,7 @@ function imgui.OnDrawFrame()
 		 
          imgui.Spacing()
          if imgui.Button(u8"Check updates",imgui.ImVec2(150, 25)) then
-		    os.execute('explorer https://github.com/ins1x/AbsEventHelper/releases')
+		    os.execute('explorer https://github.com/ins1x/MappingToolkit/releases')
 		 end
          
          imgui.Spacing()
@@ -5519,18 +5477,18 @@ function imgui.OnDrawFrame()
                
             if imgui.Button(u8"Сохранить избранные в файл", imgui.ImVec2(200, 25)) then
                favfile = io.open(getGameDirectory() ..
-               "//moonloader//resource//abseventhelper//objects.txt", "w")
+               "//moonloader//resource//mappingtoolkit//objects.txt", "w")
                --favfile:write("\n")
                --favfile:write(string.format("%s \n", os.date("%d.%m.%y %H:%M:%S")))
                favfile:write(textbuffer.note.v)
                favfile:close()
-               sampAddChatMessage("Сохранено в файл избранных: moonloader/resource/abseventhelper/objects.txt", -1)
+               sampAddChatMessage("Сохранено в файл избранных: moonloader/resource/mappingtoolkit/objects.txt", -1)
             end
          
             imgui.SameLine()
             if imgui.Button(u8"Загрузить избранные из файла", imgui.ImVec2(200, 25)) then
                favfile = io.open(getGameDirectory() ..
-               "//moonloader//resource//abseventhelper//objects.txt", "r")
+               "//moonloader//resource//mappingtoolkit//objects.txt", "r")
                textbuffer.note.v = favfile:read('*a')
                favfile:close()
             end
@@ -5558,7 +5516,7 @@ function imgui.OnDrawFrame()
       elseif tabmenu.info == 6 then
 		 imgui.Spacing()
          if imgui.CollapsingHeader(u8"Дополнительные команды:") then
-            imgui.TextColoredRGB("{00FF00}/abs{FFFFFF} - открыть главное меню хелпера")
+            imgui.TextColoredRGB("{00FF00}/toolkit{FFFFFF} - открыть главное меню тулкита")
             imgui.TextColoredRGB("{00FF00}/jump{FFFFFF} - прыгнуть вперед")
             imgui.TextColoredRGB("{00FF00}/ответ <id>{FFFFFF} - быстрые ответы")
             imgui.TextColoredRGB("{00FF00}/коорд{FFFFFF} - получить текущую позицию")
@@ -5798,7 +5756,7 @@ function imgui.OnDrawFrame()
                imgui.TextColoredRGB("В режиме ретекстур:")
                imgui.TextColoredRGB("Управление: {FF6600}Y{FFFFFF} - Текстура наверх {FF6600}N{FFFFFF} - текстура вниз")
                imgui.TextColoredRGB("{FF6600}Num4{FFFFFF} Предыдущая страница, {FF6600}Num6{FFFFFF} Следующая страница")
-               imgui.TextColoredRGB("{FF6600}Пробел{FFFFFF} - принять.")
+               imgui.TextColoredRGB("{FF6600}Клавиша бега{FFFFFF} - принять.")
             end
             if isAbsolutePlay then
 		       imgui.TextColoredRGB("{00FF00}Клавиша N{FFFFFF} — меню редактора карт (в полете)")
@@ -6652,7 +6610,7 @@ function imgui.OnDrawFrame()
             if imgui.Button(u8"Обновить список игроков МП", imgui.ImVec2(220, 25)) then
                playersTable = {}       
                playersTotal = 0
-               playersfile = io.open("moonloader/resource/abseventhelper/players.txt", "w")
+               playersfile = io.open("moonloader/resource/mappingtoolkit/players.txt", "w")
                
                for k, v in ipairs(getAllChars()) do
                   local res, id = sampGetPlayerIdByCharHandle(v)
@@ -6670,7 +6628,7 @@ function imgui.OnDrawFrame()
             if imgui.Button(u8"Вывести список игроков", imgui.ImVec2(220, 25)) then
                sampAddChatMessage("Список игроков:", 0xFFFFFF)
                playersList = {}
-               playersfile = io.open("moonloader/resource/abseventhelper/players.txt", "r")
+               playersfile = io.open("moonloader/resource/mappingtoolkit/players.txt", "r")
                for name in playersfile:lines() do
                   table.insert(playersList, name:lower())
                end
@@ -6714,7 +6672,7 @@ function imgui.OnDrawFrame()
                   
                   playersTable = {}       
                   playersTotal = 0
-                  playersfile = io.open("moonloader/resource/abseventhelper/players.txt", "w")
+                  playersfile = io.open("moonloader/resource/mappingtoolkit/players.txt", "w")
                   
                   for k, v in ipairs(getAllChars()) do
                      local res, id = sampGetPlayerIdByCharHandle(v)
@@ -7124,8 +7082,13 @@ function imgui.OnDrawFrame()
                   imgui.SameLine()
 		 	      imgui.Selectable(string.format("%d. %s", id, nick))
                   if imgui.IsItemClicked() then
-                     sampSendChat("/и " .. id)
-                     dialog.main.v = not dialog.main.v 
+                     if isAbsolutePlay then
+                        sampSendChat("/и " .. id)
+                        dialog.main.v = not dialog.main.v 
+                     else
+                        sampAddChatMessage("Ид {696969}"..id.."{FFFFFF} игрока {696969}"..nick.."{FFFFFF}скопирован в буффр обмена", -1)
+                        setClipboardText(id) 
+                     end
                   end
 		       end
 	 	    end
@@ -7320,7 +7283,7 @@ function imgui.OnDrawFrame()
             if imgui.Button(u8"Черный список игроков", imgui.ImVec2(220, 25)) then
                sampAddChatMessage("Черный список:", -1)
                blacklist = {}
-               blacklistfile = io.open("moonloader/resource/abseventhelper/blacklist.txt", "r")
+               blacklistfile = io.open("moonloader/resource/mappingtoolkit/blacklist.txt", "r")
                for name in blacklistfile:lines() do
                   table.insert(blacklist, name:lower())
                end
@@ -7591,13 +7554,16 @@ function imgui.OnDrawFrame()
                   local pposX, pposY, pposZ = getCharCoordinates(v)
 	        	  if isAbsolutePlay then
                      sampSendChat(string.format("/ngr %f %f %f",
-			         pposX+0.5, pposY+0.5, pposZ), 0x0FFFFFF)
+			         pposX+0.5, pposY+0.5, pposZ), -1)
+                  elseif isTraining then
+                     sampSendChat(string.format("/xyz %f %f %f",
+			         pposX+0.5, pposY+0.5, pposZ), -1)
 				  else
 				     setCharCoordinates(PLAYER_PED, posX+0.5, posY+0.5, posZ)
 				  end
                 end
             else
-               sampAddChatMessage("Доступно только в редакторе карт", 0x0FFFFFF)
+               sampAddChatMessage("Доступно только в редакторе карт", -1)
             end
           end
        end
@@ -7771,7 +7737,7 @@ function imgui.OnDrawFrame()
             sampAddChatMessage("Текcт скопирован в буфер обмена", -1)
 	     end
          
-         if imgui.Button(u8"Экспортировать", imgui.ImVec2(200, 25)) then
+         if imgui.TooltipButton(u8"Экспортировать", imgui.ImVec2(200, 25), u8"Выведет строчку в формате создания объекта для filterscript") then
             if LastObject.txdname ~= nil then
                if not LastObject.rotation.x ~= nil then
                   sampAddChatMessage(string.format("tmpobjid = CreateObject(%i, %.2f, %.2f, %.2f, %.2f, %.2f, %.2f);", LastObject.modelid, LastObject.position.x, LastObject.position.y, LastObject.position.z, LastObject.rotation.x, LastObject.rotation.y, LastObject.rotation.z), -1)
@@ -7788,13 +7754,60 @@ function imgui.OnDrawFrame()
             end
 	     end
          
-         if imgui.Button(u8"В избранное", imgui.ImVec2(200, 25)) then
+         if imgui.TooltipButton(u8"В избранное", imgui.ImVec2(200, 25), u8"Добавит объект в список избранных") then
             favfile = io.open(getGameDirectory() ..
-            "//moonloader//resource//abseventhelper//objects.txt", "a")
+            "//moonloader//resource//mappingtoolkit//objects.txt", "a")
             favfile:write(" ,"..LastObject.modelid)
             favfile:close()
-            sampAddChatMessage("Добавлен в файл избранных (objects.txt)", -1)
+            sampAddChatMessage("Объект {696969}"..LastObject.modelid.."{FFFFFF} добавлен в файл избранных {696969}(objects.txt)", -1)
          end
+         
+         if imgui.Button(u8"ТП к объекту", imgui.ImVec2(200, 25)) then
+		    if LastObject.modelid and LastObject.position.x ~= 0 and doesObjectExist(LastObject.handle) then
+		       if isAbsolutePlay then
+		          sampSendChat(string.format("/ngr %f %f %f",
+			      LastObject.position.x, LastObject.position.y, LastObject.position.z), 0x0FFFFFF)
+                  sampAddChatMessage("Вы телепортировались на координаты к послед.объекту "..LastObject.modelid, -1)
+               elseif isTraining then
+                  sampSendChat(string.format("/xyz %f %f %f",
+			      LastObject.position.x, LastObject.position.y, LastObject.position.z), 0x0FFFFFF)
+                  sampAddChatMessage("Вы телепортировались на координаты к послед.объекту "..LastObject.modelid, -1)
+			   else
+                  sampAddChatMessage("Недосутпно для этого сервера!", -1)
+			      --setCharCoordinates(PLAYER_PED, LastObject.position.x, LastObject.position.x, LastObject.position.z+0.2)
+			   end
+		    else
+		       sampAddChatMessage("Не найден последний объект", -1)
+		    end
+		 end
+		
+		 if imgui.Button(u8(LastObject.blip and "Убрать метку с объекта" or "Поставить метку на объект"), imgui.ImVec2(200, 25)) then
+		    if LastObject.handle and doesObjectExist(LastObject.handle) then
+		        if LastObject.blip then
+		 	      removeBlip(LastObject.blip)
+		 		  LastObject.blip = nil
+		 	   else
+		          LastObject.blip = addBlipForObject(LastObject.handle)
+		 	   end
+		    else
+		       sampAddChatMessage("Не найден последний объект", -1)
+		    end
+		 end
+		
+	     if imgui.Button(u8(LastObject.hidden and "Скрыть" or "Показать")..u8" объект", imgui.ImVec2(200, 25)) then
+		    if LastObject.handle and doesObjectExist(LastObject.handle) then
+		       if LastObject.hidden then
+		          setObjectVisible(LastObject.handle, false)
+		 		  LastObject.hidden = false
+		 	   else
+		 	      setObjectVisible(LastObject.handle, true)
+		 		  LastObject.hidden = true
+		 	   end
+		    else
+		       sampAddChatMessage("Не найден последний объект", -1)
+		    end
+		 end
+        
          imgui.Spacing()   
       end
 	  imgui.End()
@@ -8006,18 +8019,40 @@ function sampev.onSendDialogResponse(dialogId, button, listboxId, input)
             sampSendChat("/rz 90")
          end
          -- if listboxId == 4 and button == 1 and input:find("Выровнять по координатам") then
-            -- if LastObject.position.x ~= 0 then
-               -- print(LastObject.position.x, LastObject.position.y, LastObject.position.z)
-               -- --sampSendChat("/rz 90")
+            -- if LastObject.localid and LastObject.handle and doesObjectExist(LastObject.handle) then
+               -- local angle = getObjectHeading(LastObject.handle)
+               -- if angle then
+                  -- --enterEditObject()
+                  -- setObjectHeading(LastObject.handle, getCorrectAngle(angle))
+                  -- sampSendChat("/oedit")
+                   -- --setObjectRotation(LastObject.handle, float rotationX, float rotationY, float rotationZ)
+                  -- --sampSendChat("/rz "..LastObject.localid.." "..getCorrectAngle(angle))
+                  -- --print(getCorrectAngle(angle))
+               -- end
             -- end
          -- end
          if listboxId == 4 and input:find("Наложить текст") then
             sampSendChat("/otext -1")
          end
-         if listboxId == 5 and input:find("Показать индексы") then
+         if listboxId == 5 and input:find("Наложить текстуру") then
+            if LastObject.localid then 
+               editMode = 4
+               sampAddChatMessage("[SCRIPT]: {FFFFFF}Управление: {FF6600}Y{FFFFFF} - Текстура наверх {FF6600}N{FFFFFF} - текстура вниз", 0x0FF6600)
+               sampAddChatMessage("[SCRIPT]: {FF6600}Num4{FFFFFF} Предыдущая страница, {FF6600}Num6{FFFFFF} Следующая страница", 0x0FF6600)
+               sampAddChatMessage("[SCRIPT]: {FF6600}Клавиша бега{FFFFFF} - принять.", 0x0FF6600)
+               sampSendChat("/texture "..LastObject.localid)
+            end
+         end
+         if listboxId == 6 and input:find("Показать индексы") then
             sampSendChat("/sindex")
          end
-         if listboxId == 6 and input:find("Информация") then
+         if listboxId == 7 and input:find("Скрыть индексы") then
+            sampSendChat("/untexture")
+         end
+         if listboxId == 8 and input:find("Телепортироваться") then
+            sampSendChat("/tpo")
+         end
+         if listboxId == 9 and input:find("Информация") then
             sampSendChat("/oinfo")
          end
          
@@ -8178,15 +8213,26 @@ function sampev.onShowDialog(dialogId, style, title, button1, button2, text)
       -- Added new features to /omenu
       if title:find("Редактирование / Клонирование") then
          editDialogOpened = true
+         
+         local newtitle
+         if LastObject.localid then
+            newtitle = "Редактирование объекта id:"..LastObject.localid
+         else
+            newtitle = "Редактирование объекта"
+         end
+         
          local newitems = "Редактировать\n"..
          "Клонировать\n"..
          "Удалить\n"..
          "Повернуть на 90°\n"..
          --"Выровнять по координатам\n"..
          "Наложить текст\n"..
+         "Наложить текстуру\n"..
          "Показать индексы\n"..
+         "Скрыть индексы\n"..
+         "Телепортироваться\n"..
          "Информация\n"
-         return {dialogId, style, "Редактирование объекта", button1, button2, newitems}
+         return {dialogId, style, newtitle, button1, button2, newitems}
       end
       -- Automatic ID substitution for /otext
       if title:find("Master Text Textures") and text:find("Укажите ID")then
@@ -8305,7 +8351,7 @@ function sampev.onServerMessage(color, text)
    if isAbsolutePlay then   
       if text:find("Последнего созданного объекта не существует") then
          if LastObject.modelid then
-            sampAddChatMessage("Последний использованный объект: "..LastObject.modelid, 0x00FF00)
+            sampAddChatMessage("Последний использованный объект: {696969}"..LastObject.modelid, -1)
 	     end
       end
       
@@ -8361,6 +8407,13 @@ function sampev.onServerMessage(color, text)
       
       if text:find('Удален объект: (%d+)') then
          LastObject.localid = nil
+      end
+   end
+   
+   if checkbox.chathideip.v then
+      if text:match("(%d+.%d+.%d+.%d+)") then
+         local newtext = text:gsub("(%d+.%d+.%d+.%d+)", "***.***.***.***")
+         return {color, newtext}
       end
    end
    
@@ -8433,11 +8486,6 @@ function sampev.onSendCommand(command)
       -- Automatic substitution of the last object ID for some commands
       if not command:find('(.+) (.+)') then
          if LastObject.localid then
-            if command:find("/omenu") then
-               sampSendChat("/omenu "..LastObject.localid)
-               return false
-            end
-            
             if command:find("/sel") then
                sampSendChat("/sel "..LastObject.localid)
                --editMode = 3
@@ -8673,6 +8721,24 @@ function sampev.onSendCommand(command)
       return false
    end
    
+   if isTraining and command:find("omenu") then
+      if command:find('(.+) (.+)') then
+         local cmd, arg = command:match('(.+) (.+)')
+         local id = tonumber(arg)
+         if type(id) == "number" then
+            LastObject.localid = id
+            return true
+         end         
+      else
+         if LastObject.localid then
+            if command:find("/omenu") then
+               sampSendChat("/omenu "..LastObject.localid)
+               return false
+            end
+         end
+      end
+   end
+   
    if isTraining and command:find("odell") then
       editMode = 3
       if command:find('(.+) (.+)') then
@@ -8700,7 +8766,7 @@ function sampev.onSendCommand(command)
          end
       else
          if LastObject.modelid then
-            sampAddChatMessage("Последний использованный объект: "..LastObject.modelid, 0x00FF00)
+            sampAddChatMessage("Последний использованный объект: {696969}"..LastObject.modelid, -1)
          end
 	  end
    end
@@ -9312,6 +9378,28 @@ function getNearestRoadCoordinates(radius)
        return true, B[1], B[2], B[3]
    end
    return false
+end
+
+function getCorrectAngle(angle)
+   if angle > 0 and angle < 45 then
+      return 0
+   elseif angle > 45 and angle < 90 then
+      return 45
+   elseif angle > 90 and angle < 135 then
+      return 90
+   elseif angle > 135 and angle < 180 then
+      return 135
+   elseif angle > 180 and angle < 225 then
+      return 180
+   elseif angle > 225 and angle < 270 then
+      return 225
+   elseif angle > 270 and angle < 315 then
+      return 270
+   elseif angle > 315 and angle < 0 then
+      return 315
+   else 
+      return 0
+   end
 end
 
 function nameTagOn()
