@@ -4,7 +4,7 @@ script_description("In-game assistant for mappers and event makers")
 script_dependencies('imgui', 'lib.samp.events')
 script_properties("work-in-pause")
 script_url("https://github.com/ins1x/MappingToolkit")
-script_version("3.0 beta 1")
+script_version("3.0 beta 2")
 -- script_moonloader(16) moonloader v.0.26
 -- sa-mp version: 0.3.7 R1
 -- Activaton: ALT + X (show main menu) or command /toolkit
@@ -41,11 +41,15 @@ local ini = inicfg.load({
       worldsavereminder = false,
       renderfont = "Arial",
       renderfontsize = 7,
+      rendercolor = "{80FFFFFF}",
       reminderdelay = 15,
       saveskin = false,
       skinid = 27,
+      weather = 0,
+      time = 12,
       setgm = false,
       debug = false,
+      fov = 70,
       drawdist = "450",
       fog = "200",
 	  camdist = "1",
@@ -87,7 +91,7 @@ local isPlayerSpectating = false
 local isWorldHoster = false
 local isWorldJoinUnavailable = false
 local disableObjectCollision = false
-local showobjects = false
+local showobjectsmodel = false
 local chosenplayer = nil
 local chosenvehicle = nil
 local tabselectedplayer = nil
@@ -162,7 +166,8 @@ local checkbox = {
    editkey = imgui.ImBool(ini.settings.editkey),
    skinid = imgui.ImInt(ini.settings.skinid),
    showpanel = imgui.ImBool(ini.panel.showpanel),
-   showobjects = imgui.ImBool(false),
+   showobjectsmodel = imgui.ImBool(false),
+   showobjectsname = imgui.ImBool(false),
    showclosestobjects = imgui.ImBool(false),
    drawlinetomodelid = imgui.ImBool(false),
    noempyvehstream = imgui.ImBool(true),
@@ -230,9 +235,9 @@ local input = {
 local slider = {
    fog = imgui.ImInt(ini.settings.fog),
    drawdist = imgui.ImInt(ini.settings.drawdist),
-   weather = imgui.ImInt(0),
-   time = imgui.ImInt(12),
-   fov = imgui.ImInt(0),
+   weather = imgui.ImInt(ini.settings.weather),
+   time = imgui.ImInt(ini.settings.time),
+   fov = imgui.ImInt(ini.settings.fov),
    scale = imgui.ImFloat(1.0),
    camdist = imgui.ImInt(ini.settings.camdist)
 }
@@ -3088,6 +3093,14 @@ function main()
          end
       end
       
+      if isTraining and ini.settings.editkey then
+         -- N key edit object
+         if isKeyJustPressed(0x4E) and not sampIsChatInputActive() and not sampIsDialogActive()
+	     and not isPauseMenuActive() and not isSampfuncsConsoleActive() then 
+            if isWorldHoster then sampSendChat("/csel") end
+         end
+      end
+         
       if ini.settings.hotkeys then
 	     -- In onSendEditObject copy object modelid on RMB
 	     if isKeyJustPressed(0x02) and editResponse == 2 and not sampIsChatInputActive() 
@@ -3175,7 +3188,7 @@ function main()
          if isKeyDown(0x11) and isKeyJustPressed(0x4F)
 	     and not sampIsChatInputActive() and not isPauseMenuActive()
 	     and not isSampfuncsConsoleActive() then 
-            checkbox.showobjects.v= not checkbox.showobjects.v
+            checkbox.showobjectsmodel.v = not checkbox.showobjectsmodel.v
          end
          
 	     if not isAbsfixInstalled then
@@ -3207,14 +3220,6 @@ function main()
             end
          end
          
-         if isTraining and ini.settings.editkey then
-            -- N key edit object
-            if isKeyJustPressed(0x4E) and not sampIsChatInputActive() and not sampIsDialogActive()
-	 	    and not isPauseMenuActive() and not isSampfuncsConsoleActive() then 
-               if isWorldHoster then sampSendChat("/csel") end
-            end
-         end
-         
          if isKeyJustPressed(0x4B) and not sampIsChatInputActive() and not sampIsDialogActive()
 	     and not isPauseMenuActive() and not isSampfuncsConsoleActive() then 
             isTexturesListOpened = false
@@ -3243,14 +3248,19 @@ function main()
       end
 	  
       -- Objects render
-      if checkbox.showobjects.v and not isPauseMenuActive() then
+      if checkbox.showobjectsmodel.v or checkbox.showobjectsname.v and not isPauseMenuActive() then
          for _, v in pairs(getAllObjects()) do
             if isObjectOnScreen(v) then
                local _, x, y, z = getObjectCoordinates(v)
 			   local px, py, pz = getCharCoordinates(PLAYER_PED)
 			   if getDistanceBetweenCoords3d(px, py, pz, x, y, z) >= 2 then
 			      local x1, y1 = convert3DCoordsToScreen(x,y,z)
-                  renderFontDrawText(objectsrenderfont, "{80FFFFFF}" .. getObjectModel(v), x1, y1, -1)
+                  if checkbox.showobjectsmodel.v then
+                     renderFontDrawText(objectsrenderfont, 
+                     (checkbox.showobjectsname.v
+                     and ini.settings.rendercolor .. getObjectModel(v) .. " ".. tostring(sampObjectModelNames[getObjectModel(v)])
+                     or ini.settings.rendercolor .. getObjectModel(v)), x1, y1, -1)
+                  end
 			   end
             end
          end
@@ -3706,12 +3716,10 @@ function imgui.OnDrawFrame()
 		 
          if LastObject.handle and doesObjectExist(LastObject.handle) then
             if dialog.objectinfo.v then 
-               --if imgui.Button("(>>)") then
                if imgui.TooltipButton("(>>)", imgui.ImVec2(30, 25), u8"Скрыть параметры последнего объекта") then
                   dialog.objectinfo.v = not dialog.objectinfo.v
                end
             else
-               --if imgui.Button("(<<)") then
                if imgui.TooltipButton("(<<)", imgui.ImVec2(30, 25), u8"Показать параметры последнего объекта") then
                   dialog.objectinfo.v = not dialog.objectinfo.v
                end
@@ -3743,14 +3751,22 @@ function imgui.OnDrawFrame()
          
          imgui.Spacing()
 		 
-         if imgui.Checkbox(u8("Показывать modelid объектов"), checkbox.showobjects) then 
+         if imgui.Checkbox(u8("Показывать modelid объектов рядом"), checkbox.showobjectsmodel) then 
             if checkbox.drawlinetomodelid.v then checkbox.drawlinetomodelid.v = false end
 		 end
          imgui.SameLine()
-         imgui.TextQuestion("( ? )", u8"Применимо только для объектов в области стрима (CTRL + O)")
+         imgui.TextQuestion("( ? )", u8"Показывает modelid на объектах рядом (CTRL + O)")
         
+         if imgui.Checkbox(u8("Показывать имена объектов рядом"), checkbox.showobjectsname) then 
+            if not checkbox.showobjectsmodel.v then checkbox.showobjectsmodel.v = true end
+            if checkbox.drawlinetomodelid.v then checkbox.drawlinetomodelid.v = false end
+		 end
+         imgui.SameLine()
+         imgui.TextQuestion("( ? )", u8"Добавляет имя объект к рендеру объектов рядом (CTRL + O)")
+         
 		if imgui.Checkbox(u8("Найти объекты рядом по ID модели"), checkbox.drawlinetomodelid) then
-		   if checkbox.showobjects.v then checkbox.showobjects.v = false end
+		   if checkbox.showobjectsmodel.v then checkbox.showobjectsmodel.v = false end
+		   if checkbox.showobjectsname.v then checkbox.showobjectsname.v = false end
 		end
 		imgui.SameLine()
         imgui.TextQuestion("( ? )", u8"Рисует линию к объекту с указанием расстояния")
@@ -4022,7 +4038,7 @@ function imgui.OnDrawFrame()
 		 if checkbox.changefov.v then
 		    imgui.TextColoredRGB("FOV {51484f} (по-умолчанию 70)")
 			if imgui.IsItemClicked() then
-		       slider.changefov.v = 1
+		       slider.fov.v = 70
 		       cameraSetLerpFov(slider.fov.v, slider.fov.v, 999988888, true)
 		    end
 		    if imgui.SliderInt(u8"##fovslider", slider.fov, 1, 179) then
@@ -4131,19 +4147,23 @@ function imgui.OnDrawFrame()
 	     imgui.PushItemWidth(320)
          imgui.Text(u8'Время:')
          if imgui.SliderInt('##slider.time', slider.time, 0, 24) then 
-            setTime(slider.time.v) 
+            setTime(slider.time.v)
+            ini.settings.time = slider.time.v
+            inicfg.save(ini, configIni)
          end
          imgui.Spacing()
          imgui.Text(u8'Погода')
          if imgui.SliderInt('##slider.weather', slider.weather, 0, 45) then 
-            setWeather(slider.weather.v) 
+            setWeather(slider.weather.v)
+            ini.settings.weather = slider.weather.v
+            inicfg.save(ini, configIni)
          end
          imgui.PopItemWidth()
 		 
 		 imgui.Text(u8"Пресеты погоды: ")
 		 if imgui.Button(u8"Солнечная", imgui.ImVec2(150, 25)) then
 		    slider.weather.v = 0
-            setWeather(slider.weather.v) 		   
+            setWeather(slider.weather.v)
          end
 		 imgui.SameLine()
 		 if imgui.Button(u8"Облачная", imgui.ImVec2(150, 25)) then
@@ -4646,12 +4666,20 @@ function imgui.OnDrawFrame()
          
          if imgui.Button(u8"Статистика", imgui.ImVec2(100, 25)) then
             dialog.main.v = not dialog.main.v
-            sampSendChat("/stats")
+            if isTraining then 
+               sampSendChat("/stats")
+            elseif isAbsolutePlay then
+               sampSendChat("/стат")
+            end
          end
          imgui.SameLine()
          if imgui.Button(u8"Меню игрока", imgui.ImVec2(100, 25)) then
             dialog.main.v = not dialog.main.v
-            sampSendChat("/menu")
+            if isTraining then 
+               sampSendChat("/menu")
+            elseif isAbsolutePlay then
+               sampSendChat("/и")
+            end
          end
          imgui.Spacing()
          imgui.Spacing()
@@ -4669,64 +4697,64 @@ function imgui.OnDrawFrame()
          imgui.SameLine()
          imgui.TextQuestion("( ? )", u8"Активировать дополнительные горячие клавиши")
          
-         imgui.Checkbox(u8'Устанавливать свой скин', checkbox.saveskin)
-         imgui.SameLine()
-         imgui.TextQuestion("( ? )", u8"Будет выставлять скин при спавне в мире")
-         
-         if checkbox.saveskin.v then
-            imgui.PushItemWidth(50)
-            imgui.InputText("##saveskin", textbuffer.saveskin)
-            imgui.PopItemWidth()
-            local skinid = tonumber(textbuffer.saveskin.v)
-            local currentskin = getCharModel(PLAYER_PED)
-            if string.len(textbuffer.saveskin.v) < 1 then
-               textbuffer.saveskin.v = tostring(currentskin)
+         if isTraining then
+            imgui.Checkbox(u8'Устанавливать свой скин', checkbox.saveskin)
+            imgui.SameLine()
+            imgui.TextQuestion("( ? )", u8"Будет выставлять скин при спавне в мире")
+            
+            if checkbox.saveskin.v then
+               imgui.PushItemWidth(50)
+               imgui.InputText("##saveskin", textbuffer.saveskin)
+               imgui.PopItemWidth()
+               local skinid = tonumber(textbuffer.saveskin.v)
+               local currentskin = getCharModel(PLAYER_PED)
+               if string.len(textbuffer.saveskin.v) < 1 then
+                  textbuffer.saveskin.v = tostring(currentskin)
+               end
+               
+               imgui.SameLine()
+               if imgui.Button(u8"Сменить скин", imgui.ImVec2(120, 25)) then
+                  if skinid > 0 and skinid < 311 
+                  and skinid ~= 74 then
+                     sampSendChat("/skin "..skinid)
+                     sampAddChatMessage("Вы cменили скин на {696969}"..skinid, -1)
+                  end
+               end
+               imgui.SameLine()
+               if imgui.Button(u8"Сохранить скин", imgui.ImVec2(120, 25)) then
+                  if skinid > 0 and skinid < 311 
+                  and skinid ~= 74 then
+                     sampSendChat("/skin "..skinid)
+                     ini.settings.saveskin = true
+                     ini.settings.skinid = skinid
+		             inicfg.save(ini, configIni)
+                     sampAddChatMessage("Вы сохранили скин {696969}"..skinid, -1)
+                  end
+               end
+               
             end
             
-            imgui.SameLine()
-            if imgui.Button(u8"Сменить скин", imgui.ImVec2(120, 25)) then
-               if skinid > 0 and skinid < 311 
-               and skinid ~= 74 then
-                  sampSendChat("/skin "..skinid)
-                  sampAddChatMessage("Вы cменили скин на {696969}"..skinid, -1)
-               end
+            if imgui.Checkbox(u8'Включать бессмертие в мире', checkbox.setgm) then
+               sampSendChat("/gm")
+               ini.settings.setgm = checkbox.setgm.v
+		       inicfg.save(ini, configIni)
             end
             imgui.SameLine()
-            if imgui.Button(u8"Сохранить скин", imgui.ImVec2(120, 25)) then
-               if skinid > 0 and skinid < 311 
-               and skinid ~= 74 then
-                  sampSendChat("/skin "..skinid)
-                  ini.settings.saveskin = true
-                  ini.settings.skinid = skinid
-		          inicfg.save(ini, configIni)
-                  sampAddChatMessage("Вы сохранили скин {696969}"..skinid, -1)
-               end
-            end
+            imgui.TextQuestion("( ? )", u8"Будет выставлять бессмертие при спавне в мире")
             
+            if imgui.Checkbox(u8'Переключение текстур на PgUp и PgDown', checkbox.remapnum) then
+               ini.settings.remapnum = checkbox.remapnum.v
+		       inicfg.save(ini, configIni)
+            end
+            imgui.SameLine()
+            imgui.TextQuestion("( ? )", u8"Заменить переключение текстур с Numpad на PgUp и PgDown (Для ноутбуков)")
          end
-         
-         if imgui.Checkbox(u8'Включать бессмертие в мире', checkbox.setgm) then
-            sampSendChat("/gm")
-            ini.settings.setgm = checkbox.setgm.v
-		    inicfg.save(ini, configIni)
-         end
-         imgui.SameLine()
-         imgui.TextQuestion("( ? )", u8"Будет выставлять бессмертие при спавне в мире")
-         
          if imgui.Checkbox(u8'Переходить в режим редактирования на клавишу N', checkbox.editkey) then
             ini.settings.editkey = checkbox.editkey.v
 		    inicfg.save(ini, configIni)
          end
          imgui.SameLine()
          imgui.TextQuestion("( ? )", u8"Будет включать режим редактирования при нажатии на N")
-         
-         if imgui.Checkbox(u8'Переключение текстур на PgUp и PgDown', checkbox.remapnum) then
-            ini.settings.remapnum = checkbox.remapnum.v
-		    inicfg.save(ini, configIni)
-         end
-         imgui.SameLine()
-         imgui.TextQuestion("( ? )", u8"Заменить переключение текстур с Numpad на PgUp и PgDown (Для ноутбуков)")
-         
          imgui.Spacing()
       end -- end tabmenu.settings
       imgui.NextColumn()
@@ -5098,10 +5126,15 @@ function imgui.OnDrawFrame()
 		 imgui.SameLine()
 		 imgui.Link("https://github.com/ins1x/MappingToolkit", "ins1x/MappingToolkit")
          
-		 imgui.Text(u8"Blast.hk thread:")
-		 imgui.SameLine()
-		 imgui.Link("https://www.blast.hk/threads/200619/", "https://www.blast.hk")
-		 
+		 if isTraining then
+            imgui.Text("Forum page:")
+		    imgui.SameLine()
+		    imgui.Link("https://forum.training-server.com/d/19708-luamappingtoolkit/19", "Mapping Toolkit")
+         elseif isAbsolutePlay then
+            imgui.Text("Forum page:")
+		    imgui.SameLine()
+		    imgui.Link("https://forum.gta-samp.ru/index.php?/topic/1101593-mapping-toolkit/", "Mapping Toolkit")
+         end
 		 -- imgui.Text(u8"YouTube:")
 		 -- imgui.SameLine()
 		 -- imgui.Link("https://www.youtube.com/@1nsanemapping", "1nsanemapping")
@@ -8630,12 +8663,12 @@ function sampev.onSendCommand(command)
       end
       if command:find("showtext3d") then
          sampAddChatMessage("Информация о объектах показана", 0x000FF00)
-         checkbox.showobjects.v = true 
+         checkbox.showobjectsmodel.v = true 
          return false
       end
       if command:find("hidetext3d") then
          sampAddChatMessage("Информация о объектах скрыта", 0x000FF00)
-         checkbox.showobjects.v = false
+         checkbox.showobjectsmodel.v = false
          return false
       end
       if command:find("flymode") then
@@ -8934,6 +8967,7 @@ function sampev.onSendCommand(command)
          local id = tonumber(arg)
          if isValidObjectModel(id) then 
             LastRemovedObject.modelid = id
+            checkBuggedObject(id)
          end
       else
          if LastObject.modelid then
@@ -9292,20 +9326,8 @@ function sampev.onSendEnterEditObject(type, objectId, model, position)
    LastObject.position.y = position.y
    LastObject.position.z = position.z
    
-   if model == 3586 or model == 3743 then
-      sampAddChatMessage("Объект "..model.." пропадет только после релога (баг SAMP)", 0x0FF0000)
-   end
-   if model == 8979 or model == 8980 then
-      sampAddChatMessage("Объект "..model.." пропадет только после релога (баг SAMP)", 0x0FF0000)
-   end
-   if model == 1269 or model == 1270 then 
-      sampAddChatMessage("Из объекта "..model.." визуально выпадают деньги как в оригинальной игре (баг SAMP)", 0x0FF0000)
-   end
-   if model == 16637 then
-      sampAddChatMessage("Создание/удаление объекта "..model.." может привести к крашу 0x0044A503 (баг SAMP)", 0x0FF0000)
-   end
-   if model == 3426 then
-      sampAddChatMessage("Этот объект "..model.." неккоректно отображается под поверхностью, в воде, либо при повороте (баг SAMP)", 0x0FF0000)
+   if not isTraining then
+      checkBuggedObject(model)
    end
    
    if checkbox.logobjects.v then
@@ -9447,6 +9469,24 @@ function string.nupper(s)
       res[i] = lu_rus[ch] or ch
    end
    return concat(res)
+end
+
+function checkBuggedObject(model)
+   if model == 3586 or model == 3743 then
+      sampAddChatMessage("Объект "..model.." пропадет только после релога (баг SAMP)", 0x0FF0000)
+   end
+   if model == 8979 or model == 8980 then
+      sampAddChatMessage("Объект "..model.." пропадет только после релога (баг SAMP)", 0x0FF0000)
+   end
+   if model == 1269 or model == 1270 then 
+      sampAddChatMessage("Из объекта "..model.." визуально выпадают деньги как в оригинальной игре (баг SAMP)", 0x0FF0000)
+   end
+   if model == 16637 then
+      sampAddChatMessage("Создание/удаление объекта "..model.." может привести к крашу 0x0044A503 (баг SAMP)", 0x0FF0000)
+   end
+   if model == 3426 then
+      sampAddChatMessage("Этот объект "..model.." неккоректно отображается под поверхностью, в воде, либо при повороте (баг SAMP)", 0x0FF0000)
+   end
 end
 
 function direction()
@@ -9678,10 +9718,10 @@ end
 function WorldJoinInit()
    isWorldHoster = true
    worldspawnpos.x, worldspawnpos.y, worldspawnpos.z = getCharCoordinates(PLAYER_PED)
-   sampSendChat("/weather "..slider.weather.v)
+   sampSendChat("/weather "..ini.settings.weather)
    lua_thread.create(function()
       wait(1000)
-      sampSendChat("/time "..slider.time.v)
+      sampSendChat("/time "..ini.settings.time)
       wait(1000)
       if ini.settings.setgm then 
          sampSendChat("/gm")
