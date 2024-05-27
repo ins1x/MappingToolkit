@@ -4,7 +4,7 @@ script_description("In-game assistant for mappers and event makers")
 script_dependencies('imgui', 'lib.samp.events')
 script_properties("work-in-pause")
 script_url("https://github.com/ins1x/MappingToolkit")
-script_version("3.0 beta 2")
+script_version("3.0.0")
 -- script_moonloader(16) moonloader v.0.26
 -- sa-mp version: 0.3.7 R1
 -- Activaton: ALT + X (show main menu) or command /toolkit
@@ -61,6 +61,10 @@ local ini = inicfg.load({
       background = true,
       fontname = "Tahoma",
       fontsize = 7,
+      showfps = true,
+      showmode = true,
+      showstreamed = true,
+      showlastobject = true,
    },
    binds =
    {
@@ -125,6 +129,7 @@ local playersTable = {}
 local vehiclesTable = {}
 local hiddenObjects = {}
 local chatbuffer = {}
+local blacklist = {}
 -- should be global!
 vehiclesTotal = 0
 playersTotal = 0
@@ -3008,6 +3013,12 @@ function main()
          favfile:close()
       end
       
+      blacklistfile = io.open("moonloader/resource/mappingtoolkit/blacklist.txt", "r")
+      for name in blacklistfile:lines() do
+         table.insert(blacklist, name:lower())
+      end
+      io.close(blacklistfile)
+               
       sampRegisterChatCommand("toolkit", function() dialog.main.v = not dialog.main.v end)
 	  
       -- set drawdist and figdist
@@ -3057,8 +3068,8 @@ function main()
 	  
 	  -- preset time and weather
 	  if ini.settings.lockserverweather then
-	     setTime(slider.time.v)
-         setWeather(slider.weather.v)
+	     setTime(ini.settings.time)
+         setWeather(ini.settings.weather)
 	  end
 	  
       -- Hide dialogs on ESC
@@ -3339,13 +3350,30 @@ function main()
          if ini.panel.background then
             renderDrawBoxWithBorder(-2, y-15, x+2, y, 0xBF000000, 2, 0xFF000000)
          end
-         local px, py, pz = getCharCoordinates(PLAYER_PED)
-         local rendertext = string.format("%s | {3f70d6}x: %.2f, {e0364e}y: %.2f, {26b85d}z: %.2f{FFFFFF} | {FFD700}mode: %s {FFFFFF}| FPS: %i | streamed: %i ", 
-         servername, px, py, pz, editmodes[editMode+1], fps, streamedObjects)
          
-         -- if LastObject.localid then
-            -- rendertext = rendertext .. string.format(" | objectid: %i modelid: %i", LastObject.localid, LastObject.modelid)
-         -- end
+         local px, py, pz = getCharCoordinates(PLAYER_PED)
+         local rendertext = string.format("%s | {3f70d6}x: %.2f, {e0364e}y: %.2f, {26b85d}z: %.2f{FFFFFF}", servername, px, py, pz)
+         
+         if ini.panel.showmode then
+            rendertext = rendertext.." | {FFD700}mode: "..editmodes[editMode+1].."{FFFFFF}"
+         end
+         
+         if ini.panel.showfps then
+            rendertext = rendertext.." | FPS: "..fps..""
+         end
+         
+         if ini.panel.showstreamed then
+            rendertext = rendertext.." | streamed: "..streamedObjects..""
+         end
+         
+         if ini.panel.showlastobject then
+            if LastObject.localid then
+               rendertext = rendertext.." | {0080BC}id: "..LastObject.localid.."{FFFFFF}"
+            end
+            if LastObject.modelid then
+               rendertext = rendertext.." | {0080BC}model: "..LastObject.modelid.."{FFFFFF}"
+            end
+         end       
 
          renderFontDrawText(backgroundfont, rendertext, 15, y-15, 0xFFFFFFFF)
       end
@@ -4139,6 +4167,7 @@ function imgui.OnDrawFrame()
             else
                patch_samp_time_set(false)
             end
+            ini.settings.lockserverweather = checkbox.lockserverweather.v
             inicfg.save(ini, configIni)
          end
          imgui.SameLine()
@@ -4672,13 +4701,11 @@ function imgui.OnDrawFrame()
                sampSendChat("/стат")
             end
          end
-         imgui.SameLine()
-         if imgui.Button(u8"Меню игрока", imgui.ImVec2(100, 25)) then
-            dialog.main.v = not dialog.main.v
-            if isTraining then 
+         if isTraining then
+            imgui.SameLine()
+            if imgui.Button(u8"Меню игрока", imgui.ImVec2(100, 25)) then
+               dialog.main.v = not dialog.main.v
                sampSendChat("/menu")
-            elseif isAbsolutePlay then
-               sampSendChat("/и")
             end
          end
          imgui.Spacing()
@@ -4749,13 +4776,15 @@ function imgui.OnDrawFrame()
             imgui.SameLine()
             imgui.TextQuestion("( ? )", u8"Заменить переключение текстур с Numpad на PgUp и PgDown (Для ноутбуков)")
          end
-         if imgui.Checkbox(u8'Переходить в режим редактирования на клавишу N', checkbox.editkey) then
-            ini.settings.editkey = checkbox.editkey.v
-		    inicfg.save(ini, configIni)
+         if isTraining then
+            if imgui.Checkbox(u8'Переходить в режим редактирования на клавишу N', checkbox.editkey) then
+               ini.settings.editkey = checkbox.editkey.v
+		       inicfg.save(ini, configIni)
+            end
+            imgui.SameLine()
+            imgui.TextQuestion("( ? )", u8"Будет включать режим редактирования при нажатии на N")
+            imgui.Spacing()
          end
-         imgui.SameLine()
-         imgui.TextQuestion("( ? )", u8"Будет включать режим редактирования при нажатии на N")
-         imgui.Spacing()
       end -- end tabmenu.settings
       imgui.NextColumn()
 	  
@@ -6035,7 +6064,10 @@ function imgui.OnDrawFrame()
        if imgui.CollapsingHeader(u8'Как рассчитывается угол поворота?') then
 	      imgui.Text(u8"Угол поворота используется для позиционирования вращений объекта.\n0 значением, как и в компасе является Север.\nДиапазоном является обычный круг 0-359.9 градусов\nИспользуя например /rz в положительном значении,\nвы всегда будете поворачивать объект против часовой стрелки,\nсоответственно в отрицательном - против.\n")
 	   end
-       
+
+       if imgui.CollapsingHeader(u8'Правильный выбор объекта стены') then
+	      imgui.Text(u8"В игре много одинаковых стен добавленных для SA:MP.\nМногие из них имеют баг с тенями и освещением.\nИспользуйте объекты стен которые лишены тени: 19353, 19426, 19455")
+	   end       
 	   imgui.Spacing()
         if isTraining then
            imgui.Text(u8"TRAINING FAQ")
@@ -7257,12 +7289,22 @@ function imgui.OnDrawFrame()
 	         --imgui.TextColoredRGB("Цветной текст указывать через скобки (FF0000)")
              -- --imgui.Separator()
          elseif tabmenu.mp == 5 then
+            -- local _, playerId = sampGetPlayerIdByCharHandle(playerPed)
+            -- local money = getPlayerMoney(playerPed)
+            -- imgui.TextColoredRGB("{36662C}$"..money)
             if isAbsolutePlay then
-               imgui.Text(u8"Не забудьте после завершения мероприятия:")
-               imgui.Text(u8"- Вернуть точку спавна на исходное положение")
-               imgui.Text(u8"- Открыть мир для входа")
-               imgui.Text(u8"- Вернуть пак оружия на стандартный")
+               imgui.TextColoredRGB("Посмотреть свой баланс доната {696969}/donate")
+               imgui.TextColoredRGB("Дать денег игроку {36662C}${FFFFFF} {696969}/giveplayermoney <id> <кол-во>")
             end
+            if isTraining then
+               imgui.TextColoredRGB("{FF6600}/pay <id> <money>{FFFFFF} передать деньги игроку")
+            end
+            -- if isAbsolutePlay then
+               -- imgui.Text(u8"Не забудьте после завершения мероприятия:")
+               -- imgui.Text(u8"- Вернуть точку спавна на исходное положение")
+               -- imgui.Text(u8"- Открыть мир для входа")
+               -- imgui.Text(u8"- Вернуть пак оружия на стандартный")
+            -- end
             imgui.Spacing()
             imgui.Text(u8"Оставшиеся игроки рядом:")
             for k, v in ipairs(getAllChars()) do
@@ -7473,12 +7515,6 @@ function imgui.OnDrawFrame()
             imgui.SameLine()
             if imgui.Button(u8"Черный список игроков", imgui.ImVec2(220, 25)) then
                sampAddChatMessage("Черный список:", -1)
-               blacklist = {}
-               blacklistfile = io.open("moonloader/resource/mappingtoolkit/blacklist.txt", "r")
-               for name in blacklistfile:lines() do
-                  table.insert(blacklist, name:lower())
-               end
-               io.close(blacklistfile)
                s = 1
                for k, n in pairs(blacklist) do
                   sampAddChatMessage("{363636}" .. s .. ". {FF0000}" .. n, 0xFFFFFF)
@@ -8520,6 +8556,12 @@ function sampev.onServerMessage(color, text)
       lastPmMessage = text
    end
    if isTraining and text:find('PM') and text:find('от') then
+      -- blacklict check
+      for k, name in pairs(blacklist) do
+         if text:find(name) then
+            return false
+         end
+      end
       lastPmMessage = text
    end
    
@@ -8538,7 +8580,9 @@ function sampev.onServerMessage(color, text)
       end
       if text:find("Меню управления миром") then
          isWorldHoster = true
-         sampAddChatMessage("[SERVER]: {FFFFFF}Меню управления миром - /vw или клавиша - M", 0x0FF6600)
+         if ini.settings.hotkeys then
+            sampAddChatMessage("[SERVER]: {FFFFFF}Меню управления миром - /vw или клавиша - M", 0x0FF6600)
+         end
          return false
       end
    end
@@ -9710,7 +9754,9 @@ function SaveReminder()
       while checkbox.worldsavereminder.v do
          local delay = tonumber(ini.settings.reminderdelay)
          wait(1000*60*delay)
-         sampAddChatMessage("{FF6600}[SCRIPT]{FFFFFF} Вы давно не сохраняли мир. Сохраните его во избежание потери прогресса.", 0x0FF6600)
+         if isWorldHoster and not isAbsolutePlay then
+            sampAddChatMessage("{FF6600}[SCRIPT]{FFFFFF} Вы давно не сохраняли мир. Сохраните его во избежание потери прогресса.", 0x0FF6600)
+         end
       end   
    end)
 end
