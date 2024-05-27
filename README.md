@@ -5,16 +5,11 @@
     <a href="https://training-server.com/"><img src="https://img.shields.io/badge/Server-TRAINING%20-yellow"></a>
 </p>
 
+###### The following description is in Russian, because it is the main language of the user base.
+
 ![logo](https://github.com/ins1x/MappingToolkit/raw/main/moonloader/resource/mappingtoolkit/demo.gif)
 
-#### ENGLISH
-Lua script Assistant for mappers and event makers.   
-The main task of this script - is make the mapping process in the in-game map editor as pleasant  
-as possible, and to give more opportunities to event organizers.  
-Find more about mapping on server at [wiki](https://github.com/ins1x/MappingToolkit/wiki).  
-The following description is in Russian, because it is the main language of the user base.   
-
-#### RUS
+#### Описание скрипта
 LUA ассистент для мапперов и организаторов мероприятий.  
 Основная задача данного скрипта - сделать процесс маппинга в внутриигровом редакторе карт максимально приятным, и дать больше возможностей организаторам мероприятий. 
 
@@ -159,11 +154,14 @@ LUA ассистент для мапперов и организаторов м�
 * Запустить GTA. В игре нажмите **ALT + X** или введите команду **/toolkit**
 * Если скрипт не запустился, в папке moonloader есть файл moonloader.log с информацией о проблеме
 
+> Ответы на часто задаваемы вопросы по скрипту: https://github.com/ins1x/MappingToolkit/wiki/FAQ-%D0%BF%D0%BE-MappingToolkit
+
 ## Disclaimer 
-Скрипт *не работает с включенным античитом* Samp Addon (ничего не мешает Вам поставить хелпер в свою сборку без аддона или отключить античит). Скрипт может работать на других серверах, но перед его использованием убедитесь что его функционал не запрещен на вашем сервере! Некоторые мемхаки такие как эффекты работают только на версии клиента 0.3.7 R1.
+Скрипт может работать на других серверах, но перед его использованием убедитесь что его функционал не запрещен на вашем сервере! Некоторые мемхаки такие как эффекты работают только на версии клиента 0.3.7 R1.
 
 ---------------------------------------------
 
 [![blast.hk](https://img.shields.io/badge/Homepage-blasthk-blue)](https://www.blast.hk/threads/200619/)
-[![forum](https://img.shields.io/badge/Forum-Absolute_Play-red)](https://forum.gta-samp.ru/index.php?/topic/1101593-mapping-toolkit/)
+[![forum absolute](https://img.shields.io/badge/Forum-Absolute_Play-red)](https://forum.gta-samp.ru/index.php?/topic/1101593-mapping-toolkit/)
+[![forum training](https://img.shields.io/badge/Forum-TRAINING_SANDBOX-yellow)](https://forum.training-server.com/d/19708-luamappingtoolkit/20)
 [![github](https://img.shields.io/badge/Wiki-Github-black)](https://github.com/ins1x/MappingToolkit/wiki)
