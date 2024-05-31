@@ -4,7 +4,7 @@ script_description("In-game assistant for mappers and event makers")
 script_dependencies('imgui', 'lib.samp.events')
 script_properties("work-in-pause")
 script_url("https://github.com/ins1x/MappingToolkit")
-script_version("3.0.0")
+script_version("3.0.2")
 -- script_moonloader(16) moonloader v.0.26
 -- sa-mp version: 0.3.7 R1
 -- Activaton: ALT + X (show main menu) or command /toolkit
@@ -39,6 +39,7 @@ local ini = inicfg.load({
       freezechat = false,
       playerwarnings = false,
       worldsavereminder = false,
+      extendedmenues = true,
       renderfont = "Arial",
       renderfontsize = 7,
       rendercolor = "{80FFFFFF}",
@@ -257,7 +258,7 @@ local tabmenu = {
 }
 
 local textbuffer = {
-   vehiclename = imgui.ImBuffer(128),
+   vehiclename = imgui.ImBuffer(64),
    mpname = imgui.ImBuffer(128),
    mpprize = imgui.ImBuffer(32),
    mpdonators = imgui.ImBuffer(128),
@@ -283,9 +284,15 @@ local textbuffer = {
    tpcy = imgui.ImBuffer(12),
    tpcz = imgui.ImBuffer(12),
    sms = imgui.ImBuffer(256),
+   pid = imgui.ImBuffer(4),
+   sethp = imgui.ImBuffer(6),
+   setarm = imgui.ImBuffer(6),
+   setteam = imgui.ImBuffer(3),
+   setreason = imgui.ImBuffer(32),
+   setptime = imgui.ImBuffer(10),
    tpstep = imgui.ImBuffer(2),
    saveskin = imgui.ImBuffer(4),
-   note = imgui.ImBuffer(1024)
+   favorites = imgui.ImBuffer(1024)
 }
 
 local combobox = {
@@ -3009,7 +3016,7 @@ function main()
       if doesFileExist(getGameDirectory() .. '\\moonloader\\resource\\mappingtoolkit\\objects.txt') then
          favfile = io.open(getGameDirectory() ..
          "//moonloader//resource//mappingtoolkit//objects.txt", "r")
-         textbuffer.note.v = favfile:read('*a')
+         textbuffer.favorites.v = favfile:read('*a')
          favfile:close()
       end
       
@@ -3026,6 +3033,10 @@ function main()
       memory.setfloat(13210352, ini.settings.fog, true)
 	
       textbuffer.mpprize.v = '1.000.000$'
+      textbuffer.setarm.v = '100'
+      textbuffer.sethp.v = '100'
+      textbuffer.setteam.v = '0'
+     
       --textbuffer.mpname.v = u8'Проходит МП "<название>" '
       
       if ini.settings.worldsavereminder then
@@ -3106,7 +3117,7 @@ function main()
       
       if isTraining and ini.settings.editkey then
          -- N key edit object
-         if isKeyJustPressed(0x4E) and not sampIsChatInputActive() and not sampIsDialogActive()
+         if isKeyJustPressed(0x4E) and not isCharInAnyCar(PLAYER_PED) and not sampIsChatInputActive() and not sampIsDialogActive()
 	     and not isPauseMenuActive() and not isSampfuncsConsoleActive() then 
             if isWorldHoster then sampSendChat("/csel") end
          end
@@ -3404,7 +3415,7 @@ function imgui.OnDrawFrame()
       imgui.NextColumn()
       
       imgui.SameLine()
-      imgui.Text("                      ")
+      imgui.Text("                                   ")
       
 	  imgui.SameLine()
       if imgui.Button(u8"Свернуть") then
@@ -3907,14 +3918,14 @@ function imgui.OnDrawFrame()
 		   end
 		end
 	    
-		if imgui.Checkbox(u8("Возвращать объект на исходную позицию"), checkbox.showobjectrot) then
+		if imgui.Checkbox(u8("Возвращать объект на исходную позицию"), checkbox.restoreobjectpos) then
            ini.settings.restoreobjectpos = checkbox.restoreobjectpos.v
 		   inicfg.save(ini, configIni)
 		end
         imgui.SameLine()
         imgui.TextQuestion("( ? )", u8"Возвращает объект на исходную позицию при отмене редактирования")
 		
-        if imgui.Checkbox(u8("Показывать координаты объекта при перемещении"), checkbox.restoreobjectpos) then
+        if imgui.Checkbox(u8("Показывать координаты объекта при перемещении"), checkbox.showobjectrot) then
            ini.settings.showobjectrot = checkbox.showobjectrot.v
 		   inicfg.save(ini, configIni)
 		end
@@ -3958,14 +3969,6 @@ function imgui.OnDrawFrame()
         imgui.SameLine()
         imgui.TextQuestion("( ? )", u8"Визуально изменяет масштаб объекта, и растягивает его. (как в МТА)")
         
-              
-		-- if imgui.Button(u8"Восстановить удаленный объект", imgui.ImVec2(250, 25)) then
-		   -- if isAbsolutePlay then
-		      -- if lastRemovedObjectModelid then
-			     -- undoMode = not undoMode 
-			  -- end
-		   -- end
-		-- end
 		imgui.Spacing()
 		
 	  elseif tabmenu.settings == 3 then
@@ -4667,6 +4670,7 @@ function imgui.OnDrawFrame()
 	     end
          
       elseif tabmenu.settings == 9 then
+         resetIO()
          local _, id = sampGetPlayerIdByCharHandle(playerPed)
          local nickname = sampGetPlayerNickname(id)
          local score = sampGetPlayerScore(id)
@@ -4744,7 +4748,7 @@ function imgui.OnDrawFrame()
                   if skinid > 0 and skinid < 311 
                   and skinid ~= 74 then
                      sampSendChat("/skin "..skinid)
-                     sampAddChatMessage("Вы cменили скин на {696969}"..skinid, -1)
+                     sampAddChatMessage("Вы cменили скин {696969}"..currentskin.."{FFFFFF} на {696969}"..skinid, -1)
                   end
                end
                imgui.SameLine()
@@ -4806,7 +4810,7 @@ function imgui.OnDrawFrame()
       imgui.Columns(1)
        
       elseif tabmenu.main == 2 then
-       
+       resetIO()
 	   -- if dialog.extendedtab.v then
 	      -- if imgui.Button("[ >> ]") then
 	         -- dialog.extendedtab.v = not dialog.extendedtab.v
@@ -4946,6 +4950,7 @@ function imgui.OnDrawFrame()
           imgui.Text(u8"Всего игроков в таблице: ".. playersTotal)
       
 	  elseif combobox.selecttable.v == 1 then
+         resetIO()
          imgui.Columns(2, "vehtableheader", false)
          imgui.SetColumnWidth(-1, 320)
          
@@ -5066,7 +5071,7 @@ function imgui.OnDrawFrame()
          imgui.Text(u8"Всего транспорта в таблице: ".. vehiclesTotal)
          
       elseif combobox.selecttable.v == 2 then
-         
+         resetIO()
          imgui.Separator()
          imgui.Columns(4)
          imgui.TextQuestion("ID", u8"Внутренний ID (/ctd)")
@@ -5169,8 +5174,15 @@ function imgui.OnDrawFrame()
 		 -- imgui.Link("https://www.youtube.com/@1nsanemapping", "1nsanemapping")
 		 
          imgui.Spacing()
-         if imgui.Button(u8"Check updates",imgui.ImVec2(150, 25)) then
+         if imgui.Button(u8"Проверить обновления",imgui.ImVec2(150, 25)) then
 		    os.execute('explorer https://github.com/ins1x/MappingToolkit/releases')
+		 end
+         imgui.SameLine()
+         if imgui.Button(u8"Сбросить настройки",imgui.ImVec2(150, 25)) then
+		    os.rename(getGameDirectory().."//moonloader//config//mappingtoolkit.ini", getGameDirectory().."//moonloader//config//backup_mappingtoolkit.ini")
+            sampAddChatMessage("Настройки были сброшены на стандартные. Скрипт автоматически перезагрузится.",-1)
+            sampAddChatMessage("Резервную копию ваших предыдущих настроек можно найти в moonloader/config.",-1)
+            reloadScripts()
 		 end
          
          imgui.Spacing()
@@ -5258,7 +5270,7 @@ function imgui.OnDrawFrame()
          
 
       elseif tabmenu.info == 3 then
-
+         resetIO()
          imgui.Text(u8"Цветовая палитра")
          imgui.PushStyleColor(imgui.Col.Button, imgui.ImVec4(1.0, 0.0, 0.0, 1.0))
          if imgui.Button("{FF0000}  RED    ", imgui.ImVec2(120, 25)) then
@@ -5441,38 +5453,38 @@ function imgui.OnDrawFrame()
 		 
          if imgui.CollapsingHeader(u8'Популярные текстуры') then
             if isTraining then
-               imgui.TextColoredRGB("{00FF00}8660{FFFFFF} - невидимая текстура")
-               imgui.TextColoredRGB("{00FF00}2643 или 64{FFFFFF} - двойной цвет (бело-чёрный)")
-               imgui.TextColoredRGB("{00FF00}121{FFFFFF} - песок")
-               imgui.TextColoredRGB("{00FF00}388{FFFFFF} - прозрачная текстура")
-               imgui.TextColoredRGB("{00FF00}89{FFFFFF} - вода")
-               imgui.TextColoredRGB("{00FF00}56 и 4853{FFFFFF} - трава")
-               imgui.TextColoredRGB("{00FF00}1165 и 3123{FFFFFF} - дерево")
-               imgui.TextColoredRGB("{00FF00}2864 и 3035{FFFFFF} - стекло")
-               imgui.TextColoredRGB("{00FF00}2921 и 4062{FFFFFF} - белая текстура")
-               imgui.TextColoredRGB("{00FF00}300{FFFFFF} - чёрная текстурка")
-               imgui.TextColoredRGB("{00FF00}7838 - 7807 - 7808 - 8405 - 8406 - 8407 - 8408 - 5440 - 5441 - 5442 - 5443{FFFFFF}")
+               imgui.TextColoredRGB("{FF6600}8660{FFFFFF} - невидимая текстура")
+               imgui.TextColoredRGB("{FF6600}2643 или 64{FFFFFF} - двойной цвет (бело-чёрный)")
+               imgui.TextColoredRGB("{FF6600}121{FFFFFF} - песок")
+               imgui.TextColoredRGB("{FF6600}388{FFFFFF} - прозрачная текстура")
+               imgui.TextColoredRGB("{FF6600}89{FFFFFF} - вода")
+               imgui.TextColoredRGB("{FF6600}56 и 4853{FFFFFF} - трава")
+               imgui.TextColoredRGB("{FF6600}1165 и 3123{FFFFFF} - дерево")
+               imgui.TextColoredRGB("{FF6600}2864 и 3035{FFFFFF} - стекло")
+               imgui.TextColoredRGB("{FF6600}2921 и 4062{FFFFFF} - белая текстура")
+               imgui.TextColoredRGB("{FF6600}300{FFFFFF} - чёрная текстурка")
+               imgui.TextColoredRGB("{FF6600}7838 - 7807 - 7808 - 8405 - 8406 - 8407 - 8408 - 5440 - 5441 - 5442 - 5443{FFFFFF}")
                imgui.TextColoredRGB("разные цвета (зелёный, красный, синий и т.д)")
-               imgui.TextColoredRGB("{00FF00}235{FFFFFF} - стрелки")
-               imgui.TextColoredRGB("{00FF00}6510{FFFFFF} - затемнение")
-               imgui.TextColoredRGB("{00FF00}6439{FFFFFF} - прозрачная дверь")
-               imgui.TextColoredRGB("{00FF00}6289{FFFFFF} - деревянные балки")
-               imgui.TextColoredRGB("{00FF00}6239{FFFFFF} - окно")
-               imgui.TextColoredRGB("{00FF00}6006{FFFFFF} - экран TВ")
-               imgui.TextColoredRGB("{00FF00}4812{FFFFFF} - гараж")
-               imgui.TextColoredRGB("{00FF00}4741{FFFFFF} - вентиляция")
-               imgui.TextColoredRGB("{00FF00}4700{FFFFFF} - разбитое окно или двери")
-               imgui.TextColoredRGB("{00FF00}3321{FFFFFF} - окно в магазинах")
-               imgui.TextColoredRGB("{00FF00}3223{FFFFFF} - газета")
-               imgui.TextColoredRGB("{00FF00}3124{FFFFFF} - люди, просто люди")
-               imgui.TextColoredRGB("{00FF00}2519{FFFFFF} - занавес")
-               imgui.TextColoredRGB("{00FF00}2410{FFFFFF} - флаги")
-               imgui.TextColoredRGB("{00FF00}1847{FFFFFF} - дверь")
-               imgui.TextColoredRGB("{00FF00}1665{FFFFFF} - сетка прозрачная")
+               imgui.TextColoredRGB("{FF6600}235{FFFFFF} - стрелки")
+               imgui.TextColoredRGB("{FF6600}6510{FFFFFF} - затемнение")
+               imgui.TextColoredRGB("{FF6600}6439{FFFFFF} - прозрачная дверь")
+               imgui.TextColoredRGB("{FF6600}6289{FFFFFF} - деревянные балки")
+               imgui.TextColoredRGB("{FF6600}6239{FFFFFF} - окно")
+               imgui.TextColoredRGB("{FF6600}6006{FFFFFF} - экран TВ")
+               imgui.TextColoredRGB("{FF6600}4812{FFFFFF} - гараж")
+               imgui.TextColoredRGB("{FF6600}4741{FFFFFF} - вентиляция")
+               imgui.TextColoredRGB("{FF6600}4700{FFFFFF} - разбитое окно или двери")
+               imgui.TextColoredRGB("{FF6600}3321{FFFFFF} - окно в магазинах")
+               imgui.TextColoredRGB("{FF6600}3223{FFFFFF} - газета")
+               imgui.TextColoredRGB("{FF6600}3124{FFFFFF} - люди, просто люди")
+               imgui.TextColoredRGB("{FF6600}2519{FFFFFF} - занавес")
+               imgui.TextColoredRGB("{FF6600}2410{FFFFFF} - флаги")
+               imgui.TextColoredRGB("{FF6600}1847{FFFFFF} - дверь")
+               imgui.TextColoredRGB("{FF6600}1665{FFFFFF} - сетка прозрачная")
                imgui.Spacing()
-               imgui.TextColoredRGB("{00FF00}/tsearch <objectid> <slot> <name>{FFFFFF} - наложение текстуры по поиску")
-               imgui.TextColoredRGB("{00FF00}/stexture <objectid> <slot> <index>{FFFFFF} - наложить текстуру на объект по индексу")
-               imgui.TextColoredRGB("{00FF00}/untexture <objectid>{FFFFFF} - обнулить наложенные текстуры (и /ocolor)")
+               imgui.TextColoredRGB("{FF6600}/tsearch <objectid> <slot> <name>{FFFFFF} - наложение текстуры по поиску")
+               imgui.TextColoredRGB("{FF6600}/stexture <objectid> <slot> <index>{FFFFFF} - наложить текстуру на объект по индексу")
+               imgui.TextColoredRGB("{FF6600}/untexture <objectid>{FFFFFF} - обнулить наложенные текстуры (и /ocolor)")
             end
             if isAbsolutePlay then
                imgui.TextColoredRGB("{00FF00}90{FFFFFF} - Вода из ViceCity")
@@ -5609,7 +5621,7 @@ function imgui.OnDrawFrame()
 		 imgui.Link("https://www.open.mp/docs/scripting/functions/SetObjectMaterial", "SetObjectMaterial")
 		 
       elseif tabmenu.info == 5 then
-         
+         resetIO()
 		 imgui.Text(u8"Выберите категорию: ")
 		 imgui.SameLine()
          local comboboxitems = {u8'Основные', u8'Специальные', u8'Эффекты', 
@@ -5669,14 +5681,14 @@ function imgui.OnDrawFrame()
             imgui.Text(u8"Картины: 2255-2289, 3962-3964, 14860, 14812, 14737")
          elseif combobox.objects.v == 5 then
             imgui.Text(u8"Здесь вы можете сохранить ваши объекты в избранное")
-            imgui.InputTextMultiline('##bufftext', textbuffer.note, imgui.ImVec2(480, 150))
+            imgui.InputTextMultiline('##bufftext', textbuffer.favorites, imgui.ImVec2(480, 150))
                
             if imgui.Button(u8"Сохранить избранные в файл", imgui.ImVec2(200, 25)) then
                favfile = io.open(getGameDirectory() ..
                "//moonloader//resource//mappingtoolkit//objects.txt", "w")
                --favfile:write("\n")
                --favfile:write(string.format("%s \n", os.date("%d.%m.%y %H:%M:%S")))
-               favfile:write(textbuffer.note.v)
+               favfile:write(textbuffer.favorites.v)
                favfile:close()
                sampAddChatMessage("Сохранено в файл избранных: moonloader/resource/mappingtoolkit/objects.txt", -1)
             end
@@ -5685,7 +5697,7 @@ function imgui.OnDrawFrame()
             if imgui.Button(u8"Загрузить избранные из файла", imgui.ImVec2(200, 25)) then
                favfile = io.open(getGameDirectory() ..
                "//moonloader//resource//mappingtoolkit//objects.txt", "r")
-               textbuffer.note.v = favfile:read('*a')
+               textbuffer.favorites.v = favfile:read('*a')
                favfile:close()
             end
          end
@@ -6296,6 +6308,7 @@ function imgui.OnDrawFrame()
            end
 		end 
       elseif tabmenu.info == 8 then
+         resetIO()
          if isAbsolutePlay then
 	        imgui.Text(u8"Интерфейс взаимодействия с сайтом")
 		    imgui.SameLine()
@@ -6490,13 +6503,13 @@ function imgui.OnDrawFrame()
                      local nickname = sampGetPlayerNickname(id)
                      if nickname == u8:decode(textbuffer.ckeckplayer.v) then
                         chosenplayer = sampGetPlayerIdByNickname(nickname)
-		   		  end
-		   	   end
+		   		     end
+		   	      end
                end
             end
 		    imgui.PopItemWidth()
 		    imgui.SameLine()
-		    if imgui.Button(u8"Найти",imgui.ImVec2(70, 25)) then
+		    if imgui.Button(u8"Найти##FindPlayerButton",imgui.ImVec2(70, 25)) then
 		   	   if string.len(textbuffer.ckeckplayer.v) > 0 then
                   local link = 'explorer "https://training-server.com/api/user/'..u8:decode(textbuffer.ckeckplayer.v)..'"'
 		   	      os.execute(link)
@@ -6506,6 +6519,7 @@ function imgui.OnDrawFrame()
          end
 		 imgui.Spacing()
       elseif tabmenu.info == 9 then
+         resetIO()
       	 imgui.TextColoredRGB("{007DFF}Prineside DevTools (Online)")
          imgui.Text(u8"В этом разделе вы можете найти объекты через сайт")
          imgui.SameLine()
@@ -6573,6 +6587,356 @@ function imgui.OnDrawFrame()
          if imgui.Button(u8"Все объекты с анимацией",imgui.ImVec2(220, 25)) then
             os.execute('explorer "https://dev.prineside.com/ru/gtasa_samp_model_id/customsearch/?c%5B%5D=1&s=id-asc&bc=-1&bb=-1&bt=-1&ba=1"')
          end
+      elseif tabmenu.info == 10 then
+         imgui.Text(u8"Командные блоки(КБ) - это логические блоки позволяющие игрокам создавать")
+         imgui.Text(u8"уникальный функционал для миров. Вы можете задавать последовательности") 
+         imgui.Text(u8"различных действий и обработку условий по множеству параметров.")
+         if imgui.CollapsingHeader(u8"Команды для взаимодействия с КБ") then
+            imgui.TextColoredRGB("{FF6600}/cb{FFFFFF} - создать командный блокам")
+            imgui.TextColoredRGB("{FF6600}/cbdell{FFFFFF} - удалить блок")
+            imgui.TextColoredRGB("{FF6600}/cbtp{FFFFFF} - телепортрт к блоку")
+            imgui.TextColoredRGB("{FF6600}/cbedit{FFFFFF} - открыть меню блока")
+            imgui.TextColoredRGB("{FF6600}/data{FFFFFF} - информация об игроке и данных в его массиве.")
+            imgui.TextColoredRGB("{FF6600}/timers{FFFFFF} - список таймеров мира")
+            imgui.TextColoredRGB("{FF6600}/oldcb{FFFFFF} - включить устарелые текстовые команды")
+            imgui.TextColoredRGB("{FF6600}/cmb | //<text>{FFFFFF} - активировать КБ аллиас")
+            imgui.TextColoredRGB("{FF6600}/cblist{FFFFFF} - список всех командных блоков в мире")
+            imgui.TextColoredRGB("{FF6600}/tb{FFFFFF} - список триггер блоков в мире")
+            imgui.TextColoredRGB("{FF6600}/shopmenu{FFFFFF} - управление магазинами мира для КБ")
+         end
+         
+         if imgui.CollapsingHeader(u8"Текстовые команды список") then    
+            imgui.TextColoredRGB("{FF6600}#playerid#{FFFFFF} - вернет ID игрока.")
+            imgui.TextColoredRGB("{FF6600}#sc#{FFFFFF} - вернет социальный рейтинг игрока")
+            imgui.TextColoredRGB("{FF6600}#array(slot, *playerid)#{FFFFFF} - вернуть массив (СЛОТ: 0-26) игрока.")
+            imgui.TextColoredRGB("{FF6600}#server(slot)#{FFFFFF} - вернуть массив сервера (СЛОТ: 0-49)")
+            imgui.TextColoredRGB("{FF6600}#var(name)#{FFFFFF} - вернуть переменную мира, из /varlist")
+            imgui.TextColoredRGB("{FF6600}#pvar(name, *playerid)#{FFFFFF} - вернуть переменную игрока, из /pvarlist")
+            imgui.TextColoredRGB("{FF6600}#teamOnline(teamid)#{FFFFFF} - вернуть онлайн команды (/team) по teamid")
+            imgui.TextColoredRGB("{FF6600}#online#{FFFFFF} - вернуть онлайн мира")
+            imgui.TextColoredRGB("{FF6600}#anim(*playerid)#{FFFFFF} - вернуть числовой индекс активной анимации игрока")
+            imgui.TextColoredRGB("{FF6600}#skin(*playerid)#{FFFFFF} - вернуть модель скина игрока")
+            imgui.TextColoredRGB("{FF6600}#acid(*playerid)#{FFFFFF} - глобальный ID игрока")
+            imgui.TextColoredRGB("{FF6600}#gun(*playerid)# or #weapon(*playerid)#{FFFFFF} - ID оружия игрока")
+            imgui.TextColoredRGB("{FF6600}#ammo(*playerid)#{FFFFFF} - кол-во патронов в активном слоте оружия игрока")
+            imgui.TextColoredRGB("{FF6600}#timestamp#{FFFFFF} - секунды")
+            imgui.TextColoredRGB("{FF6600}#team(*playerid)#{FFFFFF} - вернуть ID команды (/team) игрока")
+            imgui.TextColoredRGB("{FF6600}#score(*playerid)#{FFFFFF} - вернуть кол-во очков в TABe игрока")
+            imgui.TextColoredRGB("{FF6600}#money(*playerid)#{FFFFFF} - вернуть кол-во грошей игрока")
+            imgui.TextColoredRGB("{FF6600}#health(*playerid)#{FFFFFF} - вернуть уровень здоровья игрока")
+            imgui.TextColoredRGB("{FF6600}#armour(*playerid)#{FFFFFF} - вернуть уровень брони игрока")
+            imgui.TextColoredRGB("{FF6600}#name(*playerid)#{FFFFFF} - вернуть никнэйм игрока по playerid")
+            imgui.TextColoredRGB("{FF6600}#xyz(*playerid)#{FFFFFF} - вернуть позицию игрока")
+            imgui.TextColoredRGB("#x(*playerid)# #y(*playerid)# #z(*playerid)#{FFFFFF}")
+            imgui.TextColoredRGB("{FF6600}#camxyz(*playerid)# {FFFFFF} - вернуть позицию камеры игрока")
+            imgui.TextColoredRGB("#camx(*playerid)# #camy(*playerid)# #camz(*playerid)#{FFFFFF}")
+            imgui.TextColoredRGB("{FF6600}#speed(*playerid)#{FFFFFF} - скорость игрока")
+            imgui.TextColoredRGB("{FF6600}#gunName(*playerid)#{FFFFFF} - вернуть названия оружия в активном слоте игрока")
+            imgui.TextColoredRGB("{FF6600}#time#{FFFFFF} - вернуть время мира")
+            imgui.TextColoredRGB("{FF6600}#weather#{FFFFFF} - вернуть погоду мира")
+            imgui.TextColoredRGB("{FF6600}#drunk(*playerid)#{FFFFFF} - вернуть ур. опьянения игрока")
+            imgui.TextColoredRGB("{FF6600}#channel(*playerid)#{FFFFFF} - вернуть канал игрока (/channel)")
+            imgui.TextColoredRGB("{FF6600}#vehSeat(*playerid)#{FFFFFF} - вернуть место игрока в авто")
+            imgui.TextColoredRGB("{FF6600}#waterlvl(*playerid)#{FFFFFF} - вернуть уровень нахождения игрока в море")
+            imgui.TextColoredRGB("{FF6600}#zone(*playerid)#{FFFFFF} - название района игрока")
+            imgui.TextColoredRGB("{FF6600}#getzone(x, y)#{FFFFFF} - названия района по x, y")
+            imgui.TextColoredRGB("{FF6600}#getzoneid(x, y)#{FFFFFF} - id района по x, y (исп. в проверке на район в КБ)")
+            imgui.TextColoredRGB("{FF6600}#ping(*playerid)#{FFFFFF} - пинг игрока")
+            imgui.TextColoredRGB("{FF6600}#ban(*playerid)#{FFFFFF} - есть ли варн у игрока (0/1)")
+            imgui.TextColoredRGB("{FF6600}#netstat(*playerid)#{FFFFFF} - процент потери пакетов")
+            imgui.TextColoredRGB("{FF6600}#hr(*playerid)#{FFFFFF} - соотношение попаданий к выстрелам (процент попаданий)")
+            imgui.TextColoredRGB("{FF6600}#fa(*playerid)#{FFFFFF} - угол поворота игрока")
+            imgui.TextColoredRGB("{FF6600}#afk(*playerid)#{FFFFFF} - кол-во секунд AFK игрока")
+            imgui.TextColoredRGB("{FF6600}#death(*playerid)#{FFFFFF} - кол-во секунд стадии смерти (РП) игрока")
+            imgui.TextColoredRGB("{FF6600}#target(*playerid)#{FFFFFF} - вернет ид игрока на которого наведен игрок с помощью ПКМ")
+            imgui.TextColoredRGB("{FF6600}#teamName(*playerid)#{FFFFFF} - название команды игрока")
+            imgui.TextColoredRGB("{FF6600}#ext(blockid value)#{FFFFFF} - вернет строку значения командного блока")
+            imgui.TextColoredRGB("{FF6600}#bodypart(*playerid)#")
+            imgui.TextColoredRGB("{FF6600}#issuerGun(*playerid)#")
+            imgui.TextColoredRGB("{FF6600}#GetDistPlayer(targetid, *playerid)#{FFFFFF} - вернет дистанцию к targetid")
+            imgui.TextColoredRGB("{FF6600}#GetDistPos(x y z *playerid)#{FFFFFF} - вернет дистанцию к позиции x y z")
+            imgui.TextColoredRGB("{FF6600}#nearply(*playerid)#")
+            imgui.TextColoredRGB("{FF6600}#getZ(x y)#")
+            imgui.TextColoredRGB("{FF6600}#retval(id, *playerid)#")
+            imgui.TextColoredRGB("{FF6600}#retstr(*id, **playerid)#")
+            imgui.TextColoredRGB("{FF6600}#GetDist(x1 y1 z1 ?2 y2 z2)#")
+            imgui.TextColoredRGB("{FF6600}#randomPlayer(*category)#")
+            imgui.TextColoredRGB("team <id>, skin <id>, veh <id>, data <slot> <value>, wanted <value>, action <id>, dead, alive")
+            imgui.TextColoredRGB("{FF6600}#moder(*playerid)#{FFFFFF} - ур. модерки игрока в мире (хост - 999)")
+            imgui.TextColoredRGB("{FF6600}#specState(*playerid)#")
+            imgui.TextColoredRGB("{FF6600}#specTarget(*playerid)#")
+            imgui.TextColoredRGB("{FF6600}#int(*playerid)#{FFFFFF} - интерьер игрока")
+            imgui.TextColoredRGB("{FF6600}#vip(*playerid)#")
+            imgui.TextColoredRGB("{FF6600}#raycast(cam/pos dist col coord)#")
+            imgui.TextColoredRGB("{FF6600}#chatStyle(*playerid)#")
+            imgui.TextColoredRGB("{FF6600}#freeze(*playerid)#")
+            imgui.TextColoredRGB("{FF6600}#freezeTime(*playerid)#")
+            imgui.TextColoredRGB("{FF6600}#gm(*playerid)#")
+            imgui.TextColoredRGB("{FF6600}#mute(*playerid)#")
+            imgui.TextColoredRGB("{FF6600}#muteTime(*playerid)#")
+            imgui.TextColoredRGB("{FF6600}#taser(*playerid)#")
+            imgui.TextColoredRGB("{FF6600}#lastActor(*playerid)#")
+            imgui.TextColoredRGB("{FF6600}#clist(*playerid)#")
+            imgui.TextColoredRGB("{FF6600}#fightStyle(*playerid)#")
+            imgui.TextColoredRGB("{FF6600}#isWorld(playerid)#")
+            imgui.TextColoredRGB("{FF6600}#pame(slot, *playerid)#{FFFFFF} - вернет строку /pame игрока из слота")
+            imgui.TextColoredRGB("{FF6600}#customRaycast(x y z angle dist 0/1 x/y/z/xyz)#")
+            imgui.TextColoredRGB("{FF6600}#playerCount(category 0)#")
+            imgui.TextColoredRGB("category: team, skin, veh, data, wanted, action, dead, alive, score, vehseat")
+            imgui.TextColoredRGB("gun/weapon, channel, afk, vip, taser, surfingveh, int, attach, attachmodel, retval")
+            imgui.TextColoredRGB("{FF6600}#playerList(item category 0)# | category: (см. выше)")
+            imgui.TextColoredRGB("{FF6600}#key(side, *playerid)#")
+            imgui.TextColoredRGB("{FF6600}#weaponState(*playerid)# or #gunState(*playerid)#")
+            imgui.TextColoredRGB("{FF6600}#front(dist <x/y>, *playerid)#")
+            imgui.TextColoredRGB("{FF6600}#zoom(*playerid)#")
+         end
+         if imgui.CollapsingHeader(u8"Транспортные средства") then
+            imgui.TextColoredRGB("{FF6600}#vehicle(*playerid)# or #veh(*playerid)#{FFFFFF} - вернуть ID т/c из /dll")
+            imgui.TextColoredRGB("{FF6600}#vdata(vehid slot)#{FFFFFF} - вернуть массив транспорта (СЛОТ: 0-49)")
+            imgui.TextColoredRGB("{FF6600}#GetDistVeh(vehid, *playerid)#{FFFFFF} - вернет дистанцию к vehid")
+            imgui.TextColoredRGB("{FF6600}#vehPos(vehid)#{FFFFFF} - вернет позицию ТС по vehid")
+            imgui.TextColoredRGB("{FF6600}#vehColor(*playerid)#{FFFFFF} - цвет автомобиля в HEX формате")
+            imgui.TextColoredRGB("{FF6600}#vehColor1(*playerid)#{FFFFFF} - цвет автомобиля 1")
+            imgui.TextColoredRGB("{FF6600}#vehColor2(*playerid)#{FFFFFF} - цвет автомобиля 2")
+            imgui.TextColoredRGB("{FF6600}#vehModel(*playerid)##{FFFFFF} - вернет модель ТС игрока по playerid")
+            imgui.TextColoredRGB("{FF6600}#GetVehModel(vehid)#{FFFFFF} - вернет модель ТС по vehid")
+            imgui.TextColoredRGB("{FF6600}#vehHealth(*playerid)#{FFFFFF} - вернуть уровень здоровья ТС")
+            imgui.TextColoredRGB("{FF6600}#gearState(vehid)#{FFFFFF} - возвращает положение шасси в самолетах.")
+            imgui.TextColoredRGB("0{FFFFFF} - опущены / 1{FFFFFF} - спрятаны")
+            imgui.TextColoredRGB("{FF6600}#surfingVeh(*playerid)#{FFFFFF} - вернет ID автомобиля на котором стоит игрок")
+            imgui.TextColoredRGB("ИНАЧЕ ВОЗВРАЩАЕТ 65535. Работает только при нахождении водителя в ТС.")
+            imgui.TextColoredRGB("{FF6600}#nearveh(radius, *playerid)#{FFFFFF} - вернет ближ. автомобиль в радиусе radius")
+            imgui.TextColoredRGB("{FF6600}#vehParam(vehicleid param)#{FFFFFF} - вернет параметр автомобиля,")
+            imgui.TextColoredRGB("вместо vehicleid можно указать 0 - заменит на ид вашего транспорта.")
+            imgui.TextColoredRGB("0 - engine - получает статус двигателя, если 1 - двигатель включен.")
+            imgui.TextColoredRGB("1 - lights - получает статус фар, если 1 - включены.")
+            imgui.TextColoredRGB("2 - alarm - получает сигнал тревоги, если 1 - звучит.")
+            imgui.TextColoredRGB("3 - doors - получает статус дверей, если 1 - закрыты.")
+            imgui.TextColoredRGB("4 - bonnet - получает статус капота, если 1 - открыт.")
+            imgui.TextColoredRGB("5 - boot - получает статус багажника, если 1 - открыт.")
+            imgui.TextColoredRGB("6 - objective - метка на карте, если 1 - включено.")
+            imgui.TextColoredRGB("аналог параметров из действия “изменить параметры ТС")
+            imgui.TextColoredRGB("{FF6600}#vehdriver(vehid)#{FFFFFF} - вернет ID водителя машины vehid")
+            imgui.TextColoredRGB("{FF6600}#gmcar(vehid)#{FFFFFF} - вернет статус ГМ кара автомобиля vehid")
+            imgui.TextColoredRGB("{FF6600}#siren(vehid)#{FFFFFF} - вернет статус cирены автомобиля по vehid")
+            imgui.TextColoredRGB("{FF6600}#getVehName(vehid)#{FFFFFF} - вернет названия модели машины по VEHID")
+            imgui.TextColoredRGB("{FF6600}#getModelName(modelid)#{FFFFFF} - вернет название модели машины по MODELID")
+            imgui.TextColoredRGB("{FF6600}#getVehName(vehid)#{FFFFFF} - вернет названия машины по vehid")
+            imgui.TextColoredRGB("{FF6600}#vehCount#{FFFFFF} - вернет кол-во машин в мире")
+         end
+         if imgui.CollapsingHeader(u8"Объекты") then
+            imgui.TextColoredRGB("{FF6600}#GetDistObject(objectid, *playerid)#{FFFFFF} - вернет дистацию к объекту")
+            imgui.TextColoredRGB("{FF6600}#omodel(objectid)#{FFFFFF} - вернет модель объекта по мировому objectid")
+            imgui.TextColoredRGB("{FF6600}#oxyz(objectid)# #ox(objectid)# #oy(objectid)# #oz(objectid)#{FFFFFF}")
+            imgui.TextColoredRGB("{FFFFFF}вернет координаты объекта по мировому objectid")
+            imgui.TextColoredRGB("{FF6600}#rxyz(objectid)# #rx(objectid)# #ry(objectid)# #rz(objectid)#{FFFFFF}")
+            imgui.TextColoredRGB("{FFFFFF}вернет угол поворота по осям объекта по мировому objectid")
+            imgui.TextColoredRGB("{FF6600}#nearObj(dist modelid)#{FFFFFF} - вернет ближ. объект в радиусе dist меетров")
+            imgui.TextColoredRGB("{FFFFFF}НЕ БОЛЬШЕ 200 МЕТРОВ). Необязательный параметр: modelid")
+            imgui.TextColoredRGB("{FF6600}#nearobjxyz(dist modelid x y z)#{FFFFFF} - вернет ближ. объект к ")
+            imgui.TextColoredRGB("{FFFFFF}определённым координатам в радиусе dist метров (НЕ БОЛЬШЕ 200 МЕТРОВ)")
+            imgui.TextColoredRGB("{FFFFFF}Необязательный параметр: modelid")
+            imgui.TextColoredRGB("{FF6600}#oMove(objectid)#{FFFFFF} - вернет статус движется ли объект{FFFFFF} - 0/1")
+            imgui.TextColoredRGB("{FF6600}#oMoveXYZ(objectid)# #oMoveX(objectid)# #oMoveY(objectid)# #oMoveZ(objectid)#")
+            imgui.TextColoredRGB("{FFFFFF} - вернет координаты к которым движется объект")
+            imgui.TextColoredRGB("{FF6600}#oArray(objectid *slot)#{FFFFFF} - вернет массив объекта")
+            imgui.TextColoredRGB("{FF6600}#oState(objectid)#{FFFFFF} - вернет статус отображения объекта")
+            imgui.TextColoredRGB("{FF6600}#objectCount#{FFFFFF} - вернет кол-во объектов в мире")
+            imgui.TextColoredRGB("{FF6600}#maxObjectCount#{FFFFFF} - вернет макс. возможное кол-во объектов в мире")
+            imgui.TextColoredRGB("{FF6600}#getDistAction(actionid)#{FFFFFF} - вернет дистанцию к /action")
+            imgui.TextColoredRGB("{FF6600}#actionXYZ(actionid)# #actionX(actionid)# #actionY(actionid)# #actionZ(actionid)#")
+            imgui.TextColoredRGB("{FFFFFF} - вернет координаты /actrion")
+            imgui.TextColoredRGB("{FF6600}#actionText(actionid)#{FFFFFF} - вернет текст акшиона")
+         end
+         if imgui.CollapsingHeader(u8"Действия со строками") then
+            imgui.TextColoredRGB("{FF6600}#strfind(str, substr, caps)#")
+            imgui.TextColoredRGB("{FFFFFF} - найдет substr в str и вернет символ начала substr в str")
+            imgui.TextColoredRGB("{FFFFFF} - CAPS: 0/1 - учитывать ли регистр, по умолчанию: учитывать (1))")
+            imgui.TextColoredRGB("{FF6600}#strfindtimes(str, substr, caps)#")
+            imgui.TextColoredRGB("{FFFFFF} - найдет сколько раз substr встречается в str. ")
+            imgui.TextColoredRGB("{FFFFFF} - CAPS: 0/1 - учитывать ли регистр, по умолчанию: учитывать (1)")
+            imgui.TextColoredRGB("{FF6600}#strcmp(str, substr, caps)#{")
+            imgui.TextColoredRGB("{FFFFFF} - проверит идентичные строки и вернет символ начала substr в str.")
+            imgui.TextColoredRGB("{FFFFFF} - CAPS: 0/1 - учитывать ли регистр, по умолчанию: учитывать")
+            imgui.TextColoredRGB("{FF6600}(1). Функция подходит для сравнения введенных параметров (паролей,")
+            imgui.TextColoredRGB("которые содержат символы, а не только числа).")
+            imgui.TextColoredRGB("{FF6600}#strdel(str, start, stop)#")
+            imgui.TextColoredRGB("{FFFFFF} - удалит со str символы начиная с start и заканчивая stop")
+            imgui.TextColoredRGB("{FF6600}#strlen(str)#{FFFFFF} - вернет длину строки str")
+            imgui.TextColoredRGB("{FF6600}#strins(str, substr, index)#{FFFFFF} - вставит substr в str на index место")
+            imgui.TextColoredRGB("{FF6600}#worldName#{FFFFFF} - вернет название мира")
+            imgui.TextColoredRGB("{FF6600}#worldDesc#{FFFFFF} - вернет описание мира")
+            imgui.TextColoredRGB("{FF6600}#sscanf(text, d, &)# - функция для разделения параметров из text")
+            imgui.TextColoredRGB("d - порядковый номер элемента")
+            imgui.TextColoredRGB("& - разделитель")
+         end
+         if imgui.CollapsingHeader(u8"Действия с числами") then
+            imgui.TextColoredRGB("{FF6600}#random(numb1, numb2)#{FFFFFF} - вернет случайное число")
+            imgui.TextColoredRGB("{FF6600}#floatnum(numb1 type numb2)#{FFFFFF} - действия с плавающими числами.") 
+            imgui.TextColoredRGB("{FF6600}#round(number *method)# or #floatround(number *method)# {FFFFFF} methods:")
+            imgui.TextColoredRGB("round - метод по дефолту, округляет к ближ. целому числу")
+            imgui.TextColoredRGB("floor - округляет вниз")
+            imgui.TextColoredRGB("ceil - округляет вверх")
+            imgui.TextColoredRGB("tozero - округляет ближе к 0")
+            imgui.TextColoredRGB("{FF6600}#log(number base)#{FFFFFF} - логарифм")
+            imgui.TextColoredRGB("{FF6600}#sin(number *method)#{FFFFFF} - синус от числа number")
+            imgui.TextColoredRGB("{FF6600}#cos(number *method)#{FFFFFF} - косинус от числа number")
+            imgui.TextColoredRGB("{FF6600}#tan(number *method)#{FFFFFF} - тангенс от числа number")
+            imgui.TextColoredRGB("methods:")
+            imgui.TextColoredRGB("radian - по дефолту")
+            imgui.TextColoredRGB("degrees")
+            imgui.TextColoredRGB("grades")
+            imgui.TextColoredRGB("{FF6600}#atan2(x, y)#{FFFFFF} - возвращает угол между положительной осью X")
+            imgui.TextColoredRGB("{FFFFFF}и отрезком между центром и точкой (x, y)")
+            imgui.TextColoredRGB("{FF6600}#sqroot(number)#{FFFFFF} - найдет квадратный корень из числа number")
+            imgui.TextColoredRGB("{FF6600}#power(numb1 numb2)#{FFFFFF} - возведет число numb1 в степень numb2")
+            imgui.TextColoredRGB("{FF6600}#min(value1 value2)#{FFFFFF} - вернет наименьшее из двух чисел")
+            imgui.TextColoredRGB("{FF6600}#max(value1 value2)#{FFFFFF} - вернет наибольшее из двух чисел")
+            imgui.TextColoredRGB("{FF6600}#clamp(value min_value max_value)#{FFFFFF} - сведет число value к диапазону чисел.")
+            imgui.TextColoredRGB("Если число меньше min_value то оно вернет min_value")
+            imgui.TextColoredRGB("если больше max_value то вернет max_value")
+         end
+         if imgui.CollapsingHeader(u8"Пасс") then
+            imgui.TextColoredRGB("{FF6600}#passinfo(*playerid)#{FFFFFF} - вернет ID ближ. pass к игроку")
+            imgui.TextColoredRGB("{FF6600}#pXYZ(passid)# #pX(passid)# #pY(passid)# #pZ(passid)#{FFFFFF} - координаты /pass")
+            imgui.TextColoredRGB("{FF6600}#pRX(passid)#{FFFFFF}")
+            imgui.TextColoredRGB("{FF6600}#pInt(passid)#{FFFFFF}")
+            imgui.TextColoredRGB("{FF6600}#pLock(passid)#{FFFFFF}")
+            imgui.TextColoredRGB("{FF6600}#pOwner(passid)#{FFFFFF}")
+            imgui.TextColoredRGB("{FF6600}#pVehicle(passid)#{FFFFFF}")
+            imgui.TextColoredRGB("{FF6600}#getDate(*category)#{FFFFFF} - list: day, month, year, days/daynum")
+            imgui.TextColoredRGB("{FF6600}#getTime(*category)#{FFFFFF} - list: hour, minute, second")
+            imgui.TextColoredRGB("{FF6600}#pModel(passid)#{FFFFFF}")
+            imgui.TextColoredRGB("{FF6600}#pStatus(passid)# or #pState(passid)#{FFFFFF}")
+            imgui.TextColoredRGB("{FF6600}#pTeam(passid)#{FFFFFF}")
+         end
+         if imgui.CollapsingHeader(u8"Актеры") then
+            imgui.TextColoredRGB("{FF6600}arActor(dist, skinid)#{FFFFFF} - вернет ближ. актера в радиусе radius. ")
+            imgui.TextColoredRGB("Необязательный параметр: модель скина.")
+            imgui.TextColoredRGB("{FF6600}torXYZ(actorid)# #actorX(actorid)# #actorY(actorid)# #actorZ(actorid)#{FFFFFF}")
+            imgui.TextColoredRGB("{FF6600}tDistActor(actorid, *playerid)#{FFFFFF} - вернет координаты актера")
+            imgui.TextColoredRGB("{FF6600}torState(actorid)# or #actorStatus(actorid)#{FFFFFF} - вернет статус актера")
+            imgui.TextColoredRGB("{FF6600}torAnim(actorid)#{FFFFFF} - вернет анимацию актера из списка")
+            imgui.TextColoredRGB("{FF6600}torAltAnim(actorid)#{FFFFFF} - вернет альтернативную анимацию актера из списка")
+            imgui.TextColoredRGB("{FF6600}torSkin(actorid)#{FFFFFF} - вернет модель скина актера")
+            imgui.TextColoredRGB("{FF6600}torHealth(actorid)#{FFFFFF} - вернет уровень здоровья актера")
+            imgui.TextColoredRGB("{FF6600}torInvulnerable(actorid)# or #actorGM(actorid)#{FFFFFF} - вернет статус GM’a у актера")
+         end
+         if imgui.CollapsingHeader(u8"Аттачи") then
+            imgui.TextColoredRGB("{FF6600}#attach(id, *playerid)#")
+            imgui.TextColoredRGB("{FF6600}#attachModel(id, *playerid)#")
+            imgui.TextColoredRGB("{FF6600}#isAttachModel(modelid, *playerid)#")
+            imgui.TextColoredRGB("{FF6600}#attachBone(slot, *playerid)#")
+            imgui.TextColoredRGB("{FF6600}#attachOffsetXYZ(slot, *playerid)#")
+            imgui.TextColoredRGB("{FF6600}#attachOffsetX(slot, *playerid)#")
+            imgui.TextColoredRGB("{FF6600}#attachOffsetY(slot, *playerid)#")
+            imgui.TextColoredRGB("{FF6600}#attachOffsetZ(slot, *playerid)#")
+            imgui.TextColoredRGB("{FF6600}#attachRotXYZ(slot, *playerid)#")
+            imgui.TextColoredRGB("{FF6600}#attachRotX(slot, *playerid)#")
+            imgui.TextColoredRGB("{FF6600}#attachRotY(slot, *playerid)#")
+            imgui.TextColoredRGB("{FF6600}#attachRotZ(slot, *playerid)#")
+            imgui.TextColoredRGB("{FF6600}#attachScaleXYZ(slot, *playerid)#")
+            imgui.TextColoredRGB("{FF6600}#attachScaleX(slot, *playerid)#")
+            imgui.TextColoredRGB("{FF6600}#attachScaleY(slot, *playerid)#")
+            imgui.TextColoredRGB("{FF6600}#attachScaleZ(slot, *playerid)#")
+            imgui.TextColoredRGB("{FF6600}#vAttach(slot, vehicleid)#")
+            imgui.TextColoredRGB("{FF6600}#vAttachModel(slot,*vehicleid)#")
+            imgui.TextColoredRGB("{FF6600}#isvAttachModel(modelid, vehicleid)#")
+            imgui.TextColoredRGB("{FF6600}#vAttachXYZ(slot, vehicleid)#")
+            imgui.TextColoredRGB("{FF6600}#vAttachX(slot, vehicleid)#")
+            imgui.TextColoredRGB("{FF6600}#vAttachY(slot, vehicleid)#")
+            imgui.TextColoredRGB("{FF6600}#vAttachZ(slot, vehicleid)#")
+            imgui.TextColoredRGB("{FF6600}#vAttachRotXYZ(slot, vehicleid)#")
+            imgui.TextColoredRGB("{FF6600}#vAttachRotX(slot, vehicleid)#")
+            imgui.TextColoredRGB("{FF6600}#vAttachRotY(slot, vehicleid)#")
+            imgui.TextColoredRGB("{FF6600}#vAttachRotZ(slot, vehicleid)#")
+            imgui.TextColoredRGB("{FF6600}#vAttachOffsetXYZ(slot, vehicleid)#")
+            imgui.TextColoredRGB("{FF6600}#vAttachOffsetX(slot, vehicleid)#")
+            imgui.TextColoredRGB("{FF6600}#vAttachOffsetY(slot, vehicleid)#")
+            imgui.TextColoredRGB("{FF6600}#vAttachOffsetZ(slot, vehicleid)#")
+         end
+         if imgui.CollapsingHeader(u8"Проходы") then
+            imgui.TextColoredRGB("{FF6600}#gateStatus(gateid)# or #gateState(gateid)#")
+            imgui.TextColoredRGB("{FF6600}#gateID(gateid)# (MODEL)")
+            imgui.TextColoredRGB("{FF6600}#gateTeam(gateid)#")
+            imgui.TextColoredRGB("{FF6600}#gateType(gateid)#")
+            imgui.TextColoredRGB("{FF6600}#gateLocal(gateid)#")
+            imgui.TextColoredRGB("{FF6600}#gateSpeed(gateid)#")
+            imgui.TextColoredRGB("{FF6600}#gateStartPosXYZ(gateid)#")
+            imgui.TextColoredRGB("{FF6600}#gateStartPosX(gateid)#")
+            imgui.TextColoredRGB("{FF6600}#gateStartPosY(gateid)#")
+            imgui.TextColoredRGB("{FF6600}#gateStartPosZ(gateid)#")
+            imgui.TextColoredRGB("{FF6600}#gateStartPosRXYZ(gateid)#")
+            imgui.TextColoredRGB("{FF6600}#gateStartPosRX(gateid)#")
+            imgui.TextColoredRGB("{FF6600}#gateStartPosRY(gateid)#")
+            imgui.TextColoredRGB("{FF6600}#gateStartPosRZ(gateid)#")
+            imgui.TextColoredRGB("{FF6600}#gateStopPosXYZ(gateid)# or gateEndPos")
+            imgui.TextColoredRGB("{FF6600}#gateStopPosX(gateid)# or gateEndPos")
+            imgui.TextColoredRGB("{FF6600}#gateStopPosY(gateid)# or gateEndPos")
+            imgui.TextColoredRGB("{FF6600}#gateStopPosZ(gateid)# or gateEndPos")
+            imgui.TextColoredRGB("{FF6600}#gateStopPosRXYZ(gateid)# or gateEndPos")
+            imgui.TextColoredRGB("{FF6600}#gateStopPosRX(gateid)# or gateEndPos")
+            imgui.TextColoredRGB("{FF6600}#gateStopPosRY(gateid)# or gateEndPos")
+            imgui.TextColoredRGB("{FF6600}#gateStopPosRZ(gateid)# or gateEndPos")
+         end
+         if imgui.CollapsingHeader(u8"Текстдравы") then
+            imgui.TextColoredRGB("{FF6600}#tdShown(slot)#{FFFFFF} - отображен ли текстдрав")
+            imgui.TextColoredRGB("{FF6600}#tdPos(slot)# #tdPosX(slot)# #tdPosY(slot)#{FFFFFF} - позиция текстдрава")
+            imgui.TextColoredRGB("{FF6600}#tdString(slot)#{FFFFFF} - строка текстдрава (если бокс _)")
+            imgui.TextColoredRGB("{FF6600}#tdSize(slot)# #tdSizeX(slot)# #tdSizeY(slot)#{FFFFFF} - размер текстдрава")
+            imgui.TextColoredRGB("{FF6600}#tdLetSize(slot)# #tdLetSizeX(slot)# #tdLetSizeY(slot)#{FFFFFF} - размер букв текста")
+            imgui.TextColoredRGB("{FF6600}#tdOutline(slot)#{FFFFFF} - размер обводки текста")
+            imgui.TextColoredRGB("{FF6600}#tdShadow(slot)#{FFFFFF} - размер тени текста")
+            imgui.TextColoredRGB("{FF6600}#tdAligment(slot)#{FFFFFF} - выравнивание (1 - право | 2 - центр | 3 - лево)")
+            imgui.TextColoredRGB("{FF6600}#isTdBox(slot)#{FFFFFF} - является ли текстдрав боксом")
+            imgui.TextColoredRGB("{FF6600}#tdClickable(slot)#{FFFFFF} - можно ли на текстдрав нажать")
+            imgui.TextColoredRGB("{FF6600}#tdTime(slot)#{FFFFFF} - время отображения текстдрава")
+            imgui.TextColoredRGB("{FF6600}#tdModel(slot)#{FFFFFF} - ид модели в боксе")
+            imgui.TextColoredRGB("{FF6600}#tdModelRotX(slot)# #tdModelRotY(slot)# #tdModelRotZ(slot)#{FFFFFF} - поворот")
+            imgui.TextColoredRGB("{FF6600}#tdModelZoom(slot)#{FFFFFF} - зум модели в боксе")
+            imgui.TextColoredRGB("{FF6600}#tdModelColor(slot)#{FFFFFF} - цвет модели в боксе (возвращается 2 параметра)")
+         end
+         if imgui.CollapsingHeader(u8"Ввод диалога") then
+            imgui.TextColoredRGB("{FF6600}#retstr#{FFFFFF} - введенный текст игрока в диалог.")
+            imgui.TextColoredRGB("{FF6600}#retstr(0-9)#{FFFFFF} - введенный текст игрока в диалог по 24 символа.")
+            imgui.TextColoredRGB("{FF6600}#retval(0)#{FFFFFF} - ID игрока который активировал диалог.")
+            imgui.TextColoredRGB("{FF6600}#retval(1)#{FFFFFF} - Выбранная строка игроком.")
+            imgui.TextColoredRGB("{FF6600}#retval(2)#{FFFFFF} - Цифровой параметр введенный игроком.")
+            imgui.TextColoredRGB("{FF6600}#retval(3)#{FFFFFF} - Цифровой параметр введенный игроком.")
+            imgui.TextColoredRGB("{FF6600}#retval(4)#{FFFFFF} - Цифровой параметр введенный игроком.")
+            imgui.TextColoredRGB("{FF6600}#retval(5)#{FFFFFF} - ID вызываемого блока.")
+            imgui.TextColoredRGB("{FF6600}#retval(6)#{FFFFFF} - Кнопка диалога выбранная игроком. Y - 1. X - 0.")
+            imgui.TextColoredRGB("{FF6600}#retval(7-9)#{FFFFFF} - N/A.")
+         end
+         if imgui.CollapsingHeader(u8"Вызов блока") then
+            imgui.TextColoredRGB("{FF6600}#retval(0)#{FFFFFF} - ID игрока который вызывал блок.")
+            imgui.TextColoredRGB("{FF6600}#retval(1)#{FFFFFF} - Пункт диалога выбранный игроком.")
+            imgui.TextColoredRGB("{FF6600}#retval(2-4)#{FFFFFF} - Цифровой параметр введенный игроком.")
+            imgui.TextColoredRGB("{FF6600}#retval(5)#{FFFFFF} - ID вызываемого блока.")
+            imgui.TextColoredRGB("{FF6600}#retval(6)#{FFFFFF} - Кнопка диалога выбранная игроком. Y - 1 / X - 0.")
+            imgui.TextColoredRGB("{FF6600}#retval(7-9)#{FFFFFF} - N/A.")
+         end
+         if imgui.CollapsingHeader(u8"Создание чего-либо через КБ") then   
+            imgui.TextColoredRGB("{FF6600}#retval(0)#{FFFFFF} - Возвращает ID созданого чего-либо.")
+            imgui.TextColoredRGB("{FF6600}#retval(1-9)#{FFFFFF} - N/A")
+            imgui.TextColoredRGB("{FF6600}#retval(0)#{FFFFFF} - ID игрока который активировал диалог.")
+            imgui.TextColoredRGB("{FF6600}#retval(1)#{FFFFFF} - Пункт диалога выбранный игроком.")
+            imgui.TextColoredRGB("{FF6600}#retval(2-4)#{FFFFFF} - Цифровой параметр введенный игроком.")
+            imgui.TextColoredRGB("{FF6600}#retval(5)#{FFFFFF} - ID вызываемого блока.")
+            imgui.TextColoredRGB("{FF6600}#retval(6)#{FFFFFF} - Кнопка диалога выбранная игроком. Y - 1 / X - 0.")
+         end
+         imgui.Spacing()
+         imgui.TextColoredRGB("Командные блоки (Описание/Туториал)")
+         imgui.SameLine()
+         imgui.Link("https://forum.training-server.com/d/4466", "forum.training-server.com")
+         
+         imgui.TextColoredRGB("Коллбэки")
+         imgui.SameLine()
+         imgui.Link("https://forum.training-server.com/d/6166-kollbeki", "forum.training-server.com")
+         
+         imgui.TextColoredRGB("Список новых текстовых функций")
+         imgui.SameLine()
+         imgui.Link("https://forum.training-server.com/d/16872-spisok-novyh-tekstovyh-funktsiy", "forum.training-server.com")
       end -- end tabmenu.info
 		 
       imgui.NextColumn()
@@ -6583,6 +6947,9 @@ function imgui.OnDrawFrame()
       if imgui.Button(u8"Цвета", imgui.ImVec2(100,25)) then tabmenu.info = 3 end
       if imgui.Button(u8"Ретекстур", imgui.ImVec2(100,25)) then tabmenu.info = 4 end
       if imgui.Button(u8"Команды", imgui.ImVec2(100,25)) then tabmenu.info = 6 end
+      if isTraining then
+         if imgui.Button(u8"КБ", imgui.ImVec2(100,25)) then tabmenu.info = 10 end
+      end
       if imgui.Button(u8"FAQ", imgui.ImVec2(100,25)) then tabmenu.info = 7 end
       if isAbsolutePlay or isTraining then
          if imgui.Button(u8"Форум", imgui.ImVec2(100,25)) then tabmenu.info = 8 end
@@ -6594,22 +6961,25 @@ function imgui.OnDrawFrame()
       elseif tabmenu.main == 4 then
       
          imgui.Columns(2)
-         imgui.SetColumnWidth(-1, 490)
+         imgui.SetColumnWidth(-1, 500)
         
          local ip, port = sampGetCurrentServerAddress()
          local servername = sampGetCurrentServerName()
          
-         imgui.TextColoredRGB("Сервер: {007DFF}" .. servername)
-         --imgui.SameLine()
-         --imgui.TextColoredRGB("IP:  {686868}" .. tostring(ip) ..":".. tostring(port))
-         imgui.TextColoredRGB("Дата: {686868}" .. os.date('%d.%m.%Y %X'))
-         if mpStartedDTime ~= nil then
-            imgui.SameLine()
-            imgui.TextColoredRGB("Началось МП в {686868}" .. mpStartedDTime)
-         end
-         imgui.Spacing()
+         -- TODO Add mpname here
+         -- imgui.Spacing()
          
          if tabmenu.mp == 1 then
+            resetIO()
+            imgui.TextColoredRGB("Сервер: {007DFF}" .. servername)
+            --imgui.SameLine()
+            --imgui.TextColoredRGB("IP:  {686868}" .. tostring(ip) ..":".. tostring(port))
+            imgui.TextColoredRGB("Дата: {686868}" .. os.date('%d.%m.%Y %X'))
+            if mpStartedDTime ~= nil then
+               imgui.SameLine()
+               imgui.TextColoredRGB("Началось МП в {686868}" .. mpStartedDTime)
+            end
+            
             if combobox.profiles.v ~= 0 then
                imgui.Text(u8" Выбрано мероприятие: ")
             else
@@ -6925,51 +7295,179 @@ function imgui.OnDrawFrame()
 	        imgui.Spacing()
             
          elseif tabmenu.mp == 2 then
-
-            imgui.PushItemWidth(150)
-            imgui.Combo('##ComboWeaponSelect', combobox.weaponselect, weaponNames)
-            imgui.PopItemWidth()
-            imgui.SameLine()
-            if imgui.Button(u8"Выдать оружие", imgui.ImVec2(120, 25)) then
-               --setVirtualKeyDown(78, true)
-               setGameKeyState(10, 128)
-              -- setVirtualKeyDown(0x4E, false)
+            resetIO()
+            local pid 
+            local res, playerId = sampGetPlayerIdByCharHandle(playerPed)
+            if string.len(textbuffer.pid.v) < 1 then
+               textbuffer.pid.v = tostring(playerId)
             end
-            imgui.Text(u8"Выдать патроны")
-            imgui.Text(u8"Выставить скины")
-            if imgui.Button(u8"Пополнить хп", imgui.ImVec2(220, 25)) then
-               if isAbsolutePlay then
-                  for k, v in pairs(playersTable) do
-                     sampSendChat("/хп "..v)
-                  end
-               end
+            
+            if string.len(textbuffer.pid.v) > 1 
+            and sampIsPlayerConnected(tonumber(textbuffer.pid.v))then
+               pid = tonumber(textbuffer.pid.v)
+            else
+               pid = tostring(playerId)
+            end             
+            
+            imgui.Text(u8"Для всех игроков в мире:")
+            if imgui.Button(u8"Пополнить хп", imgui.ImVec2(150, 25)) then
+               -- if isAbsolutePlay then
+                  -- for k, v in pairs(playersTable) do
+                     -- sampSendChat("/хп "..v)
+                  -- end
+               -- end
                if isTraining then
                   sampSendChat("/health 100")
-                  sampAddChatMessage("Вы пополнили хп до 100 всем игрокам в мире", -1)
+                  sampAddChatMessage("[SCRIPT]: {FFFFFF}Вы пополнили хп до 100 всем игрокам в мире", 0x0FF6600)
                end
             end
             imgui.SameLine()
-            if imgui.Button(u8"Пополнить броню", imgui.ImVec2(220, 25)) then
+            if imgui.Button(u8"Пополнить броню", imgui.ImVec2(150, 25)) then
                if isTraining then
                   sampSendChat("/armour 100")
-                  sampAddChatMessage("Вы пополнили броню до 100 всем игрокам в мире", -1)
+                  sampAddChatMessage("[SCRIPT]: {FFFFFF}Вы пополнили броню до 100 всем игрокам в мире", 0x0FF6600)
                end
             end
-            if imgui.Button(u8"Забрать оружие", imgui.ImVec2(220, 25)) then
-            end
-            if imgui.Button(u8"Зареспавнить игроков", imgui.ImVec2(220, 25)) then
-            end
-            if imgui.Button(u8"Изменить спавн", imgui.ImVec2(220, 25)) then
-               if isAbsolutePlay then
-                  sampAddChatMessage("Изменить спан можно в меню", 0x000FF00)
-                  sampAddChatMessage("Y - Редактор миров - Управление мирами - Выбрать точку появления", 0x000FF00)
+            imgui.SameLine()
+            if imgui.Button(u8"Ресснуть игроков", imgui.ImVec2(150, 25)) then
+               if isTraining then
+                  sampSendChat("/ressall")
+                  --sampAddChatMessage("Вы пополнили броню до 100 всем игрокам в мире", -1)
                end
-            end
-            if imgui.Button(u8"Заморозить", imgui.ImVec2(220, 25)) then
             end
             
+            -- if imgui.Button(u8"Изменить спавн", imgui.ImVec2(150, 25)) then
+               -- if isAbsolutePlay then
+                  -- sampAddChatMessage("Изменить спан можно в меню", 0x000FF00)
+                  -- sampAddChatMessage("Y - Редактор миров - Управление мирами - Выбрать точку появления", 0x000FF00)
+               -- end
+            -- end
+            imgui.Text(u8"Введите ID:")
+            if imgui.Button(u8">>", imgui.ImVec2(50, 25)) then
+               if chosenplayer then
+                  dialog.playerstat.v = not dialog.playerstat.v
+               end
+            end
+            imgui.SameLine()
+            imgui.PushItemWidth(70)
+            if imgui.InputText("##PlayerIDBuffer", textbuffer.pid) then
+            end
+            imgui.PopItemWidth()
+           
+            imgui.SameLine()
+            if pid then
+               if sampIsPlayerConnected(pid) then
+                  chosenplayer = pid
+                  imgui.Text(u8"Ник: "..sampGetPlayerNickname(pid))
+               elseif pid == playerId then
+                  chosenplayer = playerId
+                  imgui.Text(u8"Ник: "..sampGetPlayerNickname(playerId))
+               end
+            end
+            
+            if pid then
+               imgui.Text(u8"Для игрока: "..sampGetPlayerNickname(pid))
+            else
+               imgui.Text(u8"Для игрока: ")
+            end
+
+            imgui.PushItemWidth(50)
+            if imgui.InputText("##PlayerIdHp", textbuffer.sethp) then
+            end
+            imgui.PopItemWidth()
+            imgui.SameLine()
+            if imgui.Button(u8"Установить HP", imgui.ImVec2(150, 25)) then
+               sampSendChat("/sethp "..pid.." "..textbuffer.sethp.v)
+               sampAddChatMessage("[SCRIPT]: {FFFFFF}Вы пополнили хп игроку "..pid.." до "..textbuffer.sethp.v, 0x0FF6600)
+            end
+            imgui.SameLine()
+            imgui.Text("  ")
+            imgui.SameLine()
+            if imgui.Button(u8"Воскресить", imgui.ImVec2(150, 25)) then
+               sampSendChat("/ress "..pid)
+            end
+
+            imgui.PushItemWidth(50)
+            if imgui.InputText("##PlayerIdArmour", textbuffer.setarm) then
+            end
+            imgui.PopItemWidth()
+            imgui.SameLine()
+            if imgui.Button(u8"Установить броню", imgui.ImVec2(150, 25)) then
+               sampSendChat("/setarm "..pid.." "..textbuffer.setarm.v)
+               sampAddChatMessage("[SCRIPT]: {FFFFFF}Вы пополнили броню игроку "..pid.." до "..textbuffer.sethp.v, 0x0FF6600)
+            end
+            imgui.SameLine()
+            imgui.Text("  ")
+            imgui.SameLine()
+            if imgui.Button(u8"Обнулить команду", imgui.ImVec2(150, 25)) then
+               sampSendChat("/unteam "..pid)
+            end
+ 
+            imgui.PushItemWidth(50)
+            if imgui.InputText("##PlayerIdTeamId", textbuffer.setteam) then
+            end
+            imgui.PopItemWidth()
+            imgui.SameLine()
+            if imgui.Button(u8"Установить команду", imgui.ImVec2(150, 25)) then
+               sampSendChat("/setteam "..pid.." "..textbuffer.setteam.v)
+               sampAddChatMessage("[SCRIPT]: {FFFFFF}Вы установили тиму "..textbuffer.setteam.v.."{FFFFFF} игроку {696969}"..pid, 0x0FF6600)
+            end
+            
+            imgui.PushItemWidth(200)
+            if imgui.InputText("##PlayerIdVehicle", textbuffer.vehiclename) then
+            end
+            imgui.PopItemWidth()
+            imgui.SameLine()
+            imgui.TextQuestion("( ? )", u8"Укажите ID либо имя транспорта")
+            imgui.SameLine()
+            if imgui.Button(u8"Выдать транспорт", imgui.ImVec2(150, 25)) then
+               if string.len(textbuffer.vehiclename.v) >= 3 then
+                  sampSendChat("/giveveh "..pid.." "..textbuffer.vehiclename.v)
+               else
+                  sampAddChatMessage("Вы не указали ID транспорта", -1)
+               end
+            end
+            
+            imgui.Text(u8"Выдать наказание: ")
+            imgui.PushItemWidth(200)
+            if imgui.InputText(u8"причина", textbuffer.setreason) then
+            end
+            imgui.PopItemWidth()
+            imgui.SameLine()
+            imgui.PushItemWidth(50)
+            if imgui.InputText(u8"минут", textbuffer.setptime) then
+            end
+            imgui.PopItemWidth()
+            imgui.SameLine()
+            imgui.TextQuestion("( ? )", u8"Чтобы забанить навсегда укажите 0 в графу с минутами")
+            
+            if imgui.Button(u8"Кикнуть игрока", imgui.ImVec2(150, 25)) then
+               if string.len(textbuffer.setreason.v) >= 3 then
+                  sampSendChat("/vkick "..pid.." "..textbuffer.setreason.v)
+               else
+                  sampAddChatMessage("Вы не указали причину", -1)
+               end
+            end
+            imgui.SameLine()
+            if imgui.Button(u8"Заглушить игрока", imgui.ImVec2(150, 25)) then
+               if string.len(textbuffer.setptime.v) >= 1 then
+                  sampSendChat("/vmute "..pid.." "..tonumber(textbuffer.settime.v).." "..textbuffer.setreason.v)
+               else
+                  sampAddChatMessage("Вы не указали на какое время выдать наказание", -1)
+               end
+            end
+            imgui.SameLine()
+            if imgui.Button(u8"Забанить игрока", imgui.ImVec2(150, 25)) then
+               if string.len(textbuffer.setptime.v) >= 1 then
+                  sampSendChat("/vban "..pid.." "..tonumber(textbuffer.settime.v).." "..textbuffer.setreason.v)
+               else
+                  sampAddChatMessage("Вы не указали на какое время выдать наказание", -1)
+               end
+            end
+
+            imgui.Spacing()
          elseif tabmenu.mp == 3 then
-            
+            resetIO()
             local prefix = ""
             if isAbsolutePlay then             
                imgui.PushItemWidth(120)
@@ -7071,6 +7569,7 @@ function imgui.OnDrawFrame()
             imgui.Spacing()
             
          elseif tabmenu.mp == 4 then
+             resetIO()
              imgui.ColorEdit4("##ColorEdit4lite", color, imgui.ColorEditFlags.NoInputs)
              imgui.SameLine()
              
@@ -7297,7 +7796,7 @@ function imgui.OnDrawFrame()
                imgui.TextColoredRGB("Дать денег игроку {36662C}${FFFFFF} {696969}/giveplayermoney <id> <кол-во>")
             end
             if isTraining then
-               imgui.TextColoredRGB("{FF6600}/pay <id> <money>{FFFFFF} передать деньги игроку")
+               imgui.TextColoredRGB("{FF6600}/pay <id> <money>{cdcdcd} передать деньги игроку")
             end
             -- if isAbsolutePlay then
                -- imgui.Text(u8"Не забудьте после завершения мероприятия:")
@@ -7319,7 +7818,7 @@ function imgui.OnDrawFrame()
                         sampSendChat("/и " .. id)
                         dialog.main.v = not dialog.main.v 
                      else
-                        sampAddChatMessage("Ид {696969}"..id.."{FFFFFF} игрока {696969}"..nick.."{FFFFFF}скопирован в буффр обмена", -1)
+                        sampAddChatMessage("Ид {696969}"..id.."{FFFFFF} игрока {696969}"..nick.." {FFFFFF}скопирован в буффер обмена", -1)
                         setClipboardText(id) 
                      end
                   end
@@ -7357,7 +7856,7 @@ function imgui.OnDrawFrame()
 	        end
             imgui.Spacing()
          elseif tabmenu.mp == 6 then
-            
+            resetIO()
             imgui.Text(u8"Разрешенное оружие: ")
             if #legalweapons > 2 then
                for k, v in pairs(legalweapons) do
@@ -7588,7 +8087,9 @@ function imgui.OnDrawFrame()
          imgui.NextColumn()
          
          if imgui.Button(u8"Подготовка к МП",imgui.ImVec2(120, 25)) then tabmenu.mp = 1 end 
-         --if imgui.Button(u8"Управление МП",imgui.ImVec2(120, 25)) then tabmenu.mp = 2 end 
+         if isTraining then
+            if imgui.Button(u8"Управление МП",imgui.ImVec2(120, 25)) then tabmenu.mp = 2 end 
+         end
          if imgui.Button(u8"Быстрые команды",imgui.ImVec2(120, 25)) then tabmenu.mp = 3 end 
          if imgui.Button(u8"Проверка игроков",imgui.ImVec2(120, 25)) then tabmenu.mp = 6 end 
          if imgui.Button(u8"Правила МП",imgui.ImVec2(120, 25)) then tabmenu.mp = 4 end 
@@ -7705,7 +8206,7 @@ function imgui.OnDrawFrame()
 	  if health > 250.0 and isAbsolutePlay then
 	     imgui.TextColoredRGB("{FF0000}Бессмертный")
 	  else
-	     imgui.TextColoredRGB(string.format("Хп: %.1f броня: %.1f", 
+	     imgui.TextColoredRGB(string.format("Хп: %.1f  броня: %.1f", 
 	     health, armor))
 	  end
 	  
@@ -8079,7 +8580,7 @@ function sampev.onSendDialogResponse(dialogId, button, listboxId, input)
       print(string.format("dialogId: %d, button: %d, listboxId: %d, input: %s", dialogId, button, listboxId, input))
    end
    
-   if isAbsolutePlay then
+   if isAbsolutePlay and ini.settings.extendedmenues then
       isTexturesListOpened = false
       isSanpObjectsListOpened = false
       
@@ -8207,7 +8708,7 @@ function sampev.onSendDialogResponse(dialogId, button, listboxId, input)
    end
    
    -- All Training dialogId has id 32700
-   if isTraining and dialogId == 32700 then
+   if isTraining and dialogId == 32700 and ini.settings.extendedmenues then
       
       if button == 0 then 
          editDialogOpened = false
@@ -8341,7 +8842,7 @@ function sampev.onSendDialogResponse(dialogId, button, listboxId, input)
 end
 
 function sampev.onShowDialog(dialogId, style, title, button1, button2, text)
-   if isAbsolutePlay then
+   if isAbsolutePlay and ini.settings.extendedmenues then
       -- save random color from text editing dialog to clipboard
       -- moved to absolutefix
       -- if dialogId == 1496 then
@@ -8435,7 +8936,7 @@ function sampev.onShowDialog(dialogId, style, title, button1, button2, text)
       end
    end
    
-   if isTraining and dialogId == 32700 then
+   if isTraining and dialogId == 32700 and ini.settings.extendedmenues then
       -- TRAINING Skip rules dialog
       if style == 0 and button1 == "Принимаю" then
          sampSendDialogResponse(32700, 1, nil)
@@ -8520,7 +9021,7 @@ function sampev.onShowDialog(dialogId, style, title, button1, button2, text)
    end
    
    -- Skip olist when exit from /omenu
-   if isTraining and dialogId == 65535 then
+   if isTraining and dialogId == 65535 and ini.settings.extendedmenues then
       sampSendClickTextdraw(2118)
    end
    
@@ -8966,6 +9467,11 @@ function sampev.onSendCommand(command)
    if command:find("/csel") or command:find("/editobject") and not isTraining then
       sampAddChatMessage("Включен режим редактирования объекта", 0x000FF00)
       enterEditObject()
+      return false
+   end
+   
+   if isTraining and command:find("/mn") then
+      sampSendChat("/menu")
       return false
    end
    
@@ -9441,6 +9947,15 @@ function sampev.onShowTextDraw(id, data)
       end
    end
    
+   -- if isTraining then
+      -- id 2069-2058 is logs
+   -- end
+   
+   if checkbox.logtextdraws.v then
+      local posX, posY = sampTextdrawGetPos(id)
+      print(("Show Textdraw ID: %s, x : %.2f, y: %.2f text: %s"):format(id, posX, posY, data.text))
+   end
+   
    if checkbox.hidealltextdraws.v then
       return false
    end
@@ -9450,7 +9965,7 @@ function sampev.onSendClickTextDraw(textdrawId)
    lastClickedTextdrawId = textdrawId
    if checkbox.logtextdraws.v then
       local posX, posY = sampTextdrawGetPos(textdrawId)
-      print(("Textdraw ID: %s, Model: %s, x : %s, y: %s,"):format(textdrawId, sampTextdrawGetModelRotationZoomVehColor(textdrawId), posX, posY))
+      print(("Click Textdraw ID: %s, Model: %s, x : %.2f, y: %.2f"):format(textdrawId, sampTextdrawGetModelRotationZoomVehColor(textdrawId), posX, posY))
    end
    -- if textdrawId >= 2053 and textdrawId <= 2099 then
       -- local model, rotX, rotY, rotZ, zoom, clr1, clr2 = sampTextdrawGetModelRotationZoomVehColor(textdrawId)
@@ -9514,6 +10029,14 @@ function string.nupper(s)
    end
    return concat(res)
 end
+
+-- function ltrim(s)
+   -- return s:match'^%s*(.*)'
+-- end
+
+-- function trim(s)
+   -- return (s:gsub("^%s*(.-)%s*$", "%1"))
+-- end
 
 function checkBuggedObject(model)
    if model == 3586 or model == 3743 then
@@ -9688,25 +10211,7 @@ function getNearestRoadCoordinates(radius)
 end
 
 function getCorrectAngle(angle)
-   if angle > 0 and angle < 45 then
-      return 0
-   elseif angle > 45 and angle < 90 then
-      return 45
-   elseif angle > 90 and angle < 135 then
-      return 90
-   elseif angle > 135 and angle < 180 then
-      return 135
-   elseif angle > 180 and angle < 225 then
-      return 180
-   elseif angle > 225 and angle < 270 then
-      return 225
-   elseif angle > 270 and angle < 315 then
-      return 270
-   elseif angle > 315 and angle < 0 then
-      return 315
-   else 
-      return 0
-   end
+   return 360/8 * math.floor(angle/45)
 end
 
 function nameTagOn()
@@ -10061,58 +10566,67 @@ function getMDO(id_obj) -- by Gorskin
 end
 
 function cyrillic(text)
-      local convtbl = {[230]=155,[231]=159,[247]=164,[234]=107,[250]=144,[251]=168,[254]=171,[253]=170,[255]=172,[224]=97,[240]=112,[241]=99,[226]=162,[228]=154,[225]=151,[227]=153,[248]=165,[243]=121,[184]=101,[235]=158,[238]=111,[245]=120,[233]=157,[242]=166,[239]=163,[244]=63,[237]=174,[229]=101,[246]=36,[236]=175,[232]=156,[249]=161,[252]=169,[215]=141,[202]=75,[204]=77,[220]=146,[221]=147,[222]=148,[192]=65,[193]=128,[209]=67,[194]=139,[195]=130,[197]=69,[206]=79,[213]=88,[168]=69,[223]=149,[207]=140,[203]=135,[201]=133,[199]=136,[196]=131,[208]=80,[200]=133,[198]=132,[210]=143,[211]=89,[216]=142,[212]=129,[214]=137,[205]=72,[217]=138,[218]=167,[219]=145}
-      local result = {}
-      for i = 1, #text do
-          local c = text:byte(i)
-          result[i] = string.char(convtbl[c] or c)
-      end
-      return table.concat(result)
+   local convtbl = {[230]=155,[231]=159,[247]=164,[234]=107,[250]=144,
+      [251]=168,[254]=171,[253]=170,[255]=172,[224]=97,[240]=112,[241]=99,
+      [226]=162,[228]=154,[225]=151,[227]=153,[248]=165,[243]=121,[184]=101,
+      [235]=158,[238]=111,[245]=120,[233]=157,[242]=166,[239]=163,[244]=63,
+      [237]=174,[229]=101,[246]=36,[236]=175,[232]=156,[249]=161,[252]=169,
+      [215]=141,[202]=75,[204]=77,[220]=146,[221]=147,[222]=148,[192]=65,
+      [193]=128,[209]=67,[194]=139,[195]=130,[197]=69,[206]=79,[213]=88,
+      [168]=69,[223]=149,[207]=140,[203]=135,[201]=133,[199]=136,[196]=131,
+      [208]=80,[200]=133,[198]=132,[210]=143,[211]=89,[216]=142,[212]=129,
+      [214]=137,[205]=72,[217]=138,[218]=167,[219]=145}
+   local result = {}
+   for i = 1, #text do
+      local c = text:byte(i)
+      result[i] = string.char(convtbl[c] or c)
+   end
+   return table.concat(result)
 end
 
 -- imgui fuctions
 function imgui.TextColoredRGB(text)
-    local style = imgui.GetStyle()
-    local colors = style.Colors
-    local ImVec4 = imgui.ImVec4
+   local style = imgui.GetStyle()
+   local colors = style.Colors
+   local ImVec4 = imgui.ImVec4
 
-    local getcolor = function(color)
-        if color:sub(1, 6):upper() == 'SSSSSS' then
-            local r, g, b = colors[1].x, colors[1].y, colors[1].z
-            local a = tonumber(color:sub(7, 8), 16) or colors[1].w * 255
-            return ImVec4(r, g, b, a / 255)
-        end
-        local color = type(color) == 'string' and tonumber(color, 16) or color
-        if type(color) ~= 'number' then return end
-        local r, g, b, a = explode_argb(color)
-        return imgui.ImColor(r, g, b, a):GetVec4()
-    end
+   local getcolor = function(color)
+      if color:sub(1, 6):upper() == 'SSSSSS' then
+         local r, g, b = colors[1].x, colors[1].y, colors[1].z
+         local a = tonumber(color:sub(7, 8), 16) or colors[1].w * 255
+         return ImVec4(r, g, b, a / 255)
+      end
+      local color = type(color) == 'string' and tonumber(color, 16) or color
+      if type(color) ~= 'number' then return end
+      local r, g, b, a = explode_argb(color)
+      return imgui.ImColor(r, g, b, a):GetVec4()
+   end
 
-    local render_text = function(text_)
-        for w in text_:gmatch('[^\r\n]+') do
-            local text, colors_, m = {}, {}, 1
-            w = w:gsub('{(......)}', '{%1FF}')
-            while w:find('{........}') do
-                local n, k = w:find('{........}')
-                local color = getcolor(w:sub(n + 1, k - 1))
-                if color then
-                    text[#text], text[#text + 1] = w:sub(m, n - 1), w:sub(k + 1, #w)
-                    colors_[#colors_ + 1] = color
-                    m = n
-                end
-                w = w:sub(1, n - 1) .. w:sub(k + 1, #w)
+   local render_text = function(text_)
+      for w in text_:gmatch('[^\r\n]+') do
+         local text, colors_, m = {}, {}, 1
+         w = w:gsub('{(......)}', '{%1FF}')
+         while w:find('{........}') do
+            local n, k = w:find('{........}')
+            local color = getcolor(w:sub(n + 1, k - 1))
+            if color then
+               text[#text], text[#text + 1] = w:sub(m, n - 1), w:sub(k + 1, #w)
+               colors_[#colors_ + 1] = color
+               m = n
             end
-            if text[0] then
-                for i = 0, #text do
-                    imgui.TextColored(colors_[i] or colors[1], u8(text[i]))
-                    imgui.SameLine(nil, 0)
-                end
-                imgui.NewLine()
-            else imgui.Text(u8(w)) end
-        end
-    end
+            w = w:sub(1, n - 1) .. w:sub(k + 1, #w)
+         end
+         if text[0] then
+            for i = 0, #text do
+               imgui.TextColored(colors_[i] or colors[1], u8(text[i]))
+               imgui.SameLine(nil, 0)
+            end
+            imgui.NewLine()
+         else imgui.Text(u8(w)) end
+      end
+   end
 
-    render_text(text)
+   render_text(text)
 end
 
 function imgui.TooltipButton(label, size, description)
@@ -10164,15 +10678,29 @@ end
 -- end
 
 function imgui.TextQuestion(label, description)
-    imgui.TextDisabled(label)
+   imgui.TextDisabled(label)
 
-    if imgui.IsItemHovered() then
-        imgui.BeginTooltip()
-            imgui.PushTextWrapPos(600)
-                imgui.TextUnformatted(description)
-            imgui.PopTextWrapPos()
-        imgui.EndTooltip()
-    end
+   if imgui.IsItemHovered() then
+      imgui.BeginTooltip()
+         imgui.PushTextWrapPos(600)
+            imgui.TextUnformatted(description)
+         imgui.PopTextWrapPos()
+      imgui.EndTooltip()
+   end
+end
+
+function resetIO()
+   -- Bug fix with focus in inputText (imgui)
+   for i = 1, 512 do
+      imgui:GetIO().KeysDown[i] = false
+   end
+   for i = 1, 5 do
+      imgui:GetIO().MouseDown[i] = false
+   end
+   imgui:GetIO().KeyCtrl = false
+   imgui:GetIO().KeyShift = false
+   imgui:GetIO().KeyAlt = false
+   imgui:GetIO().KeySuper = false     
 end
 
 function isValidObjectModel(modelid)
