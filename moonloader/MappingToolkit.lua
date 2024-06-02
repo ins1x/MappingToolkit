@@ -4,7 +4,7 @@ script_description("In-game assistant for mappers and event makers")
 script_dependencies('imgui', 'lib.samp.events')
 script_properties("work-in-pause")
 script_url("https://github.com/ins1x/MappingToolkit")
-script_version("3.0.3")
+script_version("3.1.0")
 -- script_moonloader(16) moonloader v.0.26
 -- sa-mp version: 0.3.7 R1
 -- Activaton: ALT + X (show main menu) or command /toolkit
@@ -35,9 +35,10 @@ local ini = inicfg.load({
       chatmentions = false,
       tabclickcopy = false,
       anticaps = false,
+      anticapsads = false,
       chathideip = false,
       allchatoff = false,
-      spawnfix = true,
+      chatfilter = true,
       freezechat = false,
       playerwarnings = false,
       worldsavereminder = false,
@@ -121,7 +122,7 @@ local lastPmMessage = nil
 local editDialogOpened = false
 local editMode = 0
 local firstSpawn = true
-local formatChat = false
+local formatChat = true
 
 local fps = 0
 local fps_counter = 0
@@ -133,6 +134,7 @@ local vehiclesTable = {}
 local hiddenObjects = {}
 local chatbuffer = {}
 local blacklist = {}
+local chatfilter = {}
 -- should be global!
 vehiclesTotal = 0
 playersTotal = 0
@@ -165,12 +167,14 @@ local checkbox = {
    tabclickcopy = imgui.ImBool(ini.settings.tabclickcopy),
    freezechat = imgui.ImBool(ini.settings.freezechat),
    allchatoff = imgui.ImBool(ini.settings.allchatoff),
+   chatfilter = imgui.ImBool(ini.settings.chatfilter),
    playerwarnings = imgui.ImBool(ini.settings.playerwarnings),
    worldsavereminder = imgui.ImBool(ini.settings.worldsavereminder),
    setgm = imgui.ImBool(ini.settings.setgm),
    saveskin = imgui.ImBool(ini.settings.saveskin),
    chathideip = imgui.ImBool(ini.settings.chathideip),
    anticaps = imgui.ImBool(ini.settings.anticaps),
+   anticapsads = imgui.ImBool(ini.settings.anticapsads),
    remapnum = imgui.ImBool(ini.settings.remapnum),
    editkey = imgui.ImBool(ini.settings.editkey),
    skinid = imgui.ImInt(ini.settings.skinid),
@@ -3016,12 +3020,29 @@ function main()
          favfile:close()
       end
       
-      blacklistfile = io.open("moonloader/resource/mappingtoolkit/blacklist.txt", "r")
-      for name in blacklistfile:lines() do
-         table.insert(blacklist, name:lower())
+      if doesFileExist(getGameDirectory() .. '\\moonloader\\resource\\mappingtoolkit\\blacklist.txt') then
+         blacklistfile = io.open("moonloader/resource/mappingtoolkit/blacklist.txt", "r")
+         for name in blacklistfile:lines() do
+            table.insert(blacklist, name:lower())
+         end
+         blacklistfile:close()
+      else
+         blacklistfile = io.open("moonloader/resource/mappingtoolkit/blacklist.txt", "w")
+         blacklistfile:write(" ")
+         blacklistfile:close()
       end
-      io.close(blacklistfile)
-               
+      
+      if doesFileExist(getGameDirectory() .. '\\moonloader\\resource\\mappingtoolkit\\chatfilter.txt') then
+         chatfilterfile = io.open("moonloader/resource/mappingtoolkit/chatfilter.txt", "r")
+         for template in chatfilterfile:lines() do
+            table.insert(chatfilter, u8:decode(template))
+         end
+         io.close(chatfilterfile)
+      else
+         chatfilterfile = io.open("moonloader/resource/mappingtoolkit/chatfilter.txt", "w")
+         chatfilterfile:write("%[SALE%]%:.*", "\n")
+         chatfilterfile:close()
+      end         
       sampRegisterChatCommand("toolkit", function() dialog.main.v = not dialog.main.v end)
 	  
       -- set drawdist and figdist
@@ -3039,7 +3060,9 @@ function main()
       textbuffer.setarm.v = '100'
       textbuffer.sethp.v = '100'
       textbuffer.setteam.v = '0'
-     
+      textbuffer.setptime.v = '20'
+      textbuffer.vehiclename.v = 'bmx'
+      
       --textbuffer.mpname.v = u8'Проходит МП "<название>" '
       
       if ini.settings.worldsavereminder then
@@ -3071,22 +3094,6 @@ function main()
          if isKeyJustPressed(0x54) and not sampIsDialogActive() 
          and not sampIsScoreboardOpen() and not isSampfuncsConsoleActive() then
             sampSetChatInputEnabled(true)
-         end
-      end
-      
-      -- won't let you get stuck in another player's skin. 
-      if isTraining and ini.settings.spawnfix then
-	     for i = 0, sampGetMaxPlayerId(false) do
-	 	    if sampIsPlayerConnected(i) then
-	 	       local result, id = sampGetCharHandleBySampPlayerId(i)
-	 	   	   if result and doesCharExist(id) then
-	 	   	      local x, y, z = getCharCoordinates(id)
-	 	   	      local mX, mY, mZ = getCharCoordinates(playerPed)
-	 	   	      if 0.4 > getDistanceBetweenCoords3d(x, y, z, mX, mY, mZ) then
-	 	   	   	     setCharCollision(id, false)
-	 	   	      end
-	 	   	   end
-	        end
          end
       end
       
@@ -4624,15 +4631,19 @@ function imgui.OnDrawFrame()
 		 end
          
       elseif tabmenu.settings == 8 then
-         if imgui.Button(u8"Очистить чат (Для себя)", imgui.ImVec2(300, 25)) then
+      
+         if imgui.TooltipButton(u8"очистить", imgui.ImVec2(100, 25), u8"Очистить чат (Для себя)") then
             ClearChat()
          end
-         if imgui.Button(u8"Открыть лог чата (chatlog.txt)", imgui.ImVec2(300, 25)) then
+         imgui.SameLine()
+         if imgui.TooltipButton(u8"chatlog", imgui.ImVec2(100, 25), u8"Открыть лог чата (chatlog.txt)") then
 	        os.execute('explorer '..getFolderPath(5) ..'\\GTA San Andreas User Files\\SAMP\\chatlog.txt')
 	     end
-         if imgui.Button(u8"Отображать время в чате", imgui.ImVec2(300, 25)) then
+         imgui.SameLine()
+         if imgui.TooltipButton(u8"timestamp", imgui.ImVec2(100, 25), u8"Отображать время в чате") then
             sampProcessChatInput("/timestamp")
 	     end
+         
          if imgui.Checkbox(u8(checkbox.hidechat.v and 'Показать чат' or 'Скрыть чат'), checkbox.hidechat) then
             memory.fill(getModuleHandle("samp.dll") + 0x63DA0, checkbox.hidechat.v and 0x90909090 or 0x0A000000, 4, true)
             sampSetChatInputEnabled(checkbox.hidechat.v)
@@ -4665,6 +4676,14 @@ function imgui.OnDrawFrame()
             formatChat = true
          end   
          
+         if isTraining then
+            if imgui.Checkbox(u8("Анти-капс для объявлений в ADS"), checkbox.anticapsads) then
+               ini.settings.anticapsads = checkbox.anticapsads.v
+               inicfg.save(ini, configIni)
+               formatChat = true
+            end
+         end
+         
          if imgui.Checkbox(u8("Отключить весь чат"), checkbox.allchatoff) then
             ini.settings.allchatoff = checkbox.allchatoff.v
             inicfg.save(ini, configIni)
@@ -4676,7 +4695,7 @@ function imgui.OnDrawFrame()
 		    inicfg.save(ini, configIni)
          end
          
-         if not isAbsolutePlay then
+         if isTraining then
             if imgui.Checkbox(u8("Напоминать о необходимости сохранить мир"), checkbox.worldsavereminder) then
                if checkbox.worldsavereminder.v then
                   SaveReminder()
@@ -5279,8 +5298,10 @@ function imgui.OnDrawFrame()
             imgui.Link("https://forum.training-server.com/d/18361-prostranstvennaya-orientatsiya-po-karte-gtasa", u8"Пространственная ориентация по карте GTA:SA")
             imgui.Spacing()
          end
-         imgui.Text(u8"В радиусе 150 метров нельзя создавать более 200 объектов.")
-         imgui.TextColoredRGB("Максимальная длина текста на объектах в редакторе миров - {00FF00}50 символов")
+         if isAbsolutePlay then
+            imgui.Text(u8"В радиусе 150 метров нельзя создавать более 200 объектов.")
+            imgui.TextColoredRGB("Максимальная длина текста на объектах в редакторе миров - {00FF00}50 символов")
+         end
          
 		 imgui.Spacing()
          imgui.TextColoredRGB("Лимиты в SA:MP и UG:MP : ")
@@ -6502,8 +6523,7 @@ function imgui.OnDrawFrame()
 		    imgui.SameLine()
 		    if imgui.Button(u8"Найти",imgui.ImVec2(70, 25)) then
      	       if string.len(textbuffer.findlog.v) > 0 then
-                  local link = string.format('explorer "https://forum.training-server.com/?q="',
-		   	      os.date('%Y'),os.date('%m'), u8:decode(textbuffer.findlog.v))
+                  local link = 'explorer "https://forum.training-server.com/?q='..u8:decode(textbuffer.findlog.v)..'"'
 		   	      os.execute(link)
 		   	      print(link)
 		   	   end
@@ -7375,32 +7395,15 @@ function imgui.OnDrawFrame()
                -- end
             -- end
             imgui.Text(u8"Введите ID:")
-            if imgui.Button(u8">>", imgui.ImVec2(50, 25)) then
-               if chosenplayer then
-                  dialog.playerstat.v = not dialog.playerstat.v
-               end
-            end
-            imgui.SameLine()
+            --imgui.SameLine()
             imgui.PushItemWidth(70)
             if imgui.InputText("##PlayerIDBuffer", textbuffer.pid, imgui.InputTextFlags.CharsDecimal) then
             end
             imgui.PopItemWidth()
            
-            imgui.SameLine()
             if pid then
-               if sampIsPlayerConnected(pid) then
-                  chosenplayer = pid
-                  imgui.Text(u8"Ник: "..sampGetPlayerNickname(pid))
-               elseif pid == playerId then
-                  chosenplayer = playerId
-                  imgui.Text(u8"Ник: "..sampGetPlayerNickname(playerId))
-               end
-            end
-            
-            if pid then
-               imgui.Text(u8"Для игрока: "..sampGetPlayerNickname(pid))
-            else
-               imgui.Text(u8"Для игрока: ")
+               imgui.SameLine()
+               imgui.Text(u8""..sampGetPlayerNickname(pid))
             end
 
             imgui.PushItemWidth(50)
@@ -8805,13 +8808,17 @@ function sampev.onSendDialogResponse(dialogId, button, listboxId, input)
          end
          
          -- Added new features to /omenu
-         if listboxId == 0 then 
+         if listboxId == 0 and input:find("Редактировать") then 
             if LastObject.localid then 
                editMode = 1
                sampSendChat("/oedit "..LastObject.localid)
             end
          end
-         if listboxId == 2 then editMode = 3 end
+         --if listboxId == 1 and input:find("Клонировать") then 
+         --end
+         if listboxId == 2 and input:find("Удалить") then 
+            editMode = 3
+         end
          if listboxId == 3 and input:find("Повернуть на 90") then
             sampSendChat("/rz 90")
          end
@@ -8872,6 +8879,9 @@ function sampev.onSendDialogResponse(dialogId, button, listboxId, input)
          end
          if input:find("Список друзей") then
             sampSendChat("/flist")
+         end
+         if input:find("Ачивки") then
+            sampSendChat("/ach")
          end
          -- Extend main /vw menu
          if input:find("Настройки для команд") then
@@ -9068,7 +9078,8 @@ function sampev.onShowDialog(dialogId, style, title, button1, button2, text)
          "Заспавнить себя\n"..
          "Слапнуть себя\n"..
          "Взять Jetpack\n"..
-         "Список друзей\n"
+         "Список друзей\n"..
+         "Ачивки\n"
          return {dialogId, style, title, button1, button2, text..newitems}
       end
       if title:find("Настройки игрока") then
@@ -9254,11 +9265,27 @@ function sampev.onServerMessage(color, text)
       end
    end
    
+   if ini.settings.chatfilter then
+      for i = 1, #chatfilter do
+         if text:find(chatfilter[i]) then 
+            return false
+         end
+      end
+   end
+   
    if formatChat then
       local newtext = text
       
       if checkbox.anticaps.v then
          newtext = string.nlower(newtext)
+      end
+      
+      if isTraining then
+         if checkbox.anticapsads.v and not checkbox.anticaps.v then
+            if newtext:find("ADS") then
+               newtext = string.nlower(newtext)
+            end
+         end
       end
       
       if checkbox.chathideip.v then
@@ -10072,6 +10099,12 @@ function sampev.onSendSpawn()
          end
       end
    end
+   local _, pid = sampGetPlayerIdByCharHandle(PLAYER_PED)
+   if isTraining and pid == 0 then
+      sampAddChatMessage("[SCRIPT]: {FFFFFF}У вас багнутый ID перезайдите на сервер!", 0x0FF6600)
+      sampAddChatMessage("[SCRIPT]: {FFFFFF}Если не перезайти вас будут кикать с большинста миров!", 0x0FF6600)
+      sampSetGamestate(4)
+   end
 end
 -- END hooks
 
@@ -10109,6 +10142,10 @@ function string.nupper(s)
    return concat(res)
 end
 
+function isRpNickname(name)
+   return name:match('^%u%l+_%u%a+$')
+end
+
 -- function ltrim(s)
    -- return s:match'^%s*(.*)'
 -- end
@@ -10132,6 +10169,11 @@ function checkBuggedObject(model)
    end
    if model == 3426 then
       sampAddChatMessage("Этот объект "..model.." неккоректно отображается под поверхностью, в воде, либо при повороте (баг SAMP)", 0x0FF0000)
+   end
+   if isTraining then
+      if model == 11694 or model == 11695 or model == 11696 then
+         sampAddChatMessage("Этот объект "..model.." при размещении рядом с большим кол-вом объетов может вызывать аномалии", 0x0FF0000)
+      end
    end
 end
 
