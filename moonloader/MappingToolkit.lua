@@ -8786,9 +8786,12 @@ function sampev.onShowDialog(dialogId, style, title, button1, button2, text)
       -- Extend main /vw menu
       if text:find("Название мира") and style == 4 then
          if autodevmenutoggle then
-            sampSendDialogResponse(32700, 1, 11, "- Режим разработки")
-            sampCloseCurrentDialogWithButton(0)
-            autodevmenutoggle = false
+            lua_thread.create(function()
+               wait(500)
+               sampSendDialogResponse(32700, 1, 11, "- Режим разработки")
+               sampCloseCurrentDialogWithButton(0)
+               autodevmenutoggle = false
+            end)
          end
          local newitems = 
          " - Настройки для команд\n"..
@@ -10262,7 +10265,7 @@ end
 
 function restorePlayerSkin()
    lua_thread.create(function()
-      wait(3500)
+      wait(4500)
       if sampIsLocalPlayerSpawned() then
          if ini.settings.saveskin and isValidSkin(ini.settings.skinid) then
             if getCharModel(PLAYER_PED) ~= ini.settings.skinid then 
@@ -10313,8 +10316,10 @@ function WorldJoinInit()
          end
       end
       wait(500)
+      
       freezeCharPosition(PLAYER_PED, false)
 	  setPlayerControl(PLAYER_HANDLE, true)
+      
    end)
 end
 
