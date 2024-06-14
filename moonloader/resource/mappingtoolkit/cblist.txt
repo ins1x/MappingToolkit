@@ -1,0 +1,335 @@
+Командные блоки(КБ) - это логические блоки позволяющие игрокам создавать
+уникальный функционал для миров. Вы можете задавать последовательности 
+различных действий и обработку условий по множеству параметров.
+
+Команды для взаимодействия с КБ:
+/cb - создать командный блокам
+/cbdell - удалить блок
+/cbtp - телепортрт к блоку
+/cbedit - открыть меню блока
+/data - информация об игроке и данных в его массиве.
+/timers - список таймеров мира
+/oldcb - включить устарелые текстовые команды
+/cmb | //<text> - активировать КБ аллиас
+/cblist - список всех командных блоков в мире
+/tb - список триггер блоков в мире
+/shopmenu - управление магазинами мира для КБ
+
+Текстовые команды список: 
+#playerid# - вернет ID игрока.
+#tick# - возвращает количество тиков с начала работы сервера (1 тик - 1 мс.)
+#sc# - вернет социальный рейтинг игрока
+#array(slot, *playerid)# - вернуть массив (СЛОТ: 0-26) игрока.
+#server(slot)# - вернуть массив сервера (СЛОТ: 0-49)
+#var(name)# - вернуть переменную мира, из /varlist
+#pvar(name, *playerid)# - вернуть переменную игрока, из /pvarlist
+#teamOnline(teamid)# - вернуть онлайн команды (/team) по teamid
+#online# - вернуть онлайн мира
+#anim(*playerid)# - вернуть числовой индекс активной анимации игрока
+#skin(*playerid)# - вернуть модель скина игрока
+#acid(*playerid)# - глобальный ID игрока
+#gun(*playerid)# or #weapon(*playerid)# - ID оружия игрока
+#ammo(*playerid)# - кол-во патронов в активном слоте оружия игрока
+#timestamp# - секунды
+#team(*playerid)# - вернуть ID команды (/team) игрока
+#score(*playerid)# - вернуть кол-во очков в TABe игрока
+#money(*playerid)# - вернуть кол-во грошей игрока
+#health(*playerid)# - вернуть уровень здоровья игрока
+#armour(*playerid)# - вернуть уровень брони игрока
+#name(*playerid)# - вернуть никнэйм игрока по playerid
+#xyz(*playerid)# - вернуть позицию игрока
+#x(*playerid)# #y(*playerid)# #z(*playerid)#
+#camxyz(*playerid)#  - вернуть позицию камеры игрока
+#camx(*playerid)# #camy(*playerid)# #camz(*playerid)#
+#speed(*playerid)# - скорость игрока
+#gunName(*playerid)# - вернуть названия оружия в активном слоте игрока
+#time# - вернуть время мира
+#weather# - вернуть погоду мира
+#drunk(*playerid)# - вернуть ур. опьянения игрока
+#channel(*playerid)# - вернуть канал игрока (/channel)
+#vehSeat(*playerid)# - вернуть место игрока в авто
+#waterlvl(*playerid)# - вернуть уровень нахождения игрока в море
+#zone(*playerid)# - название района игрока
+#getzone(x, y)# - названия района по x, y
+#getzoneid(x, y)# - id района по x, y (исп. в проверке на район в КБ)
+#ping(*playerid)# - пинг игрока
+#ban(*playerid)# - есть ли варн у игрока (0/1)
+#netstat(*playerid)# - процент потери пакетов
+#hr(*playerid)# - соотношение попаданий к выстрелам (процент попаданий)
+#fa(*playerid)# - угол поворота игрока
+#afk(*playerid)# - кол-во секунд AFK игрока
+#death(*playerid)# - кол-во секунд стадии смерти (РП) игрока
+#target(*playerid)# - вернет ид игрока на которого наведен игрок с помощью ПКМ
+#teamName(*playerid)# - название команды игрока
+#ext(blockid value)# - вернет строку значения командного блока
+#bodypart(*playerid)# - вернет кость
+#issuerGun(*playerid)# - вернет ид оружия с которого нанесен урон
+#GetDistPlayer(targetid, *playerid)# - вернет дистанцию к targetid
+#GetDistPos(x y z *playerid)# - вернет дистанцию к позиции x y z
+#nearply(*playerid)# - ближайший игрок
+#getZ(x y)#
+#retval(id, *playerid)# - см.ниже раздел ввод диалога.
+#retstr(*id, **playerid)# - введенный текст игрока в диалог по 24 символа
+#GetDist(x1 y1 z1 ?2 y2 z2)#
+#randomPlayer(*category)#
+team <id>, skin <id>, veh <id>, data <slot> <value>, 
+wanted <value>, action <id>, dead, alive
+#moder(*playerid)# - ур. модерки игрока в мире (хост - 999)
+#specState(*playerid)# - в наблюдении
+#specTarget(*playerid)# - за кем наблюдает
+#int(*playerid)# - интерьер игрока
+#vip(*playerid)# - статус вип
+#raycast(cam/pos dist col coord)#
+#chatStyle(*playerid)#
+#freeze(*playerid)# - заморожен ли
+#freezeTime(*playerid)# - насколько заморожен
+#gm(*playerid)# - статус бессмертия
+#mute(*playerid)# - проверка на заглушку
+#muteTime(*playerid)# - насколько заглушен
+#taser(*playerid)#
+#lastActor(*playerid)# - последний актер с которым взаимодействовал
+#clist(*playerid)# - цвет клиста (цвет никнейма игрока)
+#fightStyle(*playerid)# - стиль боя
+#isWorld(playerid)#
+#pame(slot, *playerid)# - вернет строку /pame игрока из слота
+#customRaycast(x y z angle dist 0/1 x/y/z/xyz)#
+#playerCount(category 0)# - кол-во игроков
+category: team, skin, veh, data, wanted, action, dead,
+alive, score, vehseat, gun/weapon, channel, afk, vip, 
+taser, surfingveh, int, attach, attachmodel, retval
+#playerList(item category 0)# | category: (см. выше)
+#key(side, *playerid)#
+#weaponState(*playerid)# or #gunState(*playerid)# - статус оружия
+-1 unknown, 0 no bullets, 1 last bullet, 2 more bullets, 3 reloading
+#front(dist <x/y>, *playerid)#
+#zoom(*playerid)#
+
+Транспортные средства:
+#vehicle(*playerid)# or #veh(*playerid)# - вернуть ID т/c из /dll
+#vdata(vehid slot)# - вернуть массив транспорта (СЛОТ: 0-49)
+#GetDistVeh(vehid, *playerid)# - вернет дистанцию к vehid
+#vehPos(vehid)# - вернет позицию ТС по vehid
+#vehColor(*playerid)# - цвет автомобиля в HEX формате
+#vehColor1(*playerid)# - цвет автомобиля 1
+#vehColor2(*playerid)# - цвет автомобиля 2
+#vehModel(*playerid)## - вернет модель ТС игрока по playerid
+#GetVehModel(vehid)# - вернет модель ТС по vehid
+#vehHealth(*playerid)# - вернуть уровень здоровья ТС
+#gearState(vehid)# - возвращает положение шасси в самолетах.
+0 - опущены / 1 - спрятаны
+#surfingVeh(*playerid)# - вернет ID автомобиля на котором стоит игрок
+ИНАЧЕ ВОЗВРАЩАЕТ 65535. Работает только при нахождении водителя в ТС.
+#nearveh(radius, *playerid)# - вернет ближ. автомобиль в радиусе radius
+#vehParam(vehicleid param)# - вернет параметр автомобиля,
+вместо vehicleid можно указать 0 - заменит на ид вашего транспорта.
+0 - engine - получает статус двигателя, если 1 - двигатель включен.
+1 - lights - получает статус фар, если 1 - включены.
+2 - alarm - получает сигнал тревоги, если 1 - звучит.
+3 - doors - получает статус дверей, если 1 - закрыты.
+4 - bonnet - получает статус капота, если 1 - открыт.
+5 - boot - получает статус багажника, если 1 - открыт.
+6 - objective - метка на карте, если 1 - включено.
+аналог параметров из действия “изменить параметры ТС
+#vehdriver(vehid)# - вернет ID водителя машины vehid
+#gmcar(vehid)# - вернет статус ГМ кара автомобиля vehid
+#siren(vehid)# - вернет статус cирены автомобиля по vehid
+#getVehName(vehid)# - вернет названия модели машины по VEHID
+#getModelName(modelid)# - вернет название модели машины по MODELID
+#getVehName(vehid)# - вернет названия машины по vehid
+#vehCount# - вернет кол-во машин в мире
+
+Объекты:
+#GetDistObject(objectid, *playerid)# - вернет дистацию к объекту
+#omodel(objectid)# - вернет модель объекта по мировому objectid
+#oxyz(objectid)# #ox(objectid)# #oy(objectid)# #oz(objectid)#
+вернет координаты объекта по мировому objectid
+#rxyz(objectid)# #rx(objectid)# #ry(objectid)# #rz(objectid)#
+вернет угол поворота по осям объекта по мировому objectid
+#nearObj(dist modelid)# - вернет ближ. объект в радиусе dist меетров
+НЕ БОЛЬШЕ 200 МЕТРОВ). Необязательный параметр: modelid
+#nearobjxyz(dist modelid x y z)# - вернет ближ. объект к 
+определённым координатам в радиусе dist метров (НЕ БОЛЬШЕ 200 МЕТРОВ)
+Необязательный параметр: modelid
+#oMove(objectid)# - вернет статус движется ли объект - 0/1
+#oMoveXYZ(objectid)# - вернет координаты к которым движется объект
+#oMoveX(objectid)# #oMoveY(objectid)# #oMoveZ(objectid)#
+#oArray(objectid *slot)# - вернет массив объекта
+#oState(objectid)# - вернет статус отображения объекта
+#objectCount# - вернет кол-во объектов в мире
+#maxObjectCount# - вернет макс. возможное кол-во объектов в мире
+#getDistAction(actionid)# - вернет дистанцию к /action
+#actionXYZ(actionid)# - вернет координаты /action
+#actionX(actionid)# #actionY(actionid)# #actionZ(actionid)# 
+#actionText(actionid)# - вернет текст акшиона
+
+Действия со строками:
+#strfind(str, substr, caps)#
+- найдет substr в str и вернет символ начала substr в str
+- CAPS: 0/1 - учитывать ли регистр, по умолчанию: учитывать (1))
+#strfindtimes(str, substr, caps)#
+- найдет сколько раз substr встречается в str. 
+- CAPS: 0/1 - учитывать ли регистр, по умолчанию: учитывать (1)
+#strcmp(str, substr, caps)#{
+- проверит идентичные строки и вернет символ начала substr в str.
+- CAPS: 0/1 - учитывать ли регистр, по умолчанию: учитывать
+(1). Функция подходит для сравнения введенных параметров (паролей,
+которые содержат символы, а не только числа).
+#strdel(str, start, stop)#
+- удалит со str символы начиная с start и заканчивая stop
+#strlen(str)# - вернет длину строки str
+#strins(str, substr, index)# - вставит substr в str на index место
+#worldName# - вернет название мира
+#worldDesc# - вернет описание мира
+#sscanf(text, d, &)# - функция для разделения параметров из text
+d - порядковый номер элемента
+& - разделитель
+
+Действия с числами:
+#random(numb1, numb2)# - вернет случайное число
+#floatnum(numb1 type numb2)# - действия с плавающими числами. 
+#round(number *method)# or #floatround(number *method)#  methods:
+round - метод по дефолту, округляет к ближ. целому числу
+floor - округляет вниз
+ceil - округляет вверх
+tozero - округляет ближе к 0
+#log(number base)# - логарифм
+#sin(number *method)# - синус от числа number
+#cos(number *method)# - косинус от числа number
+#tan(number *method)# - тангенс от числа number
+methods:
+radian - по дефолту
+degrees
+grades
+#atan2(x, y)# - возвращает угол между положительной осью X
+и отрезком между центром и точкой (x, y)
+#sqroot(number)# - найдет квадратный корень из числа number
+#power(numb1 numb2)# - возведет число numb1 в степень numb2
+#min(value1 value2)# - вернет наименьшее из двух чисел
+#max(value1 value2)# - вернет наибольшее из двух чисел
+#clamp(value min_value max_value)# - сведет число value к диапазону чисел.
+Если число меньше min_value то оно вернет min_value
+если больше max_value то вернет max_value
+
+Пасс:
+#passinfo(*playerid)# - вернет ID ближ. pass к игроку
+#pXYZ(passid)# #pX(passid)# #pY(passid)# #pZ(passid)# - координаты /pass
+#pRX(passid)#
+#pInt(passid)#
+#pLock(passid)#
+#pOwner(passid)#
+#pVehicle(passid)#
+#getDate(*category)# - list: day, month, year, days/daynum
+#getTime(*category)# - list: hour, minute, second
+#pModel(passid)#
+#pStatus(passid)# or #pState(passid)#
+#pTeam(passid)#
+
+Актеры:
+arActor(dist, skinid)# - вернет ближ. актера в радиусе radius. 
+Необязательный параметр: модель скина.
+torXYZ(actorid)# #actorX(actorid)# #actorY(actorid)# #actorZ(actorid)#
+tDistActor(actorid, *playerid)# - вернет координаты актера
+torState(actorid)# or #actorStatus(actorid)# - вернет статус актера
+torAnim(actorid)# - вернет анимацию актера из списка
+torAltAnim(actorid)# - вернет альтернативную анимацию актера из списка
+torSkin(actorid)# - вернет модель скина актера
+torHealth(actorid)# - вернет уровень здоровья актера
+torInvulnerable(actorid)# or #actorGM(actorid)# - вернет статус GM’a у актера
+
+Аттачи:
+#attach(id, *playerid)# - вернет ид аттача
+#attachModel(id, *playerid)# - вернет modelid аттача
+#isAttachModel(modelid, *playerid)# - модель объекта
+#attachBone(slot, *playerid)# - кость
+#attachOffsetXYZ(slot, *playerid)# - смещение аттача
+#attachOffsetX, #attachOffsetY, #attachOffsetZ(slot, *playerid)# -
+смещение аттача по оси
+#attachRotXYZ(slot, *playerid)# - позиция аттача
+#attachRotX(slot, *playerid)# - позиция X
+#attachRotY(slot, *playerid)# - позиция Y
+#attachRotZ(slot, *playerid)# - позиция Z
+#attachScaleXYZ(slot, *playerid)# - масштабирование аттача
+#attachScaleX(slot, *playerid)# - масштабирование по оси X
+#attachScaleY(slot, *playerid)# - масштабирование по оси Y
+#attachScaleZ(slot, *playerid)# - масштабирование по оси Z
+Аттачи на транспорт:
+#vAttach(slot, vehicleid)#
+#vAttachModel(slot,*vehicleid)#
+#isvAttachModel(modelid, vehicleid)#
+#vAttachXYZ(slot, vehicleid)# - положение аттача (сразу 3 значения)
+#vAttachX, vAttachY, vAttachZ(slot, vehicleid)# - положение аттача
+#vAttachRotXYZ(slot, vehicleid)# - порот аттача (сразу 3 значения)
+#vAttachRotX, #vAttachRotY, #vAttachRotZ(slot, vehicleid)# - поворот аттача по оси
+#vAttachOffsetXYZ(slot, vehicleid)# - смещение аттача
+#vAttachOffsetX, vAttachOffsetY, vAttachOffsetZ(slot, vehicleid)#
+
+Проходы:
+#gateStatus(gateid)# or #gateState(gateid)#
+#gateID(gateid)# (MODEL)
+#gateTeam(gateid)# - для какой команды
+#gateType(gateid)#
+#gateLocal(gateid)#
+#gateSpeed(gateid)# - скорость перемещения
+#gateStartPosXYZ(gateid)# - стартовая позиция
+#gateStartPosX(gateid)# - стартовая позиция X
+#gateStartPosY(gateid)# - стартовая позиция Y
+#gateStartPosZ(gateid)# - стартовая позиция Z
+#gateStartPosRXYZ(gateid)#  - значение поворота в начале движения
+#gateStartPosRX(gateid)# - стартовая позиция RX
+#gateStartPosRY(gateid)# - стартовая позиция RY
+#gateStartPosRZ(gateid)# - стартовая позиция RZ
+#gateStopPosXYZ(gateid)# or gatePos - конечная позиция
+#gateStopPosX(gateid)# or gatePos - конечная позиция
+#gateStopPosY(gateid)# or gatePos - конечная позиция
+#gateStopPosZ(gateid)# or gatePos - конечная позиция
+#gateStopPosRXYZ(gateid)# or gatePos - конечная позиция RXYZ
+#gateStopPosRX(gateid)# or gatePos - конечная позиция RX
+#gateStopPosRY(gateid)# or gatePos - конечная позиция RY
+#gateStopPosRZ(gateid)# or gatePos - конечная позиция RZ
+Если начальная позиция будет совпадать с конечной то КБ не сработает!
+
+Текстдравы:
+#tdShown(slot)# - отображен ли текстдрав
+#tdPos(slot)# #tdPosX(slot)# #tdPosY(slot)# - позиция текстдрава
+#tdString(slot)# - строка текстдрава (если бокс _)
+#tdSize(slot)# #tdSizeX(slot)# #tdSizeY(slot)# - размер текстдрава
+#tdLetSize(slot)# #tdLetSizeX(slot)# #tdLetSizeY(slot)# - размер букв текста
+#tdOutline(slot)# - размер обводки текста
+#tdShadow(slot)# - размер тени текста
+#tdAligment(slot)# - выравнивание (1 - право | 2 - центр | 3 - лево)
+#isTdBox(slot)# - является ли текстдрав боксом
+#tdClickable(slot)# - можно ли на текстдрав нажать
+#tdTime(slot)# - время отображения текстдрава
+#tdModel(slot)# - ид модели в боксе
+#tdModelRotX(slot)# #tdModelRotY(slot)# #tdModelRotZ(slot)# - поворот
+#tdModelZoom(slot)# - зум модели в боксе
+#tdModelColor(slot)# - цвет модели в боксе (возвращается 2 параметра)
+
+Ввод диалога:
+#retstr# - введенный текст игрока в диалог.
+#retstr(0-9)# - введенный текст игрока в диалог по 24 символа.
+#retval(0)# - ID игрока который активировал диалог.
+#retval(1)# - Выбранная строка игроком.
+#retval(2)# - Цифровой параметр введенный игроком.
+#retval(3)# - Цифровой параметр введенный игроком.
+#retval(4)# - Цифровой параметр введенный игроком.
+#retval(5)# - ID вызываемого блока.
+#retval(6)# - Кнопка диалога выбранная игроком. Y - 1. X - 0.
+#retval(7-9)# - N/A.
+
+Вызов блока:
+#retval(0)# - ID игрока который вызывал блок.
+#retval(1)# - Пункт диалога выбранный игроком.
+#retval(2-4)# - Цифровой параметр введенный игроком.
+#retval(5)# - ID вызываемого блока.
+#retval(6)# - Кнопка диалога выбранная игроком. Y - 1 / X - 0.
+#retval(7-9)# - N/A.
+
+Создание чего-либо через КБ:
+#retval(0)# - Возвращает ID созданого чего-либо.
+#retval(1-9)# - N/A
+#retval(0)# - ID игрока который активировал диалог.
+#retval(1)# - Пункт диалога выбранный игроком.
+#retval(2-4)# - Цифровой параметр введенный игроком.
+#retval(5)# - ID вызываемого блока.
+#retval(6)# - Кнопка диалога выбранная игроком. Y - 1 / X - 0.
