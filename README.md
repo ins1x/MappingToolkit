@@ -2,7 +2,7 @@
 <p align="center">
     <a href="https://www.sa-mp.mp/"><img src="https://img.shields.io/badge/made%20for-GTA%20SA--MP-blue"></a>
     <a href="https://gta-samp.ru/"><img src="https://img.shields.io/badge/Server-Absolute%20Play-red"></a>
-    <a href="https://training-server.com/"><img src="https://img.shields.io/badge/Server-TRAINING%20-yellow"></a>
+    <a href="https://training-server.com/"><img src="https://img.shields.io/badge/Server-TRAINING%20SANDBOX%20-yellow"></a>
 </p>
 
 ###### The following description is in Russian, because it is the main language of the user base.
@@ -163,18 +163,25 @@
 
 > модуль **lua-requests** используется только для проверки версий, поэтому установка этого модуля необязательна для работы скрипта
 
-## Как использовать
-* Скопировать содержимое архива [MappingToolkit.zip](https://github.com/ins1x/MappingToolkit/releases) в папку **moonloader** в корне игры
-* Запустить GTA. В игре нажмите **ALT + X** или введите команду **/toolkit**
+## Установка
 
-> Если скрипт не запустился, в папке moonloader есть файл moonloader.log с информацией о проблеме
+[Скачайте актуальную версию](https://github.com/ins1x/MappingToolkit/releases) и скопируйте содержимое архива **MappingToolkit.zip** в папку **moonloader** в корне игры. Важно перенести все файлы, включая папки /config и /resource ! 
+
+> Если у вас нет папки **moonloader** в корне игры, следует установить вышеописанные в  требованиях компоненты.
+
+ [![](https://img.shields.io/badge/%20%20DOWNLOAD%20%20-696969?style=for-the-badge)](https://github.com/ins1x/MappingToolkit/releases) 
+
+После установки запустите игру и подключитесь к серверу  
+В игре нажмите **ALT + X** или введите команду **/toolkit**
+
+> Если скрипт не запустился, в папке moonloader есть файл moonloader.log с информацией о проблеме 
 
 Если вы столкнулись с проблемой c запуском либо использованием скрипта, то ознакомьтесь с документацией ниже:   
 * [FAQ - Ответы на часто задаваемы вопросы по скрипту](https://github.com/ins1x/MappingToolkit/wiki/FAQ-%D0%BF%D0%BE-MappingToolkit)  
 * [Описание всех доступных настроек (/moonloader/config/mappingtoolkit.ini)](https://github.com/ins1x/MappingToolkit/wiki/%D0%9A%D0%BE%D0%BD%D1%84%D0%B8%D0%B3%D1%83%D1%80%D0%B0%D1%86%D0%B8%D1%8F)
 
 ## Disclaimer 
-Скрипт может работать на других серверах, но перед его использованием убедитесь что его функционал не запрещен на вашем сервере! Некоторые мемхаки такие как эффекты работают только на версии [клиента 0.3.7 R1](https://resamp.ru/).
+Скрипт может работать на других серверах, но перед его использованием убедитесь что его функционал не запрещен на вашем сервере! Некоторые возможности работают только на версии [клиента 0.3.7 R1](https://resamp.ru/), но это не мешает использовать ассистент на других версиях.
 
 ---------------------------------------------
 
