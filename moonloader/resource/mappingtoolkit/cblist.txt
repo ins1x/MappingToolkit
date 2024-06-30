@@ -103,6 +103,8 @@ taser, surfingveh, int, attach, attachmodel, retval
 -1 unknown, 0 no bullets, 1 last bullet, 2 more bullets, 3 reloading
 #front(dist <x/y>, *playerid)#
 #zoom(*playerid)#
+#camVecXYZ# и #camVecX/Y/Z# - направление движения игрока в 3D пространстве
+#speedX/Y/Z(*targetid)# - скорость игрока/транспорта по определенной координате
 
 Транспортные средства:
 #vehicle(*playerid)# or #veh(*playerid)# - вернуть ID т/c из /dll
