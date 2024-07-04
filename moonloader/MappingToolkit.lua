@@ -4,10 +4,10 @@ script_description("Assistant for mappers and event makers")
 script_dependencies('imgui', 'lib.samp.events')
 script_properties("work-in-pause")
 script_url("https://github.com/ins1x/MappingToolkit")
-script_version("3.4")
+script_version("3.5")
 -- script_moonloader(16) moonloader v.0.26
--- sa-mp version: 0.3.7 R1
--- Activaton: ALT + X (show main menu) or command /toolkit
+-- tested on sa-mp client version: 0.3.7 R1
+-- activaton: ALT + X (show main menu) or command /toolkit
 
 local sampev = require 'lib.samp.events'
 local imgui = require 'imgui'
@@ -31,7 +31,7 @@ local ini = inicfg.load({
       camdist = "1",
       checkupdates = true,
       chatfilter = true,
-      chatmentions = false,
+      chathidecb = false,
       debug = false,
       disconnectreminder = false,
       drawdist = "450",
@@ -43,11 +43,11 @@ local ini = inicfg.load({
       hotkeys = true,
       imguifont = "trebucbd",
       imguifontsize = 14.0,
-      multilinefont = "trebucbd",
-      multilinefontsize = 13.0,
       lockserverweather = false,
       menukeychanged = false,
       menukey = "0x2D",
+      multilinefont = "trebucbd",
+      multilinefontsize = 13.0,
       playerwarnings = false,
       renderfont = "Arial",
       renderfontsize = 7,
@@ -68,6 +68,14 @@ local ini = inicfg.load({
       usecustomcamdist = false,
       weather = 0,
       worldsavereminder = false,
+   },
+   mentions = {
+      chatmentions = false,
+      usecolor = false,
+      usesound = true,
+      usegametext = true,
+      color = "FFD700",
+      sound = 1138,
    },
    panel = {
       background = true,
@@ -120,7 +128,6 @@ local defaultfont = nil
 local multilinetextfont = nil
 local sizeX, sizeY = getScreenResolution()
 local v = nil
-local color = imgui.ImFloat4(1, 0, 0, 1)
 
 local isAbsolutePlay = false
 local isTraining = false
@@ -144,6 +151,7 @@ local autoAnnounce = false
 local isChatFreezed = false
 local isWarningsActive = false
 local chosenplayerMarker = nil
+local isLockPlayerControl = false
 local firstSpawn = true
 local formatChat = true
 local readonly = true
@@ -199,13 +207,14 @@ local checkbox = {
    showobjectrot = imgui.ImBool(ini.settings.showobjectrot),
    showobjectcoord = imgui.ImBool(ini.settings.showobjectcoord),
    restoreobjectpos = imgui.ImBool(ini.settings.restoreobjectpos),
-   chatmentions = imgui.ImBool(ini.settings.chatmentions),
+   chatmentions = imgui.ImBool(ini.mentions.chatmentions),
    checkupdates= imgui.ImBool(ini.settings.checkupdates),
    hotkeys = imgui.ImBool(ini.settings.hotkeys),
    tabclickcopy = imgui.ImBool(ini.settings.tabclickcopy),
    freezechat = imgui.ImBool(ini.settings.freezechat),
    allchatoff = imgui.ImBool(ini.settings.allchatoff),
    chatfilter = imgui.ImBool(ini.settings.chatfilter),
+   chathidecb = imgui.ImBool(ini.settings.chathidecb),
    playerwarnings = imgui.ImBool(ini.settings.playerwarnings),
    worldsavereminder = imgui.ImBool(ini.settings.worldsavereminder),
    autodevmode = imgui.ImBool(ini.settings.autodevmode),
@@ -277,7 +286,8 @@ local input = {
    mdodist = imgui.ImInt(100),
    addtime = imgui.ImInt(3),
    ammo = imgui.ImInt(1000),
-   rendselectedmodelid = imgui.ImInt(0)
+   rendselectedmodelid = imgui.ImInt(0),
+   colorpicker = imgui.ImFloat4(1, 0, 0, 1)
 }
 
 local slider = {
@@ -329,6 +339,7 @@ local textbuffer = {
    saveskin = imgui.ImBuffer(4),
    trytext = imgui.ImBuffer(64),
    searchbar = imgui.ImBuffer(32),
+   chatfilters = imgui.ImBuffer(4096),
    rules = imgui.ImBuffer(65536),
    favorites = imgui.ImBuffer(65536),
    cblist = imgui.ImBuffer(65536)
@@ -388,13 +399,13 @@ local LastData = {
    lastPmMessage = nil,
    lastWorldNumber = 0, -- is not same GetVirtualWorldId
    lastClickedTextdrawId = 0,
-   lastDialogInput = nil,
+   lastDialogInput = nil
 }
 
 local MP = {
    StartedDTime = nil,
    EndedDTime = nil,
-   Started = false,
+   Started = false
 }
 
 local gamestates = {
@@ -865,6 +876,7 @@ function main()
          for template in chatfilterfile:lines() do
             table.insert(chatfilter, u8:decode(template))
          end
+         textbuffer.chatfilters.v = chatfilterfile:read('*a')
          io.close(chatfilterfile)
       else
          chatfilterfile = io.open("moonloader/resource/mappingtoolkit/chatfilter.txt", "w")
@@ -993,7 +1005,7 @@ function main()
       if isTraining and ini.settings.editkey then
          -- N key edit object
          if isKeyJustPressed(0x4E) and not isCharInAnyCar(PLAYER_PED) and not sampIsChatInputActive() and not sampIsDialogActive()
-	     and not isPauseMenuActive() and not isSampfuncsConsoleActive() then 
+	     and not isPauseMenuActive() and not isSampfuncsConsoleActive() and not dialoghook.textureslist then 
             if isWorldHoster then sampSendChat("/csel") end
          end
       end
@@ -1004,7 +1016,7 @@ function main()
          and not sampIsDialogActive() and not isPauseMenuActive() 
          and not isSampfuncsConsoleActive() then 
 	        setClipboardText(LastObject.modelid)
-	 	    sampAddChatMessage("modelid скопирован в буфер обмена", -1)
+	 	    sampAddChatMessage("[SCRIPT]: {FFFFFF} modelid скопирован в буфер обмена", 0x0FF6600)
 	     end
 	     
 	     -- hide edited object on hold ALT key
@@ -1116,6 +1128,7 @@ function main()
             end
          end
          
+         -- Open vehicles menu on K key
          if isKeyJustPressed(0x4B) and not sampIsChatInputActive() and not sampIsDialogActive()
 	     and not isPauseMenuActive() and not isSampfuncsConsoleActive() then 
             dialoghook.textureslist = false
@@ -1381,7 +1394,7 @@ function imgui.OnDrawFrame()
             positionX, positionY, positionZ))
 	        if imgui.IsItemClicked() then
                setClipboardText(string.format(u8"%.1f, %.1f, %.1f", positionX, positionY, positionZ))
-               sampAddChatMessage("Позиция скопирована в буфер обмена", -1)
+               sampAddChatMessage("[SCRIPT]: {FFFFFF}Позиция скопирована в буфер обмена", 0x0FF6600)
             end
 			
 		    if tpcpos.x then
@@ -1389,8 +1402,8 @@ function imgui.OnDrawFrame()
                   imgui.TextColoredRGB(string.format("Сохраненая позиция x: %.1f, y: %.1f, z: %.1f",
                   tpcpos.x, tpcpos.y, tpcpos.z))
 	              if imgui.IsItemClicked() then
-                    setClipboardText(string.format(u8"%.1f, %.1f, %.1f", tpcpos.x, tpcpos.y, tpcpos.z))
-                    sampAddChatMessage("Позиция скопирована в буфер обмена", -1)
+                     setClipboardText(string.format(u8"%.1f, %.1f, %.1f", tpcpos.x, tpcpos.y, tpcpos.z))
+                     sampAddChatMessage("[SCRIPT]: {FFFFFF}Позиция скопирована в буфер обмена", 0x0FF6600)
                   end
                   
                   imgui.SameLine()
@@ -1405,7 +1418,7 @@ function imgui.OnDrawFrame()
                   worldspawnpos.x, worldspawnpos.y, worldspawnpos.z))
 	              if imgui.IsItemClicked() then
                     setClipboardText(string.format(u8"%.1f, %.1f, %.1f", worldspawnpos.x, worldspawnpos.y, worldspawnpos.z))
-                    sampAddChatMessage("Позиция скопирована в буфер обмена", -1)
+                    sampAddChatMessage("[SCRIPT]: {FFFFFF}Позиция скопирована в буфер обмена", 0x0FF6600)
                   end
 			   end
 			end
@@ -1416,7 +1429,7 @@ function imgui.OnDrawFrame()
                bX, bY, bZ))
 			   if imgui.IsItemClicked() then
 			      setClipboardText(string.format(u8"%.1f, %.1f, %.1f", bX, bY, bZ))
-				  sampAddChatMessage("Позиция скопирована в буфер обмена", -1)
+				  sampAddChatMessage("[SCRIPT]: {FFFFFF}Позиция скопирована в буфер обмена", 0x0FF6600)
 			   end
 		    
                imgui.SameLine()
@@ -1466,7 +1479,7 @@ function imgui.OnDrawFrame()
                      sampAddChatMessage(string.format("Используйте: /тпк {696969}%.2f %.2f %.2f", tpcpos.x, tpcpos.y, tpcpos.z), -1)
                   end
                   if isTraining and isWorldHoster then
-                     sampAddChatMessage(string.format("Используйте: /xyz {696969}%.2f %.2f %.2f", tpcpos.x, tpcpos.y, tpcpos.z), -1)
+                     sampAddChatMessage(string.format("[SCRIPT]: {FFFFFF} Используйте: /xyz {696969}%.2f %.2f %.2f", tpcpos.x, tpcpos.y, tpcpos.z), 0x0FF6600)
                   end
                end
             end
@@ -1480,7 +1493,7 @@ function imgui.OnDrawFrame()
 			   textbuffer.tpcz.v = string.format("%.2f", tpcpos.z)
 			   tpcpos.x, tpcpos.y, tpcpos.z = getCharCoordinates(PLAYER_PED)
 			   setClipboardText(string.format(u8"%.2f %.2f %.2f", tpcpos.x, tpcpos.y, tpcpos.z))
-			   sampAddChatMessage(string.format("Координаты сохранены: {696969}%.2f %.2f %.2f", tpcpos.x, tpcpos.y, tpcpos.z), -1)
+			   sampAddChatMessage(string.format("[SCRIPT]: {FFFFFF} Координаты сохранены: {696969}%.2f %.2f %.2f", tpcpos.x, tpcpos.y, tpcpos.z), 0x0FF6600)
             end
             
 			if imgui.Button(u8"Прыгнуть вперед", imgui.ImVec2(200, 25)) then
@@ -1510,7 +1523,7 @@ function imgui.OnDrawFrame()
                   if isAbsolutePlay then
                      if dist < 10.0 then 
 			            setCharCoordinates(PLAYER_PED, x, y, z + 3.0)
-                        sampAddChatMessage("Вы телепортированы на ближайшую поверхность", -1)
+                        sampAddChatMessage("[SCRIPT]: {FFFFFF}Вы телепортированы на ближайшую поверхность", 0x0FF6600)
 			         else
 			            sampAddChatMessage(("Ближайшая поверхность слишком далеко (%d m.)"):format(dist), 0x0FF0000)
 			            local posX, posY, posZ = getCharCoordinates(PLAYER_PED)
@@ -1518,7 +1531,7 @@ function imgui.OnDrawFrame()
 			         end
                   else
                      setCharCoordinates(PLAYER_PED, x, y, z + 3.0)
-                     sampAddChatMessage("Вы телепортированы на ближайшую поверхность", -1)
+                     sampAddChatMessage("[SCRIPT]: {FFFFFF}Вы телепортированы на ближайшую поверхность", 0x0FF6600)
                   end
                else
                   sampAddChatMessage("Не нашлось ни одной поверхности рядом", 0x0FF0000)
@@ -1599,20 +1612,18 @@ function imgui.OnDrawFrame()
 			   if imgui.Button(u8"Телепорт по координатам", imgui.ImVec2(200, 25)) then
 			   	  freezeCharPosition(playerPed, false)
                   if textbuffer.tpcx.v then
-                     prepareTeleport = true
                      if isAbsolutePlay then
                         sampSendChat(string.format("/ngr %f %f %f", textbuffer.tpcx.v, textbuffer.tpcy.v, textbuffer.tpcz.v), -1)
-                        sampAddChatMessage(string.format("Телепорт на координаты: %.1f %.1f %.1f",
+                        sampAddChatMessage(string.format("[SCRIPT]: {FFFFFF}Телепорт на координаты: %.1f %.1f %.1f",
                         textbuffer.tpcx.v, textbuffer.tpcy.v, textbuffer.tpcz.v), 0x000FF00)
                      end
                      if isTraining then
                         sampSendChat(string.format("/xyz %f %f %f", textbuffer.tpcx.v, textbuffer.tpcy.v, textbuffer.tpcz.v), -1)
-                        sampAddChatMessage(string.format("Телепорт на координаты: %.1f %.1f %.1f",
-                        textbuffer.tpcx.v, textbuffer.tpcy.v, textbuffer.tpcz.v), 0x000FF00)
+                        sampAddChatMessage(string.format("[SCRIPT]: {FFFFFF}Телепорт на координаты: %.1f %.1f %.1f",
+                        textbuffer.tpcx.v, textbuffer.tpcy.v, textbuffer.tpcz.v), 0x0FF6600)
                      end
                   else
-                     prepareTeleport = false
-                     sampAddChatMessage("Координаты не были сохранены", -1)
+                     sampAddChatMessage("[SCRIPT]: {FFFFFF}Координаты не были сохранены", 0x0FF6600)
 				  end  
                end
 		    end
@@ -1715,7 +1726,7 @@ function imgui.OnDrawFrame()
             imgui.Text(u8"Последний modelid объекта: "..LastObject.modelid.." ("..modelName..") ")
             if imgui.IsItemClicked() then
                setClipboardText(LastObject.modelid)
-			   sampAddChatMessage("modelid скопирован в буфер обмена", -1)
+			   sampAddChatMessage("[SCRIPT]: {FFFFFF} modelid скопирован в буфер обмена", 0x0FF6600)
             end
 		 else 
 		    imgui.Text(u8"Последний modelid объекта: не выбран")
@@ -1796,15 +1807,15 @@ function imgui.OnDrawFrame()
 		   if imgui.Button(u8"Скрыть объект", imgui.ImVec2(110, 25)) then 
 		      if string.len(input.hideobjectid.v) > 0 then 
                  if not isValidObjectModel(tonumber(input.hideobjectid.v)) then
-			 	    sampAddChatMessage("Объект не был добавлен, так как вы ввели некорректный id!", -1)
+			 	    sampAddChatMessage("[SCRIPT]: {FFFFFF}Объект не был добавлен, так как вы ввели некорректный id!", 0x0FF6600)
 				 else
 			        table.insert(hiddenObjects, tonumber(input.hideobjectid.v))
 				    sampAddChatMessage(string.format("Вы скрыли все объекты с modelid: %i",
                     tonumber(input.hideobjectid.v)), -1)
                  end
-				 sampAddChatMessage("Изменения будут видны после обновления зоны стрима!", -1)
+				 sampAddChatMessage("[SCRIPT]: {FFFFFF}Изменения будут видны после обновления зоны стрима!", 0x0FF6600)
     		  else
-			     sampAddChatMessage("Объект не был добавлен, так как вы не ввели id!", -1)
+			     sampAddChatMessage("[SCRIPT]: {FFFFFF}Объект не был добавлен, так как вы не ввели id!", 0x0FF6600)
 			  end
 		   end
            imgui.SameLine()
@@ -1911,7 +1922,7 @@ function imgui.OnDrawFrame()
          camX, camY, camZ))
 		 if imgui.IsItemClicked() then
             setClipboardText(string.format(u8"%.1f, %.1f, %.1f", camX, camY, camZ))
-            sampAddChatMessage("Позиция скопирована в буфер обмена", -1)
+            sampAddChatMessage("[SCRIPT]: {FFFFFF}Позиция скопирована в буфер обмена", 0x0FF6600)
          end
 		 
 		 if imgui.Checkbox(u8("Зафиксировать камеру на координатах"), checkbox.fixcampos) then
@@ -1925,7 +1936,7 @@ function imgui.OnDrawFrame()
 			else restoreCamera() end
 		 end
          imgui.SameLine()
-         imgui.TextQuestion("( ? )", u8"Зафиксирует положение камеры на указанные значеня")
+         imgui.TextQuestion("( ? )", u8"Зафиксирует положение камеры на указанные значения")
 		 
 		 if checkbox.fixcampos.v then		
 			imgui.Text("x:")
@@ -2432,8 +2443,8 @@ function imgui.OnDrawFrame()
 		   	      file = getGameDirectory().. "\\cleo.log"
 		   	   end
 		   	   
-		          if doesFileExist(file) then
-                     os.execute('explorer '.. file)
+		       if doesFileExist(file) then
+                  os.execute('explorer '.. file)
 		   	   end
 		    end
          end
@@ -2567,13 +2578,116 @@ function imgui.OnDrawFrame()
             sampProcessChatInput("/timestamp")
 	     end
          
-         if imgui.Checkbox(u8(checkbox.hidechat.v and 'Показать чат' or 'Скрыть чат'), checkbox.hidechat) then
-            memory.fill(getModuleHandle("samp.dll") + 0x63DA0, checkbox.hidechat.v and 0x90909090 or 0x0A000000, 4, true)
-            sampSetChatInputEnabled(checkbox.hidechat.v)
-	     end
+         imgui.Spacing()
+         if imgui.CollapsingHeader(u8"Фильтры:") then
+            if imgui.Checkbox(u8("Анти-капс в глобальном чате"), checkbox.anticaps) then
+               ini.settings.anticaps = checkbox.anticaps.v
+               inicfg.save(ini, configIni)
+               formatChat = true
+            end   
+            
+            if isTraining then
+               if imgui.Checkbox(u8("Анти-капс для объявлений в ADS"), checkbox.anticapsads) then
+                  ini.settings.anticapsads = checkbox.anticapsads.v
+                  inicfg.save(ini, configIni)
+                  formatChat = true
+               end
+            end
+            
+            if imgui.Checkbox(u8("Скрывать все объявления"), checkbox.antiads) then
+               ini.settings.antiads = checkbox.antiads.v
+               inicfg.save(ini, configIni)
+            end  
+            
+            if imgui.Checkbox(u8("Скрывать сообщения от ботов"), checkbox.antichatbot) then
+               ini.settings.antichatbot = checkbox.antichatbot.v
+               inicfg.save(ini, configIni)
+            end  
+            
+            if isTraining then
+               if imgui.Checkbox(u8("Скрывать приставку [CB] в чате"), checkbox.chathidecb) then
+                  ini.settings.chathidecb = checkbox.chathidecb.v
+                  inicfg.save(ini, configIni)
+                  formatChat = true
+               end
+            end
+            imgui.Spacing()
+         end
+         
+         if imgui.CollapsingHeader(u8"Расширенные настройки фильтров:") then
+            local filedata = {filepath, lines, symbols}
+            filedata.filepath = getGameDirectory().."//moonloader//resource//mappingtoolkit//chatfilter.txt"
+            filedata.lines = 1
+            filedata.symbols = 0
+            
+            imgui.TextColoredRGB("Вы можете убрать для себя надоедливые сообщения в чате")
+            imgui.TextColoredRGB("определив правила фильтрации по паттренам.")
+            imgui.Spacing()
+            
+            filedata.symbols = math.floor(string.len(textbuffer.chatfilters.v)/2)
+            for s in string.gmatch(textbuffer.chatfilters.v, "\n" ) do
+               filedata.lines = filedata.lines + 1
+            end
+            
+            if filedata.symbols == 0 then
+               local file = io.open(filedata.filepath, "r")
+               textbuffer.chatfilters.v = file:read('*a')
+               file:close()
+            end
+            
+            if imgui.TooltipButton(u8"Обновить", imgui.ImVec2(80, 25), u8:encode("Загрузить шаблоны из файла chatfilter.txt")) then
+               local file = io.open(filedata.filepath, "r")
+               textbuffer.chatfilters.v = file:read('*a')
+               file:close()
+            end
+            imgui.SameLine()
+            if imgui.TooltipButton(u8"Изменить", imgui.ImVec2(80, 25), u8:encode("Разблокировать для редактирования")) then
+               readonly = false
+            end
+            imgui.SameLine()
+            if imgui.TooltipButton(u8"Сохранить", imgui.ImVec2(80, 25), u8:encode("Сохранить шаблоны в chatfilter.txt")) then
+               if not readonly then
+                  local file = io.open(filedata.filepath, "w")
+                  file:write(textbuffer.chatfilters.v)
+                  file:close()
+                  sampAddChatMessage("Сохранено в файл: /moonloader/resource/mappingtoolkit/chatfilter.txt", -1)
+               else
+                  sampAddChatMessage("Недоступно в режмие для чтения. Снимте режим RO (Readonly)", -1)
+               end
+            end
+            imgui.SameLine()
+            if imgui.TooltipButton(u8"Помощь", imgui.ImVec2(80, 25), u8:encode("Гайд по паттернам (Онлайн)")) then
+               os.execute('explorer https://www.blast.hk/threads/62661/')
+            end
+   
+            imgui.PushFont(multilinetextfont)
+            if readonly then
+               imgui.InputTextMultiline('##chatfilters', textbuffer.chatfilters, imgui.ImVec2(450, 145),
+               imgui.InputTextFlags.EnterReturnsTrue + imgui.InputTextFlags.AllowTabInput + imgui.InputTextFlags.ReadOnly)
+            else 
+               imgui.InputTextMultiline('##chatfilters', textbuffer.chatfilters, imgui.ImVec2(450, 145),
+               imgui.InputTextFlags.EnterReturnsTrue + imgui.InputTextFlags.AllowTabInput)
+            end
+            imgui.PopFont()
+            
+            imgui.Text("lines: "..filedata.lines.." symbols: "..filedata.symbols)
+            imgui.SameLine()
+            imgui.Text("                                      ")
+            imgui.SameLine()
+	        if imgui.Selectable(readonly and "RO" or "W", false, 0, imgui.ImVec2(25, 15)) then
+               readonly = not readonly
+            end
+            imgui.SameLine()
+            if imgui.Selectable("Unlock IO", false, 0, imgui.ImVec2(50, 15)) then
+               resetIO()
+            end
+            imgui.SameLine()
+            imgui.TextQuestion("( ? )", u8"RO - Включить режим ReadOnly\nUnlock IO - разблокировать инпут если курсор забагался")
+            imgui.Spacing()
+         end
          
          if imgui.Checkbox(u8("Уведомлять при упоминании в чате"), checkbox.chatmentions) then
-            ini.settings.chatmentions = checkbox.chatmentions.v
+            ini.mentions.chatmentions = checkbox.chatmentions.v
             inicfg.save(ini, configIni)
          end
          
@@ -2587,35 +2701,19 @@ function imgui.OnDrawFrame()
             inicfg.save(ini, configIni)
          end
          
-         if imgui.Checkbox(u8("Анти-капс в глобальном чате"), checkbox.anticaps) then
-            ini.settings.anticaps = checkbox.anticaps.v
-            inicfg.save(ini, configIni)
-            formatChat = true
-         end   
-         
-         if isTraining then
-            if imgui.Checkbox(u8("Анти-капс для объявлений в ADS"), checkbox.anticapsads) then
-               ini.settings.anticapsads = checkbox.anticapsads.v
-               inicfg.save(ini, configIni)
-               formatChat = true
-            end
-         end
-         
-         if imgui.Checkbox(u8("Скрывать все объявления"), checkbox.antiads) then
-            ini.settings.antiads = checkbox.antiads.v
-            inicfg.save(ini, configIni)
-         end  
-         
-         if imgui.Checkbox(u8("Скрывать сообщения от ботов"), checkbox.antichatbot) then
-            ini.settings.antichatbot = checkbox.antichatbot.v
-            inicfg.save(ini, configIni)
-         end  
-         
          if imgui.Checkbox(u8("Отключить весь чат"), checkbox.allchatoff) then
             ini.settings.allchatoff = checkbox.allchatoff.v
             inicfg.save(ini, configIni)
             formatChat = true
+            if checkbox.allchatoff.v then
+               sampAddChatMessage("[SCRIPT]: {FFFFFF}Все сообщения в чат будут игнорироваться", 0x0FF6600)
+            end
          end     
+         
+         if imgui.Checkbox(u8(checkbox.hidechat.v and 'Показать панель с чатотм' or 'Скрыть панель с чатом'), checkbox.hidechat) then
+            memory.fill(getModuleHandle("samp.dll") + 0x63DA0, checkbox.hidechat.v and 0x90909090 or 0x0A000000, 4, true)
+            sampSetChatInputEnabled(checkbox.hidechat.v)
+	     end
          
          if imgui.Checkbox(u8("Копировать ник кликнутого игрока в TAB"), checkbox.tabclickcopy) then
             ini.settings.tabclickcopy = checkbox.tabclickcopy.v
@@ -2626,6 +2724,7 @@ function imgui.OnDrawFrame()
             if imgui.Checkbox(u8("Напоминать о необходимости сохранить мир"), checkbox.worldsavereminder) then
                if checkbox.worldsavereminder.v then
                   SaveReminder()
+                  sampAddChatMessage("[SCRIPT]: {FFFFFF}Включены напоминания о необходимости сохранять виртуальынй мир", 0x0FF6600)
                end
                ini.settings.worldsavereminder = checkbox.worldsavereminder.v
 		       inicfg.save(ini, configIni)
@@ -3236,14 +3335,14 @@ function imgui.OnDrawFrame()
             end
          end
          if imgui.CollapsingHeader(u8"Лимиты высоты:") then
-            imgui.TextColoredRGB("На карте GTA-SA средней высотой дорог считается {00FF00}~ 20:")
-            imgui.TextColoredRGB("- В Лос-Сантосе: {00FF00}~10-15")
-            imgui.TextColoredRGB("- В Лас-Вентурасе: {00FF00}~10")
-            imgui.TextColoredRGB("- В Сан-Фиерро: {00FF00}~7-80")
-            imgui.TextColoredRGB("- Округ: {00FF00}~ -45(Карьер возле ЛВ)")
+            imgui.TextColoredRGB("На карте GTA-SA средней высотой дорог считается {00FF00} 20:")
+            imgui.TextColoredRGB("- В Лос-Сантосе: {00FF00}10-15")
+            imgui.TextColoredRGB("- В Лас-Вентурасе: {00FF00}10")
+            imgui.TextColoredRGB("- В Сан-Фиерро: {00FF00}7-80")
+            imgui.TextColoredRGB("- Округ: {00FF00} 45(Карьер возле ЛВ)")
             imgui.Spacing()
             imgui.TextColoredRGB("Уровень океана всегда равен {00FF00}0")
-            imgui.TextColoredRGB("Высшая точка на карте это горы Чиллиад {00FF00}~527")
+            imgui.TextColoredRGB("Высшая точка на карте это горы Чиллиад {00FF00}527")
             imgui.TextColoredRGB("Максимальной отрицательной высотой является значение в {00FF00}-99")
             imgui.TextColoredRGB("(Если высота будет ниже, игрока просто телепортирует на поверхность)")
             imgui.TextColoredRGB("Интерьеры принято размещать на высоте в {00FF00}1000")
@@ -3266,9 +3365,8 @@ function imgui.OnDrawFrame()
 		 imgui.SameLine()
 		 imgui.Link("https://gtamods.com/wiki/SA_Limit_Adjuster", "https://gtamods.com/wiki/SA_Limit_Adjuster")
          
-
       elseif tabmenu.info == 3 then
-         resetIO()
+
          imgui.Text(u8"Цветовая палитра")
          imgui.PushStyleColor(imgui.Col.Button, imgui.ImVec4(1.0, 0.0, 0.0, 1.0))
          if imgui.Button("{FF0000}  RED    ", imgui.ImVec2(120, 25)) then
@@ -3392,44 +3490,57 @@ function imgui.OnDrawFrame()
 			sampAddChatMessage("Цвет {000000}BLACK{FFFFFF} скопирован в буфер обмена", -1)
          end
          imgui.PopStyleColor()
-       
-         imgui.Text(u8"Тест RGB текста, например введите: {00FF00}Текст")
-         if imgui.InputText("##RGBtext", textbuffer.rgb) then
+         
+         if isTraining then
+            imgui.Text(u8"На TRAINING используется ARGB формат цвета 0xAARRGGBB")
+         elseif isAbsolutePlay then
+            imgui.Text(u8"На Absolute Play используется HEX формат цвета RRGGBB")
          end
-         imgui.TextColoredRGB(u8:decode(textbuffer.rgb.v))
-       
+         imgui.Text(u8"RR - красная часть цвета, GG - зеленая, BB - синяя,")
          imgui.SameLine()
-         if imgui.Button(u8"Скопировать") then
-            setClipboardText(textbuffer.rgb.v)
-			sampAddChatMessage("Текст скопирован в буфер обмена", -1)
+         imgui.Text(u8"AA - альфа")
+         if imgui.IsItemHovered() then
+            imgui.BeginTooltip()
+            imgui.PushTextWrapPos(600)
+            imgui.TextUnformatted(u8"Для альфа значения FF, цвет будет отображаться непрозрачно, 00 сделает прозрачным")
+            imgui.PopTextWrapPos()
+            imgui.EndTooltip()
          end
-       
-         imgui.Text(u8"RR - красная часть цвета, GG - зеленая, BB - синяя, AA - альфа")
-         imgui.ColorEdit4("##ColorEdit4", color)
+         imgui.PushItemWidth(255)
+         imgui.ColorEdit4("##ColorEdit4", input.colorpicker)
+         imgui.PopItemWidth()
          imgui.SameLine()
-		 local hexcolor = tostring(intToHex(join_argb(color.v[4] * 255,
-		 color.v[1] * 255, color.v[2] * 255, color.v[3] * 255)))
-         imgui.Text("HEX: " .. hexcolor)
-         if imgui.IsItemClicked() then
+		 local hexcolor = tostring(intToHex(join_argb(input.colorpicker.v[4] * 255,
+		 input.colorpicker.v[1] * 255, input.colorpicker.v[2] * 255, input.colorpicker.v[3] * 255)))
+         if imgui.Selectable("HEX: " .. string.upper(hexcolor)) then
             setClipboardText(hexcolor)
             sampAddChatMessage("Цвет скопирован в буфер обмена", -1)
          end
          imgui.SameLine()
          imgui.TextQuestion("( ? )", u8"Нажмите чтобы скопировать цвет в буфер обмена")
 		 
-		 if isCharInAnyCar(PLAYER_PED) then 
-            local carhandle = storeCarCharIsInNoSave(PLAYER_PED)
-            imgui.TextColoredRGB(string.format("Цвет текущего т/с %d и %d", getCarColours(carhandle)))
+         imgui.Spacing()
+         imgui.Text(u8"Тест RGB текста, например введите: {00FF00}Текст")
+         imgui.PushItemWidth(375)
+         if imgui.InputText("##RGBtext", textbuffer.rgb) then
          end
-		 
-		 imgui.Spacing()
-		 imgui.TextColoredRGB("Цвета транспорта")
-		 imgui.SameLine()
-		 imgui.Link("https://www.open.mp/docs/scripting/resources/vehiclecolorid", "www.open.mp")
-         		 
-		 imgui.TextColoredRGB("Другие цвета")
-		 imgui.SameLine()
-		 imgui.Link("https://encycolorpedia.ru/websafe", "encycolorpedia.ru")
+         imgui.PopItemWidth()
+         imgui.TextColoredRGB(u8:decode(textbuffer.rgb.v))
+         
+         if imgui.Button(u8"Скопировать") then
+            setClipboardText(textbuffer.rgb.v)
+			sampAddChatMessage("[SCRIPT]: {FFFFFF}Текст скопирован в буфер обмена", 0x0FF6600)
+         end
+         imgui.SameLine()
+         if imgui.Button(u8"Сбросить") then
+            textbuffer.rgb.v = ""
+            resetIO()
+         end
+         imgui.SameLine()
+         if imgui.Button(u8"Отправить в чат") then
+            sampSetChatInputEnabled(true)
+            sampSetChatInputText(u8:decode(textbuffer.rgb.v))
+         end
          
       elseif tabmenu.info == 4 then
          
@@ -3449,6 +3560,49 @@ function imgui.OnDrawFrame()
             end
 		 end
 		 
+         if imgui.CollapsingHeader(u8'Поиск текстур') then
+            imgui.Text(u8"В этом разделе вы можете найти текстуры через сайт")
+            imgui.SameLine()
+            imgui.Link("https://textures.xyin.ws/?page=textures&limit=100", "textures.xyin.ws")
+            imgui.SameLine()
+            imgui.TextQuestion("( ? )", u8"Все запросы перенаправляет в ваш браузер")
+            imgui.Spacing()
+            
+            imgui.Text(u8"Введите ключевое слово для поиска (на латинице):")
+	        imgui.PushItemWidth(220)
+	        if imgui.InputText("##CheckObject", textbuffer.objectid) then
+            end
+            imgui.PopItemWidth()
+		    
+		    imgui.SameLine()
+	        if imgui.Button(u8"Найти",imgui.ImVec2(65, 25)) then
+		       if string.len(textbuffer.objectid.v) > 3 then
+                  local link = 'explorer "https://textures.xyin.ws/?page=textures&limit=100&search='.. u8:decode(textbuffer.objectid.v)..'"'
+		          os.execute(link)
+               else
+                  sampAddChatMessage("[SCRIPT]: {FFFFFF}Введите больше 3-х символов для поиска",0x0FF6600)
+		       end
+	        end 
+            
+            if LastObject.txdid ~= nil then
+               local txdtable = sampTextureList[LastObject.txdid+1]
+               local txdname = tostring(txdtable[3])
+               imgui.TextColoredRGB("Последняя использованная текстура: {007DFF}"..txdname.."("..LastObject.txdid..")")
+               if imgui.IsItemClicked() then
+                  textbuffer.objectid.v = txdname
+               end
+            end
+            
+            if isTraining then
+               imgui.TextColoredRGB("Найти нужную текстуру можно командой: {696969}/tsearch <objectid> <slot> <name>")
+            else
+               imgui.TextColoredRGB("Найти нужную текстуру можно командой: {696969}/tsearch <text>")
+            end
+            imgui.TextColoredRGB("Посмотреть индексы(слои): {696969}/sindex")
+            imgui.TextColoredRGB("Показать использованные за сеанс текстуры: {696969}/tlist")
+            imgui.Spacing()
+         end
+         
          if imgui.CollapsingHeader(u8'Популярные текстуры') then
             if isTraining then
                imgui.TextColoredRGB("{FF6600}8660{FFFFFF} - невидимая текстура")
@@ -3479,10 +3633,6 @@ function imgui.OnDrawFrame()
                imgui.TextColoredRGB("{FF6600}2410{FFFFFF} - флаги")
                imgui.TextColoredRGB("{FF6600}1847{FFFFFF} - дверь")
                imgui.TextColoredRGB("{FF6600}1665{FFFFFF} - сетка прозрачная")
-               imgui.Spacing()
-               imgui.TextColoredRGB("{FF6600}/tsearch <objectid> <slot> <name>{FFFFFF} - наложение текстуры по поиску")
-               imgui.TextColoredRGB("{FF6600}/stexture <objectid> <slot> <index>{FFFFFF} - наложить текстуру на объект по индексу")
-               imgui.TextColoredRGB("{FF6600}/untexture <objectid>{FFFFFF} - обнулить наложенные текстуры (и /ocolor)")
             end
             if isAbsolutePlay then
                imgui.TextColoredRGB("{00FF00}90{FFFFFF} - Вода из ViceCity")
@@ -3501,8 +3651,6 @@ function imgui.OnDrawFrame()
                imgui.TextColoredRGB("{00FF00}8{FFFFFF} - Снег")
                imgui.TextColoredRGB("{00FF00}65{FFFFFF} - Финиш (Флаг)")
                imgui.TextColoredRGB("{00FF00}107{FFFFFF} - Скайбокс")
-               imgui.Spacing()
-               imgui.TextColoredRGB("Используйте {00FF00}/tsearch{FFFFFF} для поиска тексуры")
             end
             imgui.TextColoredRGB("Топлист текстур онлайн:")
 		    imgui.SameLine()
@@ -3636,6 +3784,10 @@ function imgui.OnDrawFrame()
             file:close()
          end
          imgui.SameLine()
+         if imgui.TooltipButton(u8"Изменить", imgui.ImVec2(80, 25), u8:encode("Разблокировать для редактирования")) then
+            readonly = false
+         end
+         imgui.SameLine()
          if imgui.TooltipButton(u8"Сохранить", imgui.ImVec2(80, 25), u8:encode("Сохранить избранные в favorites.txt")) then
             if not readonly then
                local file = io.open(filepath, "w")
@@ -3647,7 +3799,7 @@ function imgui.OnDrawFrame()
             end
          end 
          imgui.SameLine()
-         imgui.PushItemWidth(190)
+         imgui.PushItemWidth(150)
          imgui.InputText("##search", textbuffer.searchbar)
          imgui.PopItemWidth()
          imgui.SameLine()
@@ -3667,8 +3819,6 @@ function imgui.OnDrawFrame()
                sampAddChatMessage("Результат поиска: Не найдено", -1)
             end
          end
-         imgui.SameLine()
-         imgui.TextQuestion("( ? )", u8"Поиск по тексту регистрозависим!")
          
          imgui.PushFont(multilinetextfont)
          if readonly then
@@ -3714,6 +3864,8 @@ function imgui.OnDrawFrame()
                imgui.TextColoredRGB("{696969}/saveworld{FFFFFF} - сохранить мир")
                imgui.TextColoredRGB("{696969}/loadworld{FFFFFF} - загрузить мир")
                imgui.TextColoredRGB("{696969}/undo{FFFFFF} - восстановить удаленный объект")
+               imgui.TextColoredRGB("{696969}/tlist{FFFFFF} - список использованных текстур за текущую сессию")
+               imgui.TextColoredRGB("{696969}/tpaste <id>{FFFFFF} - применить последнюю текстуру на объект")
             end
             
             if not isAbsolutePlay then
@@ -4186,6 +4338,8 @@ function imgui.OnDrawFrame()
 		    if string.len(textbuffer.objectid.v) > 3 then
                local link = 'explorer "https://dev.prineside.com/ru/gtasa_samp_model_id/search/?q='.. u8:decode(textbuffer.objectid.v)..'"'
 		       os.execute(link)
+            else
+               sampAddChatMessage("[SCRIPT]: {FFFFFF}Введите больше 3-х символов для поиска",0x0FF6600)
 		    end
 	     end 
          
@@ -4269,6 +4423,10 @@ function imgui.OnDrawFrame()
          end
          imgui.SameLine()
          imgui.TextQuestion("( ? )", u8"Поиск по тексту регистрозависим!")
+         imgui.SameLine()
+         if imgui.TooltipButton(u8"Туториалы", imgui.ImVec2(85, 25), u8:encode("Командные блоки (Описание/Туториалы) на форуме")) then
+            os.execute('explorer https://forum.training-server.com/d/4466/1')
+         end
          
          imgui.PushFont(multilinetextfont)
          imgui.InputTextMultiline('##cblist', textbuffer.cblist, imgui.ImVec2(490, 370),
@@ -4494,11 +4652,6 @@ function imgui.OnDrawFrame()
             
             imgui.Text(u8"Для всех игроков в мире:")
             if imgui.Button(u8"Пополнить хп", imgui.ImVec2(150, 25)) then
-               -- if isAbsolutePlay then
-                  -- for k, v in pairs(playersTable) do
-                     -- sampSendChat("/хп "..v)
-                  -- end
-               -- end
                if isTraining then
                   sampSendChat("/health 100")
                   sampAddChatMessage("[SCRIPT]: {FFFFFF}Вы пополнили хп до 100 всем игрокам в мире", 0x0FF6600)
@@ -4515,16 +4668,9 @@ function imgui.OnDrawFrame()
             if imgui.Button(u8"Ресснуть игроков", imgui.ImVec2(150, 25)) then
                if isTraining then
                   sampSendChat("/ressall")
-                  --sampAddChatMessage("Вы пополнили броню до 100 всем игрокам в мире", -1)
                end
             end
             
-            -- if imgui.Button(u8"Изменить спавн", imgui.ImVec2(150, 25)) then
-               -- if isAbsolutePlay then
-                  -- sampAddChatMessage("Изменить спан можно в меню", 0x000FF00)
-                  -- sampAddChatMessage("Y - Редактор миров - Управление мирами - Выбрать точку появления", 0x000FF00)
-               -- end
-            -- end
             imgui.Text(u8"Введите ID:")
             --imgui.SameLine()
             imgui.PushItemWidth(50)
@@ -4999,12 +5145,6 @@ function imgui.OnDrawFrame()
                   sampAddChatMessage("Не указан приз, либо указан не в числовом формате", -1)
                end
             end
-            -- if isAbsolutePlay then
-               -- imgui.Text(u8"Не забудьте после завершения мероприятия:")
-               -- imgui.Text(u8"- Вернуть точку спавна на исходное положение")
-               -- imgui.Text(u8"- Открыть мир для входа")
-               -- imgui.Text(u8"- Вернуть пак оружия на стандартный")
-            -- end
             
             imgui.Text(u8"Оставшиеся игроки рядом:")
             local playerscounter = 0
@@ -5173,10 +5313,7 @@ function imgui.OnDrawFrame()
                   end
                end
             end
-	        -- if imgui.Checkbox(u8("Уведомлять о пополнении хп игроком"), checkbox.healthcheck) then
-               -- sampAddChatMessage("Недоступно в бета версии", -1)
-            -- end
-            
+
             imgui.Spacing()
             
             imgui.Text(u8"Проверить игроков:")
@@ -5289,23 +5426,6 @@ function imgui.OnDrawFrame()
                end
             end
             
-            -- if imgui.Button(u8"Игроки с NonRP никами", imgui.ImVec2(220, 25)) then
-               -- local nonrp = 0
-               -- for k, i in pairs(playersTable) do
-                  -- if sampIsPlayerConnected(i) then 
-		             -- local nickname = sampGetPlayerNickname(i)
-                     -- if not nickname:find("_") then
-                        -- nonrp = nonrp + 1
-                        -- sampAddChatMessage(string.format("{FF0000}Игрок %s[%d] с NonRP ником", nickname, i), -1)
-                     -- end
-                  -- end 
-               -- end
-               -- if nonrp == 0 then
-                  -- sampAddChatMessage("Не найдено игроков с NonRP никами", -1)
-               -- else
-                  -- sampAddChatMessage("Всего игроков: "..nonrp, -1)
-               -- end
-            -- end
             imgui.SameLine()
             if imgui.Button(u8"Игроки с малым уровнем", imgui.ImVec2(220, 25)) then
                local minscore = 5
@@ -6260,6 +6380,7 @@ function sampev.onSendDialogResponse(dialogId, button, listboxId, input)
          if input:find("Ачивки") then
             sampSendChat("/ach")
          end
+         
          -- Extend main /vw menu
          if input:find("Настройки для команд") then
             sampSendChat("/team")
@@ -6272,7 +6393,7 @@ function sampev.onSendDialogResponse(dialogId, button, listboxId, input)
             sampSendChat("/cblist")
          end
          if input:find("Список триггер блоков") then
-            sampSendChat("/tblist")
+            sampSendChat("/tb")
          end
          if input:find("Список таймеров") then
             sampSendChat("/timers")
@@ -6299,13 +6420,6 @@ end
 
 function sampev.onShowDialog(dialogId, style, title, button1, button2, text)
    if isAbsolutePlay and ini.settings.extendedmenues then
-      -- save random color from text editing dialog to clipboard
-      -- moved to absolutefix
-      -- if dialogId == 1496 then
-         -- local randomcolor = string.sub(text, string.len(text)-6, #text-1)
-		 -- printStringNow("color "..randomcolor.." copied to clipboard",1000)
-	     -- setClipboardText(randomcolor)
-      -- end
       if dialogId == 1400 and title:find("Управление мира") then
          isWorldHoster = true
       end
@@ -6555,9 +6669,12 @@ function sampev.onShowDialog(dialogId, style, title, button1, button2, text)
       
    -- Skip olist when exit from /omenu
    if isTraining and dialogId == 65535 and ini.settings.skipomenu then
-      if LastData.lastDialogInput ~= "Слот 1" -- /att fix
-      and LastData.lastDialogInput ~= " - Скин по умолчанию" then -- team skin fix
-         sampSendClickTextdraw(2118)
+      if LastData.lastDialogInput then
+         if not LastData.lastDialogInput:find("Слот") -- /att fix
+         and not LastData.lastDialogInput:find("Скин по умолчанию") -- team skin fix
+         and not LastData.lastDialogInput:find("Модель входа") then -- /pass fix
+            sampSendClickTextdraw(2118)
+         end
       end
    end
    
@@ -6567,6 +6684,9 @@ function sampev.onShowDialog(dialogId, style, title, button1, button2, text)
 end
 
 function sampev.onServerMessage(color, text)
+   --HEX to dec example:
+   --local hex = ('%x'):format(4289003775)
+   --local dec = tonumber('FFA500FF', 16)
    local id = getLocalPlayerId()
    local nickname = sampGetPlayerNickname(id)
    
@@ -6705,13 +6825,9 @@ function sampev.onServerMessage(color, text)
          end
          if text:find('применена текстура: (%d+)') then
             LastObject.txdid = text:match('.+применена текстура: (%d+)')
+            dialoghook.textureslist = false
             if LastObject.localid then
                worldTexturesList[LastObject.localid] = LastObject.txdid
-               -- if worldTexturesList[LastObject.localid] then 
-                  -- worldTexturesList[LastObject.localid] = LastObject.txdid
-               -- else
-                  -- table.insert(worldTexturesList, LastObject.localid, LastObject.txdid)
-               -- end
             end
          end
       end
@@ -6736,22 +6852,40 @@ function sampev.onServerMessage(color, text)
                local pointpos = text:find(":")
                local cleartext = text:sub(pointpos, string.len(text))
                if cleartext:find(nickname) then
-                  printStyledString('You were mentioned in the chat', 2000, 4)
-                  addOneOffSound(0.0, 0.0, 0.0, 1138) -- CHECKPOINT_GREEN
-                 -- return true
+                  if ini.mentions.usegametext then
+                     printStyledString('You were mentioned in the chat', 2000, 4)
+                  end
+                  if ini.mentions.usesound then
+                     addOneOffSound(0.0, 0.0, 0.0, ini.mentions.sound) -- CHECKPOINT_GREEN
+                  end
+                  if ini.mentions.usecolor then
+                     return {color, "{"..ini.mentions.color.."}"..text}
+                  end
                end
              else
-               printStyledString('You were mentioned in the chat', 2000, 4)
-               addOneOffSound(0.0, 0.0, 0.0, 1138) -- CHECKPOINT_GREEN
-              -- return true
+               if ini.mentions.usegametext then
+                  printStyledString('You were mentioned in the chat', 2000, 4)
+               end
+               if ini.mentions.usesound then
+                  addOneOffSound(0.0, 0.0, 0.0, ini.mentions.sound) -- CHECKPOINT_GREEN
+               end
+               if ini.mentions.usecolor then
+                  return {color, "{"..ini.mentions.color.."}"..text}
+               end
             end
          end
          
          -- mentions by id
          if text:match("(%s"..id.."%s)") then
-            printStyledString('You were mentioned in the chat', 2000, 4)
-            addOneOffSound(0.0, 0.0, 0.0, 1138) -- CHECKPOINT_GREEN
-            --return true
+            if ini.mentions.usegametext then
+               printStyledString('You were mentioned in the chat', 2000, 4)
+            end
+            if ini.mentions.usesound then
+               addOneOffSound(0.0, 0.0, 0.0, ini.mentions.sound) -- CHECKPOINT_GREEN
+            end
+            if ini.mentions.usecolor then
+               return {color, "{"..ini.mentions.color.."}"..text}
+            end
          end
       end
    end
@@ -6787,6 +6921,12 @@ function sampev.onServerMessage(color, text)
          local phoneneumber = string.match(newtext, "%+(%d+)")
          if phoneneumber and string.len(phoneneumber) >= 10 then
             newtext = newtext:gsub("%+(%d+)", "**********")
+         end
+      end
+      
+      if checkbox.chathidecb.v and color == -10092289 then
+         if newtext:find("%[CB%]%:.*") then
+            newtext = newtext:gsub("%[CB%]%:.", "")
          end
       end
       
@@ -7011,6 +7151,13 @@ function sampev.onSendCommand(command)
       worldspawnpos.x = 0
       worldspawnpos.y = 0
       worldspawnpos.z = 0
+      -- fix audiostream 
+      if isTraining then
+         -- send StopAudioStream()
+         local bs = raknetNewBitStream()
+         raknetEmulRpcReceiveBitStream(42,bs)         
+         raknetDeleteBitStream(bs)
+      end
    end
    
    if command:find("/time") and isTraining then
@@ -7023,7 +7170,7 @@ function sampev.onSendCommand(command)
       if sampIsLocalPlayerSpawned() then
          tpcpos.x, tpcpos.y, tpcpos.z = getCharCoordinates(PLAYER_PED)
 	     setClipboardText(string.format("%.2f %.2f %.2f", tpcpos.x, tpcpos.y, tpcpos.z))
-	     sampAddChatMessage("Позиция скопирована в буфер обмена", -1)
+	     sampAddChatMessage("[SCRIPT]: {FFFFFF}Позиция скопирована в буфер обмена", 0x0FF6600)
          if isAbsolutePlay then
             sampAddChatMessage("Используйте /gopos чтобы телепортироваться на сохраненную позицию ", 0x000FF00)
          end
@@ -7083,26 +7230,33 @@ function sampev.onSendCommand(command)
       return false
    end
    
-   if command:find("/spec") then
-      if isAbsolutePlay then
-	     if not isPlayerSpectating then 
-	        if chosenplayer and sampIsPlayerConnected(chosenplayer) then
-	           sampSendChat("/набл "..chosenplayer)
+   if isAbsolutePlay and command:find("/spec") then
+	  if not isPlayerSpectating then 
+	     if chosenplayer and sampIsPlayerConnected(chosenplayer) then
+	        sampSendChat("/набл "..chosenplayer)
+	     else
+	        if getClosestPlayerId() ~= -1 then
+	           sampSendChat("/набл "..getClosestPlayerId())
 	        else
-	           if getClosestPlayerId() ~= -1 then
-	              sampSendChat("/набл "..getClosestPlayerId())
-	           else
-	     	      sampSendChat("/полет")
-	           end
+	  	       sampSendChat("/полет")
 	        end
-         end
-	  end
+	     end
+      end
    end
    
    -- editmodes hook
    if command:find("/csel") or command:find("/editobject") and not isTraining then
       sampAddChatMessage("Включен режим редактирования объекта", 0x000FF00)
       enterEditObject()
+      return false
+   end
+   
+   if isTraining and command:find("/action") then
+      sampAddChatMessage("[SCRIPT]: {FFFFFF}Рекомендуется использовать /otext вместо /action", 0x0FF6600)
+   end
+   
+   if isTraining and command:find("/tblist") then
+      sampSendChat("/tb")
       return false
    end
    
@@ -7163,10 +7317,6 @@ function sampev.onSendCommand(command)
          if isValidObjectModel(id) then 
             LastRemovedObject.modelid = id
             checkBuggedObject(id)
-            -- if not isValidObjectModel(id) then
-               -- sampAddChatMessage("[ERROR]: {FFFFFF}Данный объект запрещен или не существует!", 0x0CC0000)
-               -- return false
-            -- end
          end
       else
          if LastObject.modelid then
@@ -7188,6 +7338,7 @@ function sampev.onSendCommand(command)
             editMode = 4
          end
          showRetextureKeysHelp()
+         dialoghook.textureslist = true
       else
          if LastObject.txdid ~= nil then
             sampAddChatMessage("[SCRIPT]: {FFFFFF}Последняя использованная текстура: " .. LastObject.txdid, 0x0FF6600)
@@ -7302,9 +7453,9 @@ function sampev.onSendCommand(command)
          for index = 0, 15 do 
             setMaterialObject(LastObject.id, 1, index, LastObject.modelid, "none", "none", 0xFFFFFFFF)
          end
-         sampAddChatMessage("Режим визуального просмотра индексов отключен", 0x000FF00)
+         sampAddChatMessage("[SCRIPT]: {FFFFFF}Режим визуального просмотра индексов отключен", 0x000FF00)
       else
-         sampAddChatMessage("Последний созданный объект не найден", -1)
+         sampAddChatMessage("[SCRIPT]: {FFFFFF}Последний созданный объект не найден", -1)
       end
       return false
    end
@@ -7317,7 +7468,7 @@ function sampev.onSendCommand(command)
 	 	    input.rendselectedmodelid.v = LastObject.modelid
             checkbox.drawlinetomodelid.v = true
          else
-            sampAddChatMessage("Последний созданный объект не найден", -1)
+            sampAddChatMessage("[SCRIPT]: {FFFFFF}Последний созданный объект не найден", 0x0FF6600)
 	     end
       end
       return false
@@ -7401,7 +7552,7 @@ function sampev.onSendCommand(command)
       end
       return false
    end
-   
+    
    if command:find("/tsearch") and not isTraining then
       if command:find('(.+) (.+)') then
          local cmd, arg = command:match('(.+) (.+)')
@@ -7446,6 +7597,7 @@ function sampev.onSendCommand(command)
          return false
       else
          showRetextureKeysHelp()
+         dialoghook.textureslist = true
       end
    end
    
@@ -7571,19 +7723,23 @@ function sampev.onSendCommand(command)
    end
    
    if command:find("/restream") then
-      Restream()
+      if not isLockPlayerControl then
+         Restream()
+      else
+         sampAddChatMessage("[SCRIPT]: {FFFFFF}Недоступно в данный момент", 0x0FF6600)
+      end
       return false
    end 
    
    if isTraining and command:find("/afkkick") then
       local counter = 0
 	  if next(playersTable) == nil then 
-	     sampAddChatMessage("Сперва обнови список игроков!", -1) 
+	     sampAddChatMessage("[SCRIPT]: {FFFFFF}Сперва обнови список игроков!", 0x0FF6600) 
          return false
       end
       
       if not isWorldHoster then 
-	     sampAddChatMessage("Вы не находитесь в вирутальном в мире!", -1) 
+	     sampAddChatMessage("[SCRIPT]: {FFFFFF}Вы не находитесь в вирутальном в мире!", 0x0FF6600) 
          return false
       end
       
@@ -7595,7 +7751,7 @@ function sampev.onSendCommand(command)
 	     end
 	  end
 	  if counter == 0 then
-	     sampAddChatMessage("АФКашники не найдены", -1)
+	     sampAddChatMessage("[SCRIPT]: {FFFFFF}АФКашники не найдены", 0x0FF6600)
 	  end
 	  
       return false
@@ -7681,24 +7837,16 @@ function sampev.onSetObjectMaterial(id, data)
       print(id, data.materialId, data.modelId, data.libraryName, data.textureName, data.color)
    end
    
-   --local showtxd = true
-   --if showtxd then
-      --local x1, y1 = convert3DCoordsToScreen(data.position.x, data.position.y, data.position.z)
-      --renderFontDrawText(objectsrenderfont, ""..data.libraryName, data.textureName, x1, y1, -1)
-      --sampCreate3dText(""..data.materials, 0x000FF00, data.position.x, data.position.y, data.position.z, 50.0, false)
-      
-      -- local handle = sampGetObjectHandleBySampId(id)
-      -- local result, x, y, z = getObjectCoordinates(handle)
-      -- local position = {x = x, y = y, z = z}
-      -- print(id, handle, position.x, position.y, position.z)
-
-      --print(materials.position)
-      --materials.id = id
-      --materials.handle = handle
-      --print(data.libraryName)
-      --print(data.textureName)
-      
-   --end
+   -- local showtxd = true
+   -- if showtxd and data.textureName then
+      -- local objectid = sampGetObjectHandleBySampId(id)
+      -- local result, x, y, z = getObjectCoordinates(objectid)
+      -- local modelid = getObjectModel(objectid)
+      -- if modelid ~= 2661 then -- ignore /texture menu
+         -- local tmp3dtext = sampCreate3dText(""..data.textureName, 0xFF00FF00, x, y, z+0.1, 25.0, true, -1, -1)
+         -- print(tmp3dtext, objectid, modelid, data.textureName)
+      -- end
+   -- end
 end
 
 function sampev.onSendEditObject(playerObject, objectId, response, position, rotation)
@@ -7713,7 +7861,6 @@ function sampev.onSendEditObject(playerObject, objectId, response, position, rot
    LastObject.rotation.x = rotation.x
    LastObject.rotation.y = rotation.y
    LastObject.rotation.z = rotation.z
-   
    
    -- Auto open /omenu on save object 
    -- if isTraining and response == 1 then
@@ -7791,7 +7938,7 @@ function sampev.onSendEnterEditObject(type, objectId, model, position)
    LastObject.startrot.x = LastObject.rotation.x
    LastObject.startrot.y = LastObject.rotation.y
    LastObject.startrot.z = LastObject.rotation.z
-   
+      
    if not isTraining then
       checkBuggedObject(model)
    end
@@ -8316,18 +8463,18 @@ function PlayerWarnings()
             
             if ini.warnings.undermap then
                if pz < 0.5 then
-                  sampAddChatMessage(string.format("{FF0000}Игрок %s[%d] возможно находится под картой",
-                  nickname, id), -1)
+                  sampAddChatMessage(string.format("[WARNING]: {FFFFFF}Игрок %s[%d] возможно находится под картой",
+                  nickname, id), 0xFF880000)
                elseif pz > 1000.0 then
-                  sampAddChatMessage(string.format("{FF0000}Игрок %s[%d] длит в небе (высота: %d)",
-                  nickname, id, pz), -1)
+                  sampAddChatMessage(string.format("[WARNING]: {FFFFFF}Игрок %s[%d] длит в небе (высота: %d)",
+                  nickname, id, pz), 0xFF880000)
                end
             end
             
             if ini.warnings.heavyweapons then
                if weaponid == 38 or weaponid == 35 or weaponid == 36 then
-                  sampAddChatMessage(string.format("{FF0000}Игрок %s[%d] держит в руках тяжелое оружие! (%s [%d])",
-                  nickname, id, weaponNames[weaponid], weaponid), -1)
+                  sampAddChatMessage(string.format("[WARNING]: {FFFFFF}Игрок %s[%d] держит в руках тяжелое оружие! (%s [%d])",
+                  nickname, id, weaponNames[weaponid], weaponid), 0xFF880000)
                end
             end
             
@@ -8335,8 +8482,8 @@ function PlayerWarnings()
                --print(weaponid)
                for key, value in pairs(legalweapons) do
                   if value ~= weaponid and weaponid > 1 then
-                     sampAddChatMessage(string.format("{FF0000}Игрок %s[%d] держит в руках нелегальное оружие! (%s [%d])",
-                     nickname, id, weaponNames[weaponid], weaponid), -1)
+                     sampAddChatMessage(string.format("[WARNING]: {FFFFFF}Игрок %s[%d] держит в руках нелегальное оружие! (%s [%d])",
+                     nickname, id, weaponNames[weaponid], weaponid), 0xFF880000)
                      break
                   end
                end
@@ -8346,8 +8493,8 @@ function PlayerWarnings()
                if checkbox.healthcheck.v then
                   print(health, tonumber(textbuffer.mphp.v))
                   if health > tonumber(textbuffer.mphp.v) then
-                     sampAddChatMessage(string.format("{FF0000}Игрок %s[%d] hp: %d превышает разрешенное значение! (max: %d)",
-                     nickname, id, health, tonumber(textbuffer.mphp.v)), -1)
+                     sampAddChatMessage(string.format("[WARNING]: {FFFFFF}Игрок %s[%d] hp: %d превышает разрешенное значение! (max: %d)",
+                     nickname, id, health, tonumber(textbuffer.mphp.v)), 0xFF880000)
                   end
                end
             end
@@ -8355,23 +8502,23 @@ function PlayerWarnings()
             if ini.warnings.armourrefill then
                if checkbox.healthcheck.v then
                   if armour > tonumber(textbuffer.mparmour.v) then
-                     sampAddChatMessage(string.format("{FF0000}Игрок %s[%d] armour: %d превышает разрешенное значение! (max: %d)",
-                     nickname, id, armour, tonumber(textbuffer.mparmour.v)), -1)
+                     sampAddChatMessage(string.format("[WARNING]: {FFFFFF}Игрок %s[%d] armour: %d превышает разрешенное значение! (max: %d)",
+                     nickname, id, armour, tonumber(textbuffer.mparmour.v)), 0xFF880000)
                   end
                end
             end
             
             if ini.warnings.laggers then
                if ping > 50 then
-                  sampAddChatMessage(string.format("{FF0000}Игрок %s[%d] лагер! (ping %d)",
-                  nickname, id, ping), -1)
+                  sampAddChatMessage(string.format("[WARNING]: {FFFFFF}Игрок %s[%d] лагер! (ping %d)",
+                  nickname, id, ping), 0xFF880000)
                end
             end
             
             if ini.warnings.afk then
                if afk then
-                  sampAddChatMessage(string.format("{FF0000}Игрок %s[%d] в AFK",
-                  nickname, id), -1)
+                  sampAddChatMessage(string.format("[WARNING]: {FFFFFF}Игрок %s[%d] в AFK",
+                  nickname, id), 0xFF880000)
                end
             end
          end
@@ -8382,7 +8529,9 @@ end
 
 function Restream()
    lua_thread.create(function()
-   sampAddChatMessage('Начинается процесс рестрима. Ожидайте 5 секунд', -1)
+   lockPlayerControl(true)
+   isLockPlayerControl = true
+   sampAddChatMessage("[SCRIPT]: {FFFFFF}Начинается процесс рестрима. Ожидайте 5 секунд", 0x0FF6600)
    tpcpos.x, tpcpos.y, tpcpos.z = getCharCoordinates(PLAYER_PED)
    if isAbsolutePlay then
       sampSendChat(string.format("/ngr %f %f %f",
@@ -8403,7 +8552,9 @@ function Restream()
    else
       setCharCoordinates(PLAYER_PED, tpcpos.x, tpcpos.y, tpcpos.z)
    end
-   sampAddChatMessage('Рестрим завершен', -1)
+   lockPlayerControl(false)
+   isLockPlayerControl = false
+   sampAddChatMessage("[SCRIPT]: {FFFFFF}Рестрим завершен", 0x0FF6600)
    end)
 end
 
