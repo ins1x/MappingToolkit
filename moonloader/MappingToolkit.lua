@@ -4,7 +4,7 @@ script_description("Assistant for mappers and event makers")
 script_dependencies('imgui', 'lib.samp.events')
 script_properties("work-in-pause")
 script_url("https://github.com/ins1x/MappingToolkit")
-script_version("3.6")
+script_version("3.7")
 -- script_moonloader(16) moonloader v.0.26
 -- tested on sa-mp client version: 0.3.7 R1
 -- activaton: ALT + X (show main menu) or command /toolkit
@@ -29,6 +29,7 @@ local ini = inicfg.load({
       autodevmode = true,
       autoengine = false,
       camdist = "1",
+      cbvalautocomplete = true,
       checkupdates = true,
       chatfilter = true,
       chathidecb = false,
@@ -37,9 +38,11 @@ local ini = inicfg.load({
       dialogautocomplete = true,
       drawdist = "450",
       editkey = true,
+      editnocol = false,
       extendedmenues = true,
       fov = 70,
       fog = "200",
+      flymodespeed = 0.3,
       freezechat = false,
       hotkeys = true,
       imguifont = "trebucbd",
@@ -152,10 +155,13 @@ local isChatFreezed = false
 local isWarningsActive = false
 local chosenplayerMarker = nil
 local isLockPlayerControl = false
+local hidePlayerObjects = false
 local firstSpawn = true
 local formatChat = true
 local readonly = true
 local minigame = nil
+local cbvaluebuffer = nil
+local flymode = false
 local fps = 0
 local fps_counter = 0
 local vehinfomodelid = 0 
@@ -169,6 +175,8 @@ local hiddenObjects = {}
 local chatbuffer = {}
 local blacklist = {}
 local chatfilter = {}
+local hiddenPlayerObjects = {}
+
 -- should be global!
 vehiclesTotal = 0
 playersTotal = 0
@@ -197,6 +205,7 @@ local dialoghook = {
    textureslist = false,
    sampobjectslist = false,
    exitdialog = false,
+   cbvalue = false,
    devmenutoggle = false
 }
 
@@ -266,7 +275,9 @@ local checkbox = {
    lightmap = imgui.ImBool(false),
    hidealltextdraws = imgui.ImBool(false),
    hidematerialtext = imgui.ImBool(false),
+   hideped = imgui.ImBool(false),
    objectcollision = imgui.ImBool(false),
+   editnocol = imgui.ImBool(false),
    changemdo = imgui.ImBool(false),
    findveh = imgui.ImBool(false),
    healthcheck = imgui.ImBool(false),
@@ -306,6 +317,7 @@ local slider = {
    time = imgui.ImInt(ini.settings.time),
    fov = imgui.ImInt(ini.settings.fov),
    scale = imgui.ImFloat(1.0),
+   flymodespeed = imgui.ImFloat(ini.settings.flymodespeed),
    camdist = imgui.ImInt(ini.settings.camdist)
 }
 
@@ -968,7 +980,7 @@ function main()
       -- Imgui menu
       imgui.RenderInMenu = false
       imgui.ShowCursor = true
-      imgui.LockPlayer = false 
+      imgui.LockPlayer = false
       imgui.Process = dialog.main.v
       
       -- chatfix
@@ -978,11 +990,18 @@ function main()
             sampSetChatInputEnabled(true)
          end
       end
-      
+   
 	  -- Camera distantion set
 	  if ini.settings.usecustomcamdist then
 	     setCameraDistanceActivated(1)
 		 setCameraDistance(ini.settings.camdist)
+         
+         -- Fix cam stuck bug
+         if isKeyDown(0x56) or isKeyDown(0x24) then -- V or HOME key
+            ini.settings.usecustomcamdist = false
+	        setCameraDistanceActivated(0)
+		   	setCameraDistance(0)
+         end
 	  end
 	  
 	  -- preset time and weather
@@ -1032,7 +1051,21 @@ function main()
             if isWorldHoster then sampSendChat("/csel") end
          end
       end
-         
+      
+      if isTraining and ini.settings.cbvalautocomplete then
+         -- CTRL + SHIFT + V
+         if isKeyDown(0x11) and isKeyDown(0x10) and isKeyDown(0x56) 
+         and not sampIsChatInputActive() and not isPauseMenuActive()
+         and not isSampfuncsConsoleActive() then  
+            if cbvaluebuffer then
+               lua_thread.create(function()
+                  wait(50)
+                  sampSetCurrentDialogEditboxText(tostring(cbvaluebuffer))
+               end)
+            end
+         end
+      end
+      
       if ini.settings.hotkeys then
 	     -- In onSendEditObject copy object modelid on RMB
 	     if isKeyJustPressed(0x02) and editResponse == 2 and not sampIsChatInputActive() 
@@ -1083,14 +1116,16 @@ function main()
             end
          end
          
-         if isTraining and isCharInAnyCar(PLAYER_PED) then
+         if isTraining then
             -- bind car lock/unlock on L key
 	        if isKeyJustPressed(0x4C) and not sampIsChatInputActive() 
             and not sampIsDialogActive() and not isPauseMenuActive() 
             and not isSampfuncsConsoleActive() then 
                sampSendChat("/lock")
             end
-            
+         end
+         
+         if isTraining and isCharInAnyCar(PLAYER_PED) then
             -- Fix exit from RC toys on F key
             if isKeyJustPressed(0x46) and not sampIsChatInputActive() 
             and not sampIsDialogActive() and not isPauseMenuActive() 
@@ -1271,6 +1306,48 @@ function main()
          end
       end
       
+      if flymode then
+         if not isCharInAnyCar(PLAYER_PED) then 
+            speed = getFullSpeed(ini.settings.flymodespeed, 0, 0) 
+            setCharHeading(PLAYER_PED, getHeadingFromVector2d(
+            select(1, getActiveCameraPointAt()) - select(1, getActiveCameraCoordinates()),
+            select(2, getActiveCameraPointAt()) - select(2, getActiveCameraCoordinates()))) 
+         end
+         
+         if sampIsCursorActive() or sampIsChatInputActive() or sampIsDialogActive() then 
+            goto holdposition 
+         end
+         
+         if isKeyDown(0x46) or isKeyDown(0x0D) then -- F/ENTER
+            toggleFlyMode(false)
+         end
+         
+         if isKeyDown(0x20) then -- SPACE
+            flyCoords[3] = flyCoords[3] + speed / 2
+         elseif isKeyDown(0xA0) and flyCoords[3] > -95.0 then -- LSHIFT
+            flyCoords[3] = flyCoords[3] - speed / 2
+         end
+         
+         if isKeyDown(0x57) then -- W key
+            flyCoords[1] = flyCoords[1] + speed * math.sin(-math.rad(getCharHeading(PLAYER_PED)))
+            flyCoords[2] = flyCoords[2] + speed * math.cos(-math.rad(getCharHeading(PLAYER_PED))) 
+         elseif isKeyDown(0x53) then -- S key
+            flyCoords[1] = flyCoords[1] - speed * math.sin(-math.rad(getCharHeading(PLAYER_PED))) 
+            flyCoords[2] = flyCoords[2] - speed * math.cos(-math.rad(getCharHeading(PLAYER_PED)))
+         end
+         
+         if isKeyDown(0x41) then -- A key
+            flyCoords[1] = flyCoords[1] - speed * math.sin(-math.rad(getCharHeading(PLAYER_PED) - 90))
+            flyCoords[2] = flyCoords[2] - speed * math.cos(-math.rad(getCharHeading(PLAYER_PED) - 90)) 
+         elseif isKeyDown(0x44) then -- D key
+            flyCoords[1] = flyCoords[1] + speed * math.sin(-math.rad(getCharHeading(PLAYER_PED) - 90))
+            flyCoords[2] = flyCoords[2] + speed * math.cos(-math.rad(getCharHeading(PLAYER_PED) - 90)) 
+         end
+         
+         ::holdposition::
+         setCharCoordinates(PLAYER_PED, flyCoords[1], flyCoords[2], flyCoords[3])
+         
+      end
       -- Render stats bar
       if ini.settings.showidonhud and not isPauseMenuActive() 
       and not isKeyDown(0x79) and not firstSpawn then -- 0x79 is F10 key
@@ -1357,6 +1434,18 @@ function main()
       end
       -- END main
    end
+end
+
+lua_thread.create(function()
+   while true do
+      wait(1000)
+      fps = fps_counter
+      fps_counter = 0
+   end
+end)
+
+function onD3DPresent()
+   fps_counter = fps_counter + 1
 end
 
 function imgui.BeforeDrawFrame()
@@ -1510,7 +1599,7 @@ function imgui.OnDrawFrame()
                      sampAddChatMessage(string.format("Используйте: /тпк {696969}%.2f %.2f %.2f", tpcpos.x, tpcpos.y, tpcpos.z), -1)
                   end
                   if isTraining and isWorldHoster then
-                     sampAddChatMessage(string.format("[SCRIPT]: {FFFFFF} Используйте: /xyz {696969}%.2f %.2f %.2f", tpcpos.x, tpcpos.y, tpcpos.z), 0x0FF6600)
+                     sampAddChatMessage(string.format("Используйте: /xyz {696969}%.2f %.2f %.2f", tpcpos.x, tpcpos.y, tpcpos.z), -1)
                   end
                end
             end
@@ -1907,7 +1996,7 @@ function imgui.OnDrawFrame()
         -- imgui.SameLine()
         -- imgui.TextQuestion("( ? )", u8"Показывает все скрытые объекты в области стрима")
         
-        if imgui.Checkbox(u8("Отключить коллизию у объектов"), checkbox.objectcollision) then 
+        if imgui.Checkbox(u8("Отключить коллизию у всех объектов"), checkbox.objectcollision) then 
            if checkbox.objectcollision.v then
               disableObjectCollision = true
            else
@@ -1924,8 +2013,15 @@ function imgui.OnDrawFrame()
            end		
         end
         imgui.SameLine()
-        imgui.TextQuestion("( ? )", u8"Применимо только для объектов в области стрима")
-           
+        imgui.TextQuestion("( ? )", u8"Отключает коллизию для всех объектов в области стрима")
+        
+        if imgui.Checkbox(u8("Отключить коллизию у редактируемого объекта"), checkbox.editnocol) then 
+           ini.settings.editnocol = checkbox.editnocol.v
+           inicfg.save(ini, configIni)
+        end
+        imgui.SameLine()
+        imgui.TextQuestion("( ? )", u8"Временно отключает коллизию только для редактируемого объекта")
+        
         imgui.Checkbox(u8("Изменить масштаб объекта"), checkbox.objectscale)
         if checkbox.objectscale.v then
            if LastObject.handle then
@@ -1953,45 +2049,52 @@ function imgui.OnDrawFrame()
             sampAddChatMessage("[SCRIPT]: {FFFFFF}Позиция скопирована в буфер обмена", 0x0FF6600)
          end
 		 
-		 if imgui.Checkbox(u8("Зафиксировать камеру на координатах"), checkbox.fixcampos) then
-		    if checkbox.fixcampos.v then
-               fixcam.x = camX 			
-               fixcam.y = camY 			
-               fixcam.z = camZ
-			   textbuffer.fixcamx.v = string.format("%.1f", fixcam.x)
-			   textbuffer.fixcamy.v = string.format("%.1f", fixcam.y)
-			   textbuffer.fixcamz.v = string.format("%.1f", fixcam.z)
-			else restoreCamera() end
+         imgui.Spacing()
+         imgui.Spacing()
+         
+         if imgui.CollapsingHeader(u8"Зафиксированная камера") then
+		    if imgui.Checkbox(u8("Зафиксировать камеру на координатах"), checkbox.fixcampos) then
+		       if checkbox.fixcampos.v then
+                  fixcam.x = camX 			
+                  fixcam.y = camY 			
+                  fixcam.z = camZ
+		   	      textbuffer.fixcamx.v = string.format("%.1f", fixcam.x)
+		   	      textbuffer.fixcamy.v = string.format("%.1f", fixcam.y)
+		   	      textbuffer.fixcamz.v = string.format("%.1f", fixcam.z)
+		   	   else 
+                  restoreCamera()
+               end
+		    end
+            imgui.SameLine()
+            imgui.TextQuestion("( ? )", u8"Зафиксирует положение камеры на указанные значения")
+		    
+		    if checkbox.fixcampos.v then		
+		   	   imgui.Text("x:")
+		   	   imgui.SameLine()
+		       imgui.PushItemWidth(70)
+		       if imgui.InputText("##FixcamxBuffer", textbuffer.fixcamx, imgui.InputTextFlags.CharsDecimal) then
+		   	      fixcam.x = tonumber(textbuffer.fixcamx.v)
+		   	   end
+		   	   imgui.PopItemWidth()
+		   	   imgui.SameLine()
+		   	   imgui.Text("y:")
+		   	   imgui.SameLine()
+		   	   imgui.PushItemWidth(70)
+		   	   if imgui.InputText("##FixcamyBuffer", textbuffer.fixcamy, imgui.InputTextFlags.CharsDecimal) then
+		   	      fixcam.y = tonumber(textbuffer.fixcamy.v)
+		   	   end
+		   	   imgui.PopItemWidth()
+		   	   imgui.SameLine()
+		   	   imgui.Text("z:")
+		   	   imgui.SameLine()
+		   	   imgui.PushItemWidth(70)
+		   	   if imgui.InputText("##FixcamzBuffer", textbuffer.fixcamz, imgui.InputTextFlags.CharsDecimal) then
+		   	      fixcam.z = tonumber(textbuffer.fixcamz.v)
+		   	   end
+		   	   imgui.PopItemWidth()
+		    end
 		 end
-         imgui.SameLine()
-         imgui.TextQuestion("( ? )", u8"Зафиксирует положение камеры на указанные значения")
-		 
-		 if checkbox.fixcampos.v then		
-			imgui.Text("x:")
-			imgui.SameLine()
-		    imgui.PushItemWidth(70)
-		    if imgui.InputText("##FixcamxBuffer", textbuffer.fixcamx, imgui.InputTextFlags.CharsDecimal) then
-			   fixcam.x = tonumber(textbuffer.fixcamx.v)
-			end
-			imgui.PopItemWidth()
-			imgui.SameLine()
-			imgui.Text("y:")
-			imgui.SameLine()
-			imgui.PushItemWidth(70)
-			if imgui.InputText("##FixcamyBuffer", textbuffer.fixcamy, imgui.InputTextFlags.CharsDecimal) then
-			   fixcam.y = tonumber(textbuffer.fixcamy.v)
-			end
-			imgui.PopItemWidth()
-			imgui.SameLine()
-			imgui.Text("z:")
-			imgui.SameLine()
-			imgui.PushItemWidth(70)
-			if imgui.InputText("##FixcamzBuffer", textbuffer.fixcamz, imgui.InputTextFlags.CharsDecimal) then
-			   fixcam.z = tonumber(textbuffer.fixcamz.v)
-			end
-			imgui.PopItemWidth()
-		 end
-		 
+         
          -- if imgui.Button("camtest") then
             -- local X, Y, Z = getActiveCameraCoordinates()
             -- local rX, rY, rZ = getActiveCameraPointAt()
@@ -1999,62 +2102,98 @@ function imgui.OnDrawFrame()
             -- X, Y, Z, rX, rY, rZ), -1)
          -- end
          
-		 if imgui.Checkbox(u8("Разблокировать изменение дистанции камеры"), checkbox.usecustomcamdist) then 
-		    ini.settings.usecustomcamdist = not ini.settings.usecustomcamdist
-            if ini.settings.usecustomcamdist then
-		       setCameraDistanceActivated(1)
-			   setCameraDistance(ini.settings.camdist)
-		    else
-	           setCameraDistanceActivated(0)
-			   setCameraDistance(0)
-		    end
-		    inicfg.save(ini, configIni)
-	     end
-	     imgui.SameLine()
-         imgui.TextQuestion("( ? )", u8"Разблокирует изменение положения камеры на произвольные значеня")
-		 
-	  	 if ini.settings.usecustomcamdist then
-	        imgui.TextColoredRGB("Дистанция камеры")
-            imgui.SameLine()
-            imgui.TextQuestion(u8"(по-умолчанию 1)", u8"Вернуть на значение по-умолчанию")
-			if imgui.IsItemClicked() then
-		       slider.camdist.v = 1
-			   ini.settings.camdist = slider.camdist.v
-			   inicfg.save(ini, configIni)
-		    end
-	        if imgui.SliderInt(u8"##camdist", slider.camdist, -100, 250) then
-               ini.settings.camdist = slider.camdist.v
-               setCameraDistanceActivated(1)		  
-		       setCameraDistance(ini.settings.camdist)
-               inicfg.save(ini, configIni)
-               memory.setfloat(13210352, ini.settings.camdist, true)
-            end
-	     end
-		 
-		 if imgui.Checkbox(u8("Разблокировать изменение FOV"), checkbox.changefov) then 
-		    if not checkbox.changefov.v then slider.fov.v = 70 end
-			cameraSetLerpFov(slider.fov.v, slider.fov.v, 1000, true)
-		 end 
-		 imgui.SameLine()
-         imgui.TextQuestion("( ? )", u8"Разблокирует изменения значение поля зрения(FOV).")
-		 
-		 if checkbox.changefov.v then
-		    imgui.TextColoredRGB("FOV")
-            imgui.SameLine()
-            imgui.TextQuestion(u8"(по-умолчанию 70)", u8"Вернуть на значение по-умолчанию")
-			if imgui.IsItemClicked() then
-		       slider.fov.v = 70
-		       cameraSetLerpFov(slider.fov.v, slider.fov.v, 1000, true)
-               ini.settings.fov = slider.fov.v
-			   inicfg.save(ini, configIni)
-		    end
-		    if imgui.SliderInt(u8"##fovslider", slider.fov, 1, 179) then
-               cameraSetLerpFov(slider.fov.v, slider.fov.v, 1000, true)
-               ini.settings.fov = slider.fov.v
-			   inicfg.save(ini, configIni)
-            end
+         if imgui.CollapsingHeader(u8"Дистанция камеры") then
+		    if imgui.Checkbox(u8("Разблокировать изменение дистанции камеры"), checkbox.usecustomcamdist) then 
+		       ini.settings.usecustomcamdist = not ini.settings.usecustomcamdist
+               if ini.settings.usecustomcamdist then
+		          setCameraDistanceActivated(1)
+		   	      setCameraDistance(ini.settings.camdist)
+		       else
+	              setCameraDistanceActivated(0)
+		   	      setCameraDistance(0)
+		       end
+		       inicfg.save(ini, configIni)
+	        end
+	        imgui.SameLine()
+            imgui.TextQuestion("( ? )", u8"Разблокирует изменение положения камеры на произвольные значеня")
+		    
+	  	    if ini.settings.usecustomcamdist then
+	           imgui.TextColoredRGB("Дистанция камеры игрока")
+               imgui.SameLine()
+               imgui.TextQuestion(u8"(по-умолчанию 1)", u8"Вернуть на значение по-умолчанию")
+		   	   if imgui.IsItemClicked() then
+		          slider.camdist.v = 1
+		   	      ini.settings.camdist = slider.camdist.v
+		   	      inicfg.save(ini, configIni)
+		       end
+	           if imgui.SliderInt(u8"##camdist", slider.camdist, -100, 250) then
+                  ini.settings.camdist = slider.camdist.v
+                  setCameraDistanceActivated(1)		  
+		          setCameraDistance(ini.settings.camdist)
+                  inicfg.save(ini, configIni)
+                  memory.setfloat(13210352, ini.settings.camdist, true)
+               end
+	        end
 		 end
 		 
+         if imgui.CollapsingHeader(u8"Flymode") then
+	  	    
+	        imgui.TextColoredRGB("Скорость перемещения в режиме полета")
+            imgui.SameLine()
+            imgui.TextQuestion(u8"(по-умолчанию 0.3)", u8"Вернуть на значение по-умолчанию")
+		   	if imgui.IsItemClicked() then
+		       slider.flymodespeed.v = 0.3
+		   	   ini.settings.flymodespeed = slider.flymodespeed.v
+		   	   inicfg.save(ini, configIni)
+		    end
+	        if imgui.SliderFloat(u8"##flymodespeed", slider.flymodespeed, 0.1, 5.0) then
+               ini.settings.flymodespeed = slider.flymodespeed.v
+               setCameraDistanceActivated(1)		  
+		       setCameraDistance(ini.settings.flymodespeed)
+               inicfg.save(ini, configIni)
+            end
+	        
+		 end
+         
+         if imgui.CollapsingHeader(u8"Field of View") then
+		    if imgui.Checkbox(u8("Разблокировать изменение FOV"), checkbox.changefov) then 
+		       if not checkbox.changefov.v then slider.fov.v = 70 end
+		   	   cameraSetLerpFov(slider.fov.v, slider.fov.v, 1000, true)
+		    end 
+		    imgui.SameLine()
+            imgui.TextQuestion("( ? )", u8"Разблокирует изменения значение поля зрения (FOV).")
+            
+            if checkbox.changefov.v then
+		       imgui.TextColoredRGB("FOV")
+               imgui.SameLine()
+               imgui.TextQuestion(u8"(по-умолчанию 70)", u8"Вернуть на значение по-умолчанию")
+			   if imgui.IsItemClicked() then
+		          slider.fov.v = 70
+		          cameraSetLerpFov(slider.fov.v, slider.fov.v, 1000, true)
+                  ini.settings.fov = slider.fov.v
+			      inicfg.save(ini, configIni)
+		       end
+		       if imgui.SliderInt(u8"##fovslider", slider.fov, 1, 179) then
+                  cameraSetLerpFov(slider.fov.v, slider.fov.v, 1000, true)
+                  ini.settings.fov = slider.fov.v
+			      inicfg.save(ini, configIni)
+               end
+		    end
+         end
+         
+         imgui.Spacing()
+         imgui.Spacing()
+         if imgui.Checkbox(u8("Визуально скрыть персонажа"), checkbox.hideped) then 
+		    if checkbox.hideped.v then
+               hidePED(true)
+            else
+               hidePED(false)
+            end
+		 end 
+		 imgui.SameLine()
+         imgui.TextQuestion("( ? )", u8"Визуально для вас скроет скин и аттачи")
+         
+
 		 if imgui.Button(u8"Вернуть камеру", imgui.ImVec2(250, 25)) then
 		    if checkbox.fixcampos.v then checkbox.fixcampos.v = false end
             sampAddChatMessage("[SCRIPT]: {FFFFFF}Камера возвращена на исходные", 0x0FF6600)
@@ -2067,18 +2206,6 @@ function imgui.OnDrawFrame()
 		    setCameraBehindPlayer()
 		 end
 		 
-		 if imgui.Button(u8(ini.settings.showhud and 'Скрыть' or 'Показать')..u8" HUD", 
-         imgui.ImVec2(250, 25)) then
-            ini.settings.showhud = not ini.settings.showhud
-            inicfg.save(ini, configIni)
-            if ini.settings.showhud then
-               displayHud(true)
-               memory.setint8(0xBA676C, 0)
-            else
-               displayHud(false)
-               memory.setint8(0xBA676C, 2)
-            end
-         end
 		 -- if imgui.Button(u8"Закрепить камеру перед игроком", imgui.ImVec2(250, 25)) then
 		    -- setCameraInFrontOfChar(PLAYER_PED)
 		 -- end
@@ -2125,7 +2252,7 @@ function imgui.OnDrawFrame()
          
          imgui.Spacing()
          imgui.Spacing()
-         
+         imgui.PushStyleVar(imgui.StyleVar.ItemSpacing, imgui.ImVec2(4, 4))
    		 if imgui.Checkbox(u8("Скрыть 3D тексты"), checkbox.hide3dtexts) then 
             if checkbox.hide3dtexts.v then
                sampAddChatMessage("[SCRIPT]: {FFFFFF}3DText hide: {00FF00}Включен", 0x0FF6600)
@@ -2216,6 +2343,8 @@ function imgui.OnDrawFrame()
 		 imgui.SameLine()
          imgui.TextQuestion("( ? )", u8"Визуально скрывает все надписи (MaterialText)")
          
+         imgui.PopStyleVar()
+         imgui.Spacing()
          if imgui.TooltipButton(u8"Рестрим", imgui.ImVec2(200, 25),
          u8:encode("Обновить зону стрима путем выхода из зоны стрима, и возврата через 5 сек")) then
             Restream()
@@ -2318,6 +2447,10 @@ function imgui.OnDrawFrame()
 		 imgui.Spacing()
 	
       elseif tabmenu.settings == 6 then
+         
+         -- changes the spacings so that all the elements can fit
+         imgui.PushStyleVar(imgui.StyleVar.ItemSpacing, imgui.ImVec2(4, 4))
+
          if imgui.Checkbox(u8'Тени мира', checkbox.shadows) then
 		    if checkbox.shadows.v then
 			   memory.write(5497177, 233, 1, false)
@@ -2508,8 +2641,10 @@ function imgui.OnDrawFrame()
 		 imgui.SameLine()
          imgui.TextQuestion("( ? )", u8"Отображение лодов транспорта")
 		 imgui.Spacing()
-         
 		 imgui.Spacing()
+         
+         imgui.PopStyleVar()
+         
 	  elseif tabmenu.settings == 7 then
 	     
 		 local id = getLocalPlayerId()
@@ -2900,6 +3035,20 @@ function imgui.OnDrawFrame()
                sampSendChat("/menu")
             end
          end
+         imgui.SameLine()
+         if imgui.Button(u8(ini.settings.showhud and 'Скрыть' or 'Показать')..u8" HUD", 
+         imgui.ImVec2(100, 25)) then
+            ini.settings.showhud = not ini.settings.showhud
+            inicfg.save(ini, configIni)
+            if ini.settings.showhud then
+               displayHud(true)
+               memory.setint8(0xBA676C, 0)
+            else
+               displayHud(false)
+               memory.setint8(0xBA676C, 2)
+            end
+         end
+         
          imgui.Spacing()
          imgui.Spacing()
          if imgui.Checkbox(u8'Показывать дополнительную нижнюю панель', checkbox.showpanel) then
@@ -2912,6 +3061,9 @@ function imgui.OnDrawFrame()
          if imgui.Checkbox(u8'Показывать ID над HUD', checkbox.showidonhud) then
             ini.settings.showidonhud = checkbox.showidonhud.v
 		    inicfg.save(ini, configIni)
+            if ini.settings.showidonhud then
+               sampAddChatMessage("[SCRIPT]: {FFFFFF}Если текст не появился, попробуйте заспавниться", 0x0FF6600)
+            end
          end
          imgui.SameLine()
          imgui.TextQuestion("( ? )", u8"Отображать ваш ID над худом (вверху экрана с правой стороны)")
@@ -3358,7 +3510,7 @@ function imgui.OnDrawFrame()
          imgui.SameLine()
          imgui.Link("https://forum.training-server.com/d/19708-luamappingtoolkit/", u8"TRAINING FORUM")
          imgui.Spacing()
-		 if isAbsfixInstalled then
+		 if isAbsolutePlay and isAbsfixInstalled then
 		    imgui.TextColoredRGB("Спасибо что используете ")
 			imgui.SameLine()
  		    imgui.Link("https://github.com/ins1x/useful-samp-stuff/tree/main/luascripts/absolutefix", "AbsoluteFix")
@@ -4080,6 +4232,7 @@ function imgui.OnDrawFrame()
             imgui.TextColoredRGB("{696969}/collision{FFFFFF} - включить  коллизию для объектов")
             imgui.TextColoredRGB("{696969}/restream{FFFFFF} - обновить зону стрима")
             imgui.TextColoredRGB("{696969}/retcam{FFFFFF} - вернуть камеру")
+            imgui.TextColoredRGB("{696969}/radius <m>{FFFFFF} - найти объекты в радиусе")
             if isTraining then
                imgui.TextColoredRGB("{696969}/afkkick{FFFFFF} - кикнуть игроков в афк")
                imgui.TextColoredRGB("{696969}/cbsearch <text>{FFFFFF} - поиск информации по командным блокам")
@@ -4719,18 +4872,18 @@ function imgui.OnDrawFrame()
             imgui.SameLine()
             imgui.TextQuestion("( ? )", u8"Скрывает ваши личные данные, и данные игроков (IP адреса, пароли, телефоны)")
             
-            -- -- TODO MP.Logs
-            -- if ini.settings.debug then
-            -- if imgui.Checkbox(u8("Лог для МП"), checkbox.logmp) then
-               -- --if checkbox.logmp.v then
-               -- if isTraining then
-                  -- dialoghook.logstoggle = true
-                  -- sampSendChat("/vw")
-               -- end
-            -- end
-            -- imgui.SameLine()
-            -- imgui.TextQuestion("( ? )", u8"Записывает в лог все ваши действия на МП")
-            -- end
+            if isTraining then
+               imgui.SameLine()
+               if imgui.Checkbox(u8("Логи мира"), checkbox.logmp) then
+                  --if checkbox.logmp.v then
+                  if isTraining then
+                     dialoghook.logstoggle = true
+                     sampSendChat("/vw")
+                  end
+               end
+               imgui.SameLine()
+               imgui.TextQuestion("( ? )", u8"Включает текстдрав с логами мира")
+            end
             
             imgui.Text(u8"Выбор капитана:")
 	        if imgui.Button(u8"Игрок с наибольшим уровнем", imgui.ImVec2(220, 25)) then
@@ -4971,7 +5124,7 @@ function imgui.OnDrawFrame()
             imgui.Combo('##ComboWeaponSelect', combobox.weaponselect, weaponNames)
             imgui.PopItemWidth()
             imgui.SameLine()
-            imgui.PushItemWidth(50)
+            imgui.PushItemWidth(54)
             imgui.InputInt("##inputAmmo", input.ammo, 0)
             imgui.PopItemWidth()
             imgui.SameLine()
@@ -6278,16 +6431,16 @@ function imgui.OnDrawFrame()
       local objectid = sampGetObjectSampIdByHandle(chosenobject)
       
       if isTraining and chosenobject == LastObject.handle then
-         imgui.TextColoredRGB("localid: {3f70d6}".. LastObject.localid)
+         imgui.TextColoredRGB("localid: {007DFF}".. LastObject.localid)
       end
       
-      imgui.TextColoredRGB("modelid: {3f70d6}".. modelid)
-      imgui.TextColoredRGB("name: {3f70d6}".. tostring(sampObjectModelNames[modelid]))
-      imgui.TextColoredRGB("id: {3f70d6}".. objectid)
+      imgui.TextColoredRGB("modelid: {007DFF}".. modelid)
+      imgui.TextColoredRGB("name: {007DFF}".. tostring(sampObjectModelNames[modelid]))
+      imgui.TextColoredRGB("id: {007DFF}".. objectid)
       
       if chosenobject == LastObject.handle then
          if not LastObject.position.x ~= nil then
-	        imgui.TextColoredRGB(string.format("{3f70d6}x: %.2f, {e0364e}y: %.2f, {26b85d}z: %.2f",
+	        imgui.TextColoredRGB(string.format("{007DFF}x: %.2f, {e0364e}y: %.2f, {26b85d}z: %.2f",
             LastObject.position.x, LastObject.position.y, LastObject.position.z))
             if imgui.IsItemClicked() then
                setClipboardText(string.format("%.2f, %.2f, %.2f", LastObject.position.x, LastObject.position.y, LastObject.position.z))
@@ -6301,13 +6454,13 @@ function imgui.OnDrawFrame()
             end
          end   
 	     if not LastObject.rotation.x ~= nil then
-            imgui.TextColoredRGB(string.format("{4f70d6}rx: %.2f, {f0364e}ry: %.2f, {36b85d}rz: %.2f",
+            imgui.TextColoredRGB(string.format("{007DFF}rx: %.2f, {f0364e}ry: %.2f, {36b85d}rz: %.2f",
             LastObject.rotation.x, LastObject.rotation.y, LastObject.rotation.z))
          end
       else
          local result, x, y, z = getObjectCoordinates(chosenobject)
          if result then
-            imgui.TextColoredRGB(string.format("{3f70d6}x: %.2f, {e0364e}y: %.2f, {26b85d}z: %.2f", x, y, z))
+            imgui.TextColoredRGB(string.format("{007DFF}x: %.2f, {e0364e}y: %.2f, {26b85d}z: %.2f", x, y, z))
             if imgui.IsItemClicked() then
                setClipboardText(string.format("%.2f, %.2f, %.2f", x, y, z))
                sampAddChatMessage("Координаты скопированы в буффер обмена", -1)
@@ -6321,20 +6474,33 @@ function imgui.OnDrawFrame()
          end
          
       end
-	  imgui.TextColoredRGB(string.format("angle: {3f70d6}%.1f", getObjectHeading(chosenobject)))
-	  if not isObjectOnScreen(chosenobject) then 
-         imgui.TextColoredRGB("{ff0000}объект вне зоны прямой видимости")
-      end
+	  imgui.TextColoredRGB(string.format("angle: {007DFF}%.1f", getObjectHeading(chosenobject)))
       
       if chosenobject == LastObject.handle and isAbsolutePlay 
       and LastObject.txdname ~= nil then
          for k, txdname in pairs(absTxdNames) do
             if txdname == LastObject.txdname then
-               imgui.TextColoredRGB("texture internalid: {3f70d6}" .. k-1)
+               imgui.TextColoredRGB("texture internalid: {007DFF}" .. k-1)
                break
             end
          end
-	     imgui.TextColoredRGB("txdname: {3f70d6}".. LastObject.txdname .. " ("..LastObject.txdlibname..") ")
+	     imgui.TextColoredRGB("txdname: {007DFF}".. LastObject.txdname .. " ("..LastObject.txdlibname..") ")
+      end
+      
+      if chosenobject == LastObject.handle and isTraining
+      and LastObject.txdid ~= nil then
+         local txdtable = sampTextureList[LastObject.txdid+1]
+         local txdname = tostring(txdtable[3])
+         imgui.TextColoredRGB("txd: {007DFF}"..txdname.."("..LastObject.txdid..")")
+         if imgui.IsItemClicked() then
+            textbuffer.objectid.v = txdname
+         end
+      end
+      
+      if isObjectOnScreen(chosenobject) then 
+         imgui.TextColoredRGB("{696969}object streamed")
+      else
+         imgui.TextColoredRGB("{ff0000}объект вне зоны прямой видимости")
       end
       
       imgui.Spacing()  
@@ -6480,6 +6646,8 @@ function sampev.onSendEnterVehicle(vehicleId, passenger)
          end)
       end
    end
+   
+   toggleFlyMode(false)
 end
 
 function sampev.onPutPlayerInVehicle(vehicleId, seatId)
@@ -6495,6 +6663,8 @@ function sampev.onPutPlayerInVehicle(vehicleId, seatId)
          end)
       end
    end
+   
+   toggleFlyMode(false)
 end
 
 function sampev.onPlayerQuit(id, reason)
@@ -6668,6 +6838,17 @@ function sampev.onSendDialogResponse(dialogId, button, listboxId, input)
          end)
       end
       
+      if ini.settings.cbvalautocomplete then
+         if input:find("- Значение #") then
+            if button == 1 then
+               dialoghook.cbvalue = true
+            else
+               dialoghook.cbvalue = false
+               cbvaluebuffer = nil
+            end
+         end
+      end
+      
       if button == 1 then -- if dialog response
          -- Corrects spawn item on /world menu
          if listboxId == 3 and input:find("Вернуться в свой мир") then
@@ -6699,8 +6880,14 @@ function sampev.onSendDialogResponse(dialogId, button, listboxId, input)
                sampSendChat("/oedit "..LastObject.localid)
             end
          end
-         --if listboxId == 1 and input:find("Клонировать") then 
-         --end
+         if listboxId == 1 and input:find("Клонировать") then 
+            lua_thread.create(function()
+               wait(500)
+               editMode = 2
+               sampSendChat("/clone "..LastObject.localid) 
+            end)
+            return false
+         end
          if listboxId == 2 and input:find("Удалить") then 
             editMode = 3
          end
@@ -6712,10 +6899,15 @@ function sampev.onSendDialogResponse(dialogId, button, listboxId, input)
                -- local angle = getObjectHeading(LastObject.handle)
                -- if angle then
                   -- --enterEditObject()
-                  -- setObjectHeading(LastObject.handle, getCorrectAngle(angle))
-                  -- sampSendChat("/oedit")
-                   -- --setObjectRotation(LastObject.handle, float rotationX, float rotationY, float rotationZ)
-                  -- --sampSendChat("/rz "..LastObject.localid.." "..getCorrectAngle(angle))
+                  -- --sampSendChat("/oedit")
+                  -- --setObjectHeading(LastObject.handle, getCorrectAngle(angle))
+                  -- --sampSendChat("/oedit")
+                  -- --setObjectRotation(LastObject.handle, float rotationX, float rotationY, float rotationZ)
+                  -- lua_thread.create(function()
+                     -- wait(500)
+                     -- sampSendChat(string.format("/rz %i %.1f", LastObject.localid, getCorrectAngle(angle)))
+                     -- sampAddChatMessage("old"..angle..">"..getCorrectAngle(angle), -1)
+                  -- end)
                   -- --print(getCorrectAngle(angle))
                -- end
             -- end
@@ -6908,6 +7100,30 @@ function sampev.onShowDialog(dialogId, style, title, button1, button2, text)
          LastData.lastActor = title:match('Меню актера #(%d+)')
       end
       
+      if ini.settings.cbvalautocomplete and dialoghook.cbvalue then
+         if not text:find("N/A") then
+            local lines = {}
+            for line in string.gmatch(text, "([^\n]*)") do
+               table.insert(lines, line)
+            end
+            
+            local result = tostring(lines[#lines - 1])
+            if result and string.len(result) >= 1 then
+               cbvaluebuffer = result
+            else
+               cbvaluebuffer = nil
+            end
+            dialoghook.cbvalue = false
+         
+            local newtext = text ..
+            "\n{696969}Нажмите CTRL + SHIFT + V чтобы вставить текущее значение\n"
+            return {dialogId, style, title, button1, button2, newtext}
+         else
+            dialoghook.cbvalue = false
+            cbvaluebuffer = nil
+         end
+      end
+      
       if title:find('Поиск') then
          local newtext = text ..
          "\nИскать можно так же через /cbsearch <text>\n"
@@ -6968,6 +7184,7 @@ function sampev.onShowDialog(dialogId, style, title, button1, button2, text)
             return {dialogId, style, title, button1, button2, newtext}
          end
       end
+      
       -- Extend main /vw menu
       if text:find("Название мира") and style == 4 then
          if dialoghook.devmenutoggle then
@@ -7131,6 +7348,11 @@ function sampev.onServerMessage(color, text)
       print(string.format("%s, %s", color, text))
    end
    
+   -- Corrects erroneous recieving of empty chat messages
+   if text:match("^%s.*$") and text:len() <= 2 then
+      return false
+   end
+   
    if checkbox.allchatoff.v then
       -- disable global chat, but write information to chatlog
       chatlog = io.open(getFolderPath(5).."\\GTA San Andreas User Files\\SAMP\\chatlog.txt", "a")
@@ -7205,9 +7427,18 @@ function sampev.onServerMessage(color, text)
       
    if isAbsolutePlay then   
       if text:find("Последнего созданного объекта не существует") then
-         if LastObject.modelid then
-            sampAddChatMessage("Последний использованный объект: {696969}"..LastObject.modelid, -1)
-	     end
+         lua_thread.create(function()
+            wait(500)
+            if LastObject.modelid then
+               sampAddChatMessage("Последний использованный объект: {696969}"..LastObject.modelid, -1)
+	        end
+            local closestObjectId = getClosestObjectId()
+            if closestObjectId then
+               sampAddChatMessage("Ближайший объект: {696969}"..getObjectModel(closestObjectId).." ("..tostring(sampObjectModelNames[getObjectModel(closestObjectId)])..") ", -1)
+            else
+               sampAddChatMessage("Можете попробовать объект: {696969}3374{FFFFFF} - Большие стаки сена", -1)
+            end
+         end)
       end
       
       if text:find("Управляющим мира смертельный урон не наносится") then
@@ -7249,6 +7480,21 @@ function sampev.onServerMessage(color, text)
       
       if text:find('Создан объект: (%d+)') then
          LastObject.localid = text:match('Создан объект: (%d+)')
+      end
+      
+      if text:find('Данный объект запрещен или не существует') then
+         lua_thread.create(function()
+            wait(500)
+            if LastObject.modelid then
+               sampAddChatMessage("Последний использованный объект: {696969}"..LastObject.modelid, -1)
+	        end
+            local closestObjectId = getClosestObjectId()
+            if closestObjectId then
+               sampAddChatMessage("Ближайший объект: {696969}"..getObjectModel(closestObjectId).." ("..tostring(sampObjectModelNames[getObjectModel(closestObjectId)])..") ", -1)
+            else
+               sampAddChatMessage("Можете попробовать объект: {696969}3374{FFFFFF} - Большие стаки сена", -1)
+            end
+         end)
       end
       
       if text:find('Выбран предмет: (%d+)') then
@@ -7682,6 +7928,32 @@ function sampev.onSendCommand(command)
       return false
    end
    
+   if not isAbsolutePlay then 
+      if command:find("/flymode") then
+         if isTraining then
+            if not isWorldHoster then
+               sampAddChatMessage("[SCRIPT]: {FFFFFF}Вы не хостер в мире!", 0x0FF6600)
+               return false
+            end
+         end
+         
+         if isCharInAnyCar(PLAYER_PED) then
+            sampAddChatMessage("[SCRIPT]: {FFFFFF}Недоступно в транспорте!", 0x0FF6600)
+            return false
+         end
+         
+         toggleFlyMode()
+         
+         if flymode then
+            sampAddChatMessage("[SCRIPT]: {FFFFFF}Управление в режиме полета:", 0x0FF6600)
+            sampAddChatMessage("[SCRIPT]: {FFFFFF}Пробел - Вверх, левый SHIFT - Вниз.", 0x0FF6600)
+            sampAddChatMessage("[SCRIPT]: {FFFFFF}WASD - перемещение по координатам.", 0x0FF6600)
+            sampAddChatMessage("[SCRIPT]: {FFFFFF}F/ENTER - выйти из режима полета.", 0x0FF6600)
+         end
+         return false
+      end
+   end
+   
    if command:find("/slapme") and not isTraining then
       if sampIsLocalPlayerSpawned() then
          local posX, posY, posZ = getCharCoordinates(PLAYER_PED)
@@ -7723,6 +7995,13 @@ function sampev.onSendCommand(command)
    
    if isTraining and command:find("/action") then
       sampAddChatMessage("[SCRIPT]: {FFFFFF}Рекомендуется использовать /otext вместо /action", 0x0FF6600)
+   end
+   
+   if isTraining then
+      if command:find("/oc$") or command:find("/ocopy") then
+         sampSendChat("/clone")
+         return false
+      end
    end
    
    if isTraining and command:find("/tblist") then
@@ -7791,9 +8070,18 @@ function sampev.onSendCommand(command)
             checkBuggedObject(id)
          end
       else
-         if LastObject.modelid then
-            sampAddChatMessage("Последний использованный объект: {696969}"..LastObject.modelid, -1)
-         end
+        lua_thread.create(function()
+            wait(500)
+            if LastObject.modelid then
+               sampAddChatMessage("Последний использованный объект: {696969}"..LastObject.modelid, -1)
+	        end
+            local closestObjectId = getClosestObjectId()
+            if closestObjectId then
+               sampAddChatMessage("Ближайший объект: {696969}"..getObjectModel(closestObjectId).." ("..tostring(sampObjectModelNames[getObjectModel(closestObjectId)])..") ", -1)
+            else
+               sampAddChatMessage("Можете попробовать объект: {696969}3374{FFFFFF} - Большие стаки сена", -1)
+            end
+         end)
 	  end
    end
    
@@ -8278,8 +8566,30 @@ function sampev.onSendCommand(command)
       return false
    end
    
+   if command:find("/radius") then
+      if command:find('(.+) (.+)') then
+         local cmd, arg = command:match('(.+) (.+)')
+         local radius = tonumber(arg)
+         if radius then 
+            local px, py, pz = getCharCoordinates(PLAYER_PED)
+            Draw3DCircle(px, py, pz-1, radius, 0xFFD00000)
+            for _, v in ipairs(getAllObjects()) do
+               local _, x, y, z = getObjectCoordinates(v)
+               local dist = getDistanceBetweenCoords3d(x, y, z, px, py, pz)
+               if dist <= radius then
+                  sampAddChatMessage("Объект id: "..v.." model: {696969}"..getObjectModel(v).."("..tostring(sampObjectModelNames[getObjectModel(v)]).."){FFFFFF} входит в радиус ("..radius..")", -1)
+               end
+            end
+         else
+            sampAddChatMessage("[SCRIPT]: {FFFFFF}укажите радиус (в метрах)!", 0x0FF6600)
+         end
+      else
+         sampAddChatMessage("[SCRIPT]: {FFFFFF}Используйте /raduis <радиус в метрах>!", 0x0FF6600)
+      end
+      return false
+   end
+   
    if ini.settings.debug and command:find("/test") then   
-      --deleteChar(PLAYER_HANDLE)
       sampAddChatMessage("Test", -1)
       return false
    end
@@ -8288,10 +8598,8 @@ end
 
 function sampev.onSendChat(message)
    -- Corrects erroneous sending of empty chat messages
-   if isTraining then
-      if string.len(message) < 2 then
-         return false
-      end
+   if message:match("^%s.*$") and message:len() <= 2 then
+      return false
    end
 end
 
@@ -8323,7 +8631,7 @@ function sampev.onCreateObject(objectId, data)
    -- Hide objects from hiddenObjects list
    if hiddenObjects[1] ~= nil then
       for i = 1, #hiddenObjects do
-          if data.modelId == hiddenObjects[i] then return false end
+         if data.modelId == hiddenObjects[i] then return false end
       end
    end
 end
@@ -8357,6 +8665,7 @@ function sampev.onSetObjectMaterialText(id, data)
 end
 
 function sampev.onSendEditObject(playerObject, objectId, response, position, rotation)
+   -- response: 0 - exit edit, 1 - save, 2 - move
    local object = sampGetObjectHandleBySampId(objectId)
    local modelId = getObjectModel(object)
    LastObject.handle = object
@@ -8369,6 +8678,15 @@ function sampev.onSendEditObject(playerObject, objectId, response, position, rot
    LastObject.rotation.y = rotation.y
    LastObject.rotation.z = rotation.z
    
+   -- Disable collision for edit object
+   if ini.settings.editnocol then
+      if response < 2 then
+         setObjectCollision(object, true)
+      else
+         setObjectCollision(object, false)
+      end
+   end
+
    -- Auto open /omenu on save object 
    -- if isTraining and response == 1 then
       -- if LastObject.localid then
@@ -8427,11 +8745,8 @@ function sampev.onSendEditObject(playerObject, objectId, response, position, rot
 end
 
 function sampev.onSendEnterEditObject(type, objectId, model, position)
-   local object = sampGetObjectHandleBySampId(objectId)
-   local modelId = getObjectModel(object)
-   LastObject.handle = object
    LastObject.id = objectId
-   LastObject.modelid = modelId
+   LastObject.modelid = model
    --LastObject.angle = getObjectHeading(object)
    -- Сontains the initial position of the object before editing
    LastObject.startpos.x = position.x
@@ -8554,6 +8869,18 @@ function sampev.onRemoveBuilding(modelId, position, radius)
    removedBuildings = removedBuildings + 1;
 end
 
+function sampev.onSetPlayerAttachedObject(playerId, index, create, object)
+   if hidePlayerObjects then
+      lua_thread.create(function()
+         wait(50)
+         local _, myId = sampGetPlayerIdByCharHandle(PLAYER_PED)
+         if playerId == myId then
+            hidePlayerAttachedObjects()
+         end
+      end)
+   end
+end
+
 function sampev.onSendSpawn()
    if firstSpawn and ini.settings.allchatoff then
       sampAddChatMessage("[SCRIPT]: {FFFFFF}Глобальный чат отключен!", 0x0FF6600)
@@ -8572,7 +8899,50 @@ function sampev.onSendSpawn()
       sampAddChatMessage("[SCRIPT]: {FFFFFF}Если не перезайти вас будут кикать с большинста миров!", 0x0FF6600)
       sampSetGamestate(4)
    end
+   
+   toggleFlyMode(false)
 end
+
+-- FlyMode
+function toggleFlyMode(mode)
+   if mode == nil then
+      flymode = not flymode
+      mode = flymode
+   end
+   flyCoords = {getCharCoordinates(PLAYER_PED)} 
+   --flymode = not flymode
+   --printStringNow(flymode and '~w~FlyMode: ~g~Activated' or '~w~FlyMode: ~r~Disabled', 3000)
+   if mode then 
+      hidePED(true)
+      flymode=true
+      disableObjectCollision = true
+   else
+      hidePED(false)
+      flymode=false
+      lua_thread.create(function()
+         wait(500)
+         disableObjectCollision = false
+         local find_obj_x, find_obj_y, find_obj_z = getCharCoordinates(PLAYER_PED)
+         local result, objectHandle = findAllRandomObjectsInSphere(find_obj_x, find_obj_y, find_obj_z, 25, true)
+         if result then
+            for k, v in pairs(objectsCollisionDel) do
+               if doesObjectExist(v) then 
+	              setObjectCollision(v, true)
+	           end
+            end
+         end
+      end)
+   end
+end
+
+function sampev.onSendPlayerSync(data)
+   local speed_player_sync = 1.8
+   if not flymode then return end
+   local sync = getMoveSpeed(getCharHeading(PLAYER_PED), speed_player_sync)
+   data.moveSpeed = {sync.x, sync.y, data.moveSpeed.z}
+   return data
+end
+
 -- END hooks
 
 -- Macros
@@ -9108,11 +9478,43 @@ function enableDialog(bool)
 end
 
 function sampGetPlayerIdByNickname(nick)
-    local id = getLocalPlayerId()
-    if nick == sampGetPlayerNickname(id) then return id end
-    for i = 0, sampGetMaxPlayerId(false) do
-       if sampIsPlayerConnected(i) and sampGetPlayerNickname(i) == nick then return i end
-    end
+   local id = getLocalPlayerId()
+   if nick == sampGetPlayerNickname(id) then return id end
+   for i = 0, sampGetMaxPlayerId(false) do
+      if sampIsPlayerConnected(i) and sampGetPlayerNickname(i) == nick then return i end
+   end
+end
+
+function showPlayerAttachedObjects()
+   if next(hiddenPlayerObjects) then
+      for _, v in pairs(hiddenPlayerObjects) do
+         if doesObjectExist(v) then
+            setObjectVisible(v, true)
+         end
+      end
+      hiddenPlayerObjects = {}
+   end
+end
+
+function hidePED(state)
+   local address = memory.read(0xB6F5F0, 4)
+   if state then
+      memory.setuint8(address + 0x474, 2, true)
+   else
+      memory.setuint8(address + 0x474, 1, true)
+   end
+end
+
+function hidePlayerAttachedObjects()
+   for _, v in pairs(getAllObjects()) do
+      local _, objPosX, objPosY, objPosZ = getObjectCoordinates(v)
+      local charPosX, charPosY, charPosZ = getCharCoordinates(PLAYER_PED)
+      if getDistanceBetweenCoords3d(objPosX, objPosY, objPosZ, 
+      charPosX, charPosY, charPosZ) <= 0.9 then
+         table.insert(hiddenPlayerObjects, v)
+         setObjectVisible(v, false)
+      end
+   end
 end
 
 function enterEditObject()
@@ -9162,21 +9564,41 @@ function setMaterialObject(id, materialType, materialId, model, libraryName, tex
    raknetDeleteBitStream(bs)
 end
 
+function Draw3DCircle(x, y, z, radius, color)
+   -- color as 0xARGB format
+   local screen_x_line_old, screen_y_line_old
+   for rot=0, 360 do
+      local rot_temp = math.rad(rot)
+      local lineX, lineY, lineZ = radius * math.cos(rot_temp) + x, radius * math.sin(rot_temp) + y, z
+      local screen_x_line, screen_y_line = convert3DCoordsToScreen(lineX, lineY, lineZ)
+      if screen_x_line ~=nil and screen_x_line_old ~= nil then 
+         renderDrawLine(screen_x_line, screen_y_line, screen_x_line_old, screen_y_line_old, 3, color) 
+      end
+      screen_x_line_old, screen_y_line_old = screen_x_line, screen_y_line
+   end
+end
+
 function doesFileExist(path)
    local f=io.open(path,"r")
    if f~=nil then io.close(f) return true else return false end
 end
 
-lua_thread.create(function()
-    while true do
-        wait(1000)
-        fps = fps_counter
-        fps_counter = 0
-    end
-end)
+-- FlyMode
+function getFullSpeed(speed, ping, min_ping) 
+   local fps = require('memory').getfloat(0xB7CB50, true) 
+   local result = (speed / (fps / 60))
+   if ping == 1 then 
+      local ping = sampGetPlayerPing(select(2, sampGetPlayerIdByCharHandle(PLAYER_PED)))
+      if min_ping < ping then 
+         result = (result / (min_ping / ping)) 
+      end
+   end
+   return result 
+end 
 
-function onD3DPresent()
-    fps_counter = fps_counter + 1
+function getMoveSpeed(heading, speed)
+    moveSpeed = {x = math.sin(-math.rad(heading)) * (speed), y = math.cos(-math.rad(heading)) * (speed), z = 0} 
+    return moveSpeed
 end
 
 function join_argb(a, r, g, b)
@@ -9843,7 +10265,7 @@ function apply_custom_style()
    style.WindowRounding = 1.5
    style.FramePadding = imgui.ImVec2(5, 5)
    style.FrameRounding = 4.0
-   style.ItemSpacing = imgui.ImVec2(8, 8)
+   style.ItemSpacing = imgui.ImVec2(6, 6)
    style.ItemInnerSpacing = imgui.ImVec2(8, 6)
    style.IndentSpacing = 25.0
    style.ScrollbarSize = 15.0
