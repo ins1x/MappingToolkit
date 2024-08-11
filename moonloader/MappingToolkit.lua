@@ -997,10 +997,13 @@ function main()
 		 setCameraDistance(ini.settings.camdist)
          
          -- Fix cam stuck bug
-         if isKeyDown(0x56) or isKeyDown(0x24) then -- V or HOME key
-            ini.settings.usecustomcamdist = false
-	        setCameraDistanceActivated(0)
-		   	setCameraDistance(0)
+         if not sampIsChatInputActive() and not sampIsDialogActive()
+         and not isPauseMenuActive() and not isSampfuncsConsoleActive() then
+            if isKeyDown(0x56) or isKeyDown(0x24) then -- V or HOME key
+               ini.settings.usecustomcamdist = false
+	           setCameraDistanceActivated(0)
+		       setCameraDistance(0)
+            end
          end
 	  end
 	  
