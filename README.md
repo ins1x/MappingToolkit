@@ -16,8 +16,6 @@
 Потенциально читерские возможности не используются - это не мультичит!   
 Больше информации по маппингу и редактору карт в [wiki](https://github.com/ins1x/MappingToolkit/wiki).   
 
-> Для **Absolute Play** рекомендуется использовать совместно с [AbsoluteFix](https://github.com/ins1x/moonloader-scripts/tree/main/absolutefix)
-
 ## Возможности
 Ассистент дает вам больше возможностей для маппинга и разработки ваших проектов. Функционал достаточно обширен, и регулярно обновляется. Для управления всеми возможностями предоставлен удобный графического интерфейс на [imgui](https://www.blast.hk/threads/19292/). Ассистент предоставляет дополнительные функции для работы с текстурами и объектами, исправляет некоторые баги игры, дополняет серверные команды и диалоги. 
 
@@ -26,6 +24,7 @@
 [Посмотреть список всех возможностей](https://github.com/ins1x/MappingToolkit/wiki/%D0%92%D0%BE%D0%B7%D0%BC%D0%BE%D0%B6%D0%BD%D0%BE%D1%81%D1%82%D0%B8)  
 
 [![YouTube Demo](https://img.shields.io/badge/YouTube_DEMO-%23FF0000.svg?style=for-the-badge&logo=YouTube&logoColor=white)](https://www.youtube.com/watch?v=h6jbmV0viDU)
+
 
 ## Требования
 - Вам потребуется рабочая копия игры GTA San Andreas с верисей gta_sa.exe v1.0 US
@@ -45,6 +44,8 @@
 
 [Скачайте актуальную версию](https://github.com/ins1x/MappingToolkit/releases) и скопируйте содержимое архива **MappingToolkit.zip** в папку **moonloader** в корне игры. Важно перенести все файлы, включая папки /config и /resource ! 
 
+Для **Absolute Play** рекомендуется использовать совместно с [AbsoluteFix](https://github.com/ins1x/moonloader-scripts/tree/main/absolutefix)  
+
 > Если у вас нет папки **moonloader** в корне игры, следует установить вышеописанные в  требованиях компоненты.
 
  [![](https://img.shields.io/badge/%20%20DOWNLOAD%20%20-696969?style=for-the-badge)](https://github.com/ins1x/MappingToolkit/releases) 
@@ -63,7 +64,5 @@
 
 ---------------------------------------------
 
-<!--- [![blast.hk](https://img.shields.io/badge/Homepage-blasthk-blue)](https://www.blast.hk/threads/200619/) --> 
-[![forum absolute](https://img.shields.io/badge/Forum-Absolute_Play-red)](https://forum.gta-samp.ru/index.php?/topic/1101593-mapping-toolkit/)
 [![forum training](https://img.shields.io/badge/Forum-TRAINING_SANDBOX-yellow)](https://forum.training-server.com/d/19708-luamappingtoolkit/)
 [![github](https://img.shields.io/badge/Wiki-Github-black)](https://github.com/ins1x/MappingToolkit/wiki)
