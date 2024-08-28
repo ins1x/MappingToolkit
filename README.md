@@ -1,7 +1,6 @@
 <h1 align="center">Mapping Toolkit</h1>
 <p align="center">
     <a href="https://www.sa-mp.mp/"><img src="https://img.shields.io/badge/made%20for-GTA%20SA--MP-blue"></a>
-    <a href="https://gta-samp.ru/"><img src="https://img.shields.io/badge/Server-Absolute%20Play-red"></a>
     <a href="https://training-server.com/"><img src="https://img.shields.io/badge/Server-TRAINING%20SANDBOX%20-yellow"></a>
 </p>
 
@@ -19,7 +18,7 @@
 ## Возможности
 Ассистент дает вам больше возможностей для маппинга и разработки ваших проектов. Функционал достаточно обширен, и регулярно обновляется. Для управления всеми возможностями предоставлен удобный графического интерфейс на [imgui](https://www.blast.hk/threads/19292/). Ассистент предоставляет дополнительные функции для работы с текстурами и объектами, исправляет некоторые баги игры, дополняет серверные команды и диалоги. 
 
-На текущий момент поддерживаются все сервера [Absolute Play](https://sa-mp.ru/) и [TRAINING SANDBOX](https://training-server.com/). Может работать и на других проектах, но часть функционала будет недоступна. Перед его использованием убедитесь что его функционал не запрещен на вашем сервере!  
+Скрипт предназанчен для [TRAINING SANDBOX](https://training-server.com/). Может работать и на других проектах, но часть функционала будет недоступна. Перед его использованием убедитесь что его функционал не запрещен на вашем сервере!  
 
 [Посмотреть список всех возможностей](https://github.com/ins1x/MappingToolkit/wiki/%D0%92%D0%BE%D0%B7%D0%BC%D0%BE%D0%B6%D0%BD%D0%BE%D1%81%D1%82%D0%B8)  
 
@@ -43,8 +42,6 @@
 ## Установка
 
 [Скачайте актуальную версию](https://github.com/ins1x/MappingToolkit/releases) и скопируйте содержимое архива **MappingToolkit.zip** в папку **moonloader** в корне игры. Важно перенести все файлы, включая папки /config и /resource ! 
-
-Для **Absolute Play** рекомендуется использовать совместно с [AbsoluteFix](https://github.com/ins1x/moonloader-scripts/tree/main/absolutefix)  
 
 > Если у вас нет папки **moonloader** в корне игры, следует установить вышеописанные в  требованиях компоненты.
 
