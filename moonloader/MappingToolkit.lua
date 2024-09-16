@@ -37,6 +37,7 @@ local ini = inicfg.load({
       checkupdates = true,
       chatfilter = true,
       chathidecb = false,
+      chatinputdrop = false,
       debug = false,
       dialogautocomplete = true,
       disconnecttime = 0,
@@ -178,6 +179,7 @@ local dialoghook = {
    backtoworld = false,
    cbnewactivation = false,
    saveworld = false,
+   saveworldname = false,
    loadworld = false,
    logstoggle = false,
    editdialog = false,
@@ -292,6 +294,7 @@ local checkbox = {
    txdparamsonclick = imgui.ImBool(false),
    hidelastobject = imgui.ImBool(false),
    bliplastobject = imgui.ImBool(false),
+   chatinputdrop = imgui.ImBool(false),
    test = imgui.ImBool(false)
 }
 
@@ -332,7 +335,7 @@ local tabmenu = {
 local textbuffer = {
    vehiclename = imgui.ImBuffer(64),
    findplayer = imgui.ImBuffer(32),
-   objectid = imgui.ImBuffer(6),
+   objectid = imgui.ImBuffer(48),
    rgb = imgui.ImBuffer(256),
    fixcamx = imgui.ImBuffer(12),
    fixcamy = imgui.ImBuffer(12),
@@ -357,7 +360,7 @@ local combobox = {
    cbactivations = imgui.ImInt(ini.settings.cbnewactivationitem),
    imguitheme = imgui.ImInt(ini.settings.imguitheme),
    chatselect = imgui.ImInt(0),
-   selecttable = imgui.ImInt(0),
+   selecttable = imgui.ImInt(2),
    objects = imgui.ImInt(0),
    weaponselect = imgui.ImInt(0),
    itemad = imgui.ImInt(0),
@@ -705,6 +708,13 @@ function main()
                setCameraDistanceActivated(0)
                setCameraDistance(0)
             end
+         end
+      end
+      
+      -- clear chatinput on close
+      if ini.settings.chatinputdrop then
+         if not sampIsChatInputActive() then
+            sampSetChatInputText("")
          end
       end
       
@@ -1808,7 +1818,8 @@ function imgui.OnDrawFrame()
                      setObjectScale(LastObject.handle, slider.scale.v)
                   end
                else 
-                  imgui.Text(u8"Последний объект не найден")
+                  checkbox.objectscale.v = false
+                  sampAddChatMessage("[SCRIPT]: {FFFFFF} Не найден последний объект!", 0x0FF6600)
                end
             end
             imgui.SameLine()
@@ -2088,7 +2099,8 @@ function imgui.OnDrawFrame()
          
          imgui.Spacing()
       elseif tabmenu.settings == 4 then
-         imgui.TextColoredRGB("Дистанция прорисовки")
+         
+         imgui.TextColoredRGB("Дистанция прорисовки LOD")
          imgui.SameLine()
          imgui.TextQuestion(u8"(по-умолчанию 450)", u8"Вернуть на значение по-умолчанию")
          if imgui.IsItemClicked() then
@@ -2102,7 +2114,11 @@ function imgui.OnDrawFrame()
             inicfg.save(ini, configIni)
             memory.setfloat(12044272, ini.settings.drawdist, true)
          end
-        
+         imgui.SameLine()
+         imgui.TextQuestion("( ? )", u8"LOD модели - это низкополигональные версии обычных моделей.\
+         Эти модели мы видим издалека. По мере того, как вы приближаетесь \
+         к LOD-модели, она должна изменится на оригинальную.")
+         
          imgui.TextColoredRGB("Дистанция тумана")
          imgui.SameLine()
          imgui.TextQuestion(u8"(по-умолчанию 200)", u8"Вернуть на значение по-умолчанию")
@@ -2117,6 +2133,8 @@ function imgui.OnDrawFrame()
             inicfg.save(ini, configIni)
             memory.setfloat(13210352, ini.settings.fog, true)
          end
+         imgui.SameLine()
+         imgui.TextQuestion("( ? )", u8"Позволяет управлять дальностью прорисовки тумана.")
          
          imgui.Spacing()
          imgui.Spacing()
@@ -2216,6 +2234,10 @@ function imgui.OnDrawFrame()
          if imgui.TooltipButton(u8"Рестрим", imgui.ImVec2(200, 25),
          u8:encode("Обновить зону стрима путем выхода из зоны стрима, и возврата через 5 сек")) then
             Restream()
+         end
+         if imgui.Button(u8"Очистить streamed memory",imgui.ImVec2(200, 25)) then
+            cleanStreamMemory()
+            sampAddChatMessage("[SCRIPT]: {FFFFFF} Streamed memory очищена", 0x0FF6600)
          end
          
       --elseif tabmenu.settings == 5 then
@@ -2647,10 +2669,15 @@ function imgui.OnDrawFrame()
          end
          if imgui.CollapsingHeader(u8"Скрипт:") then
            
-           if imgui.Button(u8"Очистить память стрима",imgui.ImVec2(170, 25)) then
-              cleanStreamMemory()
-              sampAddChatMessage("[SCRIPT]: {FFFFFF} Память игры была очищена", 0x0FF6600)
-           end
+           local scriptParams = thisScript()
+           imgui.Text(u8"Script: "..scriptParams.name.." version: "..scriptParams.version)
+           imgui.Text(u8"path: "..scriptParams.path)
+           imgui.Text(u8"directory: "..scriptParams.directory)
+           imgui.Text(u8"filename: "..scriptParams.filename)
+           imgui.Text(u8"scriptid: "..scriptParams.id.." dead: "..tostring(scriptParams.dead).." frozen: "..tostring(scriptParams.frozen))
+           local pos_x, pos_y = getScreenResolution()
+           imgui.Text(u8"resolution: "..pos_x.."x"..pos_y)
+           
            if imgui.Button(u8"Перегрузить скрипт",imgui.ImVec2(170, 25)) then
                sampAddChatMessage("{696969}Mapping Toolkit{FFFFFF} перезагружается.", -1)
                sampAddChatMessage("Для перезапуска можно использовтаь комбинацию клавиш {696969}CTRL + R.", -1)
@@ -2853,6 +2880,11 @@ function imgui.OnDrawFrame()
             sampSetChatInputEnabled(checkbox.hidechat.v)
          end
          
+         if imgui.Checkbox(u8("Очищать строку ввода после закрытия"), checkbox.chatinputdrop) then
+            ini.settings.chatinputdrop = checkbox.chatinputdrop.v
+            inicfg.save(ini, configIni)
+         end
+         
          if imgui.Checkbox(u8("Копировать ник кликнутого игрока в TAB"), checkbox.tabclickcopy) then
             ini.settings.tabclickcopy = checkbox.tabclickcopy.v
             inicfg.save(ini, configIni)
@@ -2864,7 +2896,7 @@ function imgui.OnDrawFrame()
          end
          
       elseif tabmenu.settings == 9 then
-         resetIO()
+         
          local id = getLocalPlayerId()
          local nickname = sampGetPlayerNickname(id)
          local score = sampGetPlayerScore(id)
@@ -3087,6 +3119,7 @@ function imgui.OnDrawFrame()
          end
          
          if imgui.CollapsingHeader(u8"Вход в мир:") then
+            resetIO()
             if imgui.Checkbox(u8'Включать режим разработчика при входе в мир', checkbox.autodevmode) then
                ini.settings.autodevmode = checkbox.autodevmode.v
                inicfg.save(ini, configIni)
@@ -4867,7 +4900,8 @@ function imgui.OnDrawFrame()
             end
             
             local txdSearchFilters = {
-               "Wood", "Grass", "Door", "Window", "Floors", "Sky", "Sign"
+               "Wood", "Grass", "Door", "Metal", "Rust", "Panel",
+               "Window", "Glass", "Brick", "Tile", "Floors", "Sky", "Sign"
             }
             
             imgui.Spacing()
@@ -4893,6 +4927,7 @@ function imgui.OnDrawFrame()
       elseif tabmenu.info == 10 then
          local filepath = getGameDirectory().."//moonloader//resource//mappingtoolkit//cblist.txt"
          
+         imgui.PushStyleVar(imgui.StyleVar.ItemSpacing, imgui.ImVec2(4, 4))
          if imgui.TooltipButton(u8"Unlock IO", imgui.ImVec2(80, 25), u8:encode("разблокировать инпут если курсор забагался")) then
             resetIO()
          end
@@ -4923,6 +4958,7 @@ function imgui.OnDrawFrame()
          if imgui.TooltipButton(u8"Туториалы", imgui.ImVec2(85, 25), u8:encode("Командные блоки (Описание/Туториалы) на форуме")) then
             os.execute('explorer https://forum.training-server.com/d/4466/1')
          end
+         imgui.PopStyleVar()
          
          imgui.PushFont(multilinetextfont)
          imgui.InputTextMultiline('##cblist', textbuffer.cblist, imgui.ImVec2(490, 370),
@@ -5715,6 +5751,7 @@ function sampev.onSendDialogResponse(dialogId, button, listboxId, input)
                end)
             end
          end
+         
       end
    end
    
@@ -5914,8 +5951,20 @@ function sampev.onShowDialog(dialogId, style, title, button1, button2, text)
                   wait(50)
                   sampSendDialogResponse(32700, 1, 8, "- Сохранить виртуальный мир")
                   dialoghook.saveworld = false
+                  --dialoghook.saveworldname = true
                end)
             end
+            
+            -- if dialoghook.saveworldname then
+               -- print(LastData.lastListboxId)
+               -- local worldname = string.match(text, LastData.lastListboxId.."%s{FFFFFF}(%S+)%s")
+               -- if worldname then
+                  -- print(worldname)
+                  -- wait(200)
+                  -- sampSetCurrentDialogEditboxText(worldname)
+               -- end
+               -- dialoghook.saveworldname = false
+            -- end
             
             local newitems = 
             " - Настройки для команд\n"..
@@ -6173,9 +6222,9 @@ function sampev.onServerMessage(color, text)
    
    if checkbox.chatmentions.v then
       -- ignore system messages by color
-      if color ~= -793842689 -- lime color abs
-      and color ~= -1029514497 -- puprple color
-      and color ~= -10092289 --orange color training
+      --if color ~= -793842689 -- lime color abs
+      --if color ~= -1029514497 -- puprple color
+      if color ~= -10092289 --orange color training
       --and color ~= -1 then
       then
          -- mentions by nickname
@@ -6208,7 +6257,9 @@ function sampev.onServerMessage(color, text)
          end
          
          -- mentions by id
-         if text:match("(%s"..id.."%s)") then
+         if text:match(id.."%s(.+)") -- id text mention
+         or text:match("@"..id.."%s") then -- @id mention
+         --or text:match("(%s"..id.."%s)") then
             if ini.mentions.usegametext then
                printStyledString('You were mentioned in the chat', 2000, 4)
             end
@@ -6316,12 +6367,14 @@ function sampev.onSendCommand(command)
          if command:find('(.+) (.+)') then
             local cmd, arg = command:match('(.+) (.+)')
             local id = tonumber(arg)
-            if id >= 0 and id <= 45 then
-               ini.settings.lockserverweather = true
-               patch_samp_time_set(true)
-               slider.weather.v = id
-               setWeather(slider.weather.v)
-               sampAddChatMessage("Вы установили погоду - "..id, 0x000FF00)
+            if type(id) == "number" then
+               if id >= 0 and id <= 45 then
+                  ini.settings.lockserverweather = true
+                  patch_samp_time_set(true)
+                  slider.weather.v = id
+                  setWeather(slider.weather.v)
+                  sampAddChatMessage("Вы установили погоду - "..id, 0x000FF00)
+               end
             end
          else
             sampAddChatMessage("[SCRIPT]: {FFFFFF}Укажите верный ид погоды от 0 до 45", 0x0FF6600)
@@ -6333,12 +6386,14 @@ function sampev.onSendCommand(command)
          if command:find('(.+) (.+)') then
             local cmd, arg = command:match('(.+) (.+)')
             local id = tonumber(arg)
-            if id >= 0 and id <= 12 then
-               ini.settings.lockserverweather = true
-               patch_samp_time_set(true)
-               slider.time.v = id
-               setTime(slider.time.v)
-               sampAddChatMessage("Вы установили время - "..id, 0x000FF00)
+            if type(id) == "number" then
+               if id >= 0 and id <= 12 then
+                  ini.settings.lockserverweather = true
+                  patch_samp_time_set(true)
+                  slider.time.v = id
+                  setTime(slider.time.v)
+                  sampAddChatMessage("Вы установили время - "..id, 0x000FF00)
+               end
             end
          else
             sampAddChatMessage("[SCRIPT]: {FFFFFF}Укажите время от 0 до 12", 0x0FF6600)
@@ -6351,14 +6406,16 @@ function sampev.onSendCommand(command)
       if command:find('(.+) (.+) (.+)') then
          local cmd, id, hp = command:match('(.+) (.+) (.+)')
          local hp = tonumber(hp)
-         if sampIsPlayerConnected(id) then
-            if hp >= 0 and hp <= 100 then
-               sampSendChat("/sethp "..id.." "..hp)
+         if type(id) == "number" and type(hp) == "number" then
+            if sampIsPlayerConnected(id) then
+               if hp >= 0 and hp <= 100 then
+                  sampSendChat("/sethp "..id.." "..hp)
+               else
+                  sampAddChatMessage("[SCRIPT]: {FFFFFF} Допустимые значения хп 0-100", 0x0FF6600)   
+               end
             else
-               sampAddChatMessage("[SCRIPT]: {FFFFFF} Допустимые значения хп 0-100", 0x0FF6600)   
+               sampAddChatMessage("[SCRIPT]: {FFFFFF} Игрок не подключен либо вышел", 0x0FF6600)   
             end
-         else
-            sampAddChatMessage("[SCRIPT]: {FFFFFF} Игрок не подключен либо вышел", 0x0FF6600)   
          end
       else
          sampAddChatMessage("[SCRIPT]: {FFFFFF} Используйте /hp <id> <кол-во>", 0x0FF6600)
@@ -6370,14 +6427,16 @@ function sampev.onSendCommand(command)
       if command:find('(.+) (.+) (.+)') then
          local cmd, id, arm = command:match('(.+) (.+) (.+)')
          local arm = tonumber(arm)
-         if sampIsPlayerConnected(id) then
-            if arm >= 0 and arm <= 100 then
-               sampSendChat("/setarm "..id.." "..arm)
+         if type(id) == "number" and type(arm) == "number" then
+            if sampIsPlayerConnected(id) then
+               if arm >= 0 and arm <= 100 then
+                  sampSendChat("/setarm "..id.." "..arm)
+               else
+                  sampAddChatMessage("[SCRIPT]: {FFFFFF} Допустимые значения брони 0-100", 0x0FF6600)   
+               end
             else
-               sampAddChatMessage("[SCRIPT]: {FFFFFF} Допустимые значения брони 0-100", 0x0FF6600)   
+               sampAddChatMessage("[SCRIPT]: {FFFFFF} Игрок не подключен либо вышел", 0x0FF6600)   
             end
-         else
-            sampAddChatMessage("[SCRIPT]: {FFFFFF} Игрок не подключен либо вышел", 0x0FF6600)   
          end
       else
          sampAddChatMessage("[SCRIPT]: {FFFFFF} Используйте /arm <id> <кол-во>", 0x0FF6600)
@@ -6414,27 +6473,32 @@ function sampev.onSendCommand(command)
    if command:find("/отсчет") or command:find("/countdown") then
       if command:find('(.+) (.+)') then
          local cmd, arg = command:match('(.+) (.+)')
-         local time = tonumber(arg) 
-         if time >= 1 and time <= 10 then 
-            lua_thread.create(function()
-               while time ~= 0 do
-                  time = time - 1
-                  if time > 0 then
-                     if isTraining then
-                        sampSendChat("/s "..time)
+         local time = tonumber(arg)
+         if type(time) == "number" then
+            if time >= 1 and time <= 10 then 
+               lua_thread.create(function()
+                  while time ~= 0 do
+                     time = time - 1
+                     if time > 0 then
+                        if isTraining then
+                           sampSendChat("/s "..time)
+                        else
+                           sampSendChat(""..time)
+                        end
                      else
-                        sampSendChat(""..time)
+                        if isTraining then
+                           sampSendChat("/s GO!")
+                        else
+                           sampSendChat("GO!")
+                        end
                      end
-                  else
-                     if isTraining then
-                        sampSendChat("/s GO!")
-                     else
-                        sampSendChat("GO!")
-                     end
+                     wait(1000)
                   end
-                  wait(1000)
-               end
-            end)
+               end)
+            else
+               sampAddChatMessage("Используйте /count <1-10>", -1)
+               return false
+            end
          else
             sampAddChatMessage("Используйте /count <1-10>", -1)
             return false
@@ -6607,6 +6671,10 @@ function sampev.onSendCommand(command)
          local cmd, arg = command:match('(.+) (.+)')
          local radius = tonumber(arg)
          local findedObjects = 0
+         if type(radius) ~= "number" then
+            sampAddChatMessage("[SCRIPT]: {FFFFFF}Для радиусного удаления используйте /rdell <radius>", 0x0FF6600)
+            return false
+         end
          if radius > 0 and radius <= ini.settings.devmodelabeldist then
             --sampAddChatMessage("Список удаленных объектов:", -1)
             lua_thread.create(function()
@@ -6715,7 +6783,11 @@ function sampev.onSendCommand(command)
       editMode = 3
       if command:find('(.+) (.+)') then
          local cmd, arg = command:match('(.+) (.+)')
-         local id = tonumber(arg) 
+         local id = tonumber(arg)
+         if type(id) ~= "number" then
+            sampAddChatMessage("[SCRIPT]: {FFFFFF}Введите корректный id!", 0x0FF6600)
+            return false
+         end
          if id == LastObject.localid then
             LastRemovedObject.modelid = LastObject.modelid
             LastRemovedObject.position.x = LastObject.position.x
@@ -6735,12 +6807,14 @@ function sampev.onSendCommand(command)
       if command:find('(.+) (.+)') then
          local cmd, arg = command:match('(.+) (.+)')
          local id = tonumber(arg)
-         if isValidObjectModel(id) then 
-            LastRemovedObject.modelid = id
-            --checkBuggedObject(id)
-            local result, errorString = checkBuggedObject(id)
-            if result then
-               sampAddChatMessage("[SCRIPT] {FFFFFF}"..errorString, 0x0FF0000)
+         if type(id) == "number" then
+            if isValidObjectModel(id) then 
+               LastRemovedObject.modelid = id
+               --checkBuggedObject(id)
+               local result, errorString = checkBuggedObject(id)
+               if result then
+                  sampAddChatMessage("[SCRIPT] {FFFFFF}"..errorString, 0x0FF0000)
+               end
             end
          end
       else
@@ -6774,6 +6848,10 @@ function sampev.onSendCommand(command)
          local id = tonumber(id)
          local slot = tonumber(slot)
          
+         if type(id) ~= "number" or type(slot) ~= "slot" then
+            sampAddChatMessage("[SCRIPT]: {FFFFFF}Введите корректный id и slot!", 0x0FF6600)
+            return false
+         end
          if not LastObject.localid then
             LastObject.localid = id
          end
@@ -6859,6 +6937,10 @@ function sampev.onSendCommand(command)
       if command:find('(.+) (.+)') then
          local cmd, arg = command:match('(.+) (.+)')
          local id = tonumber(arg)
+         if type(id) ~= "number" then
+            sampAddChatMessage("[SCRIPT]: {FFFFFF}Введите корректный id!", 0x0FF6600)
+            return false
+         end
          sampSendChat("/stexture "..id.." "..LastObject.txdslot.." "..LastObject.txdid)
       else
          sampAddChatMessage("Введите ID объекта на который наложить текстуру", -1)
@@ -7023,41 +7105,6 @@ function sampev.onSendCommand(command)
       end
       return false
    end
-    
-   -- if command:find("/tsearch") and not isTraining then
-      -- if command:find('(.+) (.+)') then
-         -- local cmd, arg = command:match('(.+) (.+)')
-         -- local searchtxd = tostring(arg)
-         -- if string.len(searchtxd) < 2 then
-            -- sampAddChatMessage("Минимальное кол-во символов для поиска текстуры = 2", -1)
-            -- return false
-         -- end
-         
-         -- local findedtxd = 0
-         -- if searchtxd and searchtxd ~= nil then 
-            -- for k, txdname in pairs(absTxdNames) do
-               -- if txdname:find(searchtxd) then
-                  -- findedtxd = findedtxd + 1
-                  -- sampAddChatMessage(string.format("{696969}%d. {FFFFFF}%s", k-1, txdname), -1)
-                  -- if findedtxd >= 50 then
-                     -- break
-                  -- end
-               -- end
-            -- end
-            
-            -- if findedtxd > 0 then
-               -- sampAddChatMessage("Найдено совпадений: "..findedtxd, -1)
-            -- else
-               -- sampAddChatMessage("Совпадений не найдено.", -1)
-            -- end
-            -- return false
-         -- end
-      -- else 
-         -- sampAddChatMessage("Введите название текстуры для поиска", -1)
-         -- sampAddChatMessage("Например: /tsearch wood", -1)
-         -- return false
-      -- end
-   -- end
    
    if command:find("/tsearch") and isTraining then
       if LastObject.txdid ~= nil then
@@ -7287,6 +7334,10 @@ function sampev.onSendCommand(command)
       if command:find('(.+) (.+)') then
          local cmd, arg = command:match('(.+) (.+)')
          local radius = tonumber(arg)
+         if type(radius) ~= "number" then
+            sampAddChatMessage("[SCRIPT]: {FFFFFF}Введите корректный radius!", 0x0FF6600)
+            return false
+         end
          if radius then 
             local px, py, pz = getCharCoordinates(playerPed)
             Draw3DCircle(px, py, pz-1, radius, 0xFFD00000)
@@ -7773,13 +7824,6 @@ function onScriptTerminate(script, quit)
       -- Save last exit datetime
       ini.settings.disconnecttime = os.time()
       inicfg.save(ini, configIni)
-
-      -- TODO if script failed try reload script without updates function
-      if ini.settings.checkupdates then
-         ini.settings.checkupdates = false
-         inicfg.save(ini, configIni)
-         thisScript():reload()
-      end
    end
 end
 -- END hooks
@@ -8184,18 +8228,23 @@ end
 
 function checkScriptUpdates()
    if doesFileExist(getGameDirectory() .. "\\moonloader\\lib\\requests.lua") then
-      local response = require('requests').get('https://raw.githubusercontent.com/ins1x/MappingToolkit/main/version.dat')
-      if response then
-         local text = response.text
-         local version = text:gsub("[.]", "")
-         local installedversion = tostring(thisScript().version)
-         installedversion = installedversion:gsub("[.]", "")
-         if tonumber(version) > tonumber(installedversion) then
-            sampAddChatMessage("{696969}Mapping Toolkit  {FFFFFF}Доступно обновление до версии {696969}"..text, -1)
-            return true
+      local result, response = pcall(require('requests').get, 'https://raw.githubusercontent.com/ins1x/MappingToolkit/main/version.dat')
+      if result then
+         if response.status_code == 200 then
+            local text = response.text
+            local version = text:gsub("[.]", "")
+            local installedversion = tostring(thisScript().version)
+            installedversion = installedversion:gsub("[.]", "")
+            if tonumber(version) > tonumber(installedversion) then
+               sampAddChatMessage("{696969}Mapping Toolkit  {FFFFFF}Доступно обновление до версии {696969}"..text, -1)
+               return true
+            end
+         else
+            print("Mapping Toolkit: Check updates failed server not responded")
+            return false
          end
       else
-         print("Updates server not responded")
+         print("Mapping Toolkit: Check updates failed server unavailable")
          return false
       end
    else
@@ -8977,8 +9026,8 @@ function apply_custom_style()
    style.FrameRounding = 4.0
    style.ItemSpacing = imgui.ImVec2(6, 6)
    style.ItemInnerSpacing = imgui.ImVec2(8, 6)
-   style.IndentSpacing = 25.0
-   style.ScrollbarSize = 15.0
+   style.IndentSpacing = 20.0
+   style.ScrollbarSize = 12.0
    style.ScrollbarRounding = 9.0
    style.GrabMinSize = 5.0
    style.GrabRounding = 3.0
