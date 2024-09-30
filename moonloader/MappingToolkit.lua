@@ -244,7 +244,8 @@ local checkbox = {
    trailerspawnfix = imgui.ImBool(ini.settings.trailerspawnfix),
    skipvehnotify = imgui.ImBool(ini.settings.skipvehnotify),
    novehiclevisualdamage = imgui.ImBool(ini.settings.novehiclevisualdamage),
-   saveworldname = imgui.ImBool(ini.settings.saveworldname),
+   --saveworldname = imgui.ImBool(ini.settings.saveworldname),
+   saveworldname = imgui.ImBool(true),
    
    showpanel = imgui.ImBool(ini.panel.showpanel),
    panelbackground = imgui.ImBool(ini.panel.background),
@@ -3878,7 +3879,7 @@ function imgui.OnDrawFrame()
       elseif combobox.selecttable.v == 3 then
          imgui.Separator()
          imgui.Columns(6)
-         imgui.TextQuestion("ID", u8"Внутренний ID объекта (/ctd)")
+         imgui.TextQuestion("ID", u8"ID текстуры (/tsearch)")
          imgui.SetColumnWidth(-1, 40)
          imgui.NextColumn()
          imgui.Text("Slot")
