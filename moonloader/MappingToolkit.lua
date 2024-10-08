@@ -4,7 +4,7 @@ script_description("Assistant for mappers")
 script_dependencies('imgui', 'lib.samp.events')
 script_properties("work-in-pause")
 script_url("https://github.com/ins1x/MappingToolkit")
-script_version("4.1")
+script_version("4.1")--R2
 -- script_moonloader(16) moonloader v.0.26
 -- tested on sa-mp client version: 0.3.7 R1
 -- activaton: ALT + X (show main menu) or command /toolkit
@@ -69,6 +69,7 @@ local ini = inicfg.load({
       restoreobjectpos = false,
       reminderdelay = 15,
       saveskin = false,
+      saveworldname = true,
       setgm = false,
       showhud = true,
       showobjectrot = false,
@@ -82,6 +83,7 @@ local ini = inicfg.load({
       trailerspawnfix = true,
       usecustomcamdist = false,
       weather = 0,
+      weatherinformer = false,
       worldsavereminder = false,
    },
    hotkeyactions = {
@@ -244,8 +246,8 @@ local checkbox = {
    trailerspawnfix = imgui.ImBool(ini.settings.trailerspawnfix),
    skipvehnotify = imgui.ImBool(ini.settings.skipvehnotify),
    novehiclevisualdamage = imgui.ImBool(ini.settings.novehiclevisualdamage),
-   --saveworldname = imgui.ImBool(ini.settings.saveworldname),
-   saveworldname = imgui.ImBool(true),
+   weatherinformer = imgui.ImBool(ini.settings.weatherinformer),
+   saveworldname = imgui.ImBool(ini.settings.saveworldname),
    
    showpanel = imgui.ImBool(ini.panel.showpanel),
    panelbackground = imgui.ImBool(ini.panel.background),
@@ -275,7 +277,9 @@ local checkbox = {
    loggametexts = imgui.ImBool(false),
    logtxd = imgui.ImBool(false),
    logcamset = imgui.ImBool(false),
+   logsetplayerpos = imgui.ImBool(false),
    logmessages = imgui.ImBool(false),
+   logworlddouns = imgui.ImBool(false),
    pickeduppickups = imgui.ImBool(false),
    showtextdrawsid = imgui.ImBool(false),
    vehloads = imgui.ImBool(false),
@@ -311,6 +315,7 @@ local checkbox = {
    txdparamsonclick = imgui.ImBool(false),
    hidelastobject = imgui.ImBool(false),
    bliplastobject = imgui.ImBool(false),
+   noworldbounds = imgui.ImBool(false),
    chatinputdrop = imgui.ImBool(false),
    chathiderp = imgui.ImBool(false),
    test = imgui.ImBool(false)
@@ -1099,19 +1104,26 @@ function main()
             select(2, getActiveCameraPointAt()) - select(2, getActiveCameraCoordinates()))) 
          end
          
-         if sampIsCursorActive() or sampIsChatInputActive() or sampIsDialogActive() then 
+         if sampIsChatInputActive() or sampIsDialogActive() then 
             goto holdposition 
          end
          
-         if isKeyDown(1) then -- LMB
-            flypower = flypower + 0.1
-         elseif isKeyDown(2) then -- RMB
-            flypower = flypower - 0.1
-            if flypower < 1.0 then
-               flypower = 1.0
+         if not sampIsCursorActive() then
+            local x, y = getScreenResolution()
+            if isKeyDown(1) then -- LMB
+               flypower = flypower + 0.1
+               renderFontDrawText(infobarfont, 
+               string.format("flyspeed:{26b85d} %.2f", flypower), x-200, y-60, 0xFFFFFFFF)
+            elseif isKeyDown(2) then -- RMB
+               flypower = flypower - 0.1
+               if flypower < 1.0 then
+                  flypower = 1.0
+               end
+               renderFontDrawText(infobarfont, 
+               string.format("flyspeed:{a52a2a} %.2f", flypower),x-200, y-60, 0xFFFFFFFF)
             end
          end
-    
+         
          if isKeyDown(0x46) or isKeyDown(0x0D) then -- F/ENTER
             toggleFlyMode(false)
          end
@@ -1482,7 +1494,15 @@ function imgui.OnDrawFrame()
             
             imgui.Spacing()
             
-            if imgui.Checkbox(u8("Телепорт на координаты"), checkbox.teleportcoords) then
+            if imgui.Checkbox(u8"Отключить границы мира", checkbox.noworldbounds) then
+               if checkbox.noworldbounds.v then
+                  sampAddChatMessage("[SCRIPT]: {FFFFFF}Границы мира обнулены", 0x0FF6600)
+               end
+            end
+            imgui.SameLine()
+            imgui.TextQuestion("( ? )", u8"Отключает установленные сервером ограничения границ мира (setWorldBounds)")
+            
+            if imgui.Checkbox(u8"Телепорт на координаты", checkbox.teleportcoords) then
                tpcpos.x = positionX
                tpcpos.y = positionY
                tpcpos.z = positionZ
@@ -2650,6 +2670,8 @@ function imgui.OnDrawFrame()
             imgui.Checkbox(u8'Логгировать в консоли установку текстуры', checkbox.logtxd)
             imgui.Checkbox(u8'Логгировать в консоли изменение камеры', checkbox.logcamset)
             imgui.Checkbox(u8'Логгировать в консоли сообщения в чате', checkbox.logmessages)
+            imgui.Checkbox(u8'Логгировать в консоли изменение границ мира', checkbox.logworlddouns)
+            imgui.Checkbox(u8'Логгировать в консоли изменение позиции игрока', checkbox.logsetplayerpos)
             
             imgui.Spacing()
             imgui.Text(u8"Стандартные логи:")
@@ -2989,20 +3011,6 @@ function imgui.OnDrawFrame()
          if imgui.IsItemClicked() then
             runSampfuncsConsoleCommand("fps")
          end
-            imgui.SameLine()
-            imgui.Text(u8"   ")
-            imgui.SameLine()
-            imgui.Text(u8"Выбрана тема:")
-            imgui.SameLine()
-            imgui.PushItemWidth(120)
-            if imgui.Combo(u8'##imguitheme', combobox.imguitheme, imguiThemeNames) then
-               ini.settings.imguitheme = combobox.imguitheme.v
-               inicfg.save(ini, configIni)
-               apply_custom_style()
-               sampAddChatMessage("[SCRIPT]: {FFFFFF} Выбрана тема - "..tostring(imguiThemeNames[combobox.imguitheme.v+1]), 0x0FF6600)
-            end
-            imgui.PopItemWidth()
-         
          
          if imgui.Button(u8"Статистика", imgui.ImVec2(100, 25)) then
             dialog.main.v = not dialog.main.v
@@ -3035,6 +3043,14 @@ function imgui.OnDrawFrame()
          imgui.Spacing()
          
          if imgui.CollapsingHeader(u8"Погода:") then
+         
+            if imgui.Checkbox(u8("Уведомлять о изменении погоды сервером"), checkbox.weatherinformer) then          
+               ini.settings.weatherinformer = checkbox.weatherinformer.v
+               inicfg.save(ini, configIni)
+            end
+            imgui.SameLine()
+            imgui.TextQuestion("( ? )", u8"Сообщает в чат ид погоды при изменении сервером")
+            
             if imgui.Checkbox(u8("Блокировать изменение погоды и времени"), checkbox.lockserverweather) then          
                ini.settings.lockserverweather = not ini.settings.lockserverweather
                if ini.settings.lockserverweather then
@@ -3134,7 +3150,18 @@ function imgui.OnDrawFrame()
             imgui.Spacing()
          end
          
-         if imgui.CollapsingHeader(u8"Дополнительный интерфейс:") then
+         if imgui.CollapsingHeader(u8"Интерфейс:") then
+            
+            imgui.Text(u8"Выбрана тема:")
+            imgui.SameLine()
+            imgui.PushItemWidth(120)
+            if imgui.Combo(u8'##imguitheme', combobox.imguitheme, imguiThemeNames) then
+               ini.settings.imguitheme = combobox.imguitheme.v
+               inicfg.save(ini, configIni)
+               apply_custom_style()
+               sampAddChatMessage("[SCRIPT]: {FFFFFF} Выбрана тема - "..tostring(imguiThemeNames[combobox.imguitheme.v+1]), 0x0FF6600)
+            end
+            imgui.PopItemWidth()
             
             imgui.Text(u8"Нижняя панель:")
             if imgui.Checkbox(u8'Показывать дополнительную нижнюю панель', checkbox.showpanel) then
@@ -5779,6 +5806,11 @@ end
 
 -------------- SAMP hooks -----------
 function sampev.onSetWeather(weatherId)
+   if ini.settings.weatherinformer then
+      if weatherId ~= 0 and sampIsLocalPlayerSpawned() and not firstSpawn then
+         sampAddChatMessage("[SCRIPT]: {FFFFFF}Используется погода "..weatherId, 0x0FF6600)
+      end
+   end
    if ini.settings.lockserverweather then
       forceWeatherNow(slider.weather.v)
    end
@@ -5787,6 +5819,24 @@ end
 function sampev.onSetPlayerTime(hour, minute)
    if ini.settings.lockserverweather then
       setTimeOfDay(slider.time.v, 0)
+   end
+end
+
+function sampev.onSetPlayerPos(position)
+   if checkbox.logsetplayerpos.v then
+      --printHelpString(string.format("x:%.2f y:%.2f z:%.2f", position.x, position.y, position.z))
+      print(string.format("Server change player position: %.2f %.2f %.2f", position.x, position.y, position.z))
+   end
+end
+
+function sampev.onSetWorldBounds(maxX, minX, maxY, minY)
+   if checkbox.logworlddouns.v then
+      print(string.format("Server change world bounds: maxX:%.2f, mixX:%.2f, maxY:%.2f, mixY:%.2f", 
+      maxX, minX, maxY, minY), -1)
+   end
+   if checkbox.noworldbounds.v then
+      -- A player's world boundaries reset to default (doesn't work in interiors)
+      return {20000.0000, -20000.0000, 20000.0000, -20000.0000}
    end
 end
 
@@ -7277,7 +7327,7 @@ function sampev.onSendCommand(command)
          local id = tonumber(id)
          local slot = tonumber(slot)
          
-         if type(id) ~= "number" or type(slot) ~= "slot" then
+         if type(id) ~= "number" or type(slot) ~= "number" then
             sampAddChatMessage("[SCRIPT]: {FFFFFF}Введите корректный id и slot!", 0x0FF6600)
             return false
          end
@@ -8149,6 +8199,13 @@ function sampev.onTextDrawSetString(id, text)
    -- end
 end
 
+function sampev.onSetMapIcon(iconId, position, type, color, style)
+   local MAX_SAMP_MARKERS = 63
+   if type > MAX_SAMP_MARKERS then
+      return false
+   end
+end
+
 function sampev.onSendClickTextDraw(textdrawId)
    LastData.lastClickedTextdrawId = textdrawId
    if checkbox.logtextdraws.v then
@@ -8327,6 +8384,25 @@ function onScriptTerminate(script, quit)
       -- Save last exit datetime
       ini.settings.disconnecttime = os.time()
       inicfg.save(ini, configIni)
+   end
+end
+
+function onSendRpc(id, bs, priority, reliability, channel, shiftTimestamp)   
+   --Fix ClickMap height detection when setting a placemark on the game map
+   if id == 119 then
+      local posX, posY, posZ = raknetBitStreamReadFloat(bs), raknetBitStreamReadFloat(bs), raknetBitStreamReadFloat(bs)
+      requestCollision(posX, posY)
+      loadScene(posX, posY, posZ)
+      local res, x, y, z = getTargetBlipCoordinates()
+      if res then
+        local new_bs = raknetNewBitStream()
+        raknetBitStreamWriteFloat(new_bs, x)
+        raknetBitStreamWriteFloat(new_bs, y)
+        raknetBitStreamWriteFloat(new_bs, z + 0.5)
+        raknetSendRpcEx(119, new_bs, priority, reliability, channel, shiftTimestamp)
+        raknetDeleteBitStream(new_bs)
+      end
+      return false
    end
 end
 -- END hooks
