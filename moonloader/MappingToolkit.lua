@@ -4,7 +4,7 @@ script_description("Assistant for mappers")
 script_dependencies('imgui', 'lib.samp.events')
 script_properties("work-in-pause")
 script_url("https://github.com/ins1x/MappingToolkit")
-script_version("4.2")
+script_version("4.3")
 -- script_moonloader(16) moonloader v.0.26 
 -- tested on sa-mp client version: 0.3.7 R1
 -- activaton: ALT + X (show main menu) or command /toolkit
@@ -65,9 +65,10 @@ local ini = inicfg.load({
       recontime = 15500,
       renderfont = "Arial",
       renderfontsize = 7,
-      rendercolor = "{80FFFFFF}",
+      rendercolor = "80FFFFFF",
       remapnum = false,
       restoreobjectpos = false,
+      fixobjinfotext = false,
       reminderdelay = 15,
       saveskin = false,
       saveworldname = true,
@@ -261,6 +262,7 @@ local checkbox = {
    saveworldname = imgui.ImBool(ini.settings.saveworldname),
    worldlogson = imgui.ImBool(ini.settings.worldlogson),
    flymodenocoll = imgui.ImBool(ini.settings.flymodenocoll),
+   fixobjinfotext = imgui.ImBool(ini.settings.fixobjinfotext),
    
    showpanel = imgui.ImBool(ini.panel.showpanel),
    panelbackground = imgui.ImBool(ini.panel.background),
@@ -347,9 +349,12 @@ local input = {
    mdomodel = imgui.ImInt(0),
    mdodist = imgui.ImInt(100),
    rendselectedmodelid = imgui.ImInt(0),
+   rendmaxdist = imgui.ImInt(250),
    removetxdid = imgui.ImInt(0),
+   renderfontsize = imgui.ImInt(ini.settings.renderfontsize),
    reminderdelay = imgui.ImInt(ini.settings.reminderdelay),
    cbdefaultradius = imgui.ImFloat(ini.settings.cbdefaultradius),
+   rendclrrgba = imgui.ImFloat4(1, 1, 1, 1),
    colorpicker = imgui.ImFloat4(1, 0, 0, 1)
 }
 
@@ -381,6 +386,7 @@ local textbuffer = {
    attachcode = imgui.ImBuffer(32),
    vehiclename = imgui.ImBuffer(64),
    findplayer = imgui.ImBuffer(32),
+   rendcolor = imgui.ImBuffer(16),
    cbdefaultradius = imgui.ImBuffer(6),
    colorsearch = imgui.ImBuffer(16),
    objectid = imgui.ImBuffer(48),
@@ -500,7 +506,7 @@ local LastData = {
 }
 
 local imguiThemeNames = {
-   "Dark Night", "Grey-Blue", "Brutal", "Training"
+   "Dark Night", "Grey-Blue", "Brutal", "Training", "Halloween"
 }
 
 local gamestates = {
@@ -765,6 +771,12 @@ function main()
       textbuffer.vehiclename.v = 'bmx'
       textbuffer.cbdefaultradius.v = string.format("%.1f", ini.settings.cbdefaultradius)
       textbuffer.attachcode.v = tostring(attCodes[combobox.attname.v+1])
+      
+      -- legacy color fix
+      local formattedcolor = tostring(ini.settings.rendercolor)
+      formattedcolor = formattedcolor:gsub("}","")
+      formattedcolor = formattedcolor:gsub("{","")
+      textbuffer.rendcolor.v = formattedcolor
       
       for k, v in ipairs(uiFontsFilenames) do
          if v == ini.settings.imguifont then
@@ -1113,13 +1125,15 @@ function main()
                if isObjectOnScreen(v) then
                   local _, x, y, z = getObjectCoordinates(v)
                   local px, py, pz = getCharCoordinates(playerPed)
-                  if getDistanceBetweenCoords3d(px, py, pz, x, y, z) >= 2 then
+                  local distance = getDistanceBetweenCoords3d(px, py, pz, x, y, z)
+                  if distance <= tonumber(input.rendmaxdist.v)
+                  and distance >= 2 then -- 2 to ignore attaches
                      local x1, y1 = convert3DCoordsToScreen(x,y,z)
                      if checkbox.showobjectsmodel.v then
                         renderFontDrawText(objectsrenderfont, 
                         (checkbox.showobjectsname.v
-                        and ini.settings.rendercolor .. getObjectModel(v) .. " ".. tostring(sampObjectModelNames[getObjectModel(v)])
-                        or ini.settings.rendercolor .. getObjectModel(v)), x1, y1, -1)
+                        and "{"..ini.settings.rendercolor.."}".. getObjectModel(v) .. "\n".. tostring(sampObjectModelNames[getObjectModel(v)])
+                        or "{"..ini.settings.rendercolor.."}".. getObjectModel(v)), x1, y1, -1)
                      end
                   end
                end
@@ -1136,10 +1150,11 @@ function main()
                local x1, y1 = convert3DCoordsToScreen(x,y,z)
                local x10, y10 = convert3DCoordsToScreen(px,py,pz)
                local distance = string.format("%.0f", getDistanceBetweenCoords3d(x, y, z, px, py, pz))
-               if model ~= 2680 and model ~= 1276 -- ignore hidden packages on abs
+
+               if tonumber(distance) <= tonumber(input.rendmaxdist.v)
                and model == input.rendselectedmodelid.v then
-                  --renderFontDrawText(objectsrenderfont, "{CCFFFFFF} " .. getObjectModel(v) .." distace: ".. distance, x1, y1, -1)
-                  renderFontDrawText(objectsrenderfont, "{CCFFFFFF}distace:{CCFF6600} ".. distance, x1, y1, -1)
+                  renderFontDrawText(objectsrenderfont, 
+                  "{CCFFFFFF}distace:{CCFF6600} "..distance, x1, y1, -1)
                   renderDrawLine(x10, y10, x1, y1, 1.0, '0xCCFFFFFF')
                end
             end
@@ -1788,7 +1803,7 @@ function imgui.OnDrawFrame()
                end
             end
             imgui.SameLine()
-            if imgui.TooltipButton(u8"Online инфо", imgui.ImVec2(100, 25), u8"Посмотреть подробную информацию по объекту на Prineside DevTools") then            
+            if imgui.TooltipButton(u8"O", imgui.ImVec2(25, 25), u8"Посмотреть подробную информацию по объекту на Prineside DevTools") then            
                local link = 'explorer "https://dev.prineside.com/ru/gtasa_samp_model_id/search/?q='..modelid..'"'
                os.execute(link)
             end
@@ -1865,7 +1880,7 @@ function imgui.OnDrawFrame()
             end
             imgui.SameLine()
             imgui.TextQuestion("( ? )", u8"Показывает modelid на объектах рядом (CTRL + O)")
-            
+               
             if imgui.Checkbox(u8("Показывать имена объектов рядом"), checkbox.showobjectsname) then 
                if not checkbox.showobjectsmodel.v then checkbox.showobjectsmodel.v = true end
                if checkbox.drawlinetomodelid.v then checkbox.drawlinetomodelid.v = false end
@@ -1881,8 +1896,13 @@ function imgui.OnDrawFrame()
             imgui.TextQuestion("( ? )", u8"Рисует линию к центру объекта с указанием расстояния")
             
             if checkbox.drawlinetomodelid.v then 
-               if LastObject.modelid and input.rendselectedmodelid.v == 0 then 
-                  input.rendselectedmodelid.v = LastObject.modelid
+               -- if LastObject.modelid and input.rendselectedmodelid.v == 0 then 
+                  -- input.rendselectedmodelid.v = LastObject.modelid
+               -- end
+               
+               local closestObjectId = getClosestObjectId()
+               if closestObjectId and input.rendselectedmodelid.v == 0 then
+                  input.rendselectedmodelid.v = getObjectModel(closestObjectId)
                end
                
                imgui.Text(u8"modelid объекта: ")
@@ -1893,6 +1913,58 @@ function imgui.OnDrawFrame()
                imgui.SameLine()
                imgui.TextQuestion("( ? )", u8"Введите modelid от 615-18300 [GTASA], 18632-19521 [SAMP]")
             end
+            
+            imgui.Text(u8"Макс. дистанция поиска: ")
+            imgui.SameLine()
+            imgui.PushItemWidth(55)
+            imgui.InputInt('##rendmaxdist', input.rendmaxdist, 0)
+            imgui.PopItemWidth()
+            imgui.SameLine()
+            imgui.TextQuestion("( ? )", u8"Максимальная дистанция поиска от 0 - 500 (Ограничен зоной стрима)")
+            
+            imgui.PushItemWidth(150)
+            if imgui.ColorEdit4("##rendclrrgba", input.rendclrrgba, imgui.ColorEditFlags.NoInputs) then
+               local rgba = imgui.ImColor(input.rendclrrgba.v[1], input.rendclrrgba.v[2], input.rendclrrgba.v[3], input.rendclrrgba.v[4])
+               local hexcolor = tostring(intToHex(join_argb(input.rendclrrgba.v[4] * 255,
+               input.rendclrrgba.v[1] * 255, input.rendclrrgba.v[2] * 255, input.rendclrrgba.v[3] * 255)))
+               local color = string.upper(hexcolor)
+               textbuffer.rendcolor.v = "80"..tostring(color)
+            end
+            imgui.PopItemWidth()
+            imgui.PushItemWidth(125)
+            imgui.SameLine()
+            if imgui.InputText("##renderclr", textbuffer.rendcolor) then
+            end
+            imgui.PopItemWidth()
+            imgui.SameLine()
+            if imgui.Button(u8"Сохранить") then
+               local formattedcolor = textbuffer.rendcolor.v
+               formattedcolor = formattedcolor:gsub("}","")
+               formattedcolor = formattedcolor:gsub("{","")
+               ini.settings.rendercolor = formattedcolor
+               inicfg.save(ini, configIni)
+               sampAddChatMessage("[SCRIPT]: {FFFFFF} Сохранен новый "..tostring(formattedcolor).." цвет для рендера!", 0x0FF6600)
+            end
+            imgui.SameLine()
+            if imgui.TooltipButton(u8"[r]", imgui.ImVec2(35, 25), u8"Сбросить на стандартный (80FFFFFF)") then
+               input.rendclrrgba = imgui.ImFloat4(1, 1, 1, 1)
+               textbuffer.rendcolor.v = "80FFFFFF"
+               ini.settings.rendercolor = "80FFFFFF"
+               inicfg.save(ini, configIni)
+               sampAddChatMessage("[SCRIPT]: {FFFFFF} Цвет для рендера сброшен на стандартный!", 0x0FF6600)
+            end
+            
+            imgui.Text(u8"Размер шрифта: ")
+            imgui.SameLine()
+            imgui.PushItemWidth(100)
+            if imgui.InputInt('##INPUTrenderfontsize', input.renderfontsize) then
+               objectsrenderfont = renderCreateFont(ini.settings.renderfont, ini.settings.renderfontsize, 5)
+               ini.settings.renderfontsize = input.renderfontsize.v
+               inicfg.save(ini, configIni)
+            end
+            imgui.PopItemWidth()
+            imgui.SameLine()
+            imgui.TextQuestion("( ? )", u8"Размер шрифта для текста на рендере (стандартный - 7)")
          end
          
          if imgui.CollapsingHeader(u8"Редактирование") then
@@ -1905,7 +1977,6 @@ function imgui.OnDrawFrame()
             imgui.TextQuestion("( ? )", u8"Возвращает объект на исходную позицию при отмене редактирования")
             
             if imgui.Checkbox(u8("Показывать координаты объекта при перемещении"), checkbox.showobjectcoord) then
-               checkbox.showobjectrot.v = false
                ini.settings.showobjectrot = false
                ini.settings.showobjectcoord = checkbox.showobjectcoord.v
                inicfg.save(ini, configIni)
@@ -1914,7 +1985,6 @@ function imgui.OnDrawFrame()
             imgui.TextQuestion("( ? )", u8"Показывает координаты объекта при перемещении в редакторе карт")
             
             if imgui.Checkbox(u8("Показывать угол поворота объекта при перемещении"), checkbox.showobjectrot) then
-               checkbox.showobjectcoord.v = false
                ini.settings.showobjectcoord = false
                ini.settings.showobjectrot = checkbox.showobjectrot.v
                inicfg.save(ini, configIni)
@@ -2120,20 +2190,20 @@ function imgui.OnDrawFrame()
                   textbuffer.attachcode.v = attCodes[combobox.attname.v+1]
                end
                
-               if imgui.Button(u8"Сбросить",imgui.ImVec2(150, 25)) then
-                  textbuffer.attachcode.v = attCodes[combobox.attname.v+1]
-                  sampSendChat("/mn")
-                  lua_thread.create(function()
-                     wait(50)
-                     sampSendChat("/mn")
-                     wait(200)
-                     sampSendDialogResponse(32700, 1, 1, "Настройки игрока")
-                     wait(5)
-                     sampSendDialogResponse(32700, 1, 11, "12. Удалить все аттачи")
-                     sampAddChatMessage("[SCRIPT]: {FFFFFF} Все аттачи были удалены!", 0x0FF6600)
-                  end)
-               end
-               imgui.SameLine()
+               -- if imgui.Button(u8"Сбросить",imgui.ImVec2(150, 25)) then
+                  -- textbuffer.attachcode.v = attCodes[combobox.attname.v+1]
+                  -- sampSendChat("/mn")
+                  -- lua_thread.create(function()
+                     -- wait(50)
+                     -- sampSendChat("/mn")
+                     -- wait(200)
+                     -- sampSendDialogResponse(32700, 1, 1, "Настройки игрока")
+                     -- wait(5)
+                     -- sampSendDialogResponse(32700, 1, 11, "12. Удалить все аттачи")
+                     -- sampAddChatMessage("[SCRIPT]: {FFFFFF} Все аттачи были удалены!", 0x0FF6600)
+                  -- end)
+               -- end
+               --imgui.SameLine()
                if imgui.Button(u8"Протестировать",imgui.ImVec2(150, 25)) then
                   dialoghook.attachcode = true
                   dialoghook.autoattach = true
@@ -2143,6 +2213,7 @@ function imgui.OnDrawFrame()
             end
             
             imgui.Spacing()
+            
             imgui.Checkbox(u8("Отслеживать установку аттачей"), checkbox.hooksetattachedobject) 
             imgui.SameLine()
             imgui.TextQuestion("( ? )", u8"Будет выводить сообщение в чат при установке аттача с его параметрами")
@@ -3135,7 +3206,8 @@ function imgui.OnDrawFrame()
                   end
                end
             end
-      
+            imgui.Text(tostring(combobox.weaponselect.v))
+            imgui.SameLine()
             imgui.PushItemWidth(200)
             imgui.Combo(u8'##weapons', combobox.weaponselect, weaponNames)
             imgui.SameLine()
@@ -3146,6 +3218,8 @@ function imgui.OnDrawFrame()
             imgui.PushItemWidth(54)
             imgui.InputInt("##inputAmmo", input.ammo, 0)
             imgui.PopItemWidth()
+            imgui.SameLine()
+            imgui.Link("https://github.com/Southclaws/samp-weapon-data/blob/master/weapon-data.inc", "weapon-data")
             
             if imgui.Button(u8'Выдать оружие', imgui.ImVec2(200, 25)) then
                if combobox.weaponselect.v == 1 or combobox.weaponselect.v == 0 then
@@ -3606,6 +3680,15 @@ function imgui.OnDrawFrame()
             end
             imgui.SameLine()
             imgui.TextQuestion("( ? )", u8"Отображать ваш ID над худом (вверху экрана с правой стороны)")
+            
+            if isTraining then
+               if imgui.Checkbox(u8'Восстановить стандартынй цвет 3D текста с инф-цией о объекте', checkbox.fixobjinfotext) then
+                  ini.settings.fixobjinfotext = checkbox.fixobjinfotext.v
+                  inicfg.save(ini, configIni)
+               end
+               imgui.SameLine()
+               imgui.TextQuestion("( ? )", u8"Восстанавливает стандартный синий цвет для 3D текста с информацией о ид объекта (В режиме разработки)")
+            end
             
          end
          
@@ -4739,7 +4822,6 @@ function imgui.OnDrawFrame()
          imgui.SameLine()
          imgui.PushItemWidth(150)
          if imgui.InputText("##colorsearch", textbuffer.colorsearch) then
-            
          end
          imgui.PopItemWidth()
          imgui.SameLine()
@@ -6951,9 +7033,8 @@ function sampev.onShowDialog(dialogId, style, title, button1, button2, text)
          end
       end
       
-      --if title:find("Покинуть данный мир") then
-      if text:find("После подтверждения Вы отправитесь") then
-         dialoghook.exitdialog = true
+      if title:find("Покинуть данный мир") then
+         dialoghook.backtoworld = false
       end
       
       if text:find("Создать игровой мир") then
@@ -6965,6 +7046,8 @@ function sampev.onShowDialog(dialogId, style, title, button1, button2, text)
       end
       
       if text:find("После подтверждения Вы отправитесь в") then
+         dialoghook.exitdialog = true
+         dialoghook.backtoworld = false
          if isWorldHoster then
             sampSendDialogResponse(32700, 1, nil, nil)
             sampCloseCurrentDialogWithButton(1)
@@ -6978,6 +7061,16 @@ function sampev.onShowDialog(dialogId, style, title, button1, button2, text)
             local newtext = text ..
             "\nИскать можно так же через /cbsearch <text>\n"
             return {dialogId, style, title, button1, button2, newtext}
+         end
+         
+         if title:find('Редактирование') then
+            if text:find("скина, который будет использован") then
+               local skin = getCharModel(playerPed)
+               if skin then
+                  local newtext = "\n{696969}Ваш текущий скин: "..tostring(skin)
+                  return {dialogId, style, title, button1, button2, text..newtext}
+               end
+            end
          end
          -- Added new features to /omenu
          if title:find("Редактирование / Клонирование") then
@@ -7005,7 +7098,7 @@ function sampev.onShowDialog(dialogId, style, title, button1, button2, text)
             "Информация\n"
             return {dialogId, style, newtitle, button1, button2, newitems}
          end
-      
+         
          if title:find("Master Text Textures") then
             -- Automatic ID substitution for /otext
             if text:find("Укажите ID") then
@@ -7434,6 +7527,7 @@ function sampev.onServerMessage(color, text)
       --if color ~= -793842689 -- lime color abs
       --if color ~= -1029514497 -- puprple color
       if color ~= -10092289 --orange color training
+      and color ~= 993737727 --black system color
       --and color ~= -1 then
       then
          -- mentions by nickname
@@ -7466,17 +7560,19 @@ function sampev.onServerMessage(color, text)
          end
          
          -- mentions by id
-         if text:match(id.."%s(.+)") -- id text mention
-         or text:match("@"..id.."%s") then -- @id mention
-         --or text:match("(%s"..id.."%s)") then
-            if ini.mentions.usegametext then
-               printStyledString('You were mentioned in the chat', 2000, 4)
-            end
-            if ini.mentions.usesound then
-               addOneOffSound(0.0, 0.0, 0.0, ini.mentions.sound) -- CHECKPOINT_GREEN
-            end
-            if ini.mentions.usecolor then
-               return {color, "{"..ini.mentions.color.."}"..text}
+         if not text:find("ADS") then
+            if text:match(id.."%s(.+)") -- id text mention
+            or text:match("@"..id.."%s") then -- @id mention
+            --or text:match("(%s"..id.."%s)") then
+               if ini.mentions.usegametext then
+                  printStyledString('You were mentioned in the chat', 2000, 4)
+               end
+               if ini.mentions.usesound then
+                  addOneOffSound(0.0, 0.0, 0.0, ini.mentions.sound) -- CHECKPOINT_GREEN
+               end
+               if ini.mentions.usecolor then
+                  return {color, "{"..ini.mentions.color.."}"..text}
+               end
             end
          end
       end
@@ -7520,13 +7616,7 @@ function sampev.onSendCommand(command)
    if isTraining then
       -- Automatic substitution of the last object ID for some commands
       if not command:find('(.+) (.+)') then
-         if LastObject.localid then
-            if command:find("/sel") then
-               sampSendChat("/sel "..LastObject.localid)
-               --editMode = 3
-               return false
-            end
-            
+         if LastObject.localid then            
             if command:find("/ogh") then
                sampSendChat("/ogh "..LastObject.localid)
                return false
@@ -9181,9 +9271,16 @@ attachedPlayerId, attachedVehicleId, text)
    end
    
    -- Get local id from textdraw info
-   if isTraining and color == 8436991 then
-      LastObject.localid = text:match('id:(%d+)')
-      return {id, color, position, ini.settings.devmodelabeldist, testLOS, attachedPlayerId, attachedVehicleId, text}
+   if isTraining then
+      --if color == 8436991 or color == 16211740 then
+      if text:find("obj:") then
+         LastObject.localid = text:match('id:(%d+)')
+         if ini.settings.fixobjinfotext then
+            return {id, 8436991, position, ini.settings.devmodelabeldist, testLOS, attachedPlayerId, attachedVehicleId, text}
+         else
+            return {id, color, position, ini.settings.devmodelabeldist, testLOS, attachedPlayerId, attachedVehicleId, text}
+         end
+      end
    end
    
    if checkbox.hide3dtexts.v then 
@@ -10962,6 +11059,48 @@ function apply_custom_style()
       colors[clr.PlotHistogram] = ImVec4(0.40, 0.39, 0.38, 0.63)
       colors[clr.PlotHistogramHovered] = ImVec4(0.25, 1.00, 0.00, 1.00)
       colors[clr.TextSelectedBg] = ImVec4(0.56, 0.42, 0.01, 1.00)
+      colors[clr.ModalWindowDarkening] = ImVec4(1.00, 0.98, 0.95, 0.73)
+   -- STYLE 5: Halloween Colors theme
+   elseif ini.settings.imguitheme == 4 then 
+      colors[clr.Text] = ImVec4(0.80, 0.80, 0.83, 1.00)
+      colors[clr.TextDisabled] = ImVec4(0.24, 0.23, 0.29, 1.00)
+      colors[clr.WindowBg] = ImVec4(0.06, 0.05, 0.07, 1.00)
+      colors[clr.ChildWindowBg] = ImVec4(0.07, 0.07, 0.09, 1.00)
+      colors[clr.PopupBg] = ImVec4(0.07, 0.07, 0.09, 1.00)
+      colors[clr.Border] = ImVec4(0.80, 0.80, 0.83, 0.88)
+      colors[clr.BorderShadow] = ImVec4(0.92, 0.91, 0.88, 0.00)
+      colors[clr.FrameBg] = ImVec4(0.10, 0.09, 0.12, 1.00)
+      colors[clr.FrameBgHovered] = ImVec4(0.24, 0.23, 0.29, 1.00)
+      colors[clr.FrameBgActive] = ImVec4(0.56, 0.56, 0.58, 1.00)
+      colors[clr.TitleBg] = ImVec4(0.76, 0.31, 0.00, 1.00)
+      colors[clr.TitleBgCollapsed] = ImVec4(1.00, 0.98, 0.95, 0.75)
+      colors[clr.TitleBgActive] = ImVec4(0.80, 0.33, 0.00, 1.00)
+      colors[clr.MenuBarBg] = ImVec4(0.10, 0.09, 0.12, 1.00)
+      colors[clr.ScrollbarBg] = ImVec4(0.10, 0.09, 0.12, 1.00)
+      colors[clr.ScrollbarGrab] = ImVec4(0.80, 0.80, 0.83, 0.31)
+      colors[clr.ScrollbarGrabHovered] = ImVec4(0.56, 0.56, 0.58, 1.00)
+      colors[clr.ScrollbarGrabActive] = ImVec4(0.06, 0.05, 0.07, 1.00)
+      colors[clr.ComboBg] = ImVec4(0.19, 0.18, 0.21, 1.00)
+      colors[clr.CheckMark] = ImVec4(1.00, 0.42, 0.00, 0.53)
+      colors[clr.SliderGrab] = ImVec4(1.00, 0.42, 0.00, 0.53)
+      colors[clr.SliderGrabActive] = ImVec4(1.00, 0.42, 0.00, 1.00)
+      colors[clr.Button] = ImVec4(0.10, 0.09, 0.12, 1.00)
+      colors[clr.ButtonHovered] = ImVec4(0.24, 0.23, 0.29, 1.00)
+      colors[clr.ButtonActive] = ImVec4(0.56, 0.56, 0.58, 1.00)
+      colors[clr.Header] = ImVec4(0.10, 0.09, 0.12, 1.00)
+      colors[clr.HeaderHovered] = ImVec4(0.56, 0.56, 0.58, 1.00)
+      colors[clr.HeaderActive] = ImVec4(0.06, 0.05, 0.07, 1.00)
+      colors[clr.ResizeGrip] = ImVec4(0.00, 0.00, 0.00, 0.00)
+      colors[clr.ResizeGripHovered] = ImVec4(0.56, 0.56, 0.58, 1.00)
+      colors[clr.ResizeGripActive] = ImVec4(0.06, 0.05, 0.07, 1.00)
+      colors[clr.CloseButton] = ImVec4(0.40, 0.39, 0.38, 0.16)
+      colors[clr.CloseButtonHovered] = ImVec4(0.40, 0.39, 0.38, 0.39)
+      colors[clr.CloseButtonActive] = ImVec4(0.40, 0.39, 0.38, 1.00)
+      colors[clr.PlotLines] = ImVec4(0.40, 0.39, 0.38, 0.63)
+      colors[clr.PlotLinesHovered] = ImVec4(0.25, 1.00, 0.00, 1.00)
+      colors[clr.PlotHistogram] = ImVec4(0.40, 0.39, 0.38, 0.63)
+      colors[clr.PlotHistogramHovered] = ImVec4(0.25, 1.00, 0.00, 1.00)
+      colors[clr.TextSelectedBg] = ImVec4(0.25, 1.00, 0.00, 0.43)
       colors[clr.ModalWindowDarkening] = ImVec4(1.00, 0.98, 0.95, 0.73)
    end
 end
