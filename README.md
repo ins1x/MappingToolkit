@@ -24,14 +24,14 @@
 - [Клиент SA-MP версии 0.3.7 R1](https://samp.romzes.com/files/sa-mp-0.3.7-install.exe)
 - [ASI Loader](https://www.gtagarage.com/mods/show.php?id=21709), [CLEO 4.1](https://cleo.li/ru)+, [Moonloader 0.26](https://www.blast.hk/threads/13305/), [SAMPFUNCS 5.4.1](https://www.blast.hk/threads/17/)+
 
-> Можно использовать более новые версии клиента и sampfuncs, но некоторые мемхаки работать не будут (например смена эффектов)
+> Можно использовать более новые версии клиента и sampfuncs, но некоторые возможности могут быть недоступны
 
 Зависимости Moonloader:
 * lua imgui - https://www.blast.hk/threads/19292/
 * lib.samp.events - https://github.com/THE-FYP/SAMP.Lua
 * lua-requests - https://luarocks.org/modules/jakeg/lua-requests
 
-> модуль **lua-requests** используется только для проверки версий, поэтому установка этого модуля необязательна для работы скрипта
+> модуль **lua-requests** используется только для проверки версий, поэтому установка этого модуля необязательна для работы ассистента
 
 ## Установка
 
