@@ -1967,7 +1967,7 @@ sampTextureList = {
 	{ 10368, "cathedral_sfs", "ws_coppersheet" },
 	{ 10368, "cathedral_sfs", "ws_woodyhedge" },
 	{ 2343, "cb_bar_bits", "CJ_POLISHED" },
-	{ 2767, "cb_details", "100%fowl_cb" },
+	{ 2767, "cb_details", "fowl_cb" },
 	{ 2767, "cb_details", "CJ_cbell_top" },
 	{ 2767, "cb_details", "CJ_cb_bin1" },
 	{ 2767, "cb_details", "cluckinbig_cb" },
