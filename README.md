@@ -21,10 +21,10 @@
 
 ## Требования
 - Вам потребуется рабочая копия игры GTA San Andreas с версией gta_sa.exe v1.0 US
-- [Клиент SA-MP версии 0.3.7](https://samp.romzes.com/files/sa-mp-0.3.7-install.exe) 
+- [Клиент SA-MP (версии 0.3.7-R1, 0.3.7-R3-1, 0.3.7-R5, 0.3.DL)](https://www.sa-mp.mp/downloads) 
 - [ASI Loader](https://www.gtagarage.com/mods/show.php?id=21709), [CLEO 4.1](https://cleo.li/ru)+, [Moonloader 0.26](https://www.blast.hk/threads/13305/), [SAMPFUNCS 5.4.1](https://www.blast.hk/threads/17/)+
 
-> Можно использовать более новые версии, но некоторые возможности могут быть недоступны
+> Без SAMPFUNCS работать не будет! Можно использовать другие версии, но некоторые возможности могут быть недоступны
 
 Зависимости Moonloader:
 * lua imgui - https://www.blast.hk/threads/19292/
