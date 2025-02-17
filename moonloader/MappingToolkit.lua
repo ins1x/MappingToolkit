@@ -4,7 +4,7 @@ script_description("Assistant for mappers")
 script_dependencies('imgui', 'lib.samp.events')
 script_properties("work-in-pause")
 script_url("https://github.com/ins1x/MappingToolkit")
-script_version("4.8")
+script_version("4.9")
 
 -- support sa-mp versions depends on SAMPFUNCS (0.3.7-R1, 0.3.7-R3-1, 0.3.7-R5, 0.3.DL)
 -- script_moonloader(16) moonloader v.0.26 
@@ -32,6 +32,7 @@ local ini = inicfg.load({
       autoengine = false,
       autoreconnect = true,
       backtoworld = true,
+      bigoffsetwarning = true,
       camdist = "1",
       cberrorwarnings = true,
       cbvalautocomplete = true,
@@ -139,6 +140,7 @@ local ini = inicfg.load({
       showcursorpos = true,
    },
    tmp = {
+      animationdata = "",
       osearch = "",
       worldname = "",
       worlddescription = "",
@@ -269,6 +271,7 @@ local checkbox = {
    autoreconnect = imgui.ImBool(ini.settings.autoreconnect),
    showhud = imgui.ImBool(ini.settings.showhud),
    backtoworld = imgui.ImBool(ini.settings.backtoworld),
+   bigoffsetwarning = imgui.ImBool(ini.settings.bigoffsetwarning),
    lockserverweather = imgui.ImBool(ini.settings.lockserverweather),
    usecustomcamdist = imgui.ImBool(ini.settings.usecustomcamdist),
    showobjectrot = imgui.ImBool(ini.settings.showobjectrot),
@@ -385,7 +388,6 @@ local checkbox = {
    changemdo = imgui.ImBool(false),
    findveh = imgui.ImBool(false),
    objectscale = imgui.ImBool(false),
-   stepteleport = imgui.ImBool(false),
    freezepos = imgui.ImBool(false),
    searchobjectsext = imgui.ImBool(false),
    hideplayers = imgui.ImBool(false),
@@ -405,6 +407,7 @@ local checkbox = {
    hidelastobject = imgui.ImBool(false),
    bliplastobject = imgui.ImBool(false),
    noworldbounds = imgui.ImBool(false),
+   nogravity = imgui.ImBool(false),
    chatinputdrop = imgui.ImBool(false),
    chathiderp = imgui.ImBool(false),
    chatonlysystem = imgui.ImBool(false),
@@ -557,6 +560,7 @@ local nops = {
    forceclass = imgui.ImBool(false),
    facingangle = imgui.ImBool(false),
    togglecontrol = imgui.ImBool(false),
+   position = imgui.ImBool(false),
    audiostream = imgui.ImBool(false)
 }
 
@@ -644,6 +648,7 @@ local LastData = {
    lastVehinfoModelid = 0,
    lastCbvaluebuffer = nil,
    lastMinigame = nil,
+   lastLoadedWorldNumber = nil
 }
 
 local imguiThemeNames = {
@@ -932,9 +937,9 @@ function main()
          textbuffer.cmdlist.v = file:read('*a')
          file:close()
       else
-         local file = io.open(getGameDirectory().."/moonloader/resource/mappingtoolkit/cmdlist.txt", "r")
-         file:write(u8"Файл поврежден либо не найден")
-         file:write(u8"Скачать стандартный можно по ссылке:")
+         local file = io.open(getGameDirectory().."/moonloader/resource/mappingtoolkit/cmdlist.txt", "w")
+         file:write(u8"Файл поврежден либо не найден\n")
+         file:write(u8"Скачать стандартный можно по ссылке:\n")
          file:write("https://github.com/ins1x/MappingToolkit/blob/main/moonloader/resource/mappingtoolkit/cmdlist.txt")
          file:close()
       end
@@ -945,9 +950,9 @@ function main()
          textbuffer.animlist.v = file:read('*a')
          file:close()
       else
-         local file = io.open(getGameDirectory().."/moonloader/resource/mappingtoolkit/anims.txt", "r")
-         file:write(u8"Файл поврежден либо не найден")
-         file:write(u8"Скачать стандартный можно по ссылке:")
+         local file = io.open(getGameDirectory().."/moonloader/resource/mappingtoolkit/anims.txt", "w")
+         file:write(u8"Файл поврежден либо не найден\n")
+         file:write(u8"Скачать стандартный можно по ссылке:\n")
          file:write("https://github.com/ins1x/MappingToolkit/blob/main/moonloader/resource/mappingtoolkit/anims.txt")
          file:close()
       end
@@ -959,8 +964,8 @@ function main()
          file:close()
       else
          local file = io.open("moonloader/resource/mappingtoolkit/cblist.txt", "w")
-         file:write(u8"Файл поврежден либо не найден")
-         file:write(u8"Скачать стандартный можно по ссылке:")
+         file:write(u8"Файл поврежден либо не найден\n")
+         file:write(u8"Скачать стандартный можно по ссылке:\n")
          file:write("https://github.com/ins1x/MappingToolkit/blob/main/moonloader/resource/mappingtoolkit/cblist.txt")
          file:close()
       end
@@ -975,9 +980,6 @@ function main()
       else
          chatfilterfile = io.open("moonloader/resource/mappingtoolkit/chatfilter.txt", "w")
          chatfilterfile:write("%[SALE%]%:.*", "\n")
-         for template in chatfilterfile:lines() do
-            table.insert(chatfilter, u8:decode(template))
-         end
          chatfilterfile:close()
       end         
       sampRegisterChatCommand("toolkit", function() dialog.main.v = not dialog.main.v end)
@@ -1064,7 +1066,6 @@ function main()
       -- -- sampGetCurrentServerName() returns a value with a long delay
       -- -- unlike receiving the IP and port. Therefore, for correct operation, the code is placed here      
       local servername = sampGetCurrentServerName()
-      
       
       if servername:find("TRAINING") then
          isTrainingSanbox = true
@@ -1663,14 +1664,43 @@ function main()
             end
          end
          renderFontDrawText(fonts.backgroundfont, rendertext, 15, y-15, 0xFFFFFFFF)
-         
-         if ini.settings.showobjectcoord and edit.response == 2 then
-            renderFontDrawText(fonts.infobarfont, string.format("position {3f70d6}x: %.2f, {e0364e}y: %.2f, {26b85d}z: %.2f{FFFFFF}", 
-            LastObject.position.x, LastObject.position.y, LastObject.position.z),
-            x-400, y-60, 0xFFFFFFFF)
-            renderFontDrawText(fonts.infobarfont, string.format("rotation {3f70d6}rx: %.2f, {e0364e}ry: %.2f, {26b85d}rz: %.2f{FFFFFF}", 
-            LastObject.rotation.x, LastObject.rotation.y, LastObject.rotation.z),
+      end
+      
+      if ini.settings.showobjectcoord and edit.response == 2 
+      and not isPauseMenuActive() then
+         local x, y = getScreenResolution()
+         local offset = {x = 0.0, y = 0.0, z = 0.0}
+         renderFontDrawText(fonts.infobarfont, string.format("position {3f70d6}x: %.2f, {e0364e}y: %.2f, {26b85d}z: %.2f{FFFFFF}", 
+         LastObject.position.x, LastObject.position.y, LastObject.position.z),
+         x-400, y-80, 0xFFFFFFFF)
+         renderFontDrawText(fonts.infobarfont, string.format("rotation {3f70d6}rx: %.2f, {e0364e}ry: %.2f, {26b85d}rz: %.2f{FFFFFF}", 
+         LastObject.rotation.x, LastObject.rotation.y, LastObject.rotation.z),
+         x-400, y-60, 0xFFFFFFFF)
+         if LastObject.position.x and LastObject.startpos.x then
+            offset.x = LastObject.position.x-LastObject.startpos.x
+            offset.y = LastObject.position.y-LastObject.startpos.y
+            offset.z = LastObject.position.z-LastObject.startpos.z
+            renderFontDrawText(fonts.infobarfont, string.format("offset {3f70d6}x: %.2f, {e0364e}y: %.2f, {26b85d}z: %.2f{FFFFFF}", 
+            offset.x, offset.y, offset.z),
             x-400, y-40, 0xFFFFFFFF)
+         end
+         if ini.settings.bigoffsetwarning then
+            local maxOffsetDistance = 220.0
+            if math.abs(offset.x) > maxOffsetDistance - 25 then
+               printStyledString('~y~ WARNING ~w~to much offset ~n~distance: ~y~'..math.abs(math.floor(offset.x)), 2000, 4)
+            elseif math.abs(offset.y) > maxOffsetDistance - 25 then
+               printStyledString('~y~ WARNING ~w~to much offset ~n~distance: ~y~'..math.abs(math.floor(offset.y)), 2000, 4)
+            elseif math.abs(offset.z) > maxOffsetDistance - 25 then
+               printStyledString('~y~ WARNING ~w~to much offset ~n~distance: ~y~'..math.abs(math.floor(offset.z)), 2000, 4)
+            end
+            
+            if math.abs(offset.x) > maxOffsetDistance then
+               printStyledString('~r~ WARNING ~w~to much offset ~n~distance: ~r~'..math.abs(math.floor(offset.x)), 2000, 4)
+            elseif math.abs(offset.y) > maxOffsetDistance then 
+               printStyledString('~r~ WARNING ~w~to much offset ~n~distance: ~r~'..math.abs(math.floor(offset.y)), 2000, 4)
+            elseif math.abs(offset.z) > maxOffsetDistance then 
+               printStyledString('~r~ WARNING ~w~to much offset ~n~distance: ~r~'..math.abs(math.floor(offset.z)), 2000, 4)
+            end
          end
       end
       
@@ -1764,56 +1794,16 @@ function imgui.OnDrawFrame()
             local id = getLocalPlayerId()
             local score = sampGetPlayerScore(id)
          
-            imgui.TextColoredRGB(string.format("Ваша позиция на карте x: %.1f, y: %.1f, z: %.1f",
+            imgui.TextColoredRGB(string.format("Ваша позиция на карте {007DFF}x: %.1f, {e0364e}y: %.1f, {26b85d}z: %.1f",
             positionX, positionY, positionZ))
             if imgui.IsItemClicked() then
                setClipboardText(string.format(u8"%.1f, %.1f, %.1f", positionX, positionY, positionZ))
                sampAddChatMessage("[SCRIPT]: {FFFFFF}Позиция скопирована в буффер обмена", 0x0FF6600)
             end
             
-            if tpcpos.x then
-               if tpcpos.x ~= 0 then
-                  imgui.TextColoredRGB(string.format("Сохраненая позиция x: %.1f, y: %.1f, z: %.1f",
-                  tpcpos.x, tpcpos.y, tpcpos.z))
-                  if imgui.IsItemClicked() then
-                     setClipboardText(string.format(u8"%.1f, %.1f, %.1f", tpcpos.x, tpcpos.y, tpcpos.z))
-                     sampAddChatMessage("[SCRIPT]: {FFFFFF}Позиция скопирована в буффер обмена", 0x0FF6600)
-                  end
-                  
-                  imgui.SameLine()
-                  imgui.TextColoredRGB(string.format("dist. %.1f m.",
-                  getDistanceBetweenCoords3d(positionX, positionY, positionZ, tpcpos.x, tpcpos.y, tpcpos.z)))
-               end
-            end
-            
-            if worldspawnpos.x then
-               if worldspawnpos.x ~= 0 then
-                  imgui.TextColoredRGB(string.format("Позиция спавна в мире x: %.1f, y: %.1f, z: %.1f",
-                  worldspawnpos.x, worldspawnpos.y, worldspawnpos.z))
-                  if imgui.IsItemClicked() then
-                    setClipboardText(string.format(u8"%.1f, %.1f, %.1f", worldspawnpos.x, worldspawnpos.y, worldspawnpos.z))
-                    sampAddChatMessage("[SCRIPT]: {FFFFFF}Позиция скопирована в буффер обмена", 0x0FF6600)
-                  end
-               end
-            end
-            
-            local bTargetResult, bX, bY, bZ = getTargetBlipCoordinates()
-            if bTargetResult then
-               imgui.Text(string.format(u8"Позиция метки на карте x: %.1f, y: %.1f, z: %.1f",
-               bX, bY, bZ))
-               if imgui.IsItemClicked() then
-                  setClipboardText(string.format(u8"%.1f, %.1f, %.1f", bX, bY, bZ))
-                  sampAddChatMessage("[SCRIPT]: {FFFFFF}Позиция скопирована в буффер обмена", 0x0FF6600)
-               end
-            
-               imgui.SameLine()
-               imgui.Text(string.format(u8"dist. %.1f m.",
-               getDistanceBetweenCoords3d(positionX, positionY, positionZ, bX, bY, bZ)))
-            end 
-            
             zone = getZoneName(positionX, positionY, positionZ)
             if zone then 
-               imgui.TextColoredRGB(string.format("Вы находитесь в районе: {696969}%s", zone))
+               imgui.TextColoredRGB(string.format("Вы находитесь в районе: {FF6600}%s", zone))
                if string.len(LastData.lastWorldName) > 1 then
                   imgui.TextColoredRGB("Мир: "..LastData.lastWorldName)
                end
@@ -1847,9 +1837,61 @@ function imgui.OnDrawFrame()
             imgui.Spacing()
             imgui.Spacing()
             
-            if imgui.Button(u8"Получить координаты", imgui.ImVec2(200, 25)) then
-               if not sampIsChatInputActive() and not sampIsDialogActive() 
-               and not isPauseMenuActive() and not isSampfuncsConsoleActive() then 
+            if tabmenu.coords == 1 then
+               imgui.PushStyleColor(imgui.Col.Button, imgui.GetStyle().Colors[imgui.Col.ButtonHovered])
+               if imgui.Button(u8"Позиция", imgui.ImVec2(100, 25)) then tabmenu.coords = 1 end
+               imgui.PopStyleColor()
+            else
+               if imgui.Button(u8"Позиция", imgui.ImVec2(100, 25)) then tabmenu.coords = 1 end
+            end
+            
+            imgui.SameLine()
+            if tabmenu.coords == 2 then
+               imgui.PushStyleColor(imgui.Col.Button, imgui.GetStyle().Colors[imgui.Col.ButtonHovered])
+               if imgui.Button(u8"Телепорт", imgui.ImVec2(100, 25)) then 
+                  tabmenu.coords = 2 
+               end
+               imgui.PopStyleColor()
+            else
+               if imgui.Button(u8"Телепорт", imgui.ImVec2(100, 25)) then 
+                  -- tpcpos.x = positionX
+                  -- tpcpos.y = positionY
+                  -- tpcpos.z = positionZ
+                  -- textbuffer.tpcx.v = string.format("%.1f", tpcpos.x)
+                  -- textbuffer.tpcy.v = string.format("%.1f", tpcpos.y)
+                  -- textbuffer.tpcz.v = string.format("%.1f", tpcpos.z)
+                  tabmenu.coords = 2
+               end
+            end
+            
+            imgui.Spacing()
+            imgui.Spacing()
+            
+            if tabmenu.coords == 1 then
+               if tpcpos.x then
+                  if tpcpos.x ~= 0 then
+                     imgui.TextColoredRGB(string.format("Отмеченная позиция {696969}x: %.1f, y: %.1f, z: %.1f",
+                     tpcpos.x, tpcpos.y, tpcpos.z))
+                     if imgui.IsItemClicked() then
+                        setClipboardText(string.format(u8"%.1f, %.1f, %.1f", tpcpos.x, tpcpos.y, tpcpos.z))
+                        sampAddChatMessage("[SCRIPT]: {FFFFFF}Позиция скопирована в буффер обмена", 0x0FF6600)
+                     end
+                     
+                     imgui.SameLine()
+                     imgui.TextColoredRGB(string.format("Дистанция {696969}%.1f m.",
+                     getDistanceBetweenCoords3d(positionX, positionY, positionZ, tpcpos.x, tpcpos.y, tpcpos.z)))
+                  end
+               end
+               
+               imgui.Spacing()
+               
+               if imgui.TooltipButton(u8"Получить", imgui.ImVec2(130, 25), u8"Получить текущую позицию игрока и сохранить") then
+                  tpcpos.x = positionX
+                  tpcpos.y = positionY
+                  tpcpos.z = positionZ
+                  textbuffer.tpcx.v = string.format("%.2f", tpcpos.x)
+                  textbuffer.tpcy.v = string.format("%.2f", tpcpos.y)
+                  textbuffer.tpcz.v = string.format("%.2f", tpcpos.z)
                   tpcpos.x, tpcpos.y, tpcpos.z = getCharCoordinates(playerPed)
                   setClipboardText(string.format("%.1f %.1f %.1f", tpcpos.x, tpcpos.y, tpcpos.z))
                   sampAddChatMessage("Координаты скопированы в буффер обмена", -1)
@@ -1859,106 +1901,174 @@ function imgui.OnDrawFrame()
                      sampAddChatMessage(string.format("Используйте: /xyz {696969}%.2f %.2f %.2f", tpcpos.x, tpcpos.y, tpcpos.z), -1)
                   end
                end
-            end
-            imgui.SameLine()
-            if imgui.Button(u8"Сохранить позицию", imgui.ImVec2(200, 25)) then         
-               tpcpos.x = positionX
-               tpcpos.y = positionY
-               tpcpos.z = positionZ
-               textbuffer.tpcx.v = string.format("%.2f", tpcpos.x)
-               textbuffer.tpcy.v = string.format("%.2f", tpcpos.y)
-               textbuffer.tpcz.v = string.format("%.2f", tpcpos.z)
-               tpcpos.x, tpcpos.y, tpcpos.z = getCharCoordinates(playerPed)
-               setClipboardText(string.format(u8"%.2f %.2f %.2f", tpcpos.x, tpcpos.y, tpcpos.z))
-               sampAddChatMessage(string.format("[SCRIPT]: {FFFFFF}Координаты сохранены: {696969}%.2f %.2f %.2f", tpcpos.x, tpcpos.y, tpcpos.z), 0x0FF6600)
-            end
-            
-            if imgui.Button(u8"Прыгнуть вперед", imgui.ImVec2(200, 25)) then
-               if sampIsLocalPlayerSpawned() then
-                  JumpForward()
-               end
-            end
-            imgui.SameLine()
-            if imgui.Button(u8"Прыгнуть вверх", imgui.ImVec2(200, 25)) then
-               if sampIsLocalPlayerSpawned() then
-                  local posX, posY, posZ = getCharCoordinates(playerPed)
-                  setCharCoordinates(playerPed, posX, posY, posZ+10.0)
-               end
-            end
-            
-            if imgui.Button(u8"Провалиться под текстуры", imgui.ImVec2(200, 25)) then
-               if sampIsLocalPlayerSpawned() then
-                  local posX, posY, posZ = getCharCoordinates(playerPed)
-                  setCharCoordinates(playerPed, posX, posY, posZ-3.0)
-               end
-            end
-            imgui.SameLine()
-            if imgui.Button(u8"Вернуться на поверхность", imgui.ImVec2(200, 25)) then
-               local result, x, y, z = getNearestRoadCoordinates()
-               if result then
-                  local dist = getDistanceBetweenCoords3d(x, y, z, getCharCoordinates(playerPed))
-                  if not isTrainingSanbox then
-                     if dist < 10.0 then 
-                        setCharCoordinates(playerPed, x, y, z + 3.0)
-                        sampAddChatMessage("[SCRIPT]: {FFFFFF}Вы телепортированы на ближайшую поверхность", 0x0FF6600)
-                     else
-                        sampAddChatMessage(("Ближайшая поверхность слишком далеко (%d m.)"):format(dist), 0x0FF0000)
-                        local posX, posY, posZ = getCharCoordinates(playerPed)
-                        setCharCoordinates(playerPed, posX, posY, posZ+3.0)
-                     end
-                  else
-                     setCharCoordinates(playerPed, x, y, z + 3.0)
-                     sampAddChatMessage("[SCRIPT]: {FFFFFF}Вы телепортированы на ближайшую поверхность", 0x0FF6600)
+               imgui.SameLine()
+               if imgui.Button(u8"Прыгнуть вперед", imgui.ImVec2(130, 25)) then
+                  if sampIsLocalPlayerSpawned() then
+                     JumpForward()
                   end
-               else
-                  sampAddChatMessage("Не нашлось ни одной поверхности рядом", 0x0FF0000)
-                  local posX, posY, posZ = getCharCoordinates(playerPed)
-                  setCharCoordinates(playerPed, posX, posY, posZ+3.0)
-               end
-            end
-            
-            if isTrainingSanbox then
-               if imgui.Button(u8"Слапнуть себя", imgui.ImVec2(200, 25)) then
-                  sampSendChat("/slapme")
                end
                imgui.SameLine()
-               if imgui.Button(u8"Заспавнить себя", imgui.ImVec2(200, 25)) then
-                  sampSendChat("/spawnme")
+               if imgui.Button(u8"Прыгнуть вверх", imgui.ImVec2(130, 25)) then
+                  if sampIsLocalPlayerSpawned() then
+                     local posX, posY, posZ = getCharCoordinates(playerPed)
+                     setCharCoordinates(playerPed, posX, posY, posZ+10.0)
+                  end
                end
                
-               if imgui.Button(u8"Выбрать интерьер", imgui.ImVec2(200, 25)) then
-                  sampSendChat("/int")
-                  dialog.main.v = false
+               if imgui.Button(u8"Провалиться под текстуры", imgui.ImVec2(200, 25)) then
+                  if sampIsLocalPlayerSpawned() then
+                     local posX, posY, posZ = getCharCoordinates(playerPed)
+                     setCharCoordinates(playerPed, posX, posY, posZ-3.0)
+                  end
                end
                imgui.SameLine()
-               if imgui.Button(u8"Выбрать спавн", imgui.ImVec2(200, 25)) then
-                  sampSendChat("/team")
-                  dialog.main.v = false
+               if imgui.Button(u8"Вернуться на поверхность", imgui.ImVec2(200, 25)) then
+                  local result, x, y, z = getNearestRoadCoordinates()
+                  if result then
+                     local dist = getDistanceBetweenCoords3d(x, y, z, getCharCoordinates(playerPed))
+                     if not isTrainingSanbox then
+                        if dist < 10.0 then 
+                           setCharCoordinates(playerPed, x, y, z + 3.0)
+                           sampAddChatMessage("[SCRIPT]: {FFFFFF}Вы телепортированы на ближайшую поверхность", 0x0FF6600)
+                        else
+                           sampAddChatMessage(("Ближайшая поверхность слишком далеко (%d m.)"):format(dist), 0x0FF0000)
+                           local posX, posY, posZ = getCharCoordinates(playerPed)
+                           setCharCoordinates(playerPed, posX, posY, posZ+3.0)
+                        end
+                     else
+                        setCharCoordinates(playerPed, x, y, z + 3.0)
+                        sampAddChatMessage("[SCRIPT]: {FFFFFF}Вы телепортированы на ближайшую поверхность", 0x0FF6600)
+                     end
+                  else
+                     sampAddChatMessage("Не нашлось ни одной поверхности рядом", 0x0FF0000)
+                     local posX, posY, posZ = getCharCoordinates(playerPed)
+                     setCharCoordinates(playerPed, posX, posY, posZ+3.0)
+                  end
                end
-            end
-            
-            imgui.Spacing()
-            
-            if imgui.Checkbox(u8"Отключить границы мира", checkbox.noworldbounds) then
-               if checkbox.noworldbounds.v then
-                  sampAddChatMessage("[SCRIPT]: {FFFFFF}Границы мира обнулены (setWorldBounds)", 0x0FF6600)
+               
+               imgui.Spacing()
+               imgui.Spacing()
+               -- local filepath = getGameDirectory().."//moonloader//resource//mappingtoolkit//favorites//coordinates.txt"
+               
+               -- if imgui.Button(u8"Добавить", imgui.ImVec2(100, 25)) then
+                  -- local file = io.open(filepath, "a")
+                  -- file:write(("%s, %.2f, %.2f, %.2f\n"):format("saved point", positionX,positionY,positionZ))
+                  -- file:close()
+                  -- --sampAddChatMessage("[SCRIPT]: {FFFFFF}Текстдрав был сохранен в /moonloader/resource/mappingtoolkit/export/export_txdtocb.txt", 0x0FF6600)
+                  -- sampAddChatMessage("[SCRIPT]: {FFFFFF}Координаты были добавлены в список", 0x0FF6600)
+               -- end
+               -- imgui.SameLine()
+               -- if imgui.Button(u8"Удалить", imgui.ImVec2(100, 25)) then
+               -- end
+               
+               -- local file = io.open(filepath, "r")
+               -- for line in file:lines() do
+                  -- if line:len() > 1 then
+                     -- if imgui.Selectable(tostring(line)) then
+                        -- -- for element in string.gmatch(line, "[^,]+") do
+                        -- -- end
+                     -- end
+                  -- end
+               -- end
+               -- file:close()
+               
+                        
+               if worldspawnpos.x then
+                  if worldspawnpos.x ~= 0 then
+                     imgui.TextColoredRGB(string.format("Позиция спавна в мире {007DFF}x: %.1f, {e0364e}y: %.1f, {26b85d}z: %.1f",
+                     worldspawnpos.x, worldspawnpos.y, worldspawnpos.z))
+                     if imgui.IsItemClicked() then
+                       setClipboardText(string.format(u8"%.1f, %.1f, %.1f", worldspawnpos.x, worldspawnpos.y, worldspawnpos.z))
+                       sampAddChatMessage("[SCRIPT]: {FFFFFF}Позиция скопирована в буффер обмена", 0x0FF6600)
+                     end
+                  end
                end
-            end
-            imgui.SameLine()
-            imgui.TextQuestion("( ? )", u8"Отключает установленные сервером ограничения границ мира (setWorldBounds)")
+               
+               if imgui.TooltipButton(u8"Заспавниться", imgui.ImVec2(130, 25), u8"Отправить SpawnPlayer серверу") then
+                  sampSpawnPlayer()
+                  restoreCameraJumpcut()
+               end
+               imgui.SameLine()
+               if imgui.TooltipButton(u8"Респавн", imgui.ImVec2(130, 25), u8"Отправить SendSpawn серверу") then
+                  sampSendSpawn()
+               end
+               imgui.SameLine()
+               if imgui.TooltipButton(u8"Запросить спавн", imgui.ImVec2(130, 25), u8"Отправить SendRequestSpawn серверу") then
+                  sampSendRequestSpawn()
+               end
+               if isTrainingSanbox then
+                  if imgui.TooltipButton(u8"Слапнуть себя", imgui.ImVec2(200, 25), u8"Подбросить себя /slapme") then
+                     sampSendChat("/slapme")
+                  end
+                  imgui.SameLine()
+                  if imgui.TooltipButton(u8"Заспавнить себя", imgui.ImVec2(200, 25), u8"Заспавнить себя /spawnme") then
+                     sampSendChat("/spawnme")
+                  end
+               end
+               if isTrainingSanbox then
+                  if imgui.TooltipButton(u8"Выбрать интерьер", imgui.ImVec2(200, 25), u8"Выбрать интерьер для мира /int") then
+                     sampSendChat("/int")
+                     dialog.main.v = false
+                  end
+                  imgui.SameLine()
+                  if imgui.TooltipButton(u8"Выбрать спавн", imgui.ImVec2(200, 25), u8"Выбрать спавн для мира /team") then
+                     sampSendChat("/team")
+                     dialog.main.v = false
+                  end
+               end
+               
+               imgui.Spacing()
             
-            if imgui.Checkbox(u8"Телепорт на координаты", checkbox.teleportcoords) then
-               tpcpos.x = positionX
-               tpcpos.y = positionY
-               tpcpos.z = positionZ
-               textbuffer.tpcx.v = string.format("%.1f", tpcpos.x)
-               textbuffer.tpcy.v = string.format("%.1f", tpcpos.y)
-               textbuffer.tpcz.v = string.format("%.1f", tpcpos.z)
-            end
-            imgui.SameLine()
-            imgui.TextQuestion("( ? )", u8"Активирует телепорт по заданным координатам (доступно только редактору мира)")
-         
-            if checkbox.teleportcoords.v then
+               if imgui.Checkbox(u8"Игнорировать границы мира", checkbox.noworldbounds) then
+                  if checkbox.noworldbounds.v then
+                     sampAddChatMessage("[SCRIPT]: {FFFFFF}Границы мира обнулены (setWorldBounds)", 0x0FF6600)
+                  end
+               end
+               imgui.SameLine()
+               imgui.TextQuestion("( ? )", u8"Отключает установленные сервером ограничения границ мира (setWorldBounds)")
+               
+               if imgui.Checkbox(u8"Игнорировать изменение позиции", nops.position) then
+                  if nops.position.v then
+                     sampAddChatMessage("[SCRIPT]: {FFFFFF}Изменение вашей позиции сервером будет игнорироваться. {CC0000}Это может триггерить античит!", 0x0FF6600)
+                  end
+               end
+               imgui.SameLine()
+               imgui.TextQuestion("( ? )", u8"Отключает изменение сервером позиции игрока (setPlayerPos) Это может триггерить античит!")
+               
+               if imgui.Checkbox(u8"Игнорировать изменение гравитации", checkbox.nogravity) then
+                  if checkbox.nogravity.v then
+                     sampAddChatMessage("[SCRIPT]: {FFFFFF}Изменение гравитации сервером будет игнорироваться", 0x0FF6600)
+                  end
+               end
+               imgui.SameLine()
+               imgui.TextQuestion("( ? )", u8"Отключает установленные сервером значения гравитации (setGravity)")
+               
+               if imgui.TooltipButton(u8"ForceSync", imgui.ImVec2(200, 25), u8"Отправить ForceSync серверу") then
+                  sampForceAimSync()
+                  sampForceOnfootSync()
+                  sampForceStatsSync()
+                  sampForceWeaponsSync()
+               end
+               
+            elseif tabmenu.coords == 2 then
+            
+               local bTargetResult, bX, bY, bZ = getTargetBlipCoordinates()
+               if bTargetResult then
+                  imgui.TextColoredRGB(string.format("Позиция метки на карте {007DFF}x: %.1f, {e0364e}y: %.1f, {26b85d}z: %.1f",
+                  bX, bY, bZ))
+                  if imgui.IsItemClicked() then
+                     setClipboardText(string.format(u8"%.1f, %.1f, %.1f", bX, bY, bZ))
+                     sampAddChatMessage("[SCRIPT]: {FFFFFF}Позиция скопирована в буффер обмена", 0x0FF6600)
+                  end
+               
+                  imgui.SameLine()
+                  imgui.TextColoredRGB(string.format("Дистанция {696969}%.1f m.",
+                  getDistanceBetweenCoords3d(positionX, positionY, positionZ, bX, bY, bZ)))
+               end 
+               
+               imgui.Spacing()
+               
+               imgui.Text(u8"Телепорт по координатам:")
                if imgui.TooltipButton(u8"Обновить", imgui.ImVec2(70, 25), u8"Обновит значения на вашу текущую позицию") then
                   tpcpos.x = positionX
                   tpcpos.y = positionY
@@ -1968,7 +2078,7 @@ function imgui.OnDrawFrame()
                   textbuffer.tpcz.v = string.format("%.1f", tpcpos.z)
                end
                imgui.SameLine()
-               imgui.Text("x:")
+               imgui.TextColoredRGB("{007DFF}x:")
                imgui.SameLine()
                imgui.PushItemWidth(70)
                if imgui.InputText("##TpcxBuffer", textbuffer.tpcx, imgui.InputTextFlags.CharsDecimal) then
@@ -1976,7 +2086,7 @@ function imgui.OnDrawFrame()
                end
                imgui.PopItemWidth()
                imgui.SameLine()
-               imgui.Text("y:")
+               imgui.TextColoredRGB("{e0364e}y:")
                imgui.SameLine()
                imgui.PushItemWidth(70)
                if imgui.InputText("##TpcyBuffer", textbuffer.tpcy, imgui.InputTextFlags.CharsDecimal) then
@@ -1984,7 +2094,7 @@ function imgui.OnDrawFrame()
                end
                imgui.PopItemWidth()
                imgui.SameLine()
-               imgui.Text("z:")
+               imgui.TextColoredRGB("{26b85d}z:")
                imgui.SameLine()
                imgui.PushItemWidth(70)
                if imgui.InputText("##TpczBuffer", textbuffer.tpcz, imgui.InputTextFlags.CharsDecimal) then
@@ -2081,19 +2191,15 @@ function imgui.OnDrawFrame()
                         end
                      else
                         sampAddChatMessage("[SCRIPT]: {FFFFFF}Координаты не были сохранены", 0x0FF6600)
-                     end 
-                  
+                     end                    
                   else
                      sampAddChatMessage("[SCRIPT]: {FFFFFF}Метка на карте не обнаружена. Координаты не были изменены.", 0x0FF6600)
                   end 
                end
                
-            end
-            if imgui.Checkbox(u8("Пошаговый телепорт"), checkbox.stepteleport) then
-            end
-            imgui.SameLine()
-            imgui.TextQuestion("( ? )", u8"Активирует пошаговый телепорт по заданным значениям")
-            if checkbox.stepteleport.v then
+               imgui.Spacing()
+               imgui.Text(u8"Пошаговый телепорт:")
+               
                imgui.Spacing()
                imgui.Text("       ")
                imgui.SameLine()
@@ -2158,10 +2264,7 @@ function imgui.OnDrawFrame()
                      setCharCoordinates(playerPed, posX, posY, posZ-input.tpstep.v)
                   end
                end
-               imgui.Spacing()                 
-             end
-             
-             imgui.Spacing()
+          end
         
       elseif tabmenu.settings == 2 then
          
@@ -2842,6 +2945,14 @@ function imgui.OnDrawFrame()
             end
             imgui.SameLine()
             imgui.TextQuestion("( ? )", u8"Показывает угол поворота объекта (Rx, Ry, Rz) при перемещении в редакторе карт")
+            
+            if imgui.Checkbox(u8("Предупреждать о превышении макс. сдвига"), checkbox.bigoffsetwarning) then
+               ini.settings.bigoffsetwarning = checkbox.showobjectrot.v
+               inicfg.save(ini, configIni)
+            end
+            imgui.SameLine()
+            imgui.TextQuestion("( ? )", u8"Предупреждать при приближении к максимально возможному значению сдвига (offset) объекта")
+            
             -- if imgui.Checkbox(u8("Показывать все скрытые объекты"), checkbox.showallhiddenobjects) then
             -- end
             -- imgui.SameLine()
@@ -5135,13 +5246,15 @@ function imgui.OnDrawFrame()
             if imgui.Button(u8"Открыть настройки SAMPFUNCS",imgui.ImVec2(200, 25)) then
                os.execute('explorer '..getGameDirectory().."\\SAMPFUNCS\\sampfuncs-settings.ini")
             end
-            imgui.TextColoredRGB("ModLoader:")
-            if imgui.Button(u8"Открыть папку с модами",imgui.ImVec2(200, 25)) then
-               os.execute('explorer '..getGameDirectory().."\\modloader")
-            end
-            imgui.SameLine()
-            if imgui.Button(u8"Открыть настройки ModLoader",imgui.ImVec2(200, 25)) then
-               os.execute('explorer '..getGameDirectory().."\\modloader\\modloader.ini")
+            if doesDirectoryExist("modloader") then 
+               imgui.TextColoredRGB("ModLoader:")
+               if imgui.Button(u8"Открыть папку с модами",imgui.ImVec2(200, 25)) then
+                  os.execute('explorer '..getGameDirectory().."\\modloader")
+               end
+               imgui.SameLine()
+               if imgui.Button(u8"Открыть настройки ModLoader",imgui.ImVec2(200, 25)) then
+                  os.execute('explorer '..getGameDirectory().."\\modloader\\modloader.ini")
+               end
             end
          end
          if imgui.CollapsingHeader(u8"Состояние:") then
@@ -9275,11 +9388,18 @@ end
 function sampev.onSetWorldBounds(maxX, minX, maxY, minY)
    if checkbox.logworlddouns.v then
       print(string.format("Server change world bounds: maxX:%.2f, mixX:%.2f, maxY:%.2f, mixY:%.2f", 
-      maxX, minX, maxY, minY), -1)
+      maxX, minX, maxY, minY))
    end
    if checkbox.noworldbounds.v then
       -- A player's world boundaries reset to default (doesn't work in interiors)
       return {20000.0000, -20000.0000, 20000.0000, -20000.0000}
+   end
+end
+
+function sampev.onSetGravity(gravity)
+   if checkbox.nogravity.v then
+      print(string.format("Server try change gravity to: %.2f", gravity)) 
+      return false
    end
 end
 
@@ -9312,7 +9432,9 @@ function sampev.onSendEnterVehicle(vehicleId, passenger)
       end
    end
    
-   toggleFlyMode(false)
+   if playerdata.flymode then
+      toggleFlyMode(false)
+   end
 end
 
 function sampev.onPutPlayerInVehicle(vehicleId, seatId)
@@ -9344,7 +9466,10 @@ function sampev.onPutPlayerInVehicle(vehicleId, seatId)
          end
       end
    end
-   toggleFlyMode(false)
+   
+   if playerdata.flymode then
+      toggleFlyMode(false)
+   end
 end
 
 function sampev.onSendDialogResponse(dialogId, button, listboxId, input)
@@ -9611,6 +9736,16 @@ function sampev.onSendDialogResponse(dialogId, button, listboxId, input)
             end
          end
          
+         -- autocomplete animation set dialog
+         if ini.settings.dialogautocomplete then
+            if dialoghook.animdata then
+               if string.match(input, "%a%s") then
+                  ini.tmp.animationdata = input
+                  inicfg.save(ini, configIni)
+                  dialoghook.animdata = false
+               end
+            end
+         end
          -- /animlist fix
          if dialoghook.animlist then
             if button == 1 then
@@ -9658,6 +9793,16 @@ function sampev.onShowDialog(dialogId, style, title, button1, button2, text)
          LastData.lastActor = title:match('Меню актера #(%d+)')
       end
       
+      if title:find("Загрузка мира") then
+         if LastData.lastLoadedWorldNumber then
+            lua_thread.create(function()
+               sampSendDialogResponse(32700, 1, LastData.lastLoadedWorldNumber)
+               sampCloseCurrentDialogWithButton(1)
+               dialoghook.loadworld = false
+            end)
+         end
+      end
+      
       if title:find('Редактор актера') then
          if text:find('Укажите ID скина') then
             LastData.lastLink = 'https://pawnokit.ru/ru/skins_id'
@@ -9674,6 +9819,18 @@ function sampev.onShowDialog(dialogId, style, title, button1, button2, text)
             local newtext = "{FFFFFF}".. text .. 
             "\n{007FFF}".. LastData.lastLink ..
             "\n{696969}Нажмите CTRL + SHIFT + L чтобы открыть ссылку в браузере\n"
+            
+            if ini.settings.dialogautocomplete then
+               dialoghook.animdata = true
+               if ini.tmp.animationdata then
+                  if ini.tmp.animationdata:len() > 1 then
+                     lua_thread.create(function()
+                        wait(200)
+                        sampSetCurrentDialogEditboxText(tostring(ini.tmp.animationdata))
+                     end)
+                  end
+               end
+            end
             return {dialogId, style, title, button1, button2, newtext}
          end
       end
@@ -9749,6 +9906,16 @@ function sampev.onShowDialog(dialogId, style, title, button1, button2, text)
          local newtext = "{FFFFFF}".. text .. 
          "\n{007FFF}" .. LastData.lastLink ..
          "\n{696969}Нажмите CTRL + SHIFT + L чтобы открыть ссылку в браузере\n"
+         return {dialogId, style, title, button1, button2, newtext}
+      end
+      
+      if text:find('Укажите URL потока') then
+         --LastData.lastLink = 'https://www.open.mp/docs/scripting/resources/weaponids'
+         local newtext = "{FFFFFF}Вы можете залить audio файл на {3369e8}G{d50f25}o{eeb211}o{3369e8}g{009925}l{d50f25}e {FFFFFF}Drive\n"..
+         "или воспользоваться внешними аудиострим-ресурсами.\n"..
+         "Поддерживаются форматы {696969}WAV / AIFF / MP3 / OGG.\n\n"..text 
+         -- "\n{007FFF}" .. LastData.lastLink ..
+         -- "\n{696969}Нажмите CTRL + SHIFT + L чтобы открыть ссылку в браузере\n"
          return {dialogId, style, title, button1, button2, newtext}
       end
       
@@ -9955,16 +10122,6 @@ function sampev.onShowDialog(dialogId, style, title, button1, button2, text)
                   sampSendDialogResponse(32700, 1, 7, "- Логи")
                   sampCloseCurrentDialogWithButton(0)
                   dialoghook.logstoggle = false
-               end)
-            end
-            
-            if dialoghook.loadworld then
-               lua_thread.create(function()
-                  wait(50)
-                  sampSendDialogResponse(32700, 1, 15, "- Управление игровым миром")
-                  wait(50)
-                  sampSendDialogResponse(32700, 1, 9, "- Загрузить виртуальный мир")
-                  dialoghook.loadworld = false
                end)
             end
             
@@ -10281,7 +10438,9 @@ function sampev.onServerMessage(color, text)
          return false
       end
       
-      if text:find("Мир успешно загружен!") then
+      if text:find("Мир успешно загружен") then
+         dialoghook.loadworld = false
+         LastData.lastLoadedWorldNumber = nil
          sampAddChatMessage("[SCRIPT]: {FFFFFF}Используйте /tpo или метку на карте чтобы телепортироваться.", 0x0FF6600)
       end
       
@@ -10289,6 +10448,11 @@ function sampev.onServerMessage(color, text)
       or text:find("Вы создали пробный VIP мир") then
          --LastData.lastWorldName = "{696969}Виртуальный мир"
          WorldJoinInit()
+      end
+      
+      if text:find("Не используйте данную функцию часто") then
+         dialoghook.loadworld = false
+         LastData.lastLoadedWorldNumber = nil
       end
       
       --if text:find("Хост "..nickname) and text:find("вернулся в мир") then
@@ -11695,9 +11859,19 @@ function sampev.onSendCommand(command)
       return false
    end
    
+   if isTrainingSanbox and command:find("^/loadvw") then
+      if command:find('(/%a+) (.+)') then
+         local cmd, arg = command:match('(/%a+) (.+)')
+         local id = tonumber(arg)
+         if type(id) == "number" then
+            LastData.lastLoadedWorldNumber = id
+            dialoghook.loadworld = true
+         end
+      end
+   end
+   
    if isTrainingSanbox and command:find("^/loadworld") or command:find("^/worldload") then
-      dialoghook.loadworld = true
-      sampSendChat("/vw")
+      sampSendChat("/loadvw")
       return false
    end
    
@@ -12091,6 +12265,15 @@ function sampev.onSendChat(message)
    
 end
 
+function sampev.onSetVehicleVelocity(turn, velocity)
+   if ini.settings.cberrorwarnings then
+      if velocity.x ~= velocity.x or velocity.y ~= velocity.y or velocity.z ~= velocity.z then
+         sampAddChatMessage("[WARNING]: {FFFFFF}Ignoring invalid SetVehicleVelocity", 0x0FF6600)
+         return false
+      end
+   end
+end
+
 function sampev.onApplyPlayerAnimation(playerId, animLib, animName, frameDelta, loop, lockX, lockY ,freeze, time)
    -- Fixes knocking down the jetpack by calling animation
    if isTrainingSanbox then   
@@ -12353,6 +12536,7 @@ attachedPlayerId, attachedVehicleId, text)
       local newtext = text
       local newtext = newtext:gsub(",", "  ")
       local newtext = newtext:gsub("'", " ")
+      local newtext = newtext:gsub("%s%s%s", "")
       
       local newdata = string.format('%i,"%s",%s,%.2f,%.2f,%.2f', 
       id, newtext, clr, position.x, position.y, position.z)
@@ -12734,6 +12918,7 @@ function onReceiveRpc(id, bs)
    -- NOP's
    if nops.selecttextdraw.v and id == 83 then return false end
    if nops.health.v and id == 14 then return false end
+   if nops.position.v and id == 12 then return false end
    if nops.givegun.v and id == 22 then return false end
    if nops.resetgun.v and id == 21 then return false end
    if nops.setgun.v and id == 67 then return false end
@@ -12776,6 +12961,33 @@ function onSendRpc(id, bs, priority, reliability, channel, shiftTimestamp)
         raknetDeleteBitStream(new_bs)
       end
       return false
+   end
+   
+   if ini.settings.cberrorwarnings then
+      -- Thanks Heroku for this function on !SAPatcher
+      if id == 153 then
+         local playerId = raknetBitStreamReadInt32(bs)
+         local modelId = raknetBitStreamReadInt32(bs)
+         
+         -- Fixes a SAMP crash related to the installation of an invalid player skin model.
+         -- works only on the R1 version of the client, Kalcor has already built this fix into R3.
+         if modelId < 0 or modelId == 65535 then
+            sampAddChatMessage("[WARNING]: The server is trying to set invalid skin model (model: "
+            .. modelId .. ")", 0x0FF6600)
+            return false
+         end
+         
+         -- Fixes the crash of SA-MP (0x006E3D17) associated with the installation of the skin in the car.	  
+         local result, myId = sampGetPlayerIdByCharHandle(PLAYER_PED)
+         if result then
+            if playerId == myId then
+               if isCharInAnyCar(PLAYER_PED) then
+                  sampAddChatMessage("[WARNING]: The server is trying to set the skin in the car.", 0x0FF6600)
+                  return false
+               end
+            end
+         end
+      end
    end
 end
 
