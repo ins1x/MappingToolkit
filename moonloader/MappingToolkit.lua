@@ -4,7 +4,7 @@ script_description("Assistant for mappers")
 script_dependencies('imgui', 'lib.samp.events')
 script_properties("work-in-pause")
 script_url("https://github.com/ins1x/MappingToolkit")
-script_version("4.9")
+script_version("4.9") -- R2
 
 -- support sa-mp versions depends on SAMPFUNCS (0.3.7-R1, 0.3.7-R3-1, 0.3.7-R5, 0.3.DL)
 -- script_moonloader(16) moonloader v.0.26 
@@ -561,6 +561,9 @@ local nops = {
    facingangle = imgui.ImBool(false),
    togglecontrol = imgui.ImBool(false),
    position = imgui.ImBool(false),
+   setdrunk = imgui.ImBool(false),
+   setskin = imgui.ImBool(false),
+   setspecialaction = imgui.ImBool(false),
    audiostream = imgui.ImBool(false)
 }
 
@@ -5431,6 +5434,11 @@ function imgui.OnDrawFrame()
             imgui.Checkbox(u8'ToggleControllable', nops.togglecontrol)
             imgui.SameLine()
             imgui.Checkbox(u8'FacingAngle', nops.facingangle)
+            imgui.Checkbox(u8'SetPlayerSkin                ', nops.setskin)
+            imgui.SameLine()
+            imgui.Checkbox(u8'SetDrunkLevel      ', nops.setdrunk)
+            imgui.SameLine()
+            imgui.Checkbox(u8'SetSpecialAction', nops.setspecialaction)
          end
 
          if imgui.CollapsingHeader(u8"Packets:") then
@@ -9835,88 +9843,90 @@ function sampev.onShowDialog(dialogId, style, title, button1, button2, text)
          end
       end
       
-      if text:find('Укажите желаемую погоду мира:') 
-      or text:find('Установить погоду мира:')
-      or text:find('Установить игровую погоду игроку:') then
-         LastData.lastLink = 'https://pawnokit.ru/ru/weather_id'
-         local newtext = "{FFFFFF}".. text .. 
-         "\n{007FFF}".. LastData.lastLink ..
-         "\n{696969}Нажмите CTRL + SHIFT + L чтобы открыть ссылку в браузере\n"
-         return {dialogId, style, title, button1, button2, newtext}
-      end
-      
-      if text:find('Установить ID интерьера игроку:') then
-         LastData.lastLink = 'https://pawnokit.ru/ru/interiors_id'
-         local newtext = "{FFFFFF}".. text .. 
-         "\n{007FFF}" .. LastData.lastLink ..
-         "\n{696969}Нажмите CTRL + SHIFT + L чтобы открыть ссылку в браузере\n"
-         return {dialogId, style, title, button1, button2, newtext}
-      end
-      
-      if text:find('Перекрасить транспорт:') then
-         LastData.lastLink = 'https://sampwiki.blast.hk/wiki/Colors_List'
-         local newtext = "{FFFFFF}".. text .. 
-         "\n{007FFF}" .. LastData.lastLink ..
-         "\n{696969}Нажмите CTRL + SHIFT + L чтобы открыть ссылку в браузере\n"
-         return {dialogId, style, title, button1, button2, newtext}
-      end
-      
-      if text:find('Игровой текст.*GameTextStyle') then
-         LastData.lastLink = 'https://www.open.mp/docs/scripting/resources/gametextstyles'
-         local newtext = "{FFFFFF}".. text .. 
-         "\n{007FFF}" .. LastData.lastLink ..
-         "\n{696969}Нажмите CTRL + SHIFT + L чтобы открыть ссылку в браузере\n"
-         return {dialogId, style, title, button1, button2, newtext}
-      end
-      
-      if text:find('Создать актера.*Узнать свои координаты') then
-         local px, py, pz = getCharCoordinates(playerPed)
-         LastData.lastTextBuffer = ("%i %.3f %.3f %.3f %.3f"):format(getCharModel(playerPed), px, py, pz, getCharHeading(playerPed))
-         local newtext = "{FFFFFF}".. text .. 
-         "\n{696969}Нажмите CTRL + SHIFT + V чтобы вставить текущие данные скина, позиции, и поворота\n"
-         return {dialogId, style, title, button1, button2, newtext}
-      end
-      
-      if text:find('Воспроизвести игровой звук:') then
-         LastData.lastLink = 'https://pawnokit.ru/en/sounds'
-         local newtext = "{FFFFFF}".. text .. 
-         "\n{007FFF}" .. LastData.lastLink ..
-         "\n{696969}Нажмите CTRL + SHIFT + L чтобы открыть ссылку в браузере\n"
-         return {dialogId, style, title, button1, button2, newtext}
-      end
-      
-      if text:find('Создать взрыв:') then
-         LastData.lastLink = 'https://pawnokit.ru/ru/explosions_id'
-         local newtext = "{FFFFFF}".. text .. 
-         "\n{007FFF}" .. LastData.lastLink ..
-         "\n{696969}Нажмите CTRL + SHIFT + L чтобы открыть ссылку в браузере\n"
-         return {dialogId, style, title, button1, button2, newtext}
-      end
-      
-      if text:find('Установить игроку иконку:') then
-         LastData.lastLink = 'https://www.open.mp/docs/scripting/resources/mapicons'
-         local newtext = "{FFFFFF}".. text .. 
-         "\n{007FFF}" .. LastData.lastLink ..
-         "\n{696969}Нажмите CTRL + SHIFT + L чтобы открыть ссылку в браузере\n"
-         return {dialogId, style, title, button1, button2, newtext}
-      end
-      
-      if text:find('Выдать игроку оружие/патроны:') then
-         LastData.lastLink = 'https://www.open.mp/docs/scripting/resources/weaponids'
-         local newtext = "{FFFFFF}".. text .. 
-         "\n{007FFF}" .. LastData.lastLink ..
-         "\n{696969}Нажмите CTRL + SHIFT + L чтобы открыть ссылку в браузере\n"
-         return {dialogId, style, title, button1, button2, newtext}
-      end
-      
-      if text:find('Укажите URL потока') then
-         --LastData.lastLink = 'https://www.open.mp/docs/scripting/resources/weaponids'
-         local newtext = "{FFFFFF}Вы можете залить audio файл на {3369e8}G{d50f25}o{eeb211}o{3369e8}g{009925}l{d50f25}e {FFFFFF}Drive\n"..
-         "или воспользоваться внешними аудиострим-ресурсами.\n"..
-         "Поддерживаются форматы {696969}WAV / AIFF / MP3 / OGG.\n\n"..text 
-         -- "\n{007FFF}" .. LastData.lastLink ..
-         -- "\n{696969}Нажмите CTRL + SHIFT + L чтобы открыть ссылку в браузере\n"
-         return {dialogId, style, title, button1, button2, newtext}
+      if style == 0 or style == 1 then -- if MsgBox or Input Dialog
+         if text:find('Укажите желаемую погоду мира:') 
+         or text:find('Установить погоду мира:')
+         or text:find('Установить игровую погоду игроку:') then
+            LastData.lastLink = 'https://pawnokit.ru/ru/weather_id'
+            local newtext = "{FFFFFF}".. text .. 
+            "\n{007FFF}".. LastData.lastLink ..
+            "\n{696969}Нажмите CTRL + SHIFT + L чтобы открыть ссылку в браузере\n"
+            return {dialogId, style, title, button1, button2, newtext}
+         end
+         
+         if text:find('Установить ID интерьера игроку:') then
+            LastData.lastLink = 'https://pawnokit.ru/ru/interiors_id'
+            local newtext = "{FFFFFF}".. text .. 
+            "\n{007FFF}" .. LastData.lastLink ..
+            "\n{696969}Нажмите CTRL + SHIFT + L чтобы открыть ссылку в браузере\n"
+            return {dialogId, style, title, button1, button2, newtext}
+         end
+         
+         if text:find('Перекрасить транспорт:') then
+            LastData.lastLink = 'https://sampwiki.blast.hk/wiki/Colors_List'
+            local newtext = "{FFFFFF}".. text .. 
+            "\n{007FFF}" .. LastData.lastLink ..
+            "\n{696969}Нажмите CTRL + SHIFT + L чтобы открыть ссылку в браузере\n"
+            return {dialogId, style, title, button1, button2, newtext}
+         end
+         
+         if text:find('Игровой текст.*GameTextStyle') then
+            LastData.lastLink = 'https://www.open.mp/docs/scripting/resources/gametextstyles'
+            local newtext = "{FFFFFF}".. text .. 
+            "\n{007FFF}" .. LastData.lastLink ..
+            "\n{696969}Нажмите CTRL + SHIFT + L чтобы открыть ссылку в браузере\n"
+            return {dialogId, style, title, button1, button2, newtext}
+         end
+         
+         if text:find('Создать актера.*Узнать свои координаты') then
+            local px, py, pz = getCharCoordinates(playerPed)
+            LastData.lastTextBuffer = ("%i %.3f %.3f %.3f %.3f"):format(getCharModel(playerPed), px, py, pz, getCharHeading(playerPed))
+            local newtext = "{FFFFFF}".. text .. 
+            "\n{696969}Нажмите CTRL + SHIFT + V чтобы вставить текущие данные скина, позиции, и поворота\n"
+            return {dialogId, style, title, button1, button2, newtext}
+         end
+         
+         if text:find('Воспроизвести игровой звук:') then
+            LastData.lastLink = 'https://pawnokit.ru/en/sounds'
+            local newtext = "{FFFFFF}".. text .. 
+            "\n{007FFF}" .. LastData.lastLink ..
+            "\n{696969}Нажмите CTRL + SHIFT + L чтобы открыть ссылку в браузере\n"
+            return {dialogId, style, title, button1, button2, newtext}
+         end
+         
+         if text:find('Создать взрыв:') then
+            LastData.lastLink = 'https://pawnokit.ru/ru/explosions_id'
+            local newtext = "{FFFFFF}".. text .. 
+            "\n{007FFF}" .. LastData.lastLink ..
+            "\n{696969}Нажмите CTRL + SHIFT + L чтобы открыть ссылку в браузере\n"
+            return {dialogId, style, title, button1, button2, newtext}
+         end
+         
+         if text:find('Установить игроку иконку:') then
+            LastData.lastLink = 'https://www.open.mp/docs/scripting/resources/mapicons'
+            local newtext = "{FFFFFF}".. text .. 
+            "\n{007FFF}" .. LastData.lastLink ..
+            "\n{696969}Нажмите CTRL + SHIFT + L чтобы открыть ссылку в браузере\n"
+            return {dialogId, style, title, button1, button2, newtext}
+         end
+         
+         if text:find('Выдать игроку оружие/патроны:') then
+            LastData.lastLink = 'https://www.open.mp/docs/scripting/resources/weaponids'
+            local newtext = "{FFFFFF}".. text .. 
+            "\n{007FFF}" .. LastData.lastLink ..
+            "\n{696969}Нажмите CTRL + SHIFT + L чтобы открыть ссылку в браузере\n"
+            return {dialogId, style, title, button1, button2, newtext}
+         end
+         
+         if text:find('Укажите URL потока') then
+            --LastData.lastLink = 'https://www.open.mp/docs/scripting/resources/weaponids'
+            local newtext = "{FFFFFF}Вы можете залить audio файл на {3369e8}G{d50f25}o{eeb211}o{3369e8}g{009925}l{d50f25}e {FFFFFF}Drive\n"..
+            "или воспользоваться внешними аудиострим-ресурсами.\n"..
+            "Поддерживаются форматы {696969}WAV / AIFF / MP3 / OGG.\n\n"..text 
+            -- "\n{007FFF}" .. LastData.lastLink ..
+            -- "\n{696969}Нажмите CTRL + SHIFT + L чтобы открыть ссылку в браузере\n"
+            return {dialogId, style, title, button1, button2, newtext}
+         end
       end
       
       if ini.settings.cbvalautocomplete and dialoghook.cbvalue then
@@ -12579,7 +12589,7 @@ end
 
 function sampev.onSetCameraLookAt(lookAtPosition, cutType)
    if checkbox.logcamset.v then
-      print(lookAtPosition.x, lookAtPosition,y, lookAtPosition,z, cutType)
+      print(("Set camera look at: %.2f, %.2f, %.2f cutType: %i"):format(lookAtPosition.x, lookAtPosition.y, lookAtPosition.z, cutType))
    end
    if checkbox.lockcamchange.v then
       return false
@@ -12588,7 +12598,7 @@ end
 
 function sampev.onSetCameraPosition(position)
    if checkbox.logcamset.v then
-      print(position.x, position,y, position,z)
+      print(("Set camera pos: %.2f, %.2f, %.2f"):format(position.x, position.y, position.z))
    end
    if checkbox.lockcamchange.v then
       return false
@@ -12606,7 +12616,8 @@ end
 
 function sampev.onInterpolateCamera(setPos, fromPos, destPos, time, mode)
    if checkbox.logcamset.v then
-      print(("InterpolateCamera from: %.2f, %.2f, %.2f dest: %.2f, %.2f, %.2f time:%i mode:%i"):format(fromPos, destPos, time, mode))
+      print(("InterpolateCamera from: %.2f, %.2f, %.2f dest: %.2f, %.2f, %.2f time:%i mode:%i"
+      ):format(fromPos.x, fromPos.y, fromPos.z, destPos.x, destPos.y, destPos.z, time, mode))
    end
    if checkbox.lockcamchange.v then
       return false
@@ -12932,6 +12943,9 @@ function onReceiveRpc(id, bs)
    if nops.facingangle.v and id == 19 then return false end
    if nops.togglecontrol.v and id == 15 then return false end
    if nops.audiostream.v and id == 41 then return false end
+   if nops.setskin.v and id == 153 then return false end
+   if nops.setdrunk.v and id == 35 then return false end
+   if nops.setspecialaction.v and id == 88 then return false end
    if checkbox.hideattaches.v and id == 75 then return false end
 end
 
