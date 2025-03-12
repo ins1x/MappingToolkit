@@ -4,7 +4,7 @@ script_description("Assistant for mappers")
 script_dependencies('imgui', 'lib.samp.events')
 script_properties("work-in-pause")
 script_url("https://github.com/ins1x/MappingToolkit")
-script_version("4.9") -- R2
+script_version("4.9") -- R3
 
 -- support sa-mp versions depends on SAMPFUNCS (0.3.7-R1, 0.3.7-R3-1, 0.3.7-R5, 0.3.DL)
 -- script_moonloader(16) moonloader v.0.26 
@@ -2046,15 +2046,23 @@ function imgui.OnDrawFrame()
                imgui.SameLine()
                imgui.TextQuestion("( ? )", u8"Отключает установленные сервером значения гравитации (setGravity)")
                
-               if imgui.TooltipButton(u8"ForceSync", imgui.ImVec2(200, 25), u8"Отправить ForceSync серверу") then
-                  sampForceAimSync()
-                  sampForceOnfootSync()
-                  sampForceStatsSync()
-                  sampForceWeaponsSync()
-               end
+               -- if imgui.TooltipButton(u8"ForceSync", imgui.ImVec2(200, 25), u8"Отправить ForceSync серверу") then
+                  -- sampForceAimSync()
+                  -- sampForceOnfootSync()
+                  -- sampForceStatsSync()
+                  -- sampForceWeaponsSync()
+               -- end
                
             elseif tabmenu.coords == 2 then
-            
+               
+               if string.len(textbuffer.tpcx.v) < 1 then
+                  tpcpos.x = positionX
+                  tpcpos.y = positionY
+                  tpcpos.z = positionZ
+                  textbuffer.tpcx.v = string.format("%.1f", tpcpos.x)
+                  textbuffer.tpcy.v = string.format("%.1f", tpcpos.y)
+                  textbuffer.tpcz.v = string.format("%.1f", tpcpos.z)               
+               end
                local bTargetResult, bX, bY, bZ = getTargetBlipCoordinates()
                if bTargetResult then
                   imgui.TextColoredRGB(string.format("Позиция метки на карте {007DFF}x: %.1f, {e0364e}y: %.1f, {26b85d}z: %.1f",
@@ -5942,6 +5950,11 @@ function imgui.OnDrawFrame()
             if imgui.SliderInt('##slider.time', slider.time, 0, 24) then 
                setTime(slider.time.v)
                ini.settings.time = slider.time.v
+               if slider.time.v > 6 and slider.time.v < 20 then 
+                  checkbox.daynight.v = false
+               else
+                  checkbox.daynight.v = true
+               end
                inicfg.save(ini, configIni)
             end
             imgui.Spacing()
@@ -6256,8 +6269,10 @@ function imgui.OnDrawFrame()
             imgui.TextQuestion("( ? )", u8"Будет выставлять скин при спавне в мире")
             
             if checkbox.saveskin.v then
-               imgui.PushItemWidth(50)
-               imgui.InputText("##saveskin", textbuffer.saveskin, imgui.InputTextFlags.CharsDecimal)
+               -- imgui.Text("Skinid:")
+               -- imgui.SameLine()
+               imgui.PushItemWidth(45)
+               imgui.InputText("ID##saveskin", textbuffer.saveskin, imgui.InputTextFlags.CharsDecimal)
                imgui.PopItemWidth()
                local skinid = tonumber(textbuffer.saveskin.v)
                local currentskin = getCharModel(playerPed)
@@ -6266,20 +6281,27 @@ function imgui.OnDrawFrame()
                end
                
                imgui.SameLine()
-               if imgui.Button(u8"Сменить скин", imgui.ImVec2(120, 25)) then
+               if imgui.Button(u8"Сменить скин", imgui.ImVec2(110, 25)) then
                   if isValidSkin(skinid) then
                      sampSendChat("/skin "..skinid)
-                     sampAddChatMessage("Вы cменили скин {696969}"..currentskin.."{FFFFFF} на {696969}"..skinid, -1)
+                     sampAddChatMessage("[SCRIPT]: {FFFFFF}Вы cменили скин {696969}"..currentskin.."{FFFFFF} на {696969}"..skinid, 0x0FF6600)
                   end
                end
                imgui.SameLine()
-               if imgui.Button(u8"Сохранить скин", imgui.ImVec2(120, 25)) then
+               if imgui.Button(u8"Сохранить скин", imgui.ImVec2(110, 25)) then
                   if isValidSkin(skinid) then
                      sampSendChat("/skin "..skinid)
                      ini.settings.saveskin = true
                      ini.settings.skinid = skinid
                      inicfg.save(ini, configIni)
-                     sampAddChatMessage("Вы сохранили скин {696969}"..skinid, -1)
+                     sampAddChatMessage("[SCRIPT]: {FFFFFF}Вы сохранили скин {696969}"..skinid, 0x0FF6600)
+                  end
+               end
+               imgui.SameLine()
+               if imgui.Button(u8"Сменить скин (Визуал)", imgui.ImVec2(150, 25)) then
+                  if isValidSkin(skinid) then
+                     setPlayerModel(skinid)
+                     sampAddChatMessage("[SCRIPT]: {FFFFFF}Вы визуально cменили скин {696969}"..currentskin.."{FFFFFF} на {696969}"..skinid, 0x0FF6600)
                   end
                end
             end
@@ -7485,7 +7507,6 @@ function imgui.OnDrawFrame()
             imgui.TextColoredRGB("Разработчику TRAINING-SANDBOX {FF6600}qxlies(Lester){CDCDCD} за список текстур")
             imgui.TextColoredRGB("Форумчанам с TRAINING-SANDBOX {FF6600}Кокеточка, Cheater_80_LVL, .LINCOLN.{CDCDCD}")
             imgui.TextColoredRGB("за помощь в тестировании и предложения по улучшению")
-            imgui.TextColoredRGB("Разработчику {FF6600}Gorskin{CDCDCD} за опубликованные в открытом доступе мемхаки")
          elseif tabmenu.credits == 3 then
             imgui.Spacing()
             imgui.TextColoredRGB("TRAINING-{dc143c}CHECKER:")
@@ -9943,10 +9964,12 @@ function sampev.onShowDialog(dialogId, style, title, button1, button2, text)
                LastData.lastCbvaluebuffer = nil
             end
             dialoghook.cbvalue = false
-         
-            local newtext = text ..
-            "\n{696969}Нажмите CTRL + SHIFT + V чтобы вставить текущее значение\n"
-            return {dialogId, style, title, button1, button2, newtext}
+            
+            if style == 0 or style == 1 then -- if MsgBox or Input Dialog
+               local newtext = text ..
+               "\n{696969}Нажмите CTRL + SHIFT + V чтобы вставить текущее значение\n"
+               return {dialogId, style, title, button1, button2, newtext}
+            end
          else
             dialoghook.cbvalue = false
             LastData.lastCbvaluebuffer = nil
@@ -10550,7 +10573,12 @@ function sampev.onServerMessage(color, text)
       if text:find('[SERVER].+Прорисовку стрима: (%d+)') then
          input.streamdist.v = text:match('[SERVER].+Прорисовку стрима: (%d+)')
       end
-
+      
+      if text:find('[SERVER].+Ваш мир был успешно удалён') then
+         playerdata.isWorldHoster = false
+         LastData.lastLoadedWorldNumber = nil
+      end
+      
       -- ignore message if called for gangzonefix
       if text:find('Все гангзоны были удалены для вас') then
          return false
@@ -10967,6 +10995,20 @@ function sampev.onSendCommand(command)
       return false
    end
    
+   if command:find("^/skin") then
+      if command:find('(/%a+) (.+)') then
+         local cmd, arg = command:match('(/%a+) (.+)')
+         local skinid = tonumber(arg)
+         if type(skinid) == "number" then
+            if isValidSkin(skinid) then
+               local currentskin = getCharModel(playerPed)
+               sampSendChat("/skin "..skinid)
+               sampAddChatMessage("[SCRIPT]: {FFFFFF}Вы cменили скин {696969}"..currentskin.."{FFFFFF} на {696969}"..skinid, 0x0FF6600)
+            end
+         end
+      end
+   end
+   
    if isTrainingSanbox then 
       if command:find("^/flymode") then
          if isTrainingSanbox then
@@ -11192,6 +11234,22 @@ function sampev.onSendCommand(command)
             wait(200)
             sampSetCurrentDialogEditboxText("0.1")
          end)
+      end
+   end
+   
+   if isTrainingSanbox and command:match("^/cbedit") then
+      if command:find('(/%a+) (.+)') then
+         local cmd, arg = command:match('(/%a+) (.+)')
+         local id = tonumber(arg)
+         if type(id) == "number" then
+            LastData.lastCb = id
+            print(LastData.lastCb)
+            return true
+         end         
+      else
+         if LastData.lastCb then
+            sampAddChatMessage("[SCRIPT]: {FFFFFF}Последний комадный блок: "..tostring(LastData.lastCb), 0x0FF6600)
+         end
       end
    end
    
@@ -12000,6 +12058,7 @@ function sampev.onSendCommand(command)
    end
    
    if ini.settings.devmode and command:find("^/test") then   
+      
       -- sampAddChatMessage("Test", -1)
       
       -- local rotationX, rotationY, rotationZ = 0.0
