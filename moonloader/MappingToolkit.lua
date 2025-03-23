@@ -4,7 +4,7 @@ script_description("Assistant for mappers")
 script_dependencies('imgui', 'lib.samp.events')
 script_properties("work-in-pause")
 script_url("https://github.com/ins1x/MappingToolkit")
-script_version("4.9") -- R3
+script_version("4.9") -- R4
 
 -- support sa-mp versions depends on SAMPFUNCS (0.3.7-R1, 0.3.7-R3-1, 0.3.7-R5, 0.3.DL)
 -- script_moonloader(16) moonloader v.0.26 
@@ -1177,6 +1177,9 @@ function main()
          if dialog.objectinfo.v then dialog.objectinfo.v = false end
          if dialog.dialogtext.v then dialog.dialogtext.v = false end
          if dialog.txdlist.v then dialog.txdlist.v = false end
+         if tabmenu.main == 2 then -- durtyfix tab unfolding
+            tabmenu.main = 1
+         end
       end 
       
       if ini.settings.menukeychanged then
@@ -1868,7 +1871,6 @@ function imgui.OnDrawFrame()
             end
             
             imgui.Spacing()
-            imgui.Spacing()
             
             if tabmenu.coords == 1 then
                if tpcpos.x then
@@ -2076,8 +2078,6 @@ function imgui.OnDrawFrame()
                   imgui.TextColoredRGB(string.format("Дистанция {696969}%.1f m.",
                   getDistanceBetweenCoords3d(positionX, positionY, positionZ, bX, bY, bZ)))
                end 
-               
-               imgui.Spacing()
                
                imgui.Text(u8"Телепорт по координатам:")
                if imgui.TooltipButton(u8"Обновить", imgui.ImVec2(70, 25), u8"Обновит значения на вашу текущую позицию") then
@@ -6216,6 +6216,13 @@ function imgui.OnDrawFrame()
                   ini.mentions.usecolor = checkbox.usecolor.v
                   inicfg.save(ini, configIni)
                end
+               
+               if imgui.Checkbox(u8'Скрывать всплывающие подсказки о системах транспорта', checkbox.skipvehnotify) then
+                  ini.settings.skipvehnotify = checkbox.skipvehnotify.v
+                  inicfg.save(ini, configIni)
+               end
+               imgui.SameLine()
+               imgui.TextQuestion("( ? )", u8"Скрывает всплывающие подсказки внизу экрана при переключении опций транспорта")
             end
             imgui.Spacing()
          
@@ -6358,37 +6365,7 @@ function imgui.OnDrawFrame()
             imgui.SameLine()
             imgui.TextQuestion("( ? )", u8"Автоматически пропускает меню выбора объектов при отмене в /omenu")
          end
-         
-         if imgui.CollapsingHeader(u8"Транспорт:") then
-            if imgui.Checkbox(u8'Завести двигатель при посадке в ТС', checkbox.autoengine) then
-               ini.settings.autoengine = checkbox.autoengine.v
-               inicfg.save(ini, configIni)
-            end
-            imgui.SameLine()
-            imgui.TextQuestion("( ? )", u8"При посадке в транспорт автоматически заводит двигатель")
-            
-            if imgui.Checkbox(u8'Не спавниться внутри трейлеров и спец.транспорта', checkbox.trailerspawnfix) then
-               ini.settings.trailerspawnfix = checkbox.trailerspawnfix.v
-               inicfg.save(ini, configIni)
-            end
-            imgui.SameLine()
-            imgui.TextQuestion("( ? )", u8"Исправляет ошибочный спавн игрока внутри прицепов, трейлеров и спец.транспорта")
-            
-            if imgui.Checkbox(u8'Скрывать всплывающие подсказки о системах транспорта', checkbox.skipvehnotify) then
-               ini.settings.skipvehnotify = checkbox.skipvehnotify.v
-               inicfg.save(ini, configIni)
-            end
-            imgui.SameLine()
-            imgui.TextQuestion("( ? )", u8"Скрывает всплывающие подсказки внизу экрана при переключении опций транспорта")
-            
-            if imgui.Checkbox(u8'Визуально отключить урон для транспорта', checkbox.novehiclevisualdamage) then
-               ini.settings.novehiclevisualdamage = checkbox.novehiclevisualdamage.v
-               inicfg.save(ini, configIni)
-            end
-            imgui.SameLine()
-            imgui.TextQuestion("( ? )", u8"Трансопрт будет получать урон, но визуально для вас будет целым")
-            
-         end
+
          if imgui.CollapsingHeader(u8"Подключение:") then
            
             if isTrainingSanbox then   
@@ -10591,6 +10568,7 @@ function sampev.onServerMessage(color, text)
       
       if text:find('Вы присоеденились к миру') then
          LastData.lastWorldName = string.match(text, "Вы присоеденились к миру: (.+)")
+         worldspawnpos.x, worldspawnpos.y, worldspawnpos.z = getCharCoordinates(playerPed)
       end
       
       if text:find("контент доступен только со сборки") then
@@ -11002,8 +10980,9 @@ function sampev.onSendCommand(command)
          if type(skinid) == "number" then
             if isValidSkin(skinid) then
                local currentskin = getCharModel(playerPed)
-               sampSendChat("/skin "..skinid)
-               sampAddChatMessage("[SCRIPT]: {FFFFFF}Вы cменили скин {696969}"..currentskin.."{FFFFFF} на {696969}"..skinid, 0x0FF6600)
+               if currentskin ~= skinid then
+                  sampAddChatMessage("[SCRIPT]: {FFFFFF}Вы сменили скин {696969}"..currentskin.."{FFFFFF} на {696969}"..skinid, 0x0FF6600)
+               end
             end
          end
       end
@@ -11243,7 +11222,6 @@ function sampev.onSendCommand(command)
          local id = tonumber(arg)
          if type(id) == "number" then
             LastData.lastCb = id
-            print(LastData.lastCb)
             return true
          end         
       else
