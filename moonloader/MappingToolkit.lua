@@ -4,7 +4,7 @@ script_description("Assistant for mappers")
 script_dependencies('imgui', 'lib.samp.events')
 script_properties("work-in-pause")
 script_url("https://github.com/ins1x/MappingToolkit")
-script_version("4.10")
+script_version("4.11") -- RC1
 
 -- support sa-mp versions depends on SAMPFUNCS (0.3.7-R1, 0.3.7-R3-1, 0.3.7-R5, 0.3.DL)
 -- script_moonloader(16) moonloader v.0.26 
@@ -29,7 +29,7 @@ local ini = inicfg.load({
       antichatbot = false,
       allchatoff = false,
       autodevmode = true,
-      autoengine = false,
+      --autoengine = false,
       autoreconnect = true,
       backtoworld = true,
       bigoffsetwarning = true,
@@ -166,7 +166,6 @@ local isTrainingSanbox = false
 
 local searchresults = {}
 local playerAtachedObjects = {}
-local worldTexturesList = {}  
 local objectsCollisionDel = {}
 local playersTable = {}
 local vehiclesTable = {}
@@ -298,7 +297,7 @@ local checkbox = {
    chathidecb = imgui.ImBool(ini.settings.chathidecb),
    worldsavereminder = imgui.ImBool(ini.settings.worldsavereminder),
    autodevmode = imgui.ImBool(ini.settings.autodevmode),
-   autoengine = imgui.ImBool(ini.settings.autoengine),
+   --autoengine = imgui.ImBool(ini.settings.autoengine),
    setgm = imgui.ImBool(ini.settings.setgm),
    saveskin = imgui.ImBool(ini.settings.saveskin),
    saveweather = imgui.ImBool(ini.settings.saveweather),
@@ -717,13 +716,14 @@ local hotkeysActivationList = {
    u8"Откр/Закр транспорт", u8"Починить транспорт", u8"Открыть меню транспорта",
    u8"Сохранить мир", u8"Загрузить мир", u8"Список комадных блоков",
    u8"Повернуть объект на 90", u8"Повернуть объект на 45",
+   u8"Скрыть/Показать нижнюю панель",
 }
 
 local hotkeysActivationCmds = {
    "", "/jump", "/spawnme", "/slapme", "/jetpack", "/veh 481", "/weapon",
    "/veh", "/flymode", "/spec", "/oedit", "/csel", "/omenu", "/oinfo",
    "/animlist", "/cb", "/lock", "/fix", "/vmenu", "/savevw", "/loadvw",
-   "/cblist", "/rot", "/rot 45"
+   "/cblist", "/rot", "/rot 45", "/panel"
 }
 
 local attCodes = {
@@ -871,6 +871,10 @@ function main()
          createDirectory("moonloader/resource/mappingtoolkit/export")
       end
       
+      if not doesDirectoryExist("moonloader/resource/mappingtoolkit/history") then 
+         createDirectory("moonloader/resource/mappingtoolkit/history")
+      end
+      
       if doesFileExist('moonloader/resource/mappingtoolkit/resetsetting.txt') 
       or doesFileExist('moonloader/resetsetting.txt') then
          os.rename(getGameDirectory().."//moonloader//config//mappingtoolkit.ini", getGameDirectory().."//moonloader//config//prevconf_backup_mappingtoolkit.ini")
@@ -996,6 +1000,13 @@ function main()
          file:write(u8"Файл поврежден либо не найден\n")
          file:write(u8"Скачать стандартный можно по ссылке:\n")
          file:write("https://github.com/ins1x/MappingToolkit/blob/main/moonloader/resource/mappingtoolkit/cblist.txt")
+         file:close()
+      end
+      
+      if not doesFileExist(getGameDirectory()..'\\moonloader\\resource\\mappingtoolkit\\history\\texture.txt') then
+         local file = io.open(getGameDirectory()..
+         "/moonloader/resource/mappingtoolkit/history/texture.txt", "w")
+         file:write("")
          file:close()
       end
       
@@ -9471,6 +9482,12 @@ function sampev.onSetWorldBounds(maxX, minX, maxY, minY)
 end
 
 function sampev.onSetGravity(gravity)
+   if ini.settings.cberrorwarnings then
+      if gravity > 0.2 then
+         sampAddChatMessage("[WARNING]: {FFFFFF}Попытка установить некорректную гравитацию отклонена (SetGravity: "..gravity..")", 0x0FF6600)
+         return false
+      end
+   end
    if checkbox.nogravity.v then
       print(string.format("Server try change gravity to: %.2f", gravity)) 
       return false
@@ -9490,42 +9507,56 @@ function sampev.onVehicleStreamIn()
 end
 
 function sampev.onSendEnterVehicle(vehicleId, passenger)
-   if isTrainingSanbox and ini.settings.autoengine and not passenger then
-      local result, carhandle = sampGetCarHandleBySampVehicleId(vehicleId)
-      if result then
-         local state = isCarEngineOn(carhandle)
-         
-         if not state then
-            lua_thread.create(function()
-               wait(3500)
-               setVirtualKeyDown(0x11, true)
-               wait(100)
-               setVirtualKeyDown(0x11, false)
-            end)
-         end
+
+   if ini.settings.cberrorwarnings then
+      if isCharInAnyCar(playerPed) then
+         sampAddChatMessage("[WARNING]: {FFFFFF}Попытка посадить в транспорт игрока который уже в транспорте отклонена (onSendEnterVehicle vehid:"..vehicleId..")", 0x0FF6600)
+         return false
       end
    end
+   
+   -- if isTrainingSanbox and ini.settings.autoengine and not passenger then
+      -- local result, carhandle = sampGetCarHandleBySampVehicleId(vehicleId)
+      -- if result then
+         -- local state = isCarEngineOn(carhandle)
+         
+         -- if not state then
+            -- lua_thread.create(function()
+               -- wait(3500)
+               -- setVirtualKeyDown(0x11, true)
+               -- wait(100)
+               -- setVirtualKeyDown(0x11, false)
+            -- end)
+         -- end
+      -- end
+   -- end
    
    if playerdata.flymode then
       toggleFlyMode(false)
    end
 end
 
-function sampev.onPutPlayerInVehicle(vehicleId, seatId)
-   
-   if isTrainingSanbox and ini.settings.autoengine then
-      local carhandle = storeCarCharIsInNoSave(playerPed)
-      local state = isCarEngineOn(carhandle)
-      
-      if not state then
-         lua_thread.create(function()
-            wait(500)
-            setVirtualKeyDown(0x11, true)
-            wait(100)
-            setVirtualKeyDown(0x11, false)
-         end)
+function sampev.onPutPlayerInVehicle(vehicleId, seatId)  
+   if ini.settings.cberrorwarnings then
+      if isCharInAnyCar(playerPed) then
+         sampAddChatMessage("[WARNING]: {FFFFFF}Попытка посадить в транспорт игрока который уже в транспорте отклонена (PutPlayerInVehicle vehid:"..vehicleId..")", 0x0FF6600)
+         return false
       end
    end
+   
+   -- if isTrainingSanbox and ini.settings.autoengine then
+      -- local carhandle = storeCarCharIsInNoSave(playerPed)
+      -- local state = isCarEngineOn(carhandle)
+      
+      -- if not state then
+         -- lua_thread.create(function()
+            -- wait(500)
+            -- setVirtualKeyDown(0x11, true)
+            -- wait(100)
+            -- setVirtualKeyDown(0x11, false)
+         -- end)
+      -- end
+   -- end
    
    -- reject put player into trailers and spec vehicles
    if ini.settings.trailerspawnfix then
@@ -9842,6 +9873,34 @@ function sampev.onSendDialogResponse(dialogId, button, listboxId, input)
             end
             if button == 0 then
                dialoghook.animlist = false
+            end
+         end
+      end
+      
+      if ini.settings.cberrorwarnings and
+      listboxId == 65535 and button == 1 then
+         print(input, listboxId, button)
+         local textcmd = input:find("#")
+         local length = input:len()
+         local blockCounter = 0
+         local subCounter = 0
+         
+         if textcmd then
+            for idx = 1, length do
+               local symbol = string.sub(input, idx, idx)
+               --print(idx, symbol)
+               if symbol:find("#") then
+                  blockCounter = blockCounter + 1
+               end
+               if symbol:find("`") then
+                  subCounter = subCounter + 1
+               end
+            end
+            if blockCounter % 2 ~= 0 then -- if not odd #
+               sampAddChatMessage("[WARNING]: {FFFFFF}Нечетное кол-во символов # в текстовой функции, возможно пропущен закрывающий символ #", 0x0FF6600)
+            end
+            if subCounter % 2 ~= 0 then -- if not odd ` 
+               sampAddChatMessage("[WARNING]: {FFFFFF}Нечетное кол-во символов ` (Ё в англ. регистре) в текстовой подфункции, возможно пропущен закрывающий символ `", 0x0FF6600)
             end
          end
       end
@@ -10459,15 +10518,40 @@ function sampev.onServerMessage(color, text)
    end
    
    -- Corrects erroneous recieving of empty chat messages
-   if text:match("^%s.*$") and text:len() <= 1 then
-      return false
+   -- if text:match("^%s.*$") and text:len() <= 1 then
+      -- return false
+   -- end
+   -- new version ignore erroneous recieving of empty chat messages
+   local chatsymbol = text:find(":")
+   local timestamp = text:match("%d%d:%d%d:%d%d")
+   if chatsymbol then
+      local chatmessage = text
+      if timestamp then
+         chatmessage = string.sub(text, 11+2, text:len()) --timestamp 11 symb + 2 spaces
+      else
+         chatmessage = string.sub(chatmessage, chatsymbol+1, chatmessage:len())
+      end
+      
+      -- local hexcolor = chatmessage:find("{FFA500}.*")
+      -- if isTrainingSanbox and hexcolor then
+         -- chatmessage = string.sub(chatmessage, hexcolor+8, chatmessage:len())
+         -- print(chatmessage, hexcolor)
+      -- end
+   
+      if chatmessage:match("^%s.+$") then
+         if not chatmessage:find("%w") then
+            chatlog = io.open(getFolderPath(5).."\\GTA San Andreas User Files\\SAMP\\chatlog.txt", "a")
+            chatlog:write(os.date("[%H:%M:%S] ")..text.."\r\n")
+            chatlog:close()
+            return false
+         end
+      end
    end
    
    if checkbox.allchatoff.v then
       -- disable global chat, but write information to chatlog
       chatlog = io.open(getFolderPath(5).."\\GTA San Andreas User Files\\SAMP\\chatlog.txt", "a")
-      chatlog:write(os.date("[%H:%M:%S] ")..text)
-      chatlog:write("\n")
+      chatlog:write(os.date("[%H:%M:%S] ")..text.."\r\n")
       chatlog:close()
       return false
    end
@@ -10636,9 +10720,15 @@ function sampev.onServerMessage(color, text)
          if text:find('применена текстура: (%d+)') then
             LastObject.txdid = text:match('.+применена текстура: (%d+)')
             dialoghook.textureslist = false
-            if LastObject.localid then
-               worldTexturesList[LastObject.localid] = LastObject.txdid
-            end
+            
+            local txdtable = sampTextureList[LastObject.txdid+1]
+            local txdname = tostring(txdtable[3])
+               
+            local file = io.open(getGameDirectory()..
+            "/moonloader/resource/mappingtoolkit/history/texture.txt", "a")
+            file:write(("[%s] id: %d slot: %d txdid: %d(%s)\n")
+            :format(tostring(os.date("%d.%m.%Y %X")), LastObject.localid, LastObject.txdslot, LastObject.txdid, txdname))
+            file:close()
          end
       end
       
@@ -10773,6 +10863,12 @@ function sampev.onServerMessage(color, text)
          formatChat = true
       end
    end
+   
+   -- if text:find("%") then
+      -- newtext = newtext:gsub("%", "#")
+      -- formatChat = true
+      -- return false
+   -- end
    
    if formatChat then 
       return {color, newtext}
@@ -11243,7 +11339,7 @@ function sampev.onSendCommand(command)
             end
          end
          if actorsCount == 0 then
-            sampAddChatMessage("[SCRIPT]: {FFFFFF}Актеры в стриме не обнаружены, либо вы не задали ми имена", 0x0FF6600)
+            sampAddChatMessage("[SCRIPT]: {FFFFFF}Актеры в стриме не обнаружены, либо вы не задали им имена", 0x0FF6600)
          else
             sampAddChatMessage("[SCRIPT]: {FFFFFF}Для редактирования используйте /actor <id>", 0x0FF6600)         
          end
@@ -11296,9 +11392,21 @@ function sampev.onSendCommand(command)
    end
    
    if isTrainingSanbox then
-      if command:find("^/oc$") or command:find("^/ocopy") then
+      if command:find("^/oc$") or command:find("^/copy$") then
          sampSendChat("/clone")
          edit.mode = 2
+         return false
+      end
+      
+      if command:find("^/oc%s") or command:find("^/copy%s") then
+         if command:find('(/%a+) (.+)') then
+            local cmd, arg = command:match('(/%a+) (.+)')
+            local id = tonumber(arg)
+            if type(id) == "number" then
+               sampSendChat("/clone "..id)
+               edit.mode = 2
+            end
+         end
          return false
       end
    end
@@ -11514,6 +11622,11 @@ function sampev.onSendCommand(command)
    if isTrainingSanbox and command:find("^/stexture") then
       if command:find('(/%a+) (.+) (.+) (.+)') then
          local cmd, objectid, slot, texture = command:match('(/%a+) (.+) (.+) (.+)')
+         if ini.settings.cberrorwarnings then
+            if tonumber(slot) >= 16 then
+               sampAddChatMessage("[WARNING]: {FFFFFF}Текстуры с индексои выше 15 могут вызывать глитчи", 0x0FF6600)
+            end
+         end
          if cmd:find("/stexture$") and texture:find("invis") then 
             local newcommand = string.gsub(command, texture, "8660")
             return {newcommand}
@@ -11546,16 +11659,37 @@ function sampev.onSendCommand(command)
    end
    
    if command:find("^/tlist") or command:find("^/textures") then
+
       local counter = 0
-      sampAddChatMessage("Использованные текстуры за сессию", -1)
-      for objectlocalid, txtid in pairs(worldTexturesList) do
-         if objectlocalid ~= 0 then
+      local totallines = 0
+      local maxlines = 5
+      
+      local filepath = getGameDirectory()..
+      "//moonloader//resource//mappingtoolkit//history//texture.txt"
+      
+      for line in io.lines(filepath) do
+         totallines = totallines + 1
+      end
+      
+      if totallines >= 1 then
+         sampAddChatMessage("Использованные текстуры за сессию:", -1)
+      end
+      
+      if totallines > maxlines then
+         local limit = totallines - maxlines
+         for line in io.lines(filepath) do
             counter = counter + 1
-            local txdtable = sampTextureList[txtid+1]
-            local txdname = tostring(txdtable[3])
-            sampAddChatMessage("object id: {696969}"..objectlocalid.."{FFFFFF} texture: {696969}"..txdname.." {FFFFFF}txdid: {696969}"..txtid, -1)
+            if counter > limit then
+               sampAddChatMessage(line, -1)
+            end
+         end
+      else
+         for line in io.lines(filepath) do
+            counter = counter + 1
+            sampAddChatMessage(line, -1)
          end
       end
+      
       if counter == 0 then
          sampAddChatMessage("Список использованных за сеанс текстур - пуст", -1)
       end
@@ -11618,7 +11752,17 @@ function sampev.onSendCommand(command)
       end
    end
    
-    if isTrainingSanbox and command:find("^/rot") then      
+   if command:find("^/panel$") then
+      checkbox.showpanel.v = not checkbox.showpanel.v
+      if checkbox.showpanel.v then
+         sampAddChatMessage("[SCRIPT]: {FFFFFF}Вы показали нижнюю панель", 0x0FF6600)
+      else
+         sampAddChatMessage("[SCRIPT]: {FFFFFF}Вы скрыли нижнюю панель", 0x0FF6600)
+      end
+      return false
+   end
+   
+   if isTrainingSanbox and command:find("^/rot") then      
       if command:find('(/%a+) (.+)') then
          local cmd, arg = command:match('(/%a+) (.+)')
          local degreees = tonumber(arg)
@@ -11818,7 +11962,7 @@ function sampev.onSendCommand(command)
    end
    
    if command:find("^/cmdsearch") or command:find("^/findcmd") 
-   and isTrainingSanbox then
+   or command:find("^/cmdfind") and isTrainingSanbox then
       if command:find('(/%a+) (.+)') then
          local cmd, arg = command:match('(/%a+) (.+)')
          local searchcmd = tostring(arg)
@@ -12248,12 +12392,36 @@ end
 
 function sampev.onSendChat(message)
    -- Corrects erroneous sending of empty chat messages
-   if message:match("^%s.*$") and message:len() <= 1 then
-      return false
+   -- if message:match("^%s.*$") and message:len() <= 1 then
+      -- return false
+   -- end
+   
+   -- new version ignore erroneous recieving of empty chat messages
+   local chatsymbol = message:find(":")
+   local timestamp = message:match("%d%d:%d%d:%d%d")
+   if chatsymbol then
+      local chatmessage = message
+      if timestamp then
+         chatmessage = string.sub(message, 11+2, message:len()) --timestamp 11 symb + 2 spaces
+      else
+         chatmessage = string.sub(chatmessage, chatsymbol+1, chatmessage:len())
+      end
+      
+      local hexcolor = chatmessage:find("{FFA500}.*")
+      if isTrainingSanbox and hexcolor then
+         chatmessage = string.sub(chatmessage, hexcolor+8, chatmessage:len())
+      end
+      
+      if chatmessage:match("^%s.+$") then
+         if not chatmessage:find("%w") then
+            return false
+         end
+      end
    end
    
    if ini.settings.txtmacros then
       -- Text macros in TRAINING style format
+      -- https://forum.training-server.com/d/10021-tekstovye-komandy-funktsii-kb
       local text = message
       local formatted = false
       local posX, posY, posZ = getCharCoordinates(playerPed)
@@ -13083,6 +13251,10 @@ end
 
 -- FlyMode
 function toggleFlyMode(mode)
+   if isCharInAnyCar(playerPed) then
+      return false
+   end
+   
    if mode == nil then
       playerdata.flymode = not playerdata.flymode
       mode = playerdata.flymode
@@ -13105,6 +13277,7 @@ function toggleFlyMode(mode)
             playerAtachedObjects[objid] = false
          end
       end
+      return true
    else
       hidePED(false)
       playerdata.flymode=false
@@ -13122,6 +13295,7 @@ function toggleFlyMode(mode)
             end
          end
       end
+      return false
    end
 end
 
