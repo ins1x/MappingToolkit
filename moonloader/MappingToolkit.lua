@@ -4,7 +4,7 @@ script_description("Assistant for mappers")
 script_dependencies('imgui', 'lib.samp.events')
 script_properties("work-in-pause")
 script_url("https://github.com/ins1x/MappingToolkit")
-script_version("4.11") -- RC1
+script_version("4.11") -- RC2
 
 -- support sa-mp versions depends on SAMPFUNCS (0.3.7-R1, 0.3.7-R3-1, 0.3.7-R5, 0.3.DL)
 -- script_moonloader(16) moonloader v.0.26 
@@ -29,7 +29,6 @@ local ini = inicfg.load({
       antichatbot = false,
       allchatoff = false,
       autodevmode = true,
-      --autoengine = false,
       autoreconnect = true,
       backtoworld = true,
       bigoffsetwarning = true,
@@ -297,7 +296,6 @@ local checkbox = {
    chathidecb = imgui.ImBool(ini.settings.chathidecb),
    worldsavereminder = imgui.ImBool(ini.settings.worldsavereminder),
    autodevmode = imgui.ImBool(ini.settings.autodevmode),
-   --autoengine = imgui.ImBool(ini.settings.autoengine),
    setgm = imgui.ImBool(ini.settings.setgm),
    saveskin = imgui.ImBool(ini.settings.saveskin),
    saveweather = imgui.ImBool(ini.settings.saveweather),
@@ -2366,7 +2364,7 @@ function imgui.OnDrawFrame()
          end   
          if LastObject.modelid then
             local modelName = tostring(sampObjectModelNames[LastObject.modelid])
-            imgui.TextColoredRGB("Последний modelid объекта: {007DFF}"..LastObject.modelid.." ("..modelName..") ")
+            imgui.TextColoredRGB("Последний объект: {007DFF}"..LastObject.modelid.." ("..modelName..") ")
             if imgui.IsItemClicked() then
                setClipboardText(LastObject.modelid)
                sampAddChatMessage("[SCRIPT]: {FFFFFF}modelid скопирован в буффер обмена", 0x0FF6600)
@@ -3202,9 +3200,9 @@ function imgui.OnDrawFrame()
             imgui.SameLine()
             imgui.Text("    ")
             imgui.SameLine()
-            if imgui.TooltipButton(u8"Список всех моделей пикапов", imgui.ImVec2(220, 25), 
-            u8"Открыть список всех доступных пикапов на сайте open.mp (Онлайн)") then
-               os.execute('explorer "https://www.open.mp/docs/scripting/resources/pickupids"')
+            if imgui.TooltipButton(u8"Список всех пикапов в стриме", imgui.ImVec2(220, 25), 
+            u8"Показать список всех пикапов в стриме /pickuplist") then
+               sampSendChat("/pickuplist")
             end
             
             if imgui.TooltipButton(u8"Метку на пикап", imgui.ImVec2(120, 25), u8"Установить метку на пикап") then
@@ -3225,14 +3223,22 @@ function imgui.OnDrawFrame()
             imgui.SameLine()
             imgui.Text("    ")
             imgui.SameLine()
-            if imgui.TooltipButton(u8"Список всех типов пикапов", imgui.ImVec2(220, 25), 
-            u8"Открыть список всех типов пикапов на сайте open.mp (Онлайн)") then
-               os.execute('explorer "https://sampwiki.blast.hk/wiki/PickupTypes"')
+            if imgui.TooltipButton(u8"Список всех моделей пикапов", imgui.ImVec2(220, 25), 
+            u8"Открыть список всех доступных пикапов на сайте open.mp (Онлайн)") then
+               os.execute('explorer "https://www.open.mp/docs/scripting/resources/pickupids"')
             end
             
             if imgui.TooltipButton(u8"Удалить пикап", imgui.ImVec2(245, 25), u8"Визуально удалит пикап по ID") then
                removePickup(pickup)
             end
+            imgui.SameLine()
+            imgui.Text("    ")
+            imgui.SameLine()
+            if imgui.TooltipButton(u8"Список всех типов пикапов", imgui.ImVec2(220, 25), 
+            u8"Открыть список всех типов пикапов на сайте open.mp (Онлайн)") then
+               os.execute('explorer "https://sampwiki.blast.hk/wiki/PickupTypes"')
+            end
+            
             
             if imgui.Checkbox(u8"Уведомлять о взятии пикапа", checkbox.pickupinfo) then
             end
@@ -9515,22 +9521,6 @@ function sampev.onSendEnterVehicle(vehicleId, passenger)
       end
    end
    
-   -- if isTrainingSanbox and ini.settings.autoengine and not passenger then
-      -- local result, carhandle = sampGetCarHandleBySampVehicleId(vehicleId)
-      -- if result then
-         -- local state = isCarEngineOn(carhandle)
-         
-         -- if not state then
-            -- lua_thread.create(function()
-               -- wait(3500)
-               -- setVirtualKeyDown(0x11, true)
-               -- wait(100)
-               -- setVirtualKeyDown(0x11, false)
-            -- end)
-         -- end
-      -- end
-   -- end
-   
    if playerdata.flymode then
       toggleFlyMode(false)
    end
@@ -9543,20 +9533,6 @@ function sampev.onPutPlayerInVehicle(vehicleId, seatId)
          return false
       end
    end
-   
-   -- if isTrainingSanbox and ini.settings.autoengine then
-      -- local carhandle = storeCarCharIsInNoSave(playerPed)
-      -- local state = isCarEngineOn(carhandle)
-      
-      -- if not state then
-         -- lua_thread.create(function()
-            -- wait(500)
-            -- setVirtualKeyDown(0x11, true)
-            -- wait(100)
-            -- setVirtualKeyDown(0x11, false)
-         -- end)
-      -- end
-   -- end
    
    -- reject put player into trailers and spec vehicles
    if ini.settings.trailerspawnfix then
@@ -10522,31 +10498,31 @@ function sampev.onServerMessage(color, text)
       -- return false
    -- end
    -- new version ignore erroneous recieving of empty chat messages
-   local chatsymbol = text:find(":")
-   local timestamp = text:match("%d%d:%d%d:%d%d")
-   if chatsymbol then
-      local chatmessage = text
-      if timestamp then
-         chatmessage = string.sub(text, 11+2, text:len()) --timestamp 11 symb + 2 spaces
-      else
-         chatmessage = string.sub(chatmessage, chatsymbol+1, chatmessage:len())
-      end
-      
-      -- local hexcolor = chatmessage:find("{FFA500}.*")
-      -- if isTrainingSanbox and hexcolor then
-         -- chatmessage = string.sub(chatmessage, hexcolor+8, chatmessage:len())
-         -- print(chatmessage, hexcolor)
+   -- local chatsymbol = text:find(":")
+   -- local timestamp = text:match("%d%d:%d%d:%d%d")
+   -- if chatsymbol then
+      -- local chatmessage = text
+      -- if timestamp then
+         -- chatmessage = string.sub(text, 11+2, text:len()) --timestamp 11 symb + 2 spaces
+      -- else
+         -- chatmessage = string.sub(chatmessage, chatsymbol+1, chatmessage:len())
       -- end
+      
+      -- -- local hexcolor = chatmessage:find("{FFA500}.*")
+      -- -- if isTrainingSanbox and hexcolor then
+         -- -- chatmessage = string.sub(chatmessage, hexcolor+8, chatmessage:len())
+         -- -- print(chatmessage, hexcolor)
+      -- -- end
    
-      if chatmessage:match("^%s.+$") then
-         if not chatmessage:find("%w") then
-            chatlog = io.open(getFolderPath(5).."\\GTA San Andreas User Files\\SAMP\\chatlog.txt", "a")
-            chatlog:write(os.date("[%H:%M:%S] ")..text.."\r\n")
-            chatlog:close()
-            return false
-         end
-      end
-   end
+      -- if chatmessage:match("^%s.+$") then
+         -- if not chatmessage:find("[а-Я%d%w]+") then
+            -- chatlog = io.open(getFolderPath(5).."\\GTA San Andreas User Files\\SAMP\\chatlog.txt", "a")
+            -- chatlog:write(os.date("[%H:%M:%S] ")..text.."\r\n")
+            -- chatlog:close()
+            -- return false
+         -- end
+      -- end
+   -- end
    
    if checkbox.allchatoff.v then
       -- disable global chat, but write information to chatlog
@@ -11662,7 +11638,7 @@ function sampev.onSendCommand(command)
 
       local counter = 0
       local totallines = 0
-      local maxlines = 5
+      local maxlines = 25
       
       local filepath = getGameDirectory()..
       "//moonloader//resource//mappingtoolkit//history//texture.txt"
@@ -12075,8 +12051,8 @@ function sampev.onSendCommand(command)
                end
             end
          end
-         if not results then
-            sampAddChatMessage("Результат поиска: Не найдено", -1)
+         if results == 0 then
+            sampAddChatMessage("Результат поиска: Совпадений для "..tostring(arg).." не найдено", -1)
          end
          return false
       else 
@@ -12262,6 +12238,20 @@ function sampev.onSendCommand(command)
          threads.savereminder:terminate()
          threads.savereminder = nil
          SaveReminder()
+      end
+      -- count dyn objects at stream to prevent save empty world
+      local dynobjectsCounter = 0 
+      for _, v in pairs(getAllObjects()) do
+         if isObjectOnScreen(v) then
+            local objectid = sampGetObjectSampIdByHandle(v)
+            if objectid ~= -1 then
+               dynobjectsCounter = dynobjectsCounter + 1
+            end
+         end
+      end
+      if dynobjectsCounter == 0 then
+         sampAddChatMessage("[WARNING]: {FFFFFF}Похоже мир пустой! не найдено объектов рядом, вы точно хотите его сохранить?", 0x0CC0000)
+         printStyledString('~r~ WARNING ~w~Attempt to save an empty world ~r~', 7000, 4)         
       end
    end
    
