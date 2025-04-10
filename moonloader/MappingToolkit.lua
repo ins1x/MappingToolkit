@@ -4,7 +4,7 @@ script_description("Assistant for mappers")
 script_dependencies('imgui', 'lib.samp.events')
 script_properties("work-in-pause")
 script_url("https://github.com/ins1x/MappingToolkit")
-script_version("4.11") -- RC2
+script_version("4.11") -- RC3
 
 -- support sa-mp versions depends on SAMPFUNCS (0.3.7-R1, 0.3.7-R3-1, 0.3.7-R5, 0.3.DL)
 -- script_moonloader(16) moonloader v.0.26 
@@ -56,6 +56,7 @@ local ini = inicfg.load({
       fixobjinfotext = false,
       fixpedstuck = true,
       flymodespeed = 0.3,
+      flymodemaxspeed = 50.0,
       freezechat = false,
       hotkeys = true,
       hotkeystips = true,
@@ -83,6 +84,7 @@ local ini = inicfg.load({
       saveskin = false,
       saveweather = false,
       saveworldname = true,
+      savepmmessages = true,
       setgm = false,
       serverlock = true,
       showhud = true,
@@ -102,6 +104,7 @@ local ini = inicfg.load({
       weather = 0,
       weatherinformer = false,
       worldlogson = false,
+      worldsavelogs = true,
       worldsavereminder = false,
    },
    hotkeyactions = {
@@ -323,6 +326,7 @@ local checkbox = {
    fixobjinfotext = imgui.ImBool(ini.settings.fixobjinfotext),
    serverlock = imgui.ImBool(ini.settings.serverlock),
    devmode = imgui.ImBool(ini.settings.devmode),
+   savepmmessages = imgui.ImBool(ini.settings.savepmmessages),
    
    showpanel = imgui.ImBool(ini.panel.showpanel),
    panelbackground = imgui.ImBool(ini.panel.background),
@@ -466,6 +470,8 @@ local input = {
    reminderdelay = imgui.ImInt(ini.settings.reminderdelay),
    cbdefaultradius = imgui.ImFloat(ini.settings.cbdefaultradius),
    streammemmax = imgui.ImInt(ini.settings.streammemmax),
+   flymodemaxspeed = imgui.ImFloat(ini.settings.flymodemaxspeed),
+   flymodespeed = imgui.ImFloat(ini.settings.flymodespeed),
    rendclrrgba = imgui.ImFloat4(1, 1, 1, 1),
    txdclrrgba = imgui.ImFloat4(1, 1, 1, 1),
    txdletcolorrgba = imgui.ImFloat4(1, 1, 1, 1),
@@ -482,7 +488,6 @@ local slider = {
    time = imgui.ImInt(ini.settings.time),
    fov = imgui.ImInt(ini.settings.fov),
    scale = imgui.ImFloat(1.0),
-   flymodespeed = imgui.ImFloat(ini.settings.flymodespeed),
    flymodepower = imgui.ImFloat(0.1),
    camdist = imgui.ImInt(ini.settings.camdist)
 }
@@ -1001,13 +1006,6 @@ function main()
          file:close()
       end
       
-      if not doesFileExist(getGameDirectory()..'\\moonloader\\resource\\mappingtoolkit\\history\\texture.txt') then
-         local file = io.open(getGameDirectory()..
-         "/moonloader/resource/mappingtoolkit/history/texture.txt", "w")
-         file:write("")
-         file:close()
-      end
-      
       if doesFileExist(getGameDirectory()..'\\moonloader\\resource\\mappingtoolkit\\chatfilter.txt') then
          chatfilterfile = io.open("moonloader/resource/mappingtoolkit/chatfilter.txt", "r")
          for template in chatfilterfile:lines() do
@@ -1108,12 +1106,6 @@ function main()
       
       if servername:find("TRAINING") then
          isTrainingSanbox = true
-      end
-      -- if servername:find("Texture Studio") then
-      -- end
-      if servername:find("Arizona") then
-         print("[Mapping Toolkit] Unloaded. Reason: Try connect to Arizona")
-         thisScript():unload()
       end
       
       -- Unload script if not localhost server and not is TRAINING-SANDBOX
@@ -1590,6 +1582,7 @@ function main()
       end
       
       if playerdata.flymode then
+         local x, y = getScreenResolution()
          if not isCharInAnyCar(playerPed) then 
             speed = getFullSpeed(ini.settings.flymodespeed, 0, 0) 
             setCharHeading(playerPed, getHeadingFromVector2d(
@@ -1602,15 +1595,32 @@ function main()
          end
          
          if not isPauseMenuActive() and not sampIsCursorActive() then
-            local x, y = getScreenResolution()
             if isKeyDown(1) then -- LMB
-               playerdata.flypower = playerdata.flypower + 0.1
+               if playerdata.flypower < ini.settings.flymodemaxspeed then 
+                  if playerdata.flypower <= 0.5 then
+                     playerdata.flypower = playerdata.flypower + 0.01
+                  else
+                     playerdata.flypower = playerdata.flypower + 0.05
+                  end
+               end
                renderFontDrawText(fonts.infobarfont, 
                string.format("flyspeed:{26b85d} %.2f", playerdata.flypower), x-200, y-60, 0xFFFFFFFF)
+            elseif isKeyDown(0x04) then -- MMB (Middle mouse button)
+               if playerdata.flypower < ini.settings.flymodemaxspeed then 
+                  playerdata.flypower = playerdata.flypower + 0.5
+               else
+                  playerdata.flypower = ini.settings.flymodemaxspeed
+               end
+               renderFontDrawText(fonts.infobarfont, 
+               string.format("flyspeed:{ff8c00} %.2f", playerdata.flypower),x-200, y-60, 0xFFFFFFFF)
             elseif isKeyDown(2) then -- RMB
-               playerdata.flypower = playerdata.flypower - 0.1
-               if playerdata.flypower < 0.1 then
-                  playerdata.flypower = 0.1
+               if playerdata.flypower <= 0.5 then
+                  playerdata.flypower = playerdata.flypower - 0.01
+               else
+                  playerdata.flypower = playerdata.flypower - 0.05
+               end
+               if playerdata.flypower < 0.05 then
+                  playerdata.flypower = 0.05
                end
                renderFontDrawText(fonts.infobarfont, 
                string.format("flyspeed:{a52a2a} %.2f", playerdata.flypower),x-200, y-60, 0xFFFFFFFF)
@@ -1621,9 +1631,10 @@ function main()
             toggleFlyMode(false)
          end
          
-         if isKeyDown(0x20) then -- SPACE
-            flyCoords[3] = flyCoords[3] + speed * playerdata.flypower/ 2
-         elseif isKeyDown(0xA0) and flyCoords[3] > -95.0 then -- LSHIFT
+         if isKeyDown(0xA0) or isKeyDown(0x06) then -- LSHIFT or Mouse dop key X2
+            flyCoords[3] = flyCoords[3] + speed * playerdata.flypower / 2
+         elseif isKeyDown(0x20) or isKeyDown(0x11) or isKeyDown(0x05) -- SPACE or CTRL
+         and flyCoords[3] > -95.0 then 
             flyCoords[3] = flyCoords[3] - speed * playerdata.flypower / 2
          end
          
@@ -1643,6 +1654,13 @@ function main()
             flyCoords[2] = flyCoords[2] + speed * playerdata.flypower * math.cos(-math.rad(getCharHeading(playerPed) - 90)) 
          end
          
+         if not isPauseMenuActive() then
+            if isKeyDown(0x43) then -- C key
+               playerdata.flypower = ini.settings.flymodespeed
+               renderFontDrawText(fonts.infobarfont, 
+               string.format("flyspeed:{a52a2a} %.2f", playerdata.flypower),x-200, y-60, 0xFFFFFFFF)
+            end
+         end
          ::holdposition::
          setCharCoordinates(playerPed, flyCoords[1], flyCoords[2], flyCoords[3])
          
@@ -1679,7 +1697,7 @@ function main()
             if not LastData.lastMinigame then 
                rendertext = rendertext.." | {FFD700}mode: "..editmodes[edit.mode+1].."{FFFFFF}"
             else
-               rendertext = rendertext.." | {FFD700}LastData.lastMinigame: "..tostring(trainingGamemodes[LastData.lastMinigame]).."{FFFFFF}"
+               rendertext = rendertext.." | {FFD700}minigame: "..tostring(trainingGamemodes[LastData.lastMinigame]).."{FFFFFF}"
             end
          end
          
@@ -3564,20 +3582,49 @@ function imgui.OnDrawFrame()
          if imgui.CollapsingHeader(u8"Flymode") then
             
             imgui.TextColoredRGB("Скорость перемещения в режиме полета")
-            --imgui.Text(u8"Ускорение в полете: "..tostring(playerdata.flypower))
-            imgui.SameLine()
-            imgui.TextQuestion(u8"(по-умолчанию 0.3)", u8"Вернуть на значение по-умолчанию")
-            if imgui.IsItemClicked() then
-               slider.flymodespeed.v = 0.3
-               ini.settings.flymodespeed = ("%.2f"):format(slider.flymodespeed.v)
+            imgui.PushItemWidth(95)
+            if imgui.InputFloat('Default##defspeed', input.flymodespeed, 0.01, 10.0) then
+               if input.flymodespeed.v < 0.01 or input.flymodespeed.v > 10.0 then
+                  input.flymodespeed.v = 0.30
+               end
+               --ini.settings.flymodespeed = ("%.2f"):format(input.flymodespeed.v)
+               ini.settings.flymodespeed = input.flymodespeed.v
                inicfg.save(ini, configIni)
             end
-            if imgui.SliderFloat(u8"##flymodespeed", slider.flymodespeed, 0.1, 5.0) then
-               ini.settings.flymodespeed = ("%.2f"):format(slider.flymodespeed.v)
+            imgui.PopItemWidth()
+
+            imgui.SameLine()
+            
+            imgui.PushItemWidth(95)
+            if imgui.InputFloat('MAX##maxspeed', input.flymodemaxspeed, 1.0, 100.0) then
+               if input.flymodemaxspeed.v < 1.0 or input.flymodemaxspeed.v > 100.0 then
+                  input.flymodemaxspeed.v = 50.0
+               end
+               ini.settings.flymodemaxspeed = input.flymodemaxspeed.v
                inicfg.save(ini, configIni)
             end
+            imgui.PopItemWidth()
+            
             imgui.SameLine()
-            if imgui.Button(u8"Режим полета", imgui.ImVec2(120, 25)) then
+            if imgui.Button(u8"Сбросить", imgui.ImVec2(70, 25)) then
+               input.flymodespeed.v = 0.30
+               input.flymodemaxspeed.v = 50.0
+               ini.settings.flymodemaxspeed = input.flymodemaxspeed.v
+               --ini.settings.flymodespeed = ("%.2f"):format(input.flymodespeed.v)
+               ini.settings.flymodespeed = input.flymodespeed.v
+               inicfg.save(ini, configIni)
+            end
+            
+            if imgui.Button(u8"Помощь", imgui.ImVec2(125, 25)) then
+               sampAddChatMessage("[SCRIPT]: {FFFFFF}Управление в режиме полета (Flymode):", 0x0FF6600)
+               sampAddChatMessage("[SCRIPT]: {FF6600}SHIFT{FFFFFF} - переместиться вверх {FF6600}CTRL{FFFFFF} - переместиться вниз", 0x0FF6600)
+               sampAddChatMessage("[SCRIPT]: {FF6600}ЛКМ{FFFFFF} - ускориться {FF6600}ПКМ{FFFFFF} - замедлиться", 0x0FF6600)
+               sampAddChatMessage("[SCRIPT]: {FF6600}С{FFFFFF} - сбросить скорость на начальное значение", 0x0FF6600)
+               sampAddChatMessage("[SCRIPT]: {FFFFFF}Нажатие на {FF6600}колесико мыши{FFFFFF} - быстрое ускорение", 0x0FF6600)
+               sampAddChatMessage("[SCRIPT]: {FF6600}Боковые клавиши мыши{FFFFFF} - переместиться вверх-вниз", 0x0FF6600)
+            end
+            imgui.SameLine()
+            if imgui.Button(u8"Режим полета", imgui.ImVec2(220, 25)) then
                sampSendChat("/flymode")
             end
             
@@ -4990,7 +5037,7 @@ function imgui.OnDrawFrame()
          imgui.PushStyleVar(imgui.StyleVar.ItemSpacing, imgui.ImVec2(4, 4))
          
          if tabmenu.effects == 1 then
-            if imgui.ToggleButton(u8'Тени мира', checkbox.shadows) then
+            if imgui.ToggleButton(u8'Тени окружающего мира', checkbox.shadows) then
                if checkbox.shadows.v then
                   memory.write(5497177, 233, 1, false)
                   memory.write(5489067, 492560616, 4, false)
@@ -5008,10 +5055,8 @@ function imgui.OnDrawFrame()
                   memory.fill(7391066, 144, 9, false)
                end
             end
-            imgui.SameLine()
-            imgui.TextQuestion("( ? )", u8"Переключает тени мира")
             
-            if imgui.ToggleButton(u8'Пост-обработка (PostFX)', checkbox.postfx) then
+            if imgui.ToggleButton(u8'Пост-обработка, эффекты добавляемые после рендеринга (PostFX)', checkbox.postfx) then
                if checkbox.postfx.v then
                   memory.write(7358318, 1448280247, 4, false)
                   memory.write(7358314, -988281383, 4, false)
@@ -5020,10 +5065,8 @@ function imgui.OnDrawFrame()
                   memory.write(7358314, -380152237, 4, false)
                end
             end
-            imgui.SameLine()
-            imgui.TextQuestion("( ? )", u8"Отключает постобработку (PostFX)")
             
-            if imgui.ToggleButton(u8'Анизотропная фильтрация текстур', checkbox.aniso) then
+            if imgui.ToggleButton(u8'Анизотропная фильтрация текстур (Убирает рябь на тестурах)', checkbox.aniso) then
                if checkbox.aniso.v then
                    if readMemory(0x730F9C, 1, false) ~= 0 then
                       memory.write(0x730F9C, 0, 1, false)
@@ -5038,10 +5081,8 @@ function imgui.OnDrawFrame()
                    end
                end
             end
-            imgui.SameLine()
-            imgui.TextQuestion("( ? )", u8"Исправление ряби на текстурах")
             
-            if imgui.ToggleButton(u8'Blur эффект', checkbox.blur) then
+            if imgui.ToggleButton(u8'Blur эффект - Размытость при ускореннии транспорта', checkbox.blur) then
                if checkbox.blur.v then
                   memory.fill(0x704E8A, 0xE8, 1, true)
                   memory.fill(0x704E8B, 0x11, 1, true)
@@ -5056,10 +5097,8 @@ function imgui.OnDrawFrame()
                   memory.fill(0x704E8E, 0x90, 1, true)
                end
             end
-            imgui.SameLine()
-            imgui.TextQuestion("( ? )", u8"Переключает размытость при передвижении в транспорте с увеличением скорости")
             
-            if imgui.ToggleButton(u8'Sun эффект', checkbox.sunfix) then
+            if imgui.ToggleButton(u8'Sun эффект - Солнце из одиночной игры', checkbox.sunfix) then
                if checkbox.sunfix.v then
                   memory.hex2bin("E865041C00", 0x53C136, 5) 
                   memory.protect(0x53C136, 5, memory.unprotect(0x53C136, 5))
@@ -5067,42 +5106,34 @@ function imgui.OnDrawFrame()
                   memory.fill(0x53C136, 0x90, 5, true)
                end
             end
-            imgui.SameLine()
-            imgui.TextQuestion("( ? )", u8"Возвращает солнце из одиночной игры")
             
-            if imgui.ToggleButton(u8'Nightvision', checkbox.nightvision) then
+            if imgui.ToggleButton(u8'Nightvision - Эффект ночного зрения', checkbox.nightvision) then
                if checkbox.nightvision.v then
                   setNightVision(true)
                else
                   setNightVision(false)
                end
             end
-            imgui.SameLine()
-            imgui.TextQuestion("( ? )", u8"Включает эффект ночного зрения")
             
-            if imgui.ToggleButton(u8'InfraredVision', checkbox.infraredvision) then
+            if imgui.ToggleButton(u8'InfraredVision - Эффект инфракрасного зрения', checkbox.infraredvision) then
                if checkbox.infraredvision.v then
                   setInfraredVision(true)
                else
                   setInfraredVision(false)
                end
             end
-            imgui.SameLine()
-            imgui.TextQuestion("( ? )", u8"Включает эффект инфракрасного зрения")
             
             -- https://github.com/JuniorDjjr/GraphicsTweaker/tree/master/GraphicsTweaker
-            if imgui.ToggleButton(u8'LightMap', checkbox.lightmap) then
+            if imgui.ToggleButton(u8'LightMap - Засветлить всю карту', checkbox.lightmap) then
                if checkbox.lightmap.v then
                   memory.fill(0x73558B, 0x90, 2, true)
                else
                   memory.write(0x73558B, 15476, 2, true)
                end
             end
-            imgui.SameLine()
-            imgui.TextQuestion("( ? )", u8"Все окружение становится светлым в любое время и погоду.")
             
             -- By 4elove4ik
-            if imgui.ToggleButton(u8'NoWater', checkbox.nowater) then
+            if imgui.ToggleButton(u8'NoWater - Отключает воду (Визуально)', checkbox.nowater) then
                if checkbox.nowater.v then
                   memory.fill(0x53DD31, 0x90, 5, false)
                   memory.fill(0x53E004, 0x90, 5, false)
@@ -5118,43 +5149,36 @@ function imgui.OnDrawFrame()
                   memory.setuint8(0x53E142 + 0x4, 0x00, false)
                end
             end
-            imgui.SameLine()
-            imgui.TextQuestion("( ? )", u8"Отключает воду (Визуально)")
             
-            if imgui.ToggleButton(u8'NoUnderwater', checkbox.underwater) then
+            if imgui.ToggleButton(u8'NoUnderwater - Откл. все эффекты под водой', checkbox.underwater) then
                if checkbox.underwater.v then
                   DisableUnderWaterEffects(true)
                else
                   DisableUnderWaterEffects(false)
                end
             end
-            imgui.SameLine()
-            imgui.TextQuestion("( ? )", u8"Отключает все эффекты накладываемые игрой под водой")
             
-            if imgui.ToggleButton(u8'Vehicle LODs', checkbox.vehloads) then
+            if imgui.ToggleButton(u8'Vehicle LODs - Отображение лодов транспорта', checkbox.vehloads) then
                if checkbox.vehloads.v then
                   memory.write(5425646, 1, 1, false)
                else
                   memory.write(5425646, 0, 1, false)
                end
             end
-            imgui.SameLine()
-            imgui.TextQuestion("( ? )", u8"Отображение лодов транспорта")
             imgui.Spacing()
             imgui.Spacing()
+            
          elseif tabmenu.effects == 2 then
             -- All effects finded by Gorskin
-            if imgui.ToggleButton(u8'Отключить все эффекты игры', checkbox.noeffects) then
+            if imgui.ToggleButton(u8'Отключить все эффекты игры (дыма, пыли, тени)', checkbox.noeffects) then
                if checkbox.noeffects.v then
                   memory.fill(0x53EAD3, 0x90, 5, true) 
                else
                   memory.hex2bin("E898F6FFFF", 0x53EAD3, 5) 
                end
             end
-            imgui.SameLine()
-            imgui.TextQuestion("( ? )", u8"Отключает эффекты дыма, пыли, тени")
             
-            if imgui.ToggleButton(u8'Отрисовка травы и растений', checkbox.grassfix) then
+            if imgui.ToggleButton(u8'Отрисовка травы и растений из одиночной игры', checkbox.grassfix) then
                if checkbox.grassfix.v then
                   memory.hex2bin("E8420E0A00", 0x53C159, 5) 
                   memory.protect(0x53C159, 5, memory.unprotect(0x53C159, 5)) 
@@ -5162,40 +5186,33 @@ function imgui.OnDrawFrame()
                   memory.fill(0x53C159, 0x90, 5, true)
                end
             end
-            imgui.SameLine()
-            imgui.TextQuestion("( ? )", u8"Возвращает траву из одиночной игры")
             
             if imgui.ToggleButton(u8'Отключить дым из труб и огонь с факелов', checkbox.nofactorysmoke) then
                if checkbox.nofactorysmoke.v then
                   memory.fill(0x4A125D, 0x90, 8, true)
                   writeMemory(0x539F00, 4, 0x0024C2, true)
+                  sampAddChatMessage("[SCRIPT]: {FFFFFF}Отключен дым из труб на заводах, и прочие эффекты по типу факелов, горящих черепов. (Требуется рестрим)", 0x0FF6600)
                else
                   memory.hex2bin('8B4E08E88B900000', 0x4A125D, 8)
                   writeMemory(0x539F00, 4, 0x6C8B5551, true)
                end
             end
-            imgui.SameLine()
-            imgui.TextQuestion("( ? )", u8"Отключает дым из труб на заводах и прочие эффекты по типу факелов, горящих черепов. (Требуется рестрим)")
             
-            if imgui.ToggleButton(u8'Отключить огонь', checkbox.nofire) then
+            if imgui.ToggleButton(u8'Отключить эффекты огоня (Визуально)', checkbox.nofire) then
                if checkbox.nofire.v then
                   writeMemory(0x539F00, 4, 0x0024C2, true)
                else
                   writeMemory(0x539F00, 4, 51, true)
                end
             end
-            imgui.SameLine()
-            imgui.TextQuestion("( ? )", u8"Визуально отключит эффекты огня")
             
-            if imgui.ToggleButton(u8'Отключить взрывы', checkbox.noexplosions) then
+            if imgui.ToggleButton(u8'Отключить эффект взрыва (Не убирает тряску камеры и урон)', checkbox.noexplosions) then
                if checkbox.noexplosions.v then
                   writeMemory(0x736A50, 1, 0xC3, true) 
                else
                   writeMemory(0x736A50, 1, 0x83, true)
                end
             end
-            imgui.SameLine()
-            imgui.TextQuestion("( ? )", u8"Визуально отключит эффект взыра (Не убирает тряску камеры и урон)")
             
             if imgui.ToggleButton(u8'Отключить кровь на земле', checkbox.nobloodonearth) then
                if checkbox.nobloodonearth.v then
@@ -5204,8 +5221,6 @@ function imgui.OnDrawFrame()
                   memory.hex2bin('EB05', 0x49EB23, 2) 
                end
             end
-            imgui.SameLine()
-            imgui.TextQuestion("( ? )", u8"Визуально отключит эффекты крови на земле")
             
             if imgui.ToggleButton(u8'Отключить очки ночного видения и тепловизор', checkbox.novision) then
                if checkbox.novision.v then
@@ -5214,8 +5229,6 @@ function imgui.OnDrawFrame()
                   memory.hex2bin('E874EBFAFF', 0x634F67, 5)
                end
             end
-            imgui.SameLine()
-            imgui.TextQuestion("( ? )", u8"Отключает эффект ночного видения и тепловизор")
             
             if imgui.ToggleButton(u8'Отключить следы от шин при торможении', checkbox.notiretracks) then
                if checkbox.notiretracks.v then
@@ -5224,35 +5237,29 @@ function imgui.OnDrawFrame()
                   writeMemory(0x720B22, 1, 100, true)
                end
             end
-            imgui.SameLine()
-            imgui.TextQuestion("( ? )", u8"Визуально убирает следы шин")
             
             if imgui.ToggleButton(u8'Отключить облака', checkbox.noclouds) then
                if checkbox.noclouds.v then
                   --writeMemory(0x70EAB0, 1, 0x83, true)
                   memory.setfloat(0x716642, 100000.0)
                   memory.setfloat(0x716655, 100000.0)
+                  sampAddChatMessage("[SCRIPT]: {FFFFFF}При использовании модов облака не исчезнут!", 0x0FF6600)
                else
                   memory.setfloat(0x716642, 1000.0)
                   memory.setfloat(0x716655, 1000.0)
                end
             end
-            imgui.SameLine()
-            imgui.TextQuestion("( ? )", u8"Отключает большие облака (При использовании модов облака не исчезнут)")
             
-            if imgui.ToggleButton(u8'Отключить ветер', checkbox.nosnow) then
+            if imgui.ToggleButton(u8'Отключить эффект ветра', checkbox.nosnow) then
                writeMemory(0x506667+1, 4, checkbox.nosnow.v and 0xB72914 or 0x8E26DC, true)
                writeMemory(0x505BEB+1, 4, checkbox.nosnow.v and 0xB72914 or 0x8E26DC, true)
                writeMemory(0x505377+2, 4, checkbox.nosnow.v and 0xB72914 or 0x8E26DC, true)
             end
-            imgui.SameLine()
-            imgui.TextQuestion("( ? )", u8"Отключает эффект ветра")
             
-            if imgui.ToggleButton(u8'Отключить снег', checkbox.nosnow) then
+            if imgui.ToggleButton(u8'Отключить эффеты падающего снега', checkbox.nosnow) then
                sampAddChatMessage("[SCRIPT]: {FFFFFF}Изменения будут видны только после респавна!", 0x0FF6600)
             end
-            imgui.SameLine()
-            imgui.TextQuestion("( ? )", u8"Отключает эффекты падающего снега (Требуется респавн)")
+
          end
          
          imgui.PopStyleVar()
@@ -5532,6 +5539,12 @@ function imgui.OnDrawFrame()
          imgui.SameLine()
          if imgui.TooltipButton(u8"timestamp", imgui.ImVec2(90, 25), u8"Отображать время в чате") then
             sampProcessChatInput("/timestamp")
+         end
+         if isTrainingSanbox then
+            imgui.SameLine()
+            if imgui.TooltipButton(u8"mute", imgui.ImVec2(90, 25), u8"Настройки чата, позволяет заглушить указанный тип сообщений /mute") then
+               sampProcessChatInput("/mute")
+            end
          end
          
          imgui.Spacing()
@@ -5833,6 +5846,17 @@ function imgui.OnDrawFrame()
          if imgui.Checkbox(u8("Копировать ник кликнутого игрока в TAB"), checkbox.tabclickcopy) then
             ini.settings.tabclickcopy = checkbox.tabclickcopy.v
             inicfg.save(ini, configIni)
+            if ini.settings.tabclickcopy then
+               sampAddChatMessage("[SCRIPT]: {FFFFFF}Кликните на игрока чтобы скопировать его никнейм", 0x0FF6600)
+            end
+         end
+         
+         if imgui.Checkbox(u8("Сохранять историю персональных сообщений /pmh"), checkbox.savepmmessages) then
+            ini.settings.savepmmessages = checkbox.savepmmessages.v
+            inicfg.save(ini, configIni)
+            if ini.settings.savepmmessages then
+               sampAddChatMessage("[SCRIPT]: {FFFFFF}История персональных сообщений доступна через команду /pmh", 0x0FF6600)
+            end
          end
          
          imgui.Spacing()
@@ -9468,7 +9492,7 @@ function sampev.onSetPlayerTime(hour, minute)
       setTimeOfDay(slider.time.v, 0)
    end
 end
-
+   
 function sampev.onSetPlayerPos(position)
    if checkbox.logsetplayerpos.v then
       --printHelpString(string.format("x:%.2f y:%.2f z:%.2f", position.x, position.y, position.z))
@@ -9506,7 +9530,14 @@ function sampev.onPlayerStreamIn()
    end
 end
 
-function sampev.onVehicleStreamIn()
+function sampev.onVehicleStreamIn(vehId, data)
+   if ini.settings.cberrorwarnings then
+      if data.type < 400 or data.type > 611 then
+         sampAddChatMessage("[WARNING]: {FFFFFF}Попытка отобразить несуществующую модель транспорта отклонена (onSendEnterVehicle vehid:"..vehId.." model:"..data.type..")", 0x0FF6600)
+         return false
+      end
+   end
+   
    if checkbox.hidevehicles.v then
       return false
    end
@@ -9855,7 +9886,6 @@ function sampev.onSendDialogResponse(dialogId, button, listboxId, input)
       
       if ini.settings.cberrorwarnings and
       listboxId == 65535 and button == 1 then
-         print(input, listboxId, button)
          local textcmd = input:find("#")
          local length = input:len()
          local blockCounter = 0
@@ -10493,6 +10523,14 @@ function sampev.onServerMessage(color, text)
       print(string.format("%s, %s", color, text))
    end
    
+   if text:find('PM от') or text:find('PM к') then
+      if ini.settings.savepmmessages then
+         local file = io.open(getGameDirectory()..
+         "/moonloader/resource/mappingtoolkit/history/pmmessages.txt", "a")
+         file:write(("[%s] %s \n"):format(tostring(os.date("%d.%m.%Y %X")), text))
+         file:close()
+      end
+   end
    -- Corrects erroneous recieving of empty chat messages
    -- if text:match("^%s.*$") and text:len() <= 1 then
       -- return false
@@ -10535,11 +10573,6 @@ function sampev.onServerMessage(color, text)
    if playerdata.isChatFreezed then
       table.insert(chatbuffer, {color = color, text = text})
       return false
-   end
-   
-   if text:find('Добро пожаловать на Arizona Role Play!') then
-      print("[Mapping Toolkit] Unloaded. Reason: Try connect to Arizona")
-      thisScript():unload()
    end
    
    -- if text:find("Официальный сайт сервера training") then
@@ -10606,6 +10639,7 @@ function sampev.onServerMessage(color, text)
       if text:find("Мир успешно загружен") then
          dialoghook.loadworld = false
          LastData.lastLoadedWorldNumber = nil
+         LastData.lastMinigame = nil
          sampAddChatMessage("[SCRIPT]: {FFFFFF}Используйте /tpo или метку на карте чтобы телепортироваться.", 0x0FF6600)
       end
       
@@ -10613,6 +10647,10 @@ function sampev.onServerMessage(color, text)
       or text:find("Вы создали пробный VIP мир") then
          --LastData.lastWorldName = "{696969}Виртуальный мир"
          WorldJoinInit()
+      end
+      
+      if text:find("[SERVER].+Вы присоединились к лобби") then
+         LastData.lastMinigame = 4
       end
       
       if text:find("Не используйте данную функцию часто") then
@@ -10739,6 +10777,10 @@ function sampev.onServerMessage(color, text)
       if text:find('Вы присоеденились к миру') then
          LastData.lastWorldName = string.match(text, "Вы присоеденились к миру: (.+)")
          worldspawnpos.x, worldspawnpos.y, worldspawnpos.z = getCharCoordinates(playerPed)
+      end
+      
+      if text:find('[SERVER].+Хост.+вернулся в мир!') then
+         LastData.lastMinigame = nil
       end
       
       if text:find("контент доступен только со сборки") then
@@ -10899,8 +10941,8 @@ function sampev.onSendCommand(command)
          LastData.lastMinigame = 1
       elseif command:find("^/gungame") or command:find("^/gg") then
          LastData.lastMinigame = 3
-      elseif command:find("^/copchase") or command:find("^/ch") then
-         LastData.lastMinigame = 4
+      -- elseif command:find("^/copchase") or command:find("^/ch") then
+         -- LastData.lastMinigame = 4
       elseif command:find("^/wot") then
          LastData.lastMinigame = 2
       elseif command:find("^/derby") then
@@ -11668,6 +11710,47 @@ function sampev.onSendCommand(command)
       
       if counter == 0 then
          sampAddChatMessage("Список использованных за сеанс текстур - пуст", -1)
+      end
+      return false
+   end
+   
+   if command:find("^/pmh") then
+      if not ini.settings.savepmmessages then
+         sampAddChatMessage("[SCRIPT]: {FFFFFF}Сохранение истории сообщений отключено в настройках!", 0x0FF6600)
+         return false
+      end
+      local counter = 0
+      local totallines = 0
+      local maxlines = 15
+      
+      local filepath = getGameDirectory()..
+      "//moonloader//resource//mappingtoolkit//history//pmmessages.txt"
+      
+      for line in io.lines(filepath) do
+         totallines = totallines + 1
+      end
+      
+      if totallines >= 1 then
+         sampAddChatMessage("Лог персональных сообщений (PM):", -1)
+      end
+      
+      if totallines > maxlines then
+         local limit = totallines - maxlines
+         for line in io.lines(filepath) do
+            counter = counter + 1
+            if counter > limit then
+               sampAddChatMessage(line, 0x0FFFF00)
+            end
+         end
+      else
+         for line in io.lines(filepath) do
+            counter = counter + 1
+            sampAddChatMessage(line, 0x0FFFF00)
+         end
+      end
+      
+      if counter == 0 then
+         sampAddChatMessage("Список сообщений - пуст", -1)
       end
       return false
    end
@@ -12662,7 +12745,18 @@ function sampev.onSetVehicleVelocity(turn, velocity)
    end
 end
 
+function sampev.onApplyActorAnimation(actorId, lib, name)
+   -- prevent bad animation crashes
+   if name == "null" then
+      return false
+   end
+end
+
 function sampev.onApplyPlayerAnimation(playerId, animLib, animName, frameDelta, loop, lockX, lockY ,freeze, time)
+   -- prevent bad animation crashes
+   if name == "null" then
+      return false
+   end
    -- Fixes knocking down the jetpack by calling animation
    if isTrainingSanbox then   
       local res, id = sampGetPlayerIdByCharHandle(playerPed)
@@ -13074,11 +13168,19 @@ function sampev.onTextDrawSetString(id, text)
          LastData.lastTextureListIndex = text:match('Index: (%d+)')
          LastData.lastTextureListPage = text:match('Page: (%d+)')
       end
+      
+      -- write world logs
+      -- if id >= 2058 or id <= 2069 then
+      if ini.settings.worldsavelogs then
+         if id == 2069 then
+            local file = io.open(getGameDirectory()..
+            "/moonloader/resource/mappingtoolkit/history/worldlogs.txt", "a")
+            file:write(("[%s] %s \n"):format(tostring(os.date("%d.%m.%Y %X")), text))
+            file:close()
+         end
+      end
    end
    
-   -- if isTrainingSanbox then
-      -- id 2069-2058 is logs
-   -- end
 end
 
 function sampev.onSetMapIcon(iconId, position, type, color, style)
@@ -13217,10 +13319,7 @@ function sampev.onSendSpawn()
       end
    end
    
-   --if sampIsLocalPlayerSpawned() --and localClock() < 65 
    if ini.settings.backtoworld and dialoghook.backtoworld then
-      --print(os.date("%x %X", ini.settings.disconnecttime))
-      --print(ini.settings.disconnecttime)
       local delta = tonumber(os.time()) - tonumber(ini.tmp.disconnecttime)
       if delta < 300 then
          lua_thread.create(function()
@@ -13233,7 +13332,7 @@ function sampev.onSendSpawn()
    local pid = getLocalPlayerId()
    if isTrainingSanbox and pid == 0 then
       sampAddChatMessage("[SCRIPT]: {FFFFFF}У вас багнутый ID перезайдите на сервер!", 0x0FF6600)
-      sampAddChatMessage("[SCRIPT]: {FFFFFF}Если не перезайти вас будут кикать с большинста миров!", 0x0FF6600)
+      sampAddChatMessage("[SCRIPT]: {FFFFFF}Если не перезайти вас будут кикать с большинства миров!", 0x0FF6600)
    end
    
    toggleFlyMode(false)
