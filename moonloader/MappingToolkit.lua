@@ -4,7 +4,7 @@ script_description("Assistant for mappers")
 script_dependencies('imgui', 'lib.samp.events')
 script_properties("work-in-pause")
 script_url("https://github.com/ins1x/MappingToolkit")
-script_version("4.11") -- Release
+script_version("4.11") -- R2
 -- support sa-mp versions depends on SAMPFUNCS (0.3.7-R1, 0.3.7-R3-1, 0.3.7-R5, 0.3.DL)
 -- script_moonloader(16) moonloader v.0.26 
 -- editor options: tabsize 3, Unix (LF), encoding Windows-1251
@@ -434,6 +434,7 @@ local checkbox = {
 
 local input = {
    readonly = true,
+   isbot = false,
    camdelay = imgui.ImInt(5000),
    camshake = imgui.ImInt(500),
    gametexttime = imgui.ImInt(5000),
@@ -950,7 +951,7 @@ function main()
          textbuffer.favtxd.v = file:read('*a')
          file:close()
       else
-         local file = io.open(getGameDirectory().."/moonloader/resource/mappingtoolkit/favorites/textures.txt", "r")
+         local file = io.open(getGameDirectory().."/moonloader/resource/mappingtoolkit/favorites/textures.txt", "w")
          file:write(u8"Файл поврежден либо не найден")
          file:close()
       end
@@ -1002,6 +1003,14 @@ function main()
          file:write(u8"Файл поврежден либо не найден\n")
          file:write(u8"Скачать стандартный можно по ссылке:\n")
          file:write("https://github.com/ins1x/MappingToolkit/blob/main/moonloader/resource/mappingtoolkit/cblist.txt")
+         file:close()
+      end
+      
+      if not doesFileExist(getGameDirectory()..
+         "//moonloader//resource//mappingtoolkit//history//worldlogs.txt") then
+         local file = io.open(getGameDirectory()..
+         "//moonloader//resource//mappingtoolkit//history//worldlogs.txt", "w")
+         file:write("")
          file:close()
       end
       
@@ -10788,10 +10797,18 @@ function sampev.onServerMessage(color, text)
    
    if ini.settings.blockhamster and isTrainingSanbox then
       if text:find("Hamster:") then
+         input.isbot = true
          chatlog = io.open(getFolderPath(5).."\\GTA San Andreas User Files\\SAMP\\chatlog.txt", "a")
          chatlog:write(os.date("[%H:%M:%S] ")..text.."\r\n")
          chatlog:close()
          return false
+      elseif text:find("{FFA500}%p%p%p") and input.isbot then
+         chatlog = io.open(getFolderPath(5).."\\GTA San Andreas User Files\\SAMP\\chatlog.txt", "a")
+         chatlog:write(os.date("[%H:%M:%S] ")..text.."\r\n")
+         chatlog:close()
+         return false
+      else
+         input.isbot = false
       end
    end
    
@@ -11729,6 +11746,12 @@ function sampev.onSendCommand(command)
       local filepath = getGameDirectory()..
       "//moonloader//resource//mappingtoolkit//history//texture.txt"
       
+      if not doesFileExist(filepath) then
+         local file = io.open(filepath, "w")
+         file:write("")
+         file:close()
+      end
+      
       for line in io.lines(filepath) do
          totallines = totallines + 1
       end
@@ -11769,6 +11792,12 @@ function sampev.onSendCommand(command)
       
       local filepath = getGameDirectory()..
       "//moonloader//resource//mappingtoolkit//history//pmmessages.txt"
+      
+      if not doesFileExist(filepath) then
+         local file = io.open(filepath, "w")
+         file:write("")
+         file:close()
+      end
       
       for line in io.lines(filepath) do
          totallines = totallines + 1
