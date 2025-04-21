@@ -4,7 +4,7 @@ script_description("Assistant for mappers")
 script_dependencies('imgui', 'lib.samp.events')
 script_properties("work-in-pause")
 script_url("https://github.com/ins1x/MappingToolkit")
-script_version("4.11") -- R2
+script_version("4.11") -- R3
 -- support sa-mp versions depends on SAMPFUNCS (0.3.7-R1, 0.3.7-R3-1, 0.3.7-R5, 0.3.DL)
 -- script_moonloader(16) moonloader v.0.26 
 -- editor options: tabsize 3, Unix (LF), encoding Windows-1251
@@ -267,6 +267,7 @@ local dialoghook = {
    sampobjectslist = false,
    exitdialog = false,
    cbvalue = false,
+   tbvalue = false,
    olist = false,
    previewdialog = false,
    spcars = false,
@@ -324,7 +325,6 @@ local checkbox = {
    worldlogson = imgui.ImBool(ini.settings.worldlogson),
    fixobjinfotext = imgui.ImBool(ini.settings.fixobjinfotext),
    serverlock = imgui.ImBool(ini.settings.serverlock),
-   devmode = imgui.ImBool(ini.settings.devmode),
    savepmmessages = imgui.ImBool(ini.settings.savepmmessages),
    
    showpanel = imgui.ImBool(ini.panel.showpanel),
@@ -675,6 +675,7 @@ local LastData = {
    lastPickupBlip = nil,
    lastVehinfoModelid = 0,
    lastCbvaluebuffer = nil,
+   lastTbvaluebuffer = nil,
    lastMinigame = nil,
    lastLoadedWorldNumber = nil
 }
@@ -1249,6 +1250,15 @@ function main()
                end)
                LastData.lastTextBuffer = ""
             end
+            
+            if ini.settings.cbvalautocomplete and LastData.lastTbvaluebuffer then
+               lua_thread.create(function()
+                  wait(50)
+                  sampSetCurrentDialogEditboxText(tostring(LastData.lastTbvaluebuffer))
+               end)
+               LastData.lastTextBuffer = ""
+            end
+            
             -- if dialoghook.attachcode then
                -- lua_thread.create(function()
                   -- wait(50)
@@ -1890,7 +1900,10 @@ function imgui.OnDrawFrame()
             
             local positionX, positionY, positionZ = getCharCoordinates(playerPed)
             local id = getLocalPlayerId()
-            local score = sampGetPlayerScore(id)
+            local score
+            if sampGetPlayerScore(id) then
+               score = sampGetPlayerScore(id)
+            end
          
             imgui.TextColoredRGB(string.format("Ваша позиция на карте {007DFF}x: %.1f, {e0364e}y: %.1f, {26b85d}z: %.1f",
             positionX, positionY, positionZ))
@@ -5014,6 +5027,10 @@ function imgui.OnDrawFrame()
             if imgui.Button(u8"Нажать", imgui.ImVec2(100, 25)) then
                sampSendClickTextdraw(input.txdclickid.v)
             end
+            imgui.SameLine()
+            if imgui.Button(u8"Удалить", imgui.ImVec2(100, 25)) then
+               sampTextdrawDelete(input.txdclickid.v)
+            end
             imgui.Spacing()
             imgui.Link("https://leonardo541.github.io/TextDrawEditor/","TextDrawEditor (online)")
             --imgui.SameLine()
@@ -5272,268 +5289,7 @@ function imgui.OnDrawFrame()
          
          imgui.PopStyleVar()
          
-      elseif tabmenu.settings == 7 then
-         
-         local id = getLocalPlayerId()
-         local score = sampGetPlayerScore(id)
-         local ip, port = sampGetCurrentServerAddress()
-         local major, minor, majorRev, minorRev, game, region, steam, cracked = getGameVersion()
-         local scriptParams = thisScript()
-         local sampversion = getSampVersionId()
-         
-         imgui.TextColoredRGB("script: {FF6600}"..scriptParams.name.."{CDCDCD} version {FF6600}"..scriptParams.version)
-         if sampversion then
-            imgui.SameLine()
-            imgui.TextColoredRGB("sa-mp:")
-            imgui.SameLine()
-            imgui.TextColoredRGB(tostring("{FF6600}0.3.7 R"..sampversion))
-         end
-         imgui.TextColoredRGB("path: {FF6600}"..scriptParams.path)
-         --imgui.Text(u8"directory: "..scriptParams.directory)
-         --imgui.Text(u8"filename: "..scriptParams.filename)
-         --imgui.Text(u8"scriptid: "..scriptParams.id.." dead: "..tostring(scriptParams.dead).." frozen: "..tostring(scriptParams.frozen))
-         
-         if not isGameVersionOriginal() then
-            imgui.TextColoredRGB(string.format("{FF0000}Not original game version %s.%s.%s.%s", major, minor, majorRev, minorRev))
-         end
-         if steam then
-            imgui.TextColoredRGB(string.format("{FF0000}Steam game version %s.%s.%s.%s", major, minor, majorRev, minorRev))
-         end
-         
-         if imgui.CollapsingHeader(u8"Состояние:") then
-            
-            local cursormode = sampGetCursorMode()
-            local cursormodesList = {
-               u8"0 - Отключен",
-               u8"1 - Управление клавиатурой заблокировано, курсор отключен",
-               u8"2 - Управление клавиатурой и мышкой заблокировано, курсор включен",
-               u8"3 - Управление мышкой заблокировано, курсор включен",
-               u8"4 - Управление мышкой заблокировано, курсор отключен"
-            }
-            
-            imgui.Text(string.format(u8"В игре: %.0f сек.", localClock()))
-            imgui.Text(playerdata.isPlayerSpectating and u8('В наблюдении: Да') or u8('В наблюдении: Нет'))
-            imgui.Text(playerdata.flymode and u8('В режиме полета: Да') or u8('В режиме полета: Нет'))
-            imgui.Text(isPlayerControlLocked(playerPed) and u8('Управление: Заблокированно') or u8('Управление: Доступно'))
-            imgui.Text(sampIsLocalPlayerSpawned() and u8('Заспавнен: Да') or u8('Заспавнен: Нет'))
-            imgui.Text(string.format(u8"Курсор: %s", cursormodesList[cursormode+1]))
-            imgui.Spacing()
-            if imgui.Button(u8'Выйти из спектатора', imgui.ImVec2(180, 25)) then
-               local bs = raknetNewBitStream()
-               raknetBitStreamWriteInt32(bs, 0)
-               raknetEmulRpcReceiveBitStream(124, bs)
-               raknetDeleteBitStream(bs)
-            end   
-                  
-            imgui.SameLine()
-            if imgui.Button(u8'Войти в спектатор', imgui.ImVec2(180, 25)) then
-               local bs = raknetNewBitStream()
-               raknetBitStreamWriteInt32(bs, 1)
-               raknetEmulRpcReceiveBitStream(124, bs)
-               raknetDeleteBitStream(bs)
-            end            
-            imgui.SameLine()
-            if imgui.Button(u8'Режим полета', imgui.ImVec2(120, 25)) then
-               toggleFlyMode()
-               
-               if ini.settings.hotkeystips and playerdata.flymode then
-                  sampAddChatMessage("[SCRIPT]: {FFFFFF}Управление в режиме полета:", 0x0FF6600)
-                  sampAddChatMessage("[SCRIPT]: Пробел{FFFFFF} - Вверх, {FF6600}левый SHIFT{FFFFFF} - Вниз.", 0x0FF6600)
-                  sampAddChatMessage("[SCRIPT]: WASD{FFFFFF} - перемещение по координатам.", 0x0FF6600)
-                  sampAddChatMessage("[SCRIPT]: Кнопки мыши{FFFFFF} - ускорение/замедление.", 0x0FF6600)
-                  sampAddChatMessage("[SCRIPT]: F/ENTER{FFFFFF} - выйти из режима полета.", 0x0FF6600)
-               end
-            end
-
-            if imgui.Button(u8'Заморозить на позиции', imgui.ImVec2(180, 25)) then
-               freezeCharPosition(playerPed, true)
-            end
-            imgui.SameLine()
-            if imgui.Button(u8'Разморозить', imgui.ImVec2(180, 25)) then
-               freezeCharPosition(playerPed, false)
-               setPlayerControl(PLAYER_HANDLE, true)
-               lockPlayerControl(false)
-               clearCharTasksImmediately(playerPed)
-            end
-            imgui.SameLine()
-            if imgui.Button(u8'ForceSync', imgui.ImVec2(120, 25)) then
-               sampForceAimSync()
-               sampForceOnfootSync()
-               sampForceStatsSync()
-               sampForceWeaponsSync()
-            end
-            
-            if imgui.Button(u8'Взять Jetpack', imgui.ImVec2(120, 25)) then
-               taskJetpack(playerPed)
-            end
-            imgui.SameLine()
-            if imgui.Button(u8'Выбор класса', imgui.ImVec2(120, 25)) then
-               local skin = getCharModel(playerPed)
-               sampRequestClass(skin)
-               --setPlayerModel(skin)
-            end
-            imgui.SameLine()
-            if imgui.Button(u8'Взять скин CJ', imgui.ImVec2(120, 25)) then
-               setPlayerModel(0)
-            end
-            imgui.SameLine()
-            if imgui.Button(u8'Интерьер 0', imgui.ImVec2(120, 25)) then
-               sampSendInteriorChange(0)
-            end
-         end
-         
-         if imgui.CollapsingHeader(u8"Logging:") then
-
-            imgui.Text(u8"Стандартные логи:")
-            
-            imgui.PushItemWidth(150)
-            imgui.Combo(u8'##ComboBoxLogslist', combobox.logs,
-            {"moonloader.log", "modloader.log", "sampfuncs.log", "chatlog.txt", "cleo.log"})
-            
-            imgui.SameLine()
-            if imgui.Button(u8"показать",imgui.ImVec2(110, 25)) then
-               local file
-               if combobox.logs.v == 0 then
-                  file = getGameDirectory().. "\\moonloader\\moonloader.log"
-               elseif combobox.logs.v == 1 then
-                  file = getGameDirectory().. "\\modloader\\modloader.log"
-               elseif combobox.logs.v == 2 then
-                  file = getGameDirectory().. "\\SAMPFUNCS\\SAMPFUNCS.log"
-               elseif combobox.logs.v == 3 then
-                  file = getFolderPath(5)..'\\GTA San Andreas User Files\\SAMP\\chatlog.txt'
-               elseif combobox.logs.v == 4 then
-                  file = getGameDirectory().. "\\cleo.log"
-               end
-               
-               if doesFileExist(file) then
-                  os.execute('explorer '.. file)
-               end
-            end
-            imgui.Spacing()
-            imgui.Text(u8"Логгировать в консоли:")
-            imgui.Checkbox(u8'Логгировать в консоли обработку текстдравов', checkbox.logtextdraws)
-            imgui.Checkbox(u8'Логгировать в консоли поднятые пикапы', checkbox.pickeduppickups)
-            imgui.Checkbox(u8'Логгировать в консоли ответы на диалоги', checkbox.logdialogresponse)
-            imgui.Checkbox(u8'Логгировать в консоли выбранные объекты', checkbox.logobjects)
-            imgui.Checkbox(u8'Логгировать в консоли 3d тексты', checkbox.log3dtexts)
-            imgui.Checkbox(u8'Логгировать в консоли Gametexts', checkbox.loggametexts)
-            imgui.Checkbox(u8'Логгировать в консоли установку текстуры', checkbox.logtxd)
-            imgui.Checkbox(u8'Логгировать в консоли изменение камеры', checkbox.logcamset)
-            imgui.Checkbox(u8'Логгировать в консоли сообщения в чате', checkbox.logmessages)
-            imgui.Checkbox(u8'Логгировать в консоли изменение границ мира', checkbox.logworlddouns)
-            imgui.Checkbox(u8'Логгировать в консоли изменение позиции игрока', checkbox.logsetplayerpos)
-            
-         end
-         
-         if imgui.CollapsingHeader(u8"NOP's:") then
-            imgui.TextColoredRGB("{FF0000}Использование данных функций может триггерить античит!")
-            imgui.Checkbox(u8'TogglePlayerSpectating', nops.spectator)
-            imgui.SameLine()
-            imgui.Checkbox(u8'SetPlayerHealth    ', nops.health)
-            imgui.SameLine()
-            imgui.Checkbox(u8'GivePlayerWeapon', nops.givegun)
-            imgui.Checkbox(u8'ResetPlayerWeapons    ', nops.resetgun)
-            imgui.SameLine()
-            imgui.Checkbox(u8'ShowDialog            ', nops.showdialog)
-            imgui.SameLine()
-            imgui.Checkbox(u8'ApplyAnimation', nops.applyanimation)
-            imgui.Checkbox(u8'ClearAnimation            ', nops.clearanimation)
-            imgui.SameLine()
-            imgui.Checkbox(u8'SetArmedWeapon  ', nops.setgun)
-            imgui.SameLine()
-            imgui.Checkbox(u8'Spawn', nops.spawn)
-            imgui.Checkbox(u8'Death                           ', nops.death)
-            imgui.SameLine()
-            imgui.Checkbox(u8'Player Sync            ', nops.psync)
-            imgui.SameLine()
-            imgui.Checkbox(u8'RequestClass', nops.requestclass)
-            imgui.Checkbox(u8'RequestSpawn              ', nops.requestspawn)
-            imgui.SameLine()
-            imgui.Checkbox(u8'ClickTextdraw       ', nops.clicktextdraw)
-            imgui.SameLine()
-            imgui.Checkbox(u8'SelectTextdraw', nops.selecttextdraw)
-            imgui.Checkbox(u8'ForceClassSelection      ', nops.forceclass)
-            imgui.SameLine()
-            imgui.Checkbox(u8'ToggleControllable', nops.togglecontrol)
-            imgui.SameLine()
-            imgui.Checkbox(u8'FacingAngle', nops.facingangle)
-            imgui.Checkbox(u8'SetPlayerSkin                ', nops.setskin)
-            imgui.SameLine()
-            imgui.Checkbox(u8'SetDrunkLevel      ', nops.setdrunk)
-            imgui.SameLine()
-            imgui.Checkbox(u8'SetSpecialAction', nops.setspecialaction)
-         end
-
-         if imgui.CollapsingHeader(u8"Packets:") then
-            imgui.TextColoredRGB("RPC Recieve:  {696969}"..tostring(packets.rpcRecieve))
-            imgui.SameLine()
-            imgui.TextColoredRGB("RPC Send:  {696969}"..tostring(packets.rpcSend))
-            imgui.TextColoredRGB("Packet Recieve:  {696969}"..tostring(packets.packetRecieve))
-            imgui.SameLine()
-            imgui.TextColoredRGB("Packet Send:  {696969}"..tostring(packets.packetSend))
-            
-            imgui.Text(u8"Список RPC:")
-            imgui.SameLine()
-            imgui.Link("https://github.com/Brunoo16/samp-packet-list/wiki/RPC-List","RPC List")
-            
-            imgui.SameLine()
-            imgui.Text(u8"Список Events:")
-            imgui.SameLine()
-            imgui.Link("https://github.com/THE-FYP/SAMP.Lua/blob/master/samp/events.lua","Events")
-         end
-         
-         if imgui.CollapsingHeader(u8"Dialogs:") then
-            dialogStyles = {
-            "DIALOG_STYLE_MSGBOX",
-            "DIALOG_STYLE_INPUT", 
-            "DIALOG_STYLE_LIST",
-            "DIALOG_STYLE_PASSWORD",
-            "DIALOG_STYLE_TABLIST",
-            "DIALOG_STYLE_TABLIST_HEADERS"
-            }
-            if LastData.lastDialogInput then
-               if LastData.lastDialogStyle == 3 then
-                  local newtext = LastData.lastDialogInput:gsub("(.*)", "*")
-                  imgui.TextColoredRGB("DialogInput: "..newtext)
-               else
-                  imgui.TextColoredRGB("DialogInput: "..LastData.lastDialogInput)
-                  imgui.SameLine()
-                  imgui.TextQuestion("[]", u8"Скопировать текст в буффер обмена")
-                  if imgui.IsItemClicked() then
-                     sampAddChatMessage("Текст скопирован в буффер обмена", -1)
-                     setClipboardText(LastData.lastDialogInput)
-                  end
-               end
-            end
-            if LastData.lastDialogButton then
-               imgui.Text(u8"DialogButton: "..LastData.lastDialogButton)
-            end
-            if LastData.lastDialogStyle then
-               imgui.TextColoredRGB(("DialogStyle: %i {696969}(%s)"):format(LastData.lastDialogStyle, dialogStyles[LastData.lastDialogStyle+1]))
-            end
-            if LastData.lastListboxId then
-               imgui.Text(u8"ListboxId: "..LastData.lastListboxId)
-            end
-            if sampGetCurrentDialogId() ~= 0 then
-               imgui.Text(u8"ListboxItemsCount: "..sampGetListboxItemsCount())
-               imgui.Text(u8"DialogListItem: "..sampGetCurrentDialogListItem())
-            end
-            if imgui.Button(u8'Текст диалога', imgui.ImVec2(130, 25)) then
-               if LastData.lastDialogText then
-                  textbuffer.dialogtext.v = tostring(LastData.lastDialogText)
-                  dialog.dialogtext.v = not dialog.dialogtext.v
-               else
-                  sampAddChatMessage("[SCRIPT]: {FFFFFF}Нет информации по последнему диалогу!", 0x0FF6600)
-               end
-            end            
-            imgui.SameLine()
-            if imgui.Button(u8'Скрыть диалог', imgui.ImVec2(130, 25)) then
-               enableDialog(false)
-            end
-            imgui.SameLine()
-            imgui.Text(u8'Последний ID диалога: ' .. sampGetCurrentDialogId())
-         end
-         
+      -- elseif tabmenu.settings == 7 then
       elseif tabmenu.settings == 8 then
       
          if imgui.TooltipButton(u8"очистить", imgui.ImVec2(90, 25), u8"Очистить чат (Для себя)") then
@@ -5877,7 +5633,10 @@ function imgui.OnDrawFrame()
          
          local id = getLocalPlayerId()
          local nickname = sampGetPlayerNickname(id)
-         local score = sampGetPlayerScore(id)
+         local score
+         if sampGetPlayerScore(id) then
+            score = sampGetPlayerScore(id)
+         end
          
          if dialog.playerstat.v then
             if imgui.TooltipButton("[ << ]", imgui.ImVec2(50, 25), u8:encode("Скрыть подробную статистику")) then
@@ -6178,16 +5937,6 @@ function imgui.OnDrawFrame()
                imgui.TextQuestion("( ? )", u8"Восстанавливает стандартный синий цвет для 3D текста с информацией о ид объекта (В режиме разработки)")
             end
             
-            if imgui.Checkbox(u8'Активировать режим разработчика', checkbox.devmode) then
-               ini.settings.devmode = checkbox.devmode.v
-               inicfg.save(ini, configIni)
-               if checkbox.devmode.v then
-                  tabmenu.settings = 7
-               end
-            end
-            imgui.SameLine()
-            imgui.TextQuestion("( ? )", u8"Отображать раздел для разработчиков в тулките")            
-            
          end
          
          if imgui.CollapsingHeader(u8"Уведомления:") then
@@ -6384,8 +6133,12 @@ function imgui.OnDrawFrame()
             imgui.PushItemWidth(60)
             --if imgui.InputFloat("##inputcbdefaultradius", input.cbdefaultradius, 0.1, 9999, '%.2f') then
             if imgui.InputText("##Buffercbdefaultradius", textbuffer.cbdefaultradius, imgui.InputTextFlags.CharsDecimal) then
-               ini.settings.cbdefaultradius = string.format("%.1f", textbuffer.cbdefaultradius.v)
-               inicfg.save(ini, configIni)
+               if tonumber(textbuffer.cbdefaultradius.v) > 0.1 and tonumber(textbuffer.cbdefaultradius.v) <= 9999.9 then
+                  ini.settings.cbdefaultradius = string.format("%.1f", textbuffer.cbdefaultradius.v)
+                  inicfg.save(ini, configIni)
+               else
+                  textbuffer.cbdefaultradius.v = "0.1"
+               end
             end
             imgui.PopItemWidth()
             imgui.SameLine()
@@ -6782,16 +6535,6 @@ function imgui.OnDrawFrame()
          imgui.PopStyleColor()
       else
          if imgui.Button(u8"Чатик",imgui.ImVec2(105, 30)) then tabmenu.settings = 8 end 
-      end
-      
-      if ini.settings.devmode then
-         if tabmenu.settings == 7 then
-            imgui.PushStyleColor(imgui.Col.Button, imgui.GetStyle().Colors[imgui.Col.ButtonHovered])
-            if imgui.Button(u8"Отладка",imgui.ImVec2(105, 30)) then tabmenu.settings = 7 end 
-            imgui.PopStyleColor()
-         else
-            if imgui.Button(u8"Отладка",imgui.ImVec2(105, 30)) then tabmenu.settings = 7 end 
-         end
       end
       
       --if imgui.Button(u8"Разное",imgui.ImVec2(105, 30)) then tabmenu.settings = 10 end 
@@ -7693,14 +7436,13 @@ function imgui.OnDrawFrame()
          if imgui.TooltipButton(u8"Нашел баг", imgui.ImVec2(160, 25), u8"Жми не стесняйся") then
             tabmenu.credits = 4
          end
-         
-         if imgui.Button(u8"Проверить обновления",imgui.ImVec2(160, 25)) then
-            if not checkScriptUpdates() then
-               sampAddChatMessage("{696969}Mapping Toolkit  {FFFFFF}Установлена актуальная версия {696969}"..thisScript().version, -1)
-               --os.execute('explorer https://github.com/ins1x/MappingToolkit/releases')
-            end
-         end
-         imgui.SameLine()
+         -- if imgui.Button(u8"Проверить обновления",imgui.ImVec2(160, 25)) then
+            -- if not checkScriptUpdates() then
+               -- sampAddChatMessage("{696969}Mapping Toolkit  {FFFFFF}Установлена актуальная версия {696969}"..thisScript().version, -1)
+               -- --os.execute('explorer https://github.com/ins1x/MappingToolkit/releases')
+            -- end
+         -- end
+         -- imgui.SameLine()
          if imgui.TooltipButton(u8"Сбросить настройки",imgui.ImVec2(160, 25),u8"Сбросит настройки предварительно сохранив копию текущих настроек") then
             os.rename(getGameDirectory().."//moonloader//config//mappingtoolkit.ini", getGameDirectory().."//moonloader//config//backup_mappingtoolkit.ini")
             sampAddChatMessage("[SCRIPT]: {FFFFFF}Настройки были сброшены на стандартные. Скрипт автоматически перезагрузится.",0x0FF6600)
@@ -7712,8 +7454,20 @@ function imgui.OnDrawFrame()
             folder = getGameDirectory().. "\\moonloader\\config\\"
             os.execute('explorer "'..folder..'"')
          end
+         imgui.SameLine()
+         if imgui.TooltipButton(u8"Отладка", imgui.ImVec2(160, 25), u8"Открыть инструменты для отлдаки") then
+            tabmenu.info = 4
+         end
+
          
-         if imgui.Checkbox(u8("Проверять обновления автоматически (без загрузки)"), checkbox.checkupdates) then
+         if imgui.Button(u8"Проверить обновления",imgui.ImVec2(160, 25)) then
+            if not checkScriptUpdates() then
+               sampAddChatMessage("{696969}Mapping Toolkit  {FFFFFF}Установлена актуальная версия {696969}"..thisScript().version, -1)
+               --os.execute('explorer https://github.com/ins1x/MappingToolkit/releases')
+            end
+         end
+         imgui.SameLine()
+         if imgui.Checkbox(u8("Проверять обновления автоматически"), checkbox.checkupdates) then
             ini.settings.checkupdates = checkbox.checkupdates.v
             inicfg.save(ini, configIni)
          end
@@ -8197,8 +7951,245 @@ function imgui.OnDrawFrame()
             end
          end
          
-      --elseif tabmenu.info == 4 then
+      elseif tabmenu.info == 4 then
          
+         local id = getLocalPlayerId()
+         local score
+         if sampGetPlayerScore(id) then
+            score = sampGetPlayerScore(id)
+         end
+         local ip, port = sampGetCurrentServerAddress()
+         local major, minor, majorRev, minorRev, game, region, steam, cracked = getGameVersion()
+         local scriptParams = thisScript()
+         local sampversion = getSampVersionId()
+         
+         imgui.TextColoredRGB("script: {FF6600}"..scriptParams.name.."{CDCDCD} version {FF6600}"..scriptParams.version)
+         if sampversion then
+            imgui.SameLine()
+            imgui.TextColoredRGB("sa-mp:")
+            imgui.SameLine()
+            imgui.TextColoredRGB(tostring("{FF6600}0.3.7 R"..sampversion))
+         end
+         imgui.TextColoredRGB("path: {FF6600}"..scriptParams.path)
+         --imgui.Text(u8"directory: "..scriptParams.directory)
+         --imgui.Text(u8"filename: "..scriptParams.filename)
+         --imgui.Text(u8"scriptid: "..scriptParams.id.." dead: "..tostring(scriptParams.dead).." frozen: "..tostring(scriptParams.frozen))
+         
+         if not isGameVersionOriginal() then
+            imgui.TextColoredRGB(string.format("{FF0000}Not original game version %s.%s.%s.%s", major, minor, majorRev, minorRev))
+         end
+         if steam then
+            imgui.TextColoredRGB(string.format("{FF0000}Steam game version %s.%s.%s.%s", major, minor, majorRev, minorRev))
+         end
+         
+         if imgui.CollapsingHeader(u8"Состояние:") then
+            
+            local cursormode = sampGetCursorMode()
+            local cursormodesList = {
+               u8"0 - Отключен",
+               u8"1 - Управление клавиатурой заблокировано, курсор отключен",
+               u8"2 - Управление клавиатурой и мышкой заблокировано, курсор включен",
+               u8"3 - Управление мышкой заблокировано, курсор включен",
+               u8"4 - Управление мышкой заблокировано, курсор отключен"
+            }
+            
+            imgui.Text(string.format(u8"В игре: %.0f сек.", localClock()))
+            imgui.Text(playerdata.isPlayerSpectating and u8('В наблюдении: Да') or u8('В наблюдении: Нет'))
+            imgui.Text(playerdata.flymode and u8('В режиме полета: Да') or u8('В режиме полета: Нет'))
+            imgui.Text(isPlayerControlLocked(playerPed) and u8('Управление: Заблокированно') or u8('Управление: Доступно'))
+            imgui.Text(sampIsLocalPlayerSpawned() and u8('Заспавнен: Да') or u8('Заспавнен: Нет'))
+            imgui.Text(string.format(u8"Курсор: %s", cursormodesList[cursormode+1]))
+            imgui.Spacing()
+            if imgui.Button(u8'Выйти из спектатора', imgui.ImVec2(180, 25)) then
+               local bs = raknetNewBitStream()
+               raknetBitStreamWriteInt32(bs, 0)
+               raknetEmulRpcReceiveBitStream(124, bs)
+               raknetDeleteBitStream(bs)
+            end   
+                  
+            imgui.SameLine()
+            if imgui.Button(u8'Войти в спектатор', imgui.ImVec2(180, 25)) then
+               local bs = raknetNewBitStream()
+               raknetBitStreamWriteInt32(bs, 1)
+               raknetEmulRpcReceiveBitStream(124, bs)
+               raknetDeleteBitStream(bs)
+            end            
+            imgui.SameLine()
+            if imgui.Button(u8'Режим полета', imgui.ImVec2(120, 25)) then
+               toggleFlyMode()
+               
+               if ini.settings.hotkeystips and playerdata.flymode then
+                  sampAddChatMessage("[SCRIPT]: {FFFFFF}Управление в режиме полета:", 0x0FF6600)
+                  sampAddChatMessage("[SCRIPT]: Пробел{FFFFFF} - Вверх, {FF6600}левый SHIFT{FFFFFF} - Вниз.", 0x0FF6600)
+                  sampAddChatMessage("[SCRIPT]: WASD{FFFFFF} - перемещение по координатам.", 0x0FF6600)
+                  sampAddChatMessage("[SCRIPT]: Кнопки мыши{FFFFFF} - ускорение/замедление.", 0x0FF6600)
+                  sampAddChatMessage("[SCRIPT]: F/ENTER{FFFFFF} - выйти из режима полета.", 0x0FF6600)
+               end
+            end
+
+            if imgui.Button(u8'Заморозить на позиции', imgui.ImVec2(180, 25)) then
+               freezeCharPosition(playerPed, true)
+            end
+            imgui.SameLine()
+            if imgui.Button(u8'Разморозить', imgui.ImVec2(180, 25)) then
+               freezeCharPosition(playerPed, false)
+               setPlayerControl(PLAYER_HANDLE, true)
+               lockPlayerControl(false)
+               clearCharTasksImmediately(playerPed)
+            end
+            imgui.SameLine()
+            if imgui.Button(u8'ForceSync', imgui.ImVec2(120, 25)) then
+               sampForceAimSync()
+               sampForceOnfootSync()
+               sampForceStatsSync()
+               sampForceWeaponsSync()
+            end
+            
+            if imgui.Button(u8'Взять Jetpack', imgui.ImVec2(120, 25)) then
+               taskJetpack(playerPed)
+            end
+            imgui.SameLine()
+            if imgui.Button(u8'Выбор класса', imgui.ImVec2(120, 25)) then
+               local skin = getCharModel(playerPed)
+               sampRequestClass(skin)
+               --setPlayerModel(skin)
+            end
+         end
+         
+         if imgui.CollapsingHeader(u8"Logging:") then
+
+            imgui.Text(u8"Стандартные логи:")
+            
+            imgui.PushItemWidth(150)
+            imgui.Combo(u8'##ComboBoxLogslist', combobox.logs,
+            {"moonloader.log", "modloader.log", "sampfuncs.log", "chatlog.txt", "cleo.log"})
+            
+            imgui.SameLine()
+            if imgui.Button(u8"показать",imgui.ImVec2(110, 25)) then
+               local file
+               if combobox.logs.v == 0 then
+                  file = getGameDirectory().. "\\moonloader\\moonloader.log"
+               elseif combobox.logs.v == 1 then
+                  file = getGameDirectory().. "\\modloader\\modloader.log"
+               elseif combobox.logs.v == 2 then
+                  file = getGameDirectory().. "\\SAMPFUNCS\\SAMPFUNCS.log"
+               elseif combobox.logs.v == 3 then
+                  file = getFolderPath(5)..'\\GTA San Andreas User Files\\SAMP\\chatlog.txt'
+               elseif combobox.logs.v == 4 then
+                  file = getGameDirectory().. "\\cleo.log"
+               end
+               
+               if doesFileExist(file) then
+                  os.execute('explorer '.. file)
+               end
+            end
+            imgui.Spacing()
+            imgui.Text(u8"Логгировать в консоли:")
+            imgui.Checkbox(u8'Логгировать в консоли обработку текстдравов', checkbox.logtextdraws)
+            imgui.Checkbox(u8'Логгировать в консоли поднятые пикапы', checkbox.pickeduppickups)
+            imgui.Checkbox(u8'Логгировать в консоли ответы на диалоги', checkbox.logdialogresponse)
+            imgui.Checkbox(u8'Логгировать в консоли выбранные объекты', checkbox.logobjects)
+            imgui.Checkbox(u8'Логгировать в консоли 3d тексты', checkbox.log3dtexts)
+            imgui.Checkbox(u8'Логгировать в консоли Gametexts', checkbox.loggametexts)
+            imgui.Checkbox(u8'Логгировать в консоли установку текстуры', checkbox.logtxd)
+            imgui.Checkbox(u8'Логгировать в консоли изменение камеры', checkbox.logcamset)
+            imgui.Checkbox(u8'Логгировать в консоли сообщения в чате', checkbox.logmessages)
+            imgui.Checkbox(u8'Логгировать в консоли изменение границ мира', checkbox.logworlddouns)
+            imgui.Checkbox(u8'Логгировать в консоли изменение позиции игрока', checkbox.logsetplayerpos)
+            
+         end
+         
+         if imgui.CollapsingHeader(u8"NOP's:") then
+            imgui.TextColoredRGB("{FF0000}Использование данных функций может триггерить античит!")
+            imgui.Checkbox(u8'TogglePlayerSpectating', nops.spectator)
+            imgui.SameLine()
+            imgui.Checkbox(u8'SetPlayerHealth    ', nops.health)
+            imgui.SameLine()
+            imgui.Checkbox(u8'GivePlayerWeapon', nops.givegun)
+            imgui.Checkbox(u8'ResetPlayerWeapons    ', nops.resetgun)
+            imgui.SameLine()
+            imgui.Checkbox(u8'ShowDialog            ', nops.showdialog)
+            imgui.SameLine()
+            imgui.Checkbox(u8'ApplyAnimation', nops.applyanimation)
+            imgui.Checkbox(u8'ClearAnimation            ', nops.clearanimation)
+            imgui.SameLine()
+            imgui.Checkbox(u8'SetArmedWeapon  ', nops.setgun)
+            imgui.SameLine()
+            imgui.Checkbox(u8'Spawn', nops.spawn)
+            imgui.Checkbox(u8'Death                           ', nops.death)
+            imgui.SameLine()
+            imgui.Checkbox(u8'Player Sync            ', nops.psync)
+            imgui.SameLine()
+            imgui.Checkbox(u8'RequestClass', nops.requestclass)
+            imgui.Checkbox(u8'RequestSpawn              ', nops.requestspawn)
+            imgui.SameLine()
+            imgui.Checkbox(u8'ClickTextdraw       ', nops.clicktextdraw)
+            imgui.SameLine()
+            imgui.Checkbox(u8'SelectTextdraw', nops.selecttextdraw)
+            imgui.Checkbox(u8'ForceClassSelection      ', nops.forceclass)
+            imgui.SameLine()
+            imgui.Checkbox(u8'ToggleControllable', nops.togglecontrol)
+            imgui.SameLine()
+            imgui.Checkbox(u8'FacingAngle', nops.facingangle)
+            imgui.Checkbox(u8'SetPlayerSkin                ', nops.setskin)
+            imgui.SameLine()
+            imgui.Checkbox(u8'SetDrunkLevel      ', nops.setdrunk)
+            imgui.SameLine()
+            imgui.Checkbox(u8'SetSpecialAction', nops.setspecialaction)
+         end
+         
+         if imgui.CollapsingHeader(u8"Dialogs:") then
+            dialogStyles = {
+            "DIALOG_STYLE_MSGBOX",
+            "DIALOG_STYLE_INPUT", 
+            "DIALOG_STYLE_LIST",
+            "DIALOG_STYLE_PASSWORD",
+            "DIALOG_STYLE_TABLIST",
+            "DIALOG_STYLE_TABLIST_HEADERS"
+            }
+            if LastData.lastDialogInput then
+               if LastData.lastDialogStyle == 3 then
+                  local newtext = LastData.lastDialogInput:gsub("(.*)", "*")
+                  imgui.TextColoredRGB("DialogInput: "..newtext)
+               else
+                  imgui.TextColoredRGB("DialogInput: "..LastData.lastDialogInput)
+                  imgui.SameLine()
+                  imgui.TextQuestion("[]", u8"Скопировать текст в буффер обмена")
+                  if imgui.IsItemClicked() then
+                     sampAddChatMessage("Текст скопирован в буффер обмена", -1)
+                     setClipboardText(LastData.lastDialogInput)
+                  end
+               end
+            end
+            if LastData.lastDialogButton then
+               imgui.Text(u8"DialogButton: "..LastData.lastDialogButton)
+            end
+            if LastData.lastDialogStyle then
+               imgui.TextColoredRGB(("DialogStyle: %i {696969}(%s)"):format(LastData.lastDialogStyle, dialogStyles[LastData.lastDialogStyle+1]))
+            end
+            if LastData.lastListboxId then
+               imgui.Text(u8"ListboxId: "..LastData.lastListboxId)
+            end
+            if sampGetCurrentDialogId() ~= 0 then
+               imgui.Text(u8"ListboxItemsCount: "..sampGetListboxItemsCount())
+               imgui.Text(u8"DialogListItem: "..sampGetCurrentDialogListItem())
+            end
+            if imgui.Button(u8'Текст диалога', imgui.ImVec2(130, 25)) then
+               if LastData.lastDialogText then
+                  textbuffer.dialogtext.v = tostring(LastData.lastDialogText)
+                  dialog.dialogtext.v = not dialog.dialogtext.v
+               else
+                  sampAddChatMessage("[SCRIPT]: {FFFFFF}Нет информации по последнему диалогу!", 0x0FF6600)
+               end
+            end            
+            imgui.SameLine()
+            if imgui.Button(u8'Скрыть диалог', imgui.ImVec2(130, 25)) then
+               enableDialog(false)
+            end
+            imgui.SameLine()
+            imgui.Text(u8'Последний ID диалога: ' .. sampGetCurrentDialogId())
+         end
+            
       elseif tabmenu.info == 5 then
          
          local symbols = 0
@@ -9634,6 +9625,15 @@ function sampev.onSendDialogResponse(dialogId, button, listboxId, input)
                LastData.lastCbvaluebuffer = nil
             end
          end
+         
+         if input:find("Значение:") then
+            if button == 1 then
+               dialoghook.tbvalue = true
+            else
+               dialoghook.tbvalue = false
+               LastData.lastTbvaluebuffer = nil
+            end
+         end
       end
       
       if button == 1 then -- if dialog response
@@ -10098,6 +10098,32 @@ function sampev.onShowDialog(dialogId, style, title, button1, button2, text)
          else
             dialoghook.cbvalue = false
             LastData.lastCbvaluebuffer = nil
+         end
+      end
+      -- TODO optimise and split blocks later
+      if ini.settings.cbvalautocomplete and dialoghook.tbvalue then
+         if not text:find("N/A") then
+            local lines = {}
+            for line in string.gmatch(text, "([^\n]*)") do
+               table.insert(lines, line)
+            end
+            
+            local result = tostring(lines[#lines - 1])
+            if result and string.len(result) >= 1 then
+               LastData.lastTbvaluebuffer = result
+            else
+               LastData.lastTbvaluebuffer = nil
+            end
+            dialoghook.tbvalue = false
+            
+            if style == 0 or style == 1 then -- if MsgBox or Input Dialog
+               local newtext = text ..
+               "\n{696969}Нажмите CTRL + SHIFT + V чтобы вставить текущее значение\n"
+               return {dialogId, style, title, button1, button2, newtext}
+            end
+         else
+            dialoghook.tbvalue = false
+            LastData.lastTbvaluebuffer = nil
          end
       end
       
@@ -10849,7 +10875,7 @@ function sampev.onServerMessage(color, text)
          
          -- mentions by id
          if not text:find("ADS") then
-            if text:match("[^/:]"..id.."%s(.+)") -- id text mention
+            if text:match("[^/:]".."%s"..id.."%s(.+)") -- id text mention
             or text:match("@"..id.."%s") then -- @id mention
             --or text:match("(%s"..id.."%s)") then
                if ini.mentions.usegametext then
@@ -13186,7 +13212,7 @@ function sampev.onSendClickPlayer(playerId, source)
 end
 
 function sampev.onShowTextDraw(id, data)
-   
+   -- Additional Information: global textdraws use IDs 0-2047 and per-player use IDs 2048-2303.
    lastShowedTextdrawId = id
   
    if checkbox.logtextdraws.v then
@@ -13629,8 +13655,10 @@ function isRpNickname(name)
 end
 
 function getLocalPlayerId()
-   local _, id = sampGetPlayerIdByCharHandle(playerPed)
-   return id
+   local result, id = sampGetPlayerIdByCharHandle(playerPed)
+   if result then
+      return id
+   end
 end
 
 -- function ltrim(s)
