@@ -4,7 +4,7 @@ script_description("Assistant for mappers")
 script_dependencies('imgui', 'lib.samp.events')
 script_properties("work-in-pause")
 script_url("https://github.com/ins1x/MappingToolkit")
-script_version("4.11") -- R3
+script_version("4.11") -- R4 DEBUG
 -- support sa-mp versions depends on SAMPFUNCS (0.3.7-R1, 0.3.7-R3-1, 0.3.7-R5, 0.3.DL)
 -- script_moonloader(16) moonloader v.0.26 
 -- editor options: tabsize 3, Unix (LF), encoding Windows-1251
@@ -156,6 +156,7 @@ local ini = inicfg.load({
       worlddescription = "",
       searchbar = "",
       disconnecttime = 0,
+      onstartdebug = false
    }
 }, configIni)
 inicfg.save(ini, configIni)
@@ -269,6 +270,7 @@ local dialoghook = {
    cbvalue = false,
    tbvalue = false,
    olist = false,
+   otext = false,
    previewdialog = false,
    spcars = false,
    resetguns = false,
@@ -672,6 +674,7 @@ local LastData = {
    lastTextureListPage = 0,
    lastWeather = 1,
    lastLink = "",
+   lastOtext = "",
    lastPickupBlip = nil,
    lastVehinfoModelid = 0,
    lastCbvaluebuffer = nil,
@@ -860,7 +863,12 @@ local sampTextureList = {}
 function main()
    if not isSampLoaded() or not isSampfuncsLoaded() then return end
       while not isSampAvailable() do wait(100) end
-       
+      
+      if doesFileExist('moonloader/resource/mappingtoolkit/onstartdebug.txt') then
+         ini.tmp.onstartdebug = true
+         inicfg.save(ini, configIni)
+      end
+      
       if not ini.settings.menukeychanged then
          sampAddChatMessage("{696969}Mapping Toolkit  {FFFFFF}Открыть меню: {CDCDCD}ALT + X", 0xFFFFFF)
       else
@@ -879,6 +887,10 @@ function main()
          createDirectory("moonloader/resource/mappingtoolkit/history")
       end
       
+      if ini.tmp.onstartdebug then
+         print("DEBUG directory - [OK]")
+      end
+      
       if doesFileExist('moonloader/resource/mappingtoolkit/resetsetting.txt') 
       or doesFileExist('moonloader/resetsetting.txt') then
          os.rename(getGameDirectory().."//moonloader//config//mappingtoolkit.ini", getGameDirectory().."//moonloader//config//prevconf_backup_mappingtoolkit.ini")
@@ -887,11 +899,17 @@ function main()
          sampAddChatMessage("Настройки были сброшены на стандартные. Скрипт автоматически перезагрузится.",-1)
          sampAddChatMessage("Резервную копию ваших предыдущих настроек можно найти в moonloader/config.",-1)
          reloadScripts()
+         if ini.tmp.onstartdebug then
+            print("DEBUG reset settings - [OK]")
+         end
       end      
       
       if not doesFileExist(getFolderPath(0x14)..'\\'..ini.settings.imguifont..'.ttf') then
          ini.settings.imguifont = "trebucbd"
          ini.settings.imguifontsize = 14
+      end
+      if ini.tmp.onstartdebug then
+         print("DEBUG imguifont - [OK]")
       end
       
       -- training-autologin already have a skip rules function
@@ -933,6 +951,10 @@ function main()
          sampAddChatMessage("[Mapping Toolkit] {696969}texturelist{FFFFFF} not found. Re-install script from{696969} https://github.com/ins1x/MappingToolkit/releases", 0x0FF0000)
          print("texturelist not found. Re-install script from https://github.com/ins1x/MappingToolkit/releases")
          thisScript():unload()
+      end
+      
+      if ini.tmp.onstartdebug then
+         print("DEBUG module files - [OK]")
       end
       
       if doesFileExist(getGameDirectory()..'\\moonloader\\resource\\mappingtoolkit\\favorites\\objects.txt') then
@@ -1026,7 +1048,12 @@ function main()
          chatfilterfile = io.open("moonloader/resource/mappingtoolkit/chatfilter.txt", "w")
          chatfilterfile:write("%[SALE%]%:.*", "\n")
          chatfilterfile:close()
-      end         
+      end
+      
+      if ini.tmp.onstartdebug then
+         print("DEBUG resource files - [OK]")
+      end
+      
       sampRegisterChatCommand("toolkit", function() dialog.main.v = not dialog.main.v end)
       
       -- set drawdist and figdist
@@ -1081,10 +1108,20 @@ function main()
          SaveReminder()
       end
       
-      if ini.settings.checkupdates then
-         checkScriptUpdates()
+      if ini.tmp.onstartdebug then
+         print("DEBUG load settings - [OK]")
       end
       
+      if ini.settings.checkupdates then
+         checkScriptUpdates()
+         if ini.tmp.onstartdebug then
+            print("DEBUG check updates - [OK]")
+         end
+      end
+      
+      if ini.tmp.onstartdebug then
+         print("DEBUG script init - [OK]")
+      end
       --- END init
       while true do
       wait(0)
@@ -1117,6 +1154,10 @@ function main()
          isTrainingSanbox = true
       end
       
+      if ini.tmp.onstartdebug then
+         print("DEBUG is TRAINING - "..tostring(isTrainingSanbox))
+      end
+      
       -- Unload script if not localhost server and not is TRAINING-SANDBOX
       if ini.settings.serverlock then
          if not servername:find("SA-MP") then
@@ -1129,11 +1170,19 @@ function main()
          end
       end
       
+      if ini.tmp.onstartdebug then
+         print("DEBUG server lock - [OK]")
+      end
+      
       -- Imgui menu
       imgui.RenderInMenu = false
       imgui.ShowCursor = true
       imgui.LockPlayer = false
       imgui.Process = dialog.main.v
+      
+      if ini.tmp.onstartdebug then
+         print("DEBUG imgui process - [OK]")
+      end
       
       -- chatfix
       if isTrainingSanbox then
@@ -1265,6 +1314,15 @@ function main()
                   -- sampSetCurrentDialogEditboxText("CC49-45A5-1EC8-4A50")
                -- end)
             -- end
+            
+            if LastData.lastOtext and dialoghook.otext then
+               if LastData.lastOtext:len() > 1 then
+                  lua_thread.create(function()
+                     wait(50)
+                     sampSetCurrentDialogEditboxText(tostring(LastData.lastOtext))
+                  end)
+               end
+            end
             
             if LastData.lastTextBuffer then
                if LastData.lastTextBuffer:len() > 1 then
@@ -1474,6 +1532,10 @@ function main()
          end
       end
       
+      if ini.tmp.onstartdebug then
+         print("DEBUG hotkeys - [OK]")
+      end
+      
       -- Count streamed objects
       streamedObjects = 0
       for _, v in pairs(getAllObjects()) do
@@ -1527,6 +1589,10 @@ function main()
             end
          end
       end 
+      
+      if ini.tmp.onstartdebug then
+         print("DEBUG renders init - [OK]")
+      end
       
       -- Collision
       if playerdata.disableObjectCollision then
@@ -1684,6 +1750,10 @@ function main()
          
       end
       
+      if ini.tmp.onstartdebug then
+         print("DEBUG flymode init - [OK]")
+      end
+      
       -- Render stats bar
       if ini.settings.showidonhud and not isPauseMenuActive() 
       and not isKeyDown(0x79) and not playerdata.firstSpawn then -- 0x79 is F10 key
@@ -1811,7 +1881,11 @@ function main()
             end
          end
       end
-      
+      if ini.tmp.onstartdebug then
+         print("DEBUG all init - [OK]")
+         ini.tmp.onstartdebug = false
+         inicfg.save(ini, configIni)
+      end
       -- END main
    end
 end
@@ -8189,7 +8263,7 @@ function imgui.OnDrawFrame()
             imgui.SameLine()
             imgui.Text(u8'Последний ID диалога: ' .. sampGetCurrentDialogId())
          end
-            
+         
       elseif tabmenu.info == 5 then
          
          local symbols = 0
@@ -9594,6 +9668,13 @@ function sampev.onSendDialogResponse(dialogId, button, listboxId, input)
          end
       end
       
+      if button == 1 and dialoghook.otext then
+         dialoghook.otext = false
+         if string.len(input) > 1 then 
+            LastData.lastOtext = input
+         end
+      end
+      
       if button == 1 and dialoghook.setworldname then
          dialoghook.setworldname = false
          ini.tmp.worldname = tostring(input)
@@ -10243,10 +10324,21 @@ function sampev.onShowDialog(dialogId, style, title, button1, button2, text)
                return {dialogId, style, title, button1, button2, newtext}
             end
             if text:find("Укажите текст объекта от 1 до 144 символов") then
+               dialoghook.otext = true
                local newtext = "{FFFFFF}Используйте символ {FF6600}@{FFFFFF} - для переноса текста на след. строку\n"..
                "{FFFFFF}Чтобы экранировать спецсимвол, перед символом нужно поставить символ {FF6600}\\{FFFFFF}\n"..
                "{FFFFFF}Например: input: 2\\ + 2 = 4 | output: 2 + 2 = 4\n"..
-               "\n{FFFFFF}Укажите текст объекта от 1 до 144 символов\n"
+               "\nМожно указать тег цвета в формате {RRGGBB}\n"..
+               "{FFFFFF}FFFFFF, {363636}363636, {FF0000}FF0000, "..
+               "{00FF00}00FF00, {0000FF}0000FF, {FFFF00}FFFF00, "..
+               "{FF00FF}FF00FF, {00FFFF}00FFFF{FFFFFF}, и т.д.\n"..
+               "\n{FFFFFF}Укажите текст объекта от 1 до 144 символов"
+
+               if string.len(LastData.lastOtext) > 1 then 
+                  newtext = newtext.."\nПоследний текст: "..LastData.lastOtext.."\n"..
+                  "{696969}Нажмите CTRL + SHIFT + V чтобы вставить последний текст\n"
+               end
+               
                return {dialogId, style, title, button1, button2, newtext}
             end
          end
