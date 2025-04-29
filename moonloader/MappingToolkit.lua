@@ -4,7 +4,7 @@ script_description("Assistant for mappers")
 script_dependencies('imgui', 'lib.samp.events')
 script_properties("work-in-pause")
 script_url("https://github.com/ins1x/MappingToolkit")
-script_version("4.11") -- R4 DEBUG
+script_version("4.11") -- R7
 -- support sa-mp versions depends on SAMPFUNCS (0.3.7-R1, 0.3.7-R3-1, 0.3.7-R5, 0.3.DL)
 -- script_moonloader(16) moonloader v.0.26 
 -- editor options: tabsize 3, Unix (LF), encoding Windows-1251
@@ -52,6 +52,7 @@ local ini = inicfg.load({
       extendedmenues = true,
       fov = 70,
       fog = "200",
+      forcerun = false,
       fixobjinfotext = false,
       fixpedstuck = true,
       flymodespeed = 0.3,
@@ -156,7 +157,6 @@ local ini = inicfg.load({
       worlddescription = "",
       searchbar = "",
       disconnecttime = 0,
-      onstartdebug = false
    }
 }, configIni)
 inicfg.save(ini, configIni)
@@ -213,6 +213,8 @@ local edit = {
 local playerdata = {
    isPlayerSpectating = false,
    isLockPlayerControl = false,
+   isPlayerEditAttachedObject = false,
+   isPlayerEditObject = false,
    isChatFreezed = false,
    isWorldHoster = false,
    isWorldJoinUnavailable = false,
@@ -431,12 +433,14 @@ local checkbox = {
    lockcambehind = imgui.ImBool(false),
    lockcamfront = imgui.ImBool(false),
    streammemmax = imgui.ImBool(false),
+   drunkcam = imgui.ImBool(false),
    test = imgui.ImBool(false)
 }
 
 local input = {
    readonly = true,
    isbot = false,
+   error = false,
    camdelay = imgui.ImInt(5000),
    camshake = imgui.ImInt(500),
    gametexttime = imgui.ImInt(5000),
@@ -864,11 +868,6 @@ function main()
    if not isSampLoaded() or not isSampfuncsLoaded() then return end
       while not isSampAvailable() do wait(100) end
       
-      if doesFileExist('moonloader/resource/mappingtoolkit/onstartdebug.txt') then
-         ini.tmp.onstartdebug = true
-         inicfg.save(ini, configIni)
-      end
-      
       if not ini.settings.menukeychanged then
          sampAddChatMessage("{696969}Mapping Toolkit  {FFFFFF}Открыть меню: {CDCDCD}ALT + X", 0xFFFFFF)
       else
@@ -887,10 +886,6 @@ function main()
          createDirectory("moonloader/resource/mappingtoolkit/history")
       end
       
-      if ini.tmp.onstartdebug then
-         print("DEBUG directory - [OK]")
-      end
-      
       if doesFileExist('moonloader/resource/mappingtoolkit/resetsetting.txt') 
       or doesFileExist('moonloader/resetsetting.txt') then
          os.rename(getGameDirectory().."//moonloader//config//mappingtoolkit.ini", getGameDirectory().."//moonloader//config//prevconf_backup_mappingtoolkit.ini")
@@ -899,17 +894,11 @@ function main()
          sampAddChatMessage("Настройки были сброшены на стандартные. Скрипт автоматически перезагрузится.",-1)
          sampAddChatMessage("Резервную копию ваших предыдущих настроек можно найти в moonloader/config.",-1)
          reloadScripts()
-         if ini.tmp.onstartdebug then
-            print("DEBUG reset settings - [OK]")
-         end
       end      
       
       if not doesFileExist(getFolderPath(0x14)..'\\'..ini.settings.imguifont..'.ttf') then
          ini.settings.imguifont = "trebucbd"
          ini.settings.imguifontsize = 14
-      end
-      if ini.tmp.onstartdebug then
-         print("DEBUG imguifont - [OK]")
       end
       
       -- training-autologin already have a skip rules function
@@ -951,10 +940,6 @@ function main()
          sampAddChatMessage("[Mapping Toolkit] {696969}texturelist{FFFFFF} not found. Re-install script from{696969} https://github.com/ins1x/MappingToolkit/releases", 0x0FF0000)
          print("texturelist not found. Re-install script from https://github.com/ins1x/MappingToolkit/releases")
          thisScript():unload()
-      end
-      
-      if ini.tmp.onstartdebug then
-         print("DEBUG module files - [OK]")
       end
       
       if doesFileExist(getGameDirectory()..'\\moonloader\\resource\\mappingtoolkit\\favorites\\objects.txt') then
@@ -1050,10 +1035,6 @@ function main()
          chatfilterfile:close()
       end
       
-      if ini.tmp.onstartdebug then
-         print("DEBUG resource files - [OK]")
-      end
-      
       sampRegisterChatCommand("toolkit", function() dialog.main.v = not dialog.main.v end)
       
       -- set drawdist and figdist
@@ -1108,20 +1089,10 @@ function main()
          SaveReminder()
       end
       
-      if ini.tmp.onstartdebug then
-         print("DEBUG load settings - [OK]")
-      end
-      
       if ini.settings.checkupdates then
          checkScriptUpdates()
-         if ini.tmp.onstartdebug then
-            print("DEBUG check updates - [OK]")
-         end
       end
       
-      if ini.tmp.onstartdebug then
-         print("DEBUG script init - [OK]")
-      end
       --- END init
       while true do
       wait(0)
@@ -1150,12 +1121,8 @@ function main()
       -- -- unlike receiving the IP and port. Therefore, for correct operation, the code is placed here      
       local servername = sampGetCurrentServerName()
       
-      if servername:find("TRAINING") then
+      if servername:find("TRAINING") or ini.settings.forcerun then
          isTrainingSanbox = true
-      end
-      
-      if ini.tmp.onstartdebug then
-         print("DEBUG is TRAINING - "..tostring(isTrainingSanbox))
       end
       
       -- Unload script if not localhost server and not is TRAINING-SANDBOX
@@ -1170,19 +1137,11 @@ function main()
          end
       end
       
-      if ini.tmp.onstartdebug then
-         print("DEBUG server lock - [OK]")
-      end
-      
       -- Imgui menu
       imgui.RenderInMenu = false
       imgui.ShowCursor = true
       imgui.LockPlayer = false
       imgui.Process = dialog.main.v
-      
-      if ini.tmp.onstartdebug then
-         print("DEBUG imgui process - [OK]")
-      end
       
       -- chatfix
       if isTrainingSanbox then
@@ -1532,10 +1491,6 @@ function main()
          end
       end
       
-      if ini.tmp.onstartdebug then
-         print("DEBUG hotkeys - [OK]")
-      end
-      
       -- Count streamed objects
       streamedObjects = 0
       for _, v in pairs(getAllObjects()) do
@@ -1590,10 +1545,6 @@ function main()
          end
       end 
       
-      if ini.tmp.onstartdebug then
-         print("DEBUG renders init - [OK]")
-      end
-      
       -- Collision
       if playerdata.disableObjectCollision then
          local find_obj_x, find_obj_y, find_obj_z = getCharCoordinates(playerPed)
@@ -1641,6 +1592,13 @@ function main()
       
       if checkbox.lockcamfront.v then
          setCameraInFrontOfPlayer()
+      end
+      
+      if checkbox.drunkcam.v then
+         local bs = raknetNewBitStream()
+         raknetBitStreamWriteInt32(bs, 5000)
+         raknetEmulRpcReceiveBitStream(35, bs)
+         raknetDeleteBitStream(bs)
       end
       
       if checkbox.freezechat.v then
@@ -1748,10 +1706,6 @@ function main()
          ::holdposition::
          setCharCoordinates(playerPed, flyCoords[1], flyCoords[2], flyCoords[3])
          
-      end
-      
-      if ini.tmp.onstartdebug then
-         print("DEBUG flymode init - [OK]")
       end
       
       -- Render stats bar
@@ -1880,11 +1834,6 @@ function main()
                end
             end
          end
-      end
-      if ini.tmp.onstartdebug then
-         print("DEBUG all init - [OK]")
-         ini.tmp.onstartdebug = false
-         inicfg.save(ini, configIni)
       end
       -- END main
    end
@@ -3745,7 +3694,7 @@ function imgui.OnDrawFrame()
          end
          if isTrainingSanbox then
             imgui.SameLine()
-            if imgui.TooltipButton(u8"Перейти в интерьер для съемок", imgui.ImVec2(230, 25), u8"Телепортрует в интерьер с хромакеем") then
+            if imgui.TooltipButton(u8"Перейти в интерьер для съемок", imgui.ImVec2(230, 25), u8"Телепортирует в интерьер с хромакеем") then
                if playerdata.isWorldHoster then
                   sampSendChat("/int 1 1")
                   sampAddChatMessage("[SCRIPT]: {FFFFFF}Вернуться обратно можно командой /spawnme", 0x0FF6600)
@@ -3777,6 +3726,15 @@ function imgui.OnDrawFrame()
          imgui.SameLine()
          imgui.TextQuestion("( ? )", u8"Визуально для вас скроет скин и аттачи")
 	     
+         if imgui.Checkbox(u8("Пьяная камера"), checkbox.drunkcam) then 
+            if not checkbox.drunkcam.v then
+               local bs = raknetNewBitStream()
+               raknetBitStreamWriteInt32(bs, 0)
+               raknetEmulRpcReceiveBitStream(35, bs)
+               raknetDeleteBitStream(bs)
+            end
+         end 
+         
          --imgui.Text(u8"Время:")
          --imgui.SameLine()
          imgui.PushItemWidth(50)
@@ -3789,7 +3747,7 @@ function imgui.OnDrawFrame()
          imgui.SameLine()
          imgui.TextQuestion("( ? )", u8"Создаёт эффект тряски камеры")
          
-         if imgui.Button(u8">> Вернуть камеру <<", imgui.ImVec2(300, 25)) then
+         if imgui.Button(u8">> Вернуть камеру <<", imgui.ImVec2(250, 25)) then
             if checkbox.fixcampos.v then checkbox.fixcampos.v = false end
             sampAddChatMessage("[SCRIPT]: {FFFFFF}Камера возвращена на исходные", 0x0FF6600)
             restoreCamera()
@@ -5380,9 +5338,15 @@ function imgui.OnDrawFrame()
          end
          if isTrainingSanbox then
             imgui.SameLine()
-            if imgui.TooltipButton(u8"mute", imgui.ImVec2(90, 25), u8"Настройки чата, позволяет заглушить указанный тип сообщений /mute") then
+            if imgui.TooltipButton(u8"mute", imgui.ImVec2(60, 25), u8"Настройки чата, позволяет заглушить указанный тип сообщений /mute") then
                if dialog.main.v then dialog.main.v = false end
                sampProcessChatInput("/mute")
+            end
+            imgui.SameLine()
+            if ini.settings.savepmmessages then
+               if imgui.TooltipButton(u8"pmh", imgui.ImVec2(60, 25), u8"История личных сообщений /pmh") then
+                  sampSendChat("/pmh")
+               end
             end
          end
          
@@ -6017,7 +5981,7 @@ function imgui.OnDrawFrame()
             if imgui.Checkbox(u8("Напоминать о необходимости сохранить мир"), checkbox.worldsavereminder) then
                if checkbox.worldsavereminder.v then
                   SaveReminder()
-                  sampAddChatMessage("[SCRIPT]: {FFFFFF}Включены напоминания о необходимости сохранять виртуальынй мир", 0x0FF6600)
+                  sampAddChatMessage("[SCRIPT]: {FFFFFF}Включены напоминания о необходимости сохранять виртуальный мир", 0x0FF6600)
                end
                ini.settings.worldsavereminder = checkbox.worldsavereminder.v
                inicfg.save(ini, configIni)
@@ -6043,7 +6007,7 @@ function imgui.OnDrawFrame()
             if imgui.Checkbox(u8("Уведомлять о ошибках КБ в мире"), checkbox.cberrorwarnings) then
                if checkbox.cberrorwarnings.v then
                   sampAddChatMessage("[SCRIPT]: {FFFFFF}Включены уведомления о ошибках КБ в мире", 0x0FF6600)
-                  sampAddChatMessage("[WARNING]: {FFFFFF}Будет выводить предупржеждения с тегом {FF6600}[WARNING]", 0x0FF6600)
+                  sampAddChatMessage("[WARNING]: {FFFFFF}Будет выводить предупреждения с тегом {FF6600}[WARNING]", 0x0FF6600)
                end
                ini.settings.cberrorwarnings = checkbox.cberrorwarnings.v
                inicfg.save(ini, configIni)
@@ -10750,6 +10714,10 @@ function sampev.onServerMessage(color, text)
          return false
       end
       
+      if color == -872414977 and text:find("[ERROR].+Указан неверный ID предмета!") then
+         input.error = true
+      end
+      
       if text:find("Мир успешно загружен") then
          dialoghook.loadworld = false
          LastData.lastLoadedWorldNumber = nil
@@ -11501,7 +11469,7 @@ function sampev.onSendCommand(command)
                end
             end
          end
-         sampAddChatMessage("[SCRIPT]: {FFFFFF}Для редактирования используйте /editaction <id>", 0x0FF6600)
+         sampAddChatMessage("[SCRIPT]: {FFFFFF}Для редактирования используйте /editaction <id>, или телепортируйтесь /tpaction <id>", 0x0FF6600)
          return false
       end
    end
@@ -12185,10 +12153,32 @@ function sampev.onSendCommand(command)
       end
    end
    
+   -- if command:find("^/rx") or command:find("^/ry") or command:find("^/rz") then
+      -- lua_thread.create(function()
+         -- wait(500)
+         -- if not input.error then
+            -- if command:find('(/%a+) (.+) (.+)') then
+               -- local cmd, id, arg = command:match('(/%a+) (.+) (.+)')
+               -- local id = tonumber(id)
+               -- local arg = tonumber(arg)
+               -- if type(id) == "number" and type(arg) == "number" then
+                  -- sampAddChatMessage("[SCRIPT]: {FFFFFF}Объект "..id.." повернули на "..arg.." градусов", 0x0FF6600)
+               -- end
+            -- end
+         -- else
+            -- input.error = false
+         -- end
+      -- end)
+   -- end
+   
    if command:find("^/tpo") then
       if playerdata.flymode then
-         sampAddChatMessage("[SCRIPT]: {FFFFFF}Сперва выйдите из режима полета", 0x0FF6600)
-         return false
+         toggleFlyMode(false)
+         --sampAddChatMessage("[SCRIPT]: {FFFFFF}Сперва выйдите из режима полета", 0x0FF6600)
+         lua_thread.create(function()
+            wait(500)
+            toggleFlyMode(true)
+         end)
       end
    end
    
@@ -13049,9 +13039,10 @@ end
 
 function sampev.onSendEditObject(playerObject, objectId, response, position, rotation)
    -- response: 0 - exit edit, 1 - save, 2 - move
-   
+   -- bug: playerObject always return true state
    local object = sampGetObjectHandleBySampId(objectId)
    local modelId = getObjectModel(object)
+   
    LastObject.handle = object
    LastObject.id = objectId
    LastObject.modelid = modelId
@@ -13076,7 +13067,7 @@ function sampev.onSendEditObject(playerObject, objectId, response, position, rot
          setObjectCollision(object, false)
       end
    end
-
+   
    -- Auto open /omenu on save object 
    -- if isTrainingSanbox and response == 1 then
       -- if LastObject.localid then
@@ -13088,7 +13079,7 @@ function sampev.onSendEditObject(playerObject, objectId, response, position, rot
    -- TODO restore object angle too
    edit.response = response
    
-   if ini.settings.restoreobjectpos then
+   if ini.settings.restoreobjectpos and not playerdata.isPlayerEditAttachedObject then
       if isTrainingSanbox and response == 0 then
          if LastObject.startpos.x ~= 0 and LastObject.startpos.y ~= 0 then
             return {playerObject, objectId, response,  LastObject.startpos, rotation}
@@ -13111,11 +13102,16 @@ function sampev.onSendEditObject(playerObject, objectId, response, position, rot
          print(LastObject.startrot.z, LastObject.rotation.z, rotation.z)
       end
    end
-   
    -- if ini.settings.showobjectcoord then
       -- printStringNow(string.format("x:~b~~h~%0.2f, ~w~y:~r~~h~%0.2f, ~w~z:~g~~h~%0.2f~n~ ~w~rx:~b~~h~%0.2f, ~w~ry:~r~~h~%0.2f, ~w~rz:~g~~h~%0.2f",
       -- position.x, position.y, position.z, rotation.x, rotation.y, rotation.z), 1000)
    -- end
+   
+   if response ~= 2 then
+      playerdata.isPlayerEditObject = true
+   else
+      playerdata.isPlayerEditObject = false
+   end
 end
 
 function sampev.onSendEnterEditObject(type, objectId, model, position)
@@ -13150,7 +13146,7 @@ function sampev.onSendEnterEditObject(type, objectId, model, position)
    end
    
    if checkbox.logobjects.v then
-      print(type, objectId, model)
+      print(("SendEnterEditObject type:%i, id:%i, model:%i"):format(type, objectId, model))
    end
 end
 
@@ -13457,7 +13453,13 @@ function sampev.onSendPickedUpPickup(id)
    end
 end
 
-function sampev.onSetPlayerAttachedObject(playerId, index, create, object)    
+-- bugged and don't hook anything 
+-- fixed: changed by RPC, var playerdata.isPlayerEditAttachedObject
+-- function onSendEditAttachedObject(response, index, model, bone, position, rotation, scale, color1, color2)
+-- function onEditAttachedObject(index)
+
+function sampev.onSetPlayerAttachedObject(playerId, index, create, object)  
+   
    if checkbox.hooksetattachedobject.v then
       if create then
          sampAddChatMessage(string.format("slot: %d object: %d bone: %d", 
@@ -13635,6 +13637,10 @@ function onReceiveRpc(id, bs)
    if nops.setspecialaction.v and id == 88 then return false end
    if nops.setplayerattachedobject.v and id == 113 then return false end
    if checkbox.hideattaches.v and id == 75 then return false end
+   
+   if id == 116 then -- onEditAttachedObject
+      playerdata.isPlayerEditAttachedObject = true
+   end
 end
 
 function onSendRpc(id, bs, priority, reliability, channel, shiftTimestamp)
@@ -13663,6 +13669,10 @@ function onSendRpc(id, bs, priority, reliability, channel, shiftTimestamp)
         raknetDeleteBitStream(new_bs)
       end
       return false
+   end
+   
+   if id == 116 then -- EditAttachedObject 
+      playerdata.isPlayerEditAttachedObject = false
    end
    
    if ini.settings.cberrorwarnings then
