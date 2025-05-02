@@ -4,7 +4,7 @@ script_description("Assistant for mappers")
 script_dependencies('imgui', 'lib.samp.events')
 script_properties("work-in-pause")
 script_url("https://github.com/ins1x/MappingToolkit")
-script_version("4.11") -- R7
+script_version("4.11") -- R8
 -- support sa-mp versions depends on SAMPFUNCS (0.3.7-R1, 0.3.7-R3-1, 0.3.7-R5, 0.3.DL)
 -- script_moonloader(16) moonloader v.0.26 
 -- editor options: tabsize 3, Unix (LF), encoding Windows-1251
@@ -927,9 +927,9 @@ function main()
       end
       
       if doesFileExist('moonloader/resource/mappingtoolkit/modules/texturelist.lua') then
-         if getFileSize('moonloader/resource/mappingtoolkit/modules/texturelist.lua') ~= 379889 then
-            sampAddChatMessage("[Mapping Toolkit] {696969}texturelist.lua{FFFFFF} устарел. Обновите его для корректной работы ретекстура", 0x0FF0000)
-         end
+         -- if getFileSize('moonloader/resource/mappingtoolkit/modules/texturelist.lua') ~= 379889 then
+            -- sampAddChatMessage("[Mapping Toolkit] {696969}texturelist.lua{FFFFFF} устарел. Обновите его для корректной работы ретекстура", 0x0FF0000)
+         -- end
          local loadedTable, loadError = loadfile('moonloader/resource/mappingtoolkit/modules/texturelist.lua')
          if loadedTable then 
             sampTextureList = loadedTable()
@@ -2715,8 +2715,8 @@ function imgui.OnDrawFrame()
                      sampAddChatMessage("Установлена полупрозрачность объекту (model: {696969}"..LastObject.modelid.."{FFFFFF}) отменить можно через {696969}/rindex", -1)
                   end
                else
-                  checkbox.setobjalpha = false
-                  sampAddChatMessage("Последний созданный объект не найден", -1)
+                  checkbox.setobjalpha.v = false
+                  sampAddChatMessage("[SCRIPT]: {FFFFFF}Не найден последний объект!", 0x0FF6600)
                end
             end
             imgui.SameLine()
@@ -3062,12 +3062,12 @@ function imgui.OnDrawFrame()
          
          if imgui.CollapsingHeader(u8"Позиция") then
             
-            if imgui.Checkbox(u8("Возвращать объект на исходную позицию"), checkbox.restoreobjectpos) then
+            if imgui.Checkbox(u8("Возвращать объект на исходную позицию при отмене редактирования"), checkbox.restoreobjectpos) then
                ini.settings.restoreobjectpos = checkbox.restoreobjectpos.v
                inicfg.save(ini, configIni)
             end
             imgui.SameLine()
-            imgui.TextQuestion("( ? )", u8"Возвращает объект на исходную позицию при отмене редактирования")
+            imgui.TextQuestion("( ? )", u8"Возвращает объект на исходную позицию при ESC")
             
             if imgui.Checkbox(u8("Показывать координаты объекта при перемещении"), checkbox.showobjectcoord) then
                ini.settings.showobjectrot = false
@@ -13228,7 +13228,8 @@ attachedPlayerId, attachedVehicleId, text)
    if isTrainingSanbox then
       --if color == 8436991 or color == 16211740 then
       if text:find("obj:") then
-         LastObject.localid = text:match('id:(%d+)')
+         -- Bugged instruction, remove later
+         -- LastObject.localid = text:match('id:(%d+)')
          if ini.settings.fixobjinfotext then
             return {id, 8436991, position, ini.settings.devmodelabeldist, testLOS, attachedPlayerId, attachedVehicleId, text}
          else
