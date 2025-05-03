@@ -4,7 +4,7 @@ script_description("Assistant for mappers")
 script_dependencies('imgui', 'lib.samp.events')
 script_properties("work-in-pause")
 script_url("https://github.com/ins1x/MappingToolkit")
-script_version("4.11") -- R8
+script_version("4.12")
 -- support sa-mp versions depends on SAMPFUNCS (0.3.7-R1, 0.3.7-R3-1, 0.3.7-R5, 0.3.DL)
 -- script_moonloader(16) moonloader v.0.26 
 -- editor options: tabsize 3, Unix (LF), encoding Windows-1251
@@ -210,6 +210,10 @@ local edit = {
    mode = 0, -- editmodes table
 }
 
+local const = {
+   txdmodelinfoid = 555,
+}
+
 local playerdata = {
    isPlayerSpectating = false,
    isLockPlayerControl = false,
@@ -265,6 +269,7 @@ local dialoghook = {
    setworlddescription = false,
    loadworld = false,
    logstoggle = false,
+   modelinfo = false,
    editdialog = false,
    textureslist = false,
    sampobjectslist = false,
@@ -614,6 +619,7 @@ local combobox = {
    
    attname = imgui.ImInt(0),
    chatselect = imgui.ImInt(0),
+   fonts = imgui.ImInt(0),
    selecttable = imgui.ImInt(2),
    objects = imgui.ImInt(0),
    weaponselect = imgui.ImInt(0),
@@ -684,6 +690,7 @@ local LastData = {
    lastCbvaluebuffer = nil,
    lastTbvaluebuffer = nil,
    lastMinigame = nil,
+   lastModelinfo = 0,
    lastLoadedWorldNumber = nil
 }
 
@@ -1973,21 +1980,21 @@ function imgui.OnDrawFrame()
             
             if tabmenu.coords == 1 then
                imgui.PushStyleColor(imgui.Col.Button, imgui.GetStyle().Colors[imgui.Col.ButtonHovered])
-               if imgui.Button(u8"Позиция", imgui.ImVec2(100, 25)) then tabmenu.coords = 1 end
+               if imgui.Button(u8"Позиция", imgui.ImVec2(100, 30)) then tabmenu.coords = 1 end
                imgui.PopStyleColor()
             else
-               if imgui.Button(u8"Позиция", imgui.ImVec2(100, 25)) then tabmenu.coords = 1 end
+               if imgui.Button(u8"Позиция", imgui.ImVec2(100, 30)) then tabmenu.coords = 1 end
             end
             
             imgui.SameLine()
             if tabmenu.coords == 2 then
                imgui.PushStyleColor(imgui.Col.Button, imgui.GetStyle().Colors[imgui.Col.ButtonHovered])
-               if imgui.Button(u8"Телепорт", imgui.ImVec2(100, 25)) then 
+               if imgui.Button(u8"Телепорт", imgui.ImVec2(100, 30)) then 
                   tabmenu.coords = 2 
                end
                imgui.PopStyleColor()
             else
-               if imgui.Button(u8"Телепорт", imgui.ImVec2(100, 25)) then 
+               if imgui.Button(u8"Телепорт", imgui.ImVec2(100, 30)) then 
                   -- tpcpos.x = positionX
                   -- tpcpos.y = positionY
                   -- tpcpos.z = positionZ
@@ -5063,8 +5070,22 @@ function imgui.OnDrawFrame()
             if imgui.Button(u8"Удалить", imgui.ImVec2(100, 25)) then
                sampTextdrawDelete(input.txdclickid.v)
             end
+            
             imgui.Spacing()
-            imgui.Link("https://leonardo541.github.io/TextDrawEditor/","TextDrawEditor (online)")
+            imgui.Text(u8"Онлайн сервисы:")
+            if imgui.TooltipButton(u8"Конвертер символов (Онлайн)", imgui.ImVec2(200, 25),
+            u8"Данный сервис предназначен для перевода кириллических (русских) GameText, TextDraw символов в поддерживаемый GTA-русификаторами формат.")
+            then
+               local link = 'explorer "https://pawnokit.ru/ru/text_conv"'
+               os.execute(link)
+            end
+            imgui.SameLine()
+            if imgui.TooltipButton(u8"TextDrawEditor (Онлайн)", imgui.ImVec2(200, 25),
+            u8"Онлайн редактор текстдравов для SA:MP")
+            then
+               local link = 'explorer "https://leonardo541.github.io/TextDrawEditor/"'
+               os.execute(link)
+            end
             --imgui.SameLine()
             --if imgui.Button(u8"Включить курсор", imgui.ImVec2(100, 25)) then
                --showCursor(true, true) -- showCursor(bool show, [bool lockControls])
@@ -7326,75 +7347,58 @@ function imgui.OnDrawFrame()
 
          text = string.gsub(text, "   ", "")
          imgui.Text(u8(text))
-         
-         imgui.Text(u8"Больше информации по возможностям тулкита на ")
-         imgui.SameLine()
-         imgui.Link("https://github.com/ins1x/MappingToolkit/wiki/FAQ-%D0%BF%D0%BE-MappingToolkit", u8"Github-Wiki")
+         imgui.Spacing()
+            imgui.Text(u8"Обсуждение Mapping Toolkit на форуме:")
+            imgui.SameLine()
+            imgui.Link("https://forum.training-server.com/d/19708-luamappingtoolkit/", "Mapping Toolkit")
+            
+            imgui.Text(u8"Скачать тулкит с GitHub:")
+            imgui.SameLine()
+            imgui.Link("https://github.com/ins1x/MappingToolkit", "ins1x/MappingToolkit")
+            imgui.SameLine()
+            imgui.Text(u8"или с GoogleDrive:")
+            imgui.SameLine()
+            imgui.Link("https://drive.google.com/drive/folders/1v-LmqAgKGpYYeA1C7aT-rlODTa2OfulT", 
+            "drive.google.com")
+            
+            imgui.Text(u8"Больше информации по возможностям тулкита:")
+            imgui.SameLine()
+            imgui.Link("https://github.com/ins1x/MappingToolkit/wiki/FAQ-%D0%BF%D0%BE-MappingToolkit", u8"Github-Wiki")
+            
          imgui.Spacing()
          
          imgui.PushStyleVar(imgui.StyleVar.ItemSpacing, imgui.ImVec2(5, 2))
+         
          if tabmenu.credits == 1 then
             imgui.PushStyleColor(imgui.Col.Button, imgui.GetStyle().Colors[imgui.Col.ButtonHovered])
-            if imgui.Button(u8"Официальные ресурсы", imgui.ImVec2(160, 30)) then tabmenu.credits = 1 end
+            if imgui.Button(u8"Благодарности", imgui.ImVec2(200, 30)) then tabmenu.credits = 1 end
             imgui.PopStyleColor()
          else
-            if imgui.Button(u8"Официальные ресурсы", imgui.ImVec2(160, 30)) then tabmenu.credits = 1 end
+            if imgui.Button(u8"Благодарности", imgui.ImVec2(200, 30)) then tabmenu.credits = 1 end
          end
          
          imgui.SameLine()
          if tabmenu.credits == 2 then
             imgui.PushStyleColor(imgui.Col.Button, imgui.GetStyle().Colors[imgui.Col.ButtonHovered])
-            if imgui.Button(u8"Благодарности", imgui.ImVec2(160, 30)) then tabmenu.credits = 2 end
+            if imgui.Button(u8"Полезные ресурсы", imgui.ImVec2(200, 30)) then tabmenu.credits = 2 end
             imgui.PopStyleColor()
          else
-            if imgui.Button(u8"Благодарности", imgui.ImVec2(160, 30)) then tabmenu.credits = 2 end
-         end
-         
-         imgui.SameLine()
-         if tabmenu.credits == 3 then
-            imgui.PushStyleColor(imgui.Col.Button, imgui.GetStyle().Colors[imgui.Col.ButtonHovered])
-            if imgui.Button(u8"Полезные ресурсы", imgui.ImVec2(160, 30)) then tabmenu.credits = 3 end
-            imgui.PopStyleColor()
-         else
-            if imgui.Button(u8"Полезные ресурсы", imgui.ImVec2(160, 30)) then tabmenu.credits = 3 end
+            if imgui.Button(u8"Полезные ресурсы", imgui.ImVec2(200, 30)) then tabmenu.credits = 2 end
          end
          imgui.PopStyleVar()
          
          if tabmenu.credits == 1 then
             imgui.Spacing()
-
-            imgui.Text(u8"Официальный сайт TRAINING:")
-            imgui.SameLine()
-            imgui.Link("https://training-server.com/", "training-server.com")
-            
-            imgui.Text(u8"Официальный канал TRAINING в Telegram:")
-            imgui.SameLine()
-            imgui.Link("https://t.me/training_sandbox/", "t.me/training_sandbox")
-            
-            imgui.Text(u8"Официальный сервер TRAINING в Discord:")
-            imgui.SameLine()
-            imgui.Link("https://discord.gg/4a3338g/", "discord.gg/4a3338g")
-            
-            imgui.Text(u8"Топик Mapping Toolkit на форуме:")
-            imgui.SameLine()
-            imgui.Link("https://forum.training-server.com/d/19708-luamappingtoolkit/", "Mapping Toolkit")
-            
-            imgui.Text("GitHub homepage:")
-            imgui.SameLine()
-            imgui.Link("https://github.com/ins1x/MappingToolkit", "ins1x/MappingToolkit")
-         elseif tabmenu.credits == 2 then
-            imgui.Spacing()
             local text = [[
             Форумчанам с {696969}BLASTHACK{CDCDCD} за полезные примеры и сниппеты по Lua
             Разработчику {FF6600}FYP{CDCDCD} создавшему moonloader, lib.samp.events
-            Разработчику с TRAINING-SANDBOX {FF6600}qxlies(Lester){CDCDCD}
-            Форумчанам с TRAINING-SANDBOX {FF6600}Кокеточка, Cheater_80_LVL, .LINCOLN.{CDCDCD}
-            за помощь в тестировании и предложения по улучшению
+            Форумчанам с TRAINING-SANDBOX {FF6600}Кокеточка, Cheater_80_LVL, LINCOLN, qxlies{CDCDCD}
+            за помощь в тестировании, и предложениям по улучшению
             ]]
             text = string.gsub(text, "   ", "")
             imgui.TextColoredRGB(text)
             
-         elseif tabmenu.credits == 3 then
+         elseif tabmenu.credits == 2 then
             imgui.Spacing()
             imgui.TextColoredRGB("TRAINING-{dc143c}CHECKER:")
             imgui.SameLine()
@@ -7416,7 +7420,7 @@ function imgui.OnDrawFrame()
             imgui.SameLine()
             imgui.Link("https://github.com/ins1x/", "ins1x")
             
-         elseif tabmenu.credits == 4 then
+         elseif tabmenu.credits == 3 then
             imgui.Spacing()
             local text = [[Если вы обнаружили ошибку сообщите о ней на форуме.
             Опишите, как и когда появляется ошибка и в чём именно она заключается.
@@ -7472,7 +7476,7 @@ function imgui.OnDrawFrame()
          end
          imgui.SameLine()
          if imgui.TooltipButton(u8"Нашел баг", imgui.ImVec2(160, 25), u8"Жми не стесняйся") then
-            tabmenu.credits = 4
+            tabmenu.credits = 3
          end
          -- if imgui.Button(u8"Проверить обновления",imgui.ImVec2(160, 25)) then
             -- if not checkScriptUpdates() then
@@ -8259,34 +8263,26 @@ function imgui.OnDrawFrame()
          imgui.PushStyleVar(imgui.StyleVar.ItemSpacing, imgui.ImVec2(2, 0))
          if tabmenu.favorites == 1 then
             imgui.PushStyleColor(imgui.Col.Button, imgui.GetStyle().Colors[imgui.Col.ButtonHovered])
-            if imgui.Button(u8"Объекты", imgui.ImVec2(100, 25)) then tabmenu.favorites = 1 end
+            if imgui.Button(u8"Объекты", imgui.ImVec2(120, 25)) then tabmenu.favorites = 1 end
             imgui.PopStyleColor()
          else
-            if imgui.Button(u8"Объекты", imgui.ImVec2(100, 25)) then tabmenu.favorites = 1 end
+            if imgui.Button(u8"Объекты", imgui.ImVec2(120, 25)) then tabmenu.favorites = 1 end
          end
          imgui.SameLine()
          if tabmenu.favorites == 2 then
             imgui.PushStyleColor(imgui.Col.Button, imgui.GetStyle().Colors[imgui.Col.ButtonHovered])
-            if imgui.Button(u8"Текстуры", imgui.ImVec2(100, 25)) then tabmenu.favorites = 2 end
+            if imgui.Button(u8"Текстуры", imgui.ImVec2(120, 25)) then tabmenu.favorites = 2 end
             imgui.PopStyleColor()
          else
-            if imgui.Button(u8"Текстуры", imgui.ImVec2(100, 25)) then tabmenu.favorites = 2 end
+            if imgui.Button(u8"Текстуры", imgui.ImVec2(120, 25)) then tabmenu.favorites = 2 end
          end
          imgui.SameLine()
          if tabmenu.favorites == 3 then
             imgui.PushStyleColor(imgui.Col.Button, imgui.GetStyle().Colors[imgui.Col.ButtonHovered])
-            if imgui.Button(u8"Поверхности", imgui.ImVec2(100, 25)) then tabmenu.favorites = 3 end
+            if imgui.Button(u8"Поверхности", imgui.ImVec2(120, 25)) then tabmenu.favorites = 3 end
             imgui.PopStyleColor()
          else
-            if imgui.Button(u8"Поверхности", imgui.ImVec2(100, 25)) then tabmenu.favorites = 3 end
-         end
-         imgui.SameLine()
-         if tabmenu.favorites == 4 then
-            imgui.PushStyleColor(imgui.Col.Button, imgui.GetStyle().Colors[imgui.Col.ButtonHovered])
-            if imgui.Button(u8"Шрифты", imgui.ImVec2(100, 25)) then tabmenu.favorites = 4 end
-            imgui.PopStyleColor()
-         else
-            if imgui.Button(u8"Шрифты", imgui.ImVec2(100, 25)) then tabmenu.favorites = 4 end
+            if imgui.Button(u8"Поверхности", imgui.ImVec2(120, 25)) then tabmenu.favorites = 3 end
          end
          imgui.PopStyleVar()
          
@@ -8313,12 +8309,38 @@ function imgui.OnDrawFrame()
          elseif tabmenu.favorites == 3 then
             imgui.PushFont(fonts.multilinetextfont)
             if input.readonly then
-               imgui.InputTextMultiline('##favtxt', textbuffer.favtxt, imgui.ImVec2(490, 340),
+               imgui.InputTextMultiline('##favtxt', textbuffer.favtxt, imgui.ImVec2(490, 300),
                imgui.InputTextFlags.EnterReturnsTrue + imgui.InputTextFlags.AllowTabInput + imgui.InputTextFlags.ReadOnly)
             else 
-               imgui.InputTextMultiline('##favtxt', textbuffer.favtxt, imgui.ImVec2(490, 340),
+               imgui.InputTextMultiline('##favtxt', textbuffer.favtxt, imgui.ImVec2(490, 300),
                imgui.InputTextFlags.EnterReturnsTrue + imgui.InputTextFlags.AllowTabInput)
             end
+            imgui.Spacing()
+            imgui.PushItemWidth(170)
+            if imgui.Combo(u8'< Выбор шрифта##comboboxfontname', combobox.fonts, PopularFonts) then
+            end
+            imgui.PopItemWidth()
+            imgui.SameLine()
+            if imgui.TooltipButton(u8"Просмотреть", imgui.ImVec2(120, 25), u8"Превью набора символов в шрифте (онлайн)") then
+               local fontlink = string.format('explorer "https://flamingtext.ru/Font-Search?q=%s"', tostring(PopularFonts[combobox.fonts.v+1]))
+               os.execute(fontlink)
+            end
+            
+            -- local fontlink
+            -- imgui.Spacing()
+            -- for k, fontname in pairs(PopularFonts) do
+               -- fontlink = string.format("https://flamingtext.ru/Font-Search?q=%s", fontname)
+               -- if k%2 == 0 then
+                  -- imgui.SameLine()
+               -- end
+               -- imgui.Link(fontlink, fontname)
+            -- end
+            
+            -- imgui.Spacing()
+            -- imgui.Text(u8"Пример использования:")
+            -- imgui.TextColoredRGB(u8'SetObjectMaterialText(string, "TEST", 0, 140, "webdings", 150, 0, -65536, 0, 1);')
+            -- imgui.TextColoredRGB("Максимальный размер шрифта 255")
+            
             imgui.PopFont()
             -- --imgui.SameLine()
             -- if imgui.Selectable(input.readonly and "RO" or "W", false, 0, imgui.ImVec2(25, 15)) then
@@ -8330,21 +8352,6 @@ function imgui.OnDrawFrame()
             -- end
             -- imgui.SameLine()
             -- imgui.TextQuestion("( ? )", u8"RO - Включить режим ReadOnly\nUnlock IO - разблокировать инпут если курсор забагался")
-         elseif tabmenu.favorites == 4 then
-            local fontlink
-            imgui.Spacing()
-            for k, fontname in pairs(PopularFonts) do
-               fontlink = string.format("https://flamingtext.ru/Font-Search?q=%s", fontname)
-               if k%2 == 0 then
-                  imgui.SameLine()
-               end
-               imgui.Link(fontlink, fontname)
-            end
-            
-            -- imgui.Spacing()
-            -- imgui.Text(u8"Пример использования:")
-            -- imgui.TextColoredRGB(u8'SetObjectMaterialText(string, "TEST", 0, 140, "webdings", 150, 0, -65536, 0, 1);')
-            -- imgui.TextColoredRGB("Максимальный размер шрифта 255")
          end
          
          if tabmenu.favorites == 1 then
@@ -8355,85 +8362,80 @@ function imgui.OnDrawFrame()
             imgui.TextColoredRGB("Топлист текстур онлайн:")
             imgui.SameLine()
             imgui.Link("https://textures.xyin.ws/?page=toplist", "https://textures.xyin.ws/?page=toplist")
-         elseif tabmenu.favorites == 4 then
-            imgui.Spacing()
+         elseif tabmenu.favorites == 3 then
             imgui.TextColoredRGB("Список всех спецсимволов:")
             imgui.SameLine()
             imgui.Link("https://pawnokit.ru/ru/spec_symbols", "pawnokit.ru")
          end
          
-         if tabmenu.favorites ~= 4 then
-            -- if imgui.TooltipButton(u8"Unlock IO", imgui.ImVec2(80, 25), u8:encode("разблокировать инпут если курсор забагался")) then
-               -- imgui.resetIO()
-            -- end
-            
-            if imgui.TooltipButton(u8"Обновить", imgui.ImVec2(80, 25), u8:encode("Повторно загрузить текст из файла")) then
-               local file = io.open(filepath, "r")
+         --if tabmenu.favorites ~= 3 then
+         if imgui.TooltipButton(u8"Обновить", imgui.ImVec2(80, 25), u8:encode("Повторно загрузить текст из файла")) then
+            local file = io.open(filepath, "r")
+            if tabmenu.favorites == 1 then
+               textbuffer.favobjects.v = file:read('*a')
+            elseif tabmenu.favorites == 2 then
+               textbuffer.favtxd.v = file:read('*a')
+            elseif tabmenu.favorites == 3 then
+               textbuffer.favtxt.v = file:read('*a')
+            end
+            file:close()
+         end
+         imgui.SameLine()
+         if input.readonly then
+            if imgui.TooltipButton(u8"Изменить", imgui.ImVec2(80, 25), u8:encode("Разблокировать для редактирования")) then
+               input.readonly = false
+            end
+         else
+            if imgui.TooltipButton(u8"Сохранить", imgui.ImVec2(80, 25), u8:encode("Завершить редактирование")) then
+               input.readonly = true
+               local file = io.open(filepath, "w")
                if tabmenu.favorites == 1 then
-                  textbuffer.favobjects.v = file:read('*a')
+                  file:write(textbuffer.favobjects.v)
                elseif tabmenu.favorites == 2 then
-                  textbuffer.favtxd.v = file:read('*a')
+                  file:write(textbuffer.favtxd.v)
                elseif tabmenu.favorites == 3 then
-                  textbuffer.favtxt.v = file:read('*a')
+                  file:write(textbuffer.favtxt.v)
                end
                file:close()
-            end
-            imgui.SameLine()
-            if input.readonly then
-               if imgui.TooltipButton(u8"Изменить", imgui.ImVec2(80, 25), u8:encode("Разблокировать для редактирования")) then
-                  input.readonly = false
-               end
-            else
-               if imgui.TooltipButton(u8"Сохранить", imgui.ImVec2(80, 25), u8:encode("Завершить редактирование")) then
-                  input.readonly = true
-                  local file = io.open(filepath, "w")
-                  if tabmenu.favorites == 1 then
-                     file:write(textbuffer.favobjects.v)
-                  elseif tabmenu.favorites == 2 then
-                     file:write(textbuffer.favtxd.v)
-                  elseif tabmenu.favorites == 3 then
-                     file:write(textbuffer.favtxt.v)
-                  end
-                  file:close()
-                  sampAddChatMessage("[SCRIPT]: {FFFFFF}Сохранено в файл: {696969}"..filepath, 0x0FF6600)
-               end
-            end
-
-            -- if not input.readonly then
-               -- imgui.SameLine()
-               -- if imgui.TooltipButton(u8"Сохранить", imgui.ImVec2(80, 25), u8:encode("Сохранить избранные")) then
-                  -- if not input.readonly then
-                     -- local file = io.open(filepath, "w")
-                     -- file:write(textbuffer.favobjects.v)
-                     -- file:close()
-                     -- sampAddChatMessage("Сохранено в файл: /moonloader/resource/mappingtoolkit/favorites/objects.txt", -1)
-                  -- else
-                     -- sampAddChatMessage("Недоступно в режмие для чтения. Снимте режим RO (Readonly)", -1)
-                  -- end
-               -- end
-            -- end
-            imgui.SameLine()
-            imgui.PushItemWidth(200)
-            imgui.InputText("##search", textbuffer.searchbar)
-            imgui.PopItemWidth()
-            imgui.SameLine()
-            if imgui.TooltipButton(u8"Поиск##Search", imgui.ImVec2(60, 25), u8:encode("Поиск по тексту")) then
-               local results = 0
-               local resultline = 0
-               if string.len(textbuffer.searchbar.v) > 0 then
-                  for line in io.lines(filepath) do
-                     resultline = resultline + 1
-                     if line:find(textbuffer.searchbar.v, 1, true) then
-                        results = results + 1
-                        sampAddChatMessage("Строка "..resultline.." : "..u8:decode(line), -1)
-                     end
-                  end
-               end
-               if not results then
-                  sampAddChatMessage("Результат поиска: Не найдено", -1)
-               end
+               sampAddChatMessage("[SCRIPT]: {FFFFFF}Сохранено в файл: {696969}"..filepath, 0x0FF6600)
             end
          end
+
+         -- if not input.readonly then
+            -- imgui.SameLine()
+            -- if imgui.TooltipButton(u8"Сохранить", imgui.ImVec2(80, 25), u8:encode("Сохранить избранные")) then
+               -- if not input.readonly then
+                  -- local file = io.open(filepath, "w")
+                  -- file:write(textbuffer.favobjects.v)
+                  -- file:close()
+                  -- sampAddChatMessage("Сохранено в файл: /moonloader/resource/mappingtoolkit/favorites/objects.txt", -1)
+               -- else
+                  -- sampAddChatMessage("Недоступно в режмие для чтения. Снимте режим RO (Readonly)", -1)
+               -- end
+            -- end
+         -- end
+         imgui.SameLine()
+         imgui.PushItemWidth(200)
+         imgui.InputText("##search", textbuffer.searchbar)
+         imgui.PopItemWidth()
+         imgui.SameLine()
+         if imgui.TooltipButton(u8"Поиск##Search", imgui.ImVec2(60, 25), u8:encode("Поиск по тексту")) then
+            local results = 0
+            local resultline = 0
+            if string.len(textbuffer.searchbar.v) > 0 then
+               for line in io.lines(filepath) do
+                  resultline = resultline + 1
+                  if line:find(textbuffer.searchbar.v, 1, true) then
+                     results = results + 1
+                     sampAddChatMessage("Строка "..resultline.." : "..u8:decode(line), -1)
+                  end
+               end
+            end
+            if not results then
+               sampAddChatMessage("Результат поиска: Не найдено", -1)
+            end
+         end
+         
          
       elseif tabmenu.info == 6 then
          local filepath = nil
@@ -9679,6 +9681,11 @@ function sampev.onSendDialogResponse(dialogId, button, listboxId, input)
                LastData.lastTbvaluebuffer = nil
             end
          end
+         
+         if dialoghook.modelinfo then
+            dialoghook.modelinfo = false
+            sampTextdrawDelete(const.txdmodelinfoid)
+         end
       end
       
       if button == 1 then -- if dialog response
@@ -10116,6 +10123,19 @@ function sampev.onShowDialog(dialogId, style, title, button1, button2, text)
                local newtext = text ..
                "\n\n{696969}Нажмите CTRL + SHIFT + V чтобы вставить последнее значение\n"
                return {dialogId, style, title, button1, button2, newtext}
+            end
+         end
+         
+         if text:find('{80BCFF}Модель.+{FFFFFF}') then
+            dialoghook.modelinfo = true
+            LastData.lastModelinfo = text:match('{80BCFF}Модель.+{FFFFFF}(%d+)\n')
+            if LastData.lastModelinfo ~= 0 then
+               sampTextdrawCreate(const.txdmodelinfoid, LastData.lastModelinfo, 20.0, 170.0)
+               sampTextdrawSetStyle(const.txdmodelinfoid, 5)
+               sampTextdrawSetBoxColorAndSize(const.txdmodelinfoid, 1, 0, 150.0, 150.0)
+               sampTextdrawSetModelRotationZoomVehColor(const.txdmodelinfoid, 
+               LastData.lastModelinfo, -10.0, 0, 45.0, 1.25, -1, -1)
+               sampTextdrawSetShadow(const.txdmodelinfoid, 0, 1)
             end
          end
       end
@@ -10934,7 +10954,7 @@ function sampev.onServerMessage(color, text)
          end
          
          -- mentions by id
-         if not text:find("ADS") then
+         if not text:find("ADS") and not text:find("мин") then
             if text:match("[^/:]".."%s"..id.."%s(.+)") -- id text mention
             or text:match("@"..id.."%s") then -- @id mention
             --or text:match("(%s"..id.."%s)") then
@@ -12162,7 +12182,7 @@ function sampev.onSendCommand(command)
                -- local id = tonumber(id)
                -- local arg = tonumber(arg)
                -- if type(id) == "number" and type(arg) == "number" then
-                  -- sampAddChatMessage("[SCRIPT]: {FFFFFF}Объект "..id.." повернули на "..arg.." градусов", 0x0FF6600)
+                  -- sampAddChatMessage("[SCRIPT]: {FFFFFF}Объект "..id.." повернут на "..arg.." градусов ( "..cmd.." )", 0x0FF6600)
                -- end
             -- end
          -- else
@@ -13600,6 +13620,9 @@ function onScriptTerminate(script, quit)
       inicfg.save(ini, configIni)
       
       toggleFlyMode(false)
+      if isTrainingSanbox then
+         sampTextdrawDelete(const.txdmodelinfoid)
+      end
    end
 end
 
