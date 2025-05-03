@@ -11640,7 +11640,7 @@ function sampev.onSendCommand(command)
       if ini.settings.cbdefaultradius ~= 0 then
          lua_thread.create(function()
             wait(200)
-            sampSetCurrentDialogEditboxText("0.1")
+            sampSetCurrentDialogEditboxText(ini.settings.cbdefaultradius)
          end)
       end
    end
