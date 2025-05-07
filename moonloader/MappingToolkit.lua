@@ -4,7 +4,7 @@ script_description("Assistant for mappers")
 script_dependencies('imgui', 'lib.samp.events')
 script_properties("work-in-pause")
 script_url("https://github.com/ins1x/MappingToolkit")
-script_version("4.12")
+script_version("4.12") -- R1
 -- support sa-mp versions depends on SAMPFUNCS (0.3.7-R1, 0.3.7-R3-1, 0.3.7-R5, 0.3.DL)
 -- script_moonloader(16) moonloader v.0.26 
 -- editor options: tabsize 3, Unix (LF), encoding Windows-1251
@@ -43,6 +43,7 @@ local ini = inicfg.load({
       chathiderp = false,
       chatinputdrop = false,
       chatonlysystem = false,
+      chatprefix = 0,
       debug = false,
       devmode = false,
       dialogautocomplete = true,
@@ -595,6 +596,7 @@ local nops = {
 local combobox = {
    cbactivations = imgui.ImInt(ini.settings.cbnewactivationitem),
    imguitheme = imgui.ImInt(ini.settings.imguitheme),
+   chatprefix = imgui.ImInt(ini.settings.chatprefix),
    
    hotkeyJaction = imgui.ImInt(0),
    hotkeyKaction = imgui.ImInt(0),
@@ -742,6 +744,16 @@ local hotkeysActivationCmds = {
    "/veh", "/flymode", "/spec", "/oedit", "/csel", "/omenu", "/oinfo",
    "/animlist", "/cb", "/lock", "/fix", "/vmenu", "/savevw", "/loadvw",
    "/cblist", "/rot", "/rot 45", "/panel"
+}
+
+local chatPrefixList = {
+   "", "!", "@", "$", "/b", "/c", "/r"
+}
+
+local chatPrefixNames = {
+   u8"Не выбран", u8"Глобальный чат", u8"Чат игрового мира", 
+   u8"Чат модераторов мира", u8"ООС чат", u8"Персональный чат",
+   u8"Сообщение в рацию"
 }
 
 local attCodes = {
@@ -1083,6 +1095,8 @@ function main()
       formattedcolor = formattedcolor:gsub("{","")
       textbuffer.rendcolor.v = formattedcolor
       
+      combobox.chatprefix.v = ini.settings.chatprefix
+      
       for k, v in ipairs(uiFontsFilenames) do
          if v == ini.settings.imguifont then
             combobox.uifontselect.v = k-1
@@ -1134,10 +1148,11 @@ function main()
       
       -- Unload script if not localhost server and not is TRAINING-SANDBOX
       if ini.settings.serverlock then
-         if not servername:find("SA-MP") then
+         if not servername:find("SA.+MP") then
             local ip, port = sampGetCurrentServerAddress()
             
-            if not ip:find("127.0.0.1") and not isTrainingSanbox then
+            if not ip:find("127.0.0.1") and not servername:find("TRAINING") then
+               print(servername)
                print("[Mapping Toolkit] was automatically unloaded")
                thisScript():unload()
             end
@@ -5344,7 +5359,12 @@ function imgui.OnDrawFrame()
          
       -- elseif tabmenu.settings == 7 then
       elseif tabmenu.settings == 8 then
-      
+         if ini.settings.allchatoff then 
+            imgui.TextColoredRGB("{FF0000}Chat OFF")
+         else
+            imgui.TextColoredRGB("{696969}Chat")
+         end
+         imgui.SameLine()
          if imgui.TooltipButton(u8"очистить", imgui.ImVec2(90, 25), u8"Очистить чат (Для себя)") then
             ClearChat()
             sampAddChatMessage("[SCRIPT]: {FFFFFF}Чат был очищен!", 0x0FF6600)
@@ -5359,16 +5379,17 @@ function imgui.OnDrawFrame()
          end
          if isTrainingSanbox then
             imgui.SameLine()
-            if imgui.TooltipButton(u8"mute", imgui.ImVec2(60, 25), u8"Настройки чата, позволяет заглушить указанный тип сообщений /mute") then
-               if dialog.main.v then dialog.main.v = false end
-               sampProcessChatInput("/mute")
-            end
-            imgui.SameLine()
             if ini.settings.savepmmessages then
+               --imgui.PushStyleColor(imgui.Col.Button, imgui.ImVec4(1.0, 1.0, 0.0, 1.0))
                if imgui.TooltipButton(u8"pmh", imgui.ImVec2(60, 25), u8"История личных сообщений /pmh") then
                   sampSendChat("/pmh")
                end
+               --imgui.PopStyleColor()
             end
+         end
+         imgui.SameLine()
+         if imgui.TooltipButton(u8"getids", imgui.ImVec2(60, 25), u8"Получить id и ники игроков рядом") then
+            copyNearestPlayersToClipboard()
          end
          
          imgui.Spacing()
@@ -5462,30 +5483,30 @@ function imgui.OnDrawFrame()
             imgui.SameLine()
             imgui.TextQuestion("( ? )", u8"Для поиска можно использовать регулярные выражения.\nИспользует шаблон match для поиска паттерну")
             
-            if checkbox.searchregexp.v then
-               if imgui.TreeNode(u8"Поддерживаемые опции регулярных выражений:") then
-                  imgui.TextColoredRGB("{FF6600}. {FFFFFF} - Любой символ")
-                  imgui.TextColoredRGB("{FF6600}%a {FFFFFF} - Буква (только англ.!)")
-                  imgui.TextColoredRGB("{FF6600}%A {FFFFFF} - Любая буква (русская), символ, или цифра, кроме английской буквы ")
-                  imgui.TextColoredRGB("{FF6600}%c {FFFFFF} - Управляющий символ")
-                  imgui.TextColoredRGB("{FF6600}%d {FFFFFF} - Цифра")
-                  imgui.TextColoredRGB("{FF6600}%D {FFFFFF} - Любая буква, или символ, кроме цифры")
-                  imgui.TextColoredRGB("{FF6600}%l {FFFFFF} - Буква в нижней раскладке (только англ.!)")
-                  imgui.TextColoredRGB("{FF6600}%L {FFFFFF} - Любая буква, символ, или цифра, кроме английской буквы в нижней раскладке")
-                  imgui.TextColoredRGB("{FF6600}%p {FFFFFF} - Символ пунктуации")
-                  imgui.TextColoredRGB("{FF6600}%P {FFFFFF} - Любая буква, символ, или цифра, кроме символа пунктуации")
-                  imgui.TextColoredRGB("{FF6600}%s {FFFFFF} - Символ пробел")
-                  imgui.TextColoredRGB("{FF6600}%S {FFFFFF} - Любая буква, символ, или цифра, кроме символа пробела")
-                  imgui.TextColoredRGB("{FF6600}%u {FFFFFF} - Буква в верхней раскладке (только англ.!)")
-                  imgui.TextColoredRGB("{FF6600}%U {FFFFFF} - Любая буква, символ, или цифра, кроме английской буквы в верхней раскладке")
-                  imgui.TextColoredRGB("{FF6600}%w {FFFFFF} - Любая буква, или цифра (только англ.!)")
-                  imgui.TextColoredRGB("{FF6600}%W {FFFFFF} - Любой символ, или буква (русская), кроме английской буквы, или цифры")
-                  imgui.TextColoredRGB("{FF6600}%x {FFFFFF} - Шестнадцатеричное число")
-                  imgui.TextColoredRGB("{FF6600}%X {FFFFFF} - Любая буква, или символ,  кроме цифры, или английской буквы, используемой в записи шестнадцатеричного числа")
-                  imgui.TextColoredRGB("{FF6600}%z {FFFFFF} - Строковые параметры, содержащие символы с кодом 0")
-                  imgui.TreePop()
-               end
-            end
+            local notifytext = [[
+            .  - Любой символ
+            %a  - Буква (только англ.!)
+            %A  - Любая буква (русская), символ, или цифра, кроме английской буквы
+            %c  - Управляющий символ
+            %d  - Цифра
+            %D  - Любая буква, или символ, кроме цифры
+            %l  - Буква в нижней раскладке (только англ.!)
+            %L  - Любая буква, символ, или цифра, кроме английской буквы в нижней раскладке
+            %p  - Символ пунктуации
+            %P  - Любая буква, символ, или цифра, кроме символа пунктуации
+            %s  - Символ пробел
+            %S  - Любая буква, символ, или цифра, кроме символа пробела
+            %u  - Буква в верхней раскладке (только англ.!)
+            %U  - Любая буква, символ, или цифра, кроме английской буквы в верхней раскладке
+            %w  - Любая буква, или цифра (только англ.!)
+            %W  - Любой символ, или буква (русская), кроме английской буквы, или цифры
+            %x  - Шестнадцатеричное число
+            %X  - Любая буква, или символ,  кроме цифры, или английской буквы, используемой в записи шестнадцатеричного числа
+            %z  - Строковые параметры, содержащие символы с кодом 0
+            ]]
+            notifytext = string.gsub(notifytext, "   ", "")
+            imgui.SameLine()
+            imgui.TextNotify(" [%Паттерны]",u8(notifytext))
             
             if #searchresults >= 1 then
                local maxresults = 25
@@ -5512,40 +5533,40 @@ function imgui.OnDrawFrame()
             
          end
          if imgui.CollapsingHeader(u8"Фильтры:") then
-            if imgui.Checkbox(u8"Анти-капс для сообщений в чате", checkbox.anticaps) then
+            if imgui.ToggleButton(u8"Анти-капс для сообщений в чате", checkbox.anticaps) then
                ini.settings.anticaps = checkbox.anticaps.v
                inicfg.save(ini, configIni)
             end
             
             if isTrainingSanbox then
-               if imgui.Checkbox(u8"Заткнуть хомяка (Бот Hamster)", checkbox.blockhamster) then
+               if imgui.ToggleButton(u8"Заткнуть хомяка (Бот Hamster)", checkbox.blockhamster) then
                   ini.settings.blockhamster = checkbox.blockhamster.v
                   inicfg.save(ini, configIni)
                end
             end
             
-            if imgui.Checkbox(u8"Скрывать все объявления и рекламу", checkbox.antiads) then
+            if imgui.ToggleButton(u8"Скрывать все объявления и рекламу", checkbox.antiads) then
                ini.settings.antiads = checkbox.antiads.v
                inicfg.save(ini, configIni)
             end  
             
-            if imgui.Checkbox(u8"Скрывать сообщения от ботов", checkbox.antichatbot) then
+            if imgui.ToggleButton(u8"Скрывать сообщения от ботов", checkbox.antichatbot) then
                ini.settings.antichatbot = checkbox.antichatbot.v
                inicfg.save(ini, configIni)
             end  
             
-            if imgui.Checkbox(u8"Скрывать отыгровки (/me, /do, /ame ..)", checkbox.chathiderp) then
+            if imgui.ToggleButton(u8"Скрывать отыгровки (/me, /do, /ame ..)", checkbox.chathiderp) then
                ini.settings.chathiderp = checkbox.chathiderp.v
                inicfg.save(ini, configIni)
             end
             
-            if imgui.Checkbox(u8"Скрывать все сообщения кроме системных", checkbox.chatonlysystem) then
+            if imgui.ToggleButton(u8"Скрывать все сообщения кроме системных", checkbox.chatonlysystem) then
                ini.settings.chatonlysystem = checkbox.chatonlysystem.v
                inicfg.save(ini, configIni)
             end
             
             if isTrainingSanbox then
-               if imgui.Checkbox(u8"Скрывать приставку [CB] в чате", checkbox.chathidecb) then
+               if imgui.ToggleButton(u8"Скрывать приставку [CB] в чате", checkbox.chathidecb) then
                   ini.settings.chathidecb = checkbox.chathidecb.v
                   inicfg.save(ini, configIni)
                end
@@ -5639,7 +5660,24 @@ function imgui.OnDrawFrame()
          end
          
          imgui.Spacing()
-         if imgui.Checkbox(u8("Останавливать чат при открытии поля ввода"), checkbox.freezechat) then
+         imgui.Spacing()
+         
+         if isTrainingSanbox then
+            if imgui.TooltipButton(u8"mute", imgui.ImVec2(60, 25), u8"Настройки чата, позволяет заглушить указанный тип сообщений /mute") then
+               if dialog.main.v then dialog.main.v = false end
+               sampSendChat("/mute")
+            end
+            imgui.SameLine()
+         end
+         
+         imgui.PushItemWidth(175)
+         if imgui.Combo(u8'Чат по-умолчанию##cahtprefixcombo', combobox.chatprefix, chatPrefixNames) then
+            ini.settings.chatprefix = combobox.chatprefix.v
+            inicfg.save(ini, configIni)
+         end
+         imgui.PopItemWidth()
+         
+         if imgui.ToggleButton(u8"Останавливать чат при открытии поля ввода", checkbox.freezechat) then
             if checkbox.freezechat.v then 
                playerdata.isChatFreezed = true 
             else
@@ -5649,7 +5687,7 @@ function imgui.OnDrawFrame()
             inicfg.save(ini, configIni)
          end
          
-         if imgui.Checkbox(u8("Отключить весь чат"), checkbox.allchatoff) then
+         if imgui.ToggleButton(u8"Отключить весь чат", checkbox.allchatoff) then
             ini.settings.allchatoff = checkbox.allchatoff.v
             inicfg.save(ini, configIni)
             if checkbox.allchatoff.v then
@@ -5657,17 +5695,17 @@ function imgui.OnDrawFrame()
             end
          end     
          
-         if imgui.Checkbox(u8(checkbox.hidechat.v and 'Показать панель с чатотм' or 'Скрыть панель с чатом'), checkbox.hidechat) then
+         if imgui.ToggleButton(u8(checkbox.hidechat.v and 'Показать панель с чатотм' or 'Скрыть панель с чатом'), checkbox.hidechat) then
             memory.fill(getModuleHandle("samp.dll") + 0x63DA0, checkbox.hidechat.v and 0x90909090 or 0x0A000000, 4, true)
             sampSetChatInputEnabled(checkbox.hidechat.v)
          end
          
-         if imgui.Checkbox(u8("Очищать строку ввода после закрытия"), checkbox.chatinputdrop) then
+         if imgui.ToggleButton(u8"Очищать строку ввода после закрытия", checkbox.chatinputdrop) then
             ini.settings.chatinputdrop = checkbox.chatinputdrop.v
             inicfg.save(ini, configIni)
          end
          
-         if imgui.Checkbox(u8("Копировать ник кликнутого игрока в TAB"), checkbox.tabclickcopy) then
+         if imgui.ToggleButton(u8"Копировать ник кликнутого игрока в TAB", checkbox.tabclickcopy) then
             ini.settings.tabclickcopy = checkbox.tabclickcopy.v
             inicfg.save(ini, configIni)
             if ini.settings.tabclickcopy then
@@ -5675,7 +5713,7 @@ function imgui.OnDrawFrame()
             end
          end
          
-         if imgui.Checkbox(u8("Сохранять историю персональных сообщений /pmh"), checkbox.savepmmessages) then
+         if imgui.ToggleButton(u8"Сохранять историю персональных сообщений /pmh", checkbox.savepmmessages) then
             ini.settings.savepmmessages = checkbox.savepmmessages.v
             inicfg.save(ini, configIni)
             if ini.settings.savepmmessages then
@@ -5683,10 +5721,10 @@ function imgui.OnDrawFrame()
             end
          end
          
-         imgui.Spacing()
-         if imgui.Button(u8"Получить id и ники игроков рядом", imgui.ImVec2(300, 25)) then
-            copyNearestPlayersToClipboard()
-         end
+         -- imgui.Spacing()
+         -- if imgui.Button(u8"Получить id и ники игроков рядом", imgui.ImVec2(300, 25)) then
+            -- copyNearestPlayersToClipboard()
+         -- end
          
       elseif tabmenu.settings == 9 then
          
@@ -12929,12 +12967,22 @@ function sampev.onSendChat(message)
          tostring(sampGetPlayerNickname(result)))
       end
       
+      if ini.settings.chatprefix > 0 then
+         formatted = true
+         text = chatPrefixList[combobox.chatprefix.v+1].." "..text
+         if ini.settings.chatprefix >= 4 then
+            sampSendChat(text)
+            formatted = false
+            return false
+         end
+      end
+      
       if formatted then
          return {text}
       end
       formatted = false
+      
    end
-   
 end
 
 function sampev.onSetVehicleVelocity(turn, velocity)
@@ -14313,7 +14361,7 @@ function copyNearestPlayersToClipboard()
          table.insert(tmpPlayers, string.format("%s[%d] ", nickname, id))
       end
    end
-   if totalplayers then
+   if totalplayers > 0 then
       resulstring = table.concat(tmpPlayers)
       setClipboardText(resulstring)
       sampAddChatMessage("[SCRIPT]: {FFFFFF}Ид и ники "..totalplayers.." игроков рядом скопированы в буффер обмена", 0x0FF6600)
