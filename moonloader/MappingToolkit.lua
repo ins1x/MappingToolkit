@@ -1,14 +1,26 @@
-script_author("1NS")
 script_name("Mapping Toolkit")
 script_description("Assistant for mappers")
 script_dependencies('imgui', 'lib.samp.events')
 script_properties("work-in-pause")
 script_url("https://github.com/ins1x/MappingToolkit")
-script_version("4.12") -- R1
+script_author("1NS") -- https://github.com/ins1x 
+script_version("4.12") -- R3
+-- License: MIT https://opensource.org/license/mit
 -- support sa-mp versions depends on SAMPFUNCS (0.3.7-R1, 0.3.7-R3-1, 0.3.7-R5, 0.3.DL)
 -- script_moonloader(16) moonloader v.0.26 
 -- editor options: tabsize 3, Unix (LF), encoding Windows-1251
 -- in-game activaton: ALT + X (show main menu) or command /toolkit
+
+-- Description:
+-- Toolkit gives you more options for mapping and developing your projects. 
+-- A convenient graphical interface on imgui is provided to manage all the options. 
+-- The toolkit provides additional functions for working with textures and objects,
+-- fixes some game bugs, supplements server commands and dialogs.
+
+-- The functionality is quite extensive and is regularly updated. 
+-- More information on the toolkit's capabilities is on the wiki. 
+-- Designed for TRAINING-SANDBOX. It can work on other projects, 
+-- but most of the features will be unavailable.
 
 local sampev = require 'lib.samp.events'
 local imgui = require 'imgui'
@@ -16,8 +28,8 @@ local memory = require 'memory'
 local encoding = require 'encoding'
 encoding.default = 'CP1251'
 u8 = encoding.UTF8
+-- require('requests') The lua-requests module is used only for version checking! 
 
--------------- [ cfg ] ---------------
 local inicfg = require 'inicfg'
 local configIni = "mappingtoolkit.ini"
 local ini = inicfg.load({
@@ -113,6 +125,7 @@ local ini = inicfg.load({
       keyK = "",
       keyL = "/lock",
       keyN = "",
+      keyB = "",
       keyZ = "",
       keyI = "",
       keyO = "",
@@ -161,7 +174,7 @@ local ini = inicfg.load({
    }
 }, configIni)
 inicfg.save(ini, configIni)
---------------------------------------
+
 local sizeX, sizeY = getScreenResolution()
 local v = nil
 
@@ -606,6 +619,7 @@ local combobox = {
    hotkeyOaction = imgui.ImInt(0),
    hotkeyPaction = imgui.ImInt(0),
    hotkeyNaction = imgui.ImInt(0),
+   hotkeyBaction = imgui.ImInt(0),
    hotkeyZaction = imgui.ImInt(0),
    hotkeyUaction = imgui.ImInt(0),
    
@@ -1152,7 +1166,6 @@ function main()
             local ip, port = sampGetCurrentServerAddress()
             
             if not ip:find("127.0.0.1") and not servername:find("TRAINING") then
-               print(servername)
                print("[Mapping Toolkit] was automatically unloaded")
                thisScript():unload()
             end
@@ -1350,6 +1363,9 @@ function main()
             end
             if isKeyJustPressed(0x4E) and ini.hotkeyactions.keyN ~= nil and string.len(ini.hotkeyactions.keyN) > 1 then
                sampSendChat(tostring(ini.hotkeyactions.keyN))
+            end
+            if isKeyJustPressed(0x42) and ini.hotkeyactions.keyB ~= nil and string.len(ini.hotkeyactions.keyB) > 1 then
+               sampSendChat(tostring(ini.hotkeyactions.keyB))
             end
             if isKeyJustPressed(0x4F) and ini.hotkeyactions.keyO ~= nil and string.len(ini.hotkeyactions.keyO) > 1 then
                sampSendChat(tostring(ini.hotkeyactions.keyO))
@@ -2035,6 +2051,8 @@ function imgui.OnDrawFrame()
                      imgui.SameLine()
                      imgui.TextColoredRGB(string.format("Дистанция {696969}%.1f m.",
                      getDistanceBetweenCoords3d(positionX, positionY, positionZ, tpcpos.x, tpcpos.y, tpcpos.z)))
+                  else
+                     imgui.TextColoredRGB("Отмеченная позиция: {696969}не задана")
                   end
                end
                
@@ -6041,6 +6059,11 @@ function imgui.OnDrawFrame()
                if checkbox.worldsavereminder.v then
                   SaveReminder()
                   sampAddChatMessage("[SCRIPT]: {FFFFFF}Включены напоминания о необходимости сохранять виртуальный мир", 0x0FF6600)
+               else
+                  if threads.savereminder then
+                     threads.savereminder:terminate()
+                     threads.savereminder = nil
+                  end
                end
                ini.settings.worldsavereminder = checkbox.worldsavereminder.v
                inicfg.save(ini, configIni)
@@ -6419,6 +6442,14 @@ function imgui.OnDrawFrame()
                   u8:decode(tostring(hotkeysActivationList[combobox.hotkeyNaction.v+1])), 0x0FF6600)
                end
                
+               if imgui.Combo(u8'Клавиша B##ComboBoxhotkeyBaction', combobox.hotkeyBaction, 
+               hotkeysActivationList, #hotkeysActivationList) then
+                  ini.hotkeyactions.keyB = tostring(hotkeysActivationCmds[combobox.hotkeyBaction.v+1])
+                  inicfg.save(ini, configIni)
+                  sampAddChatMessage("[SCRIPT]: {FFFFFF}Выбрано действие - "..
+                  u8:decode(tostring(hotkeysActivationList[combobox.hotkeyBaction.v+1])), 0x0FF6600)
+               end
+               
                if imgui.Combo(u8'Клавиша 0##ComboBoxhotkeyOaction', combobox.hotkeyOaction, 
                hotkeysActivationList, #hotkeysActivationList) then
                   ini.hotkeyactions.keyO = tostring(hotkeysActivationCmds[combobox.hotkeyOaction.v+1])
@@ -6542,6 +6573,7 @@ function imgui.OnDrawFrame()
                ini.hotkeyactions.keyK = ""
                ini.hotkeyactions.keyL = "/lock"
                ini.hotkeyactions.keyN = ""
+               ini.hotkeyactions.keyB = ""
                ini.hotkeyactions.keyR = ""
                ini.hotkeyactions.keyZ = ""
                ini.hotkeyactions.keyU = "/animlist"
@@ -9690,6 +9722,20 @@ function sampev.onSendDialogResponse(dialogId, button, listboxId, input)
          ini.tmp.worlddescription = tostring(input)
          inicfg.save(ini, configIni)
       end
+      
+      if button == 0 and ini.settings.skipomenu then
+         local caption = sampGetDialogCaption()
+         if LastData.lastDialogTitle then
+            --print(LastData.lastDialogTitle, caption)
+            if caption:find("Редактирование объекта") then
+               lua_thread.create(function()
+                  wait(5)
+                  sampSendClickTextdraw(2118)
+               end)
+            end
+         end
+      end
+      
       -- Покинуть данный мир? 
       if button == 1 and dialoghook.exitdialog then
          playerdata.isWorldHoster = false
@@ -9875,28 +9921,52 @@ function sampev.onSendDialogResponse(dialogId, button, listboxId, input)
          end
          -- Extend world manage menu
          if input:find("Список командных блоков") then
-            sampSendChat("/cblist")
+            lua_thread.create(function()
+               wait(100)
+               sampSendChat("/cblist")
+            end)
          end
          if input:find("Список триггер блоков") then
-            sampSendChat("/tb")
+            lua_thread.create(function()
+               wait(100)
+               sampSendChat("/tb")
+            end)
          end
          if input:find("Список таймеров") then
-            sampSendChat("/timers")
+            lua_thread.create(function()
+               wait(100)
+               sampSendChat("/timers")
+            end)
          end
          if input:find("Список объектов в мире") then
-            sampSendChat("/olist")
+            lua_thread.create(function()
+               wait(100)
+               sampSendChat("/olist")
+            end)
          end
          if input:find("Список перемещаемых объектов") then
-            sampSendChat("/gate")
+            lua_thread.create(function()
+               wait(100)
+               sampSendChat("/gate")
+            end)
          end
          if input:find("Список переменных") then
-            sampSendChat("/varlist")
+            lua_thread.create(function()
+               wait(100)
+               sampSendChat("/varlist")
+            end)
          end
          if input:find("Список переменных игрока") then
-            sampSendChat("/pvarlist")
+            lua_thread.create(function()
+               wait(100)
+               sampSendChat("/pvarlist")
+            end)
          end
          if input:find("Список аудиостримов") then
-            sampSendChat("/stream")
+            lua_thread.create(function()
+               wait(100)
+               sampSendChat("/stream")
+            end)
          end
          
          -- /vmenu
@@ -10156,12 +10226,30 @@ function sampev.onShowDialog(dialogId, style, title, button1, button2, text)
             return {dialogId, style, title, button1, button2, newtext}
          end
          
+         if text:find('Укажите желаемую погоду мира') then
+            LastData.lastLink = 'https://dev.prineside.com/en/gtasa_weather_id/'
+            local newtext = "{FFFFFF}".. text .. 
+            "\n{007FFF}" .. LastData.lastLink ..
+            "\n{696969}Нажмите CTRL + SHIFT + L чтобы открыть ссылку в браузере\n"
+            return {dialogId, style, title, button1, button2, newtext}
+         end
+         
          if text:find('Укажите текст') then
             if dialoghook.action then
                local newtext = text ..
                "\n\n{696969}Нажмите CTRL + SHIFT + V чтобы вставить последнее значение\n"
                return {dialogId, style, title, button1, button2, newtext}
             end
+         end
+         
+         if text:find('Укажите два цвета для двух слотов в формате AARRGGBB') then
+            local newtext = text ..
+            "\n\n{FF0000}R - красный, {00FF00}G - зелёный, {0000FF}B - синий\n"..
+            "{FFFFFF}Пример некоторых цветов:\n"..
+            "{FFFFFF}FFFFFFFF, {363636}FF000000, {FF0000}FFFF0000\n"..
+            "{00FF00}FF00FF00, {0000FF}FF0000FF, {FFFF00}FFFFFF00\n"..
+            "{FF00FF}FFFF00FF, {00FFFF}FF00FFFF{FFFFFF}, и т.д.\n"
+            return {dialogId, style, title, button1, button2, newtext}
          end
          
          if text:find('{80BCFF}Модель.+{FFFFFF}') then
@@ -10509,14 +10597,14 @@ function sampev.onShowDialog(dialogId, style, title, button1, button2, text)
          -- Extend world manage menu
          if text:find("Обнулить все оружие") and style == 4 then
             local newitems = "\n"..
-            "- Список командных блоков\n"..
-            "- Список триггер блоков\n"..
-            "- Список таймеров\n"..
-            "- Список объектов в мире\n"..
-            "- Список перемещаемых объектов\n"..
-            "- Список переменных\n"..
-            "- Список переменных игрока\n"..
-            "- Список аудиостримов\n"
+            "{696969}- Список командных блоков\n"..
+            "{696969}- Список триггер блоков\n"..
+            "{696969}- Список таймеров\n"..
+            "{696969}- Список объектов в мире\n"..
+            "{696969}- Список перемещаемых объектов\n"..
+            "{696969}- Список переменных\n"..
+            "{696969}- Список переменных игрока\n"..
+            "{696969}- Список аудиостримов\n"
             return {dialogId, style, title, button1, button2, text..newitems}
          end
          -- -- Extend main /menu
@@ -10628,13 +10716,30 @@ function sampev.onShowDialog(dialogId, style, title, button1, button2, text)
    end
       
    -- Skip olist when exit from /omenu
-   if isTrainingSanbox and dialogId == 65535 and ini.settings.skipomenu then
+   if isTrainingSanbox and dialogId == 65535 and ini.settings.skipomenu then      
       if LastData.lastDialogInput then
          if not LastData.lastDialogInput:find("Слот") -- /att fix
          and not LastData.lastDialogInput:find("Скин по умолчанию") -- team skin fix
          and not LastData.lastDialogInput:find("Модель входа") -- /pass fix
-         and not LastData.lastDialogInput:find("Модель выхода") then -- /pass fix
-            sampSendClickTextdraw(2118)
+         and not LastData.lastDialogInput:find("Модель выхода") -- /pass fix
+         and not LastData.lastDialogInput:find("Редактировать") -- /pass fix
+         and not LastData.lastDialogInput:find("Клонировать") -- /pass fix
+         then
+            if LastData.lastDialogTitle then
+               if not LastData.lastDialogTitle:find("Выберите часть тела") 
+               and not LastData.lastDialogTitle:find("Выбор слота") 
+               then -- /new att fix
+                  lua_thread.create(function()
+                     wait(5)
+                     sampSendClickTextdraw(2118)
+                  end)
+               end
+            else
+               lua_thread.create(function()
+                  wait(5)
+                  sampSendClickTextdraw(2118)
+               end)
+            end
          end
       end
    end
@@ -13880,6 +13985,14 @@ function hotkeyActionInit()
       for index, value in pairs(hotkeysActivationCmds) do
          if value:find(tostring(ini.hotkeyactions.keyN)) then
             combobox.hotkeyNaction.v = index-1
+         end
+      end
+   end
+   
+   if ini.hotkeyactions.keyB ~= nil and string.len(ini.hotkeyactions.keyB) > 1 then
+      for index, value in pairs(hotkeysActivationCmds) do
+         if value:find(tostring(ini.hotkeyactions.keyB)) then
+            combobox.hotkeyBaction.v = index-1
          end
       end
    end
