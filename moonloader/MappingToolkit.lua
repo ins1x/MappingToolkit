@@ -4,7 +4,7 @@ script_dependencies('imgui', 'lib.samp.events')
 script_properties("work-in-pause")
 script_url("https://github.com/ins1x/MappingToolkit")
 script_author("1NS") -- https://github.com/ins1x 
-script_version("4.12") -- R3
+script_version("4.12") -- R4
 -- License: MIT https://opensource.org/license/mit
 -- support sa-mp versions depends on SAMPFUNCS (0.3.7-R1, 0.3.7-R3-1, 0.3.7-R5, 0.3.DL)
 -- script_moonloader(16) moonloader v.0.26 
@@ -267,6 +267,7 @@ local dialog = {
    objectinfo = imgui.ImBool(false),
    dialogtext = imgui.ImBool(false),
    txdlist = imgui.ImBool(false),
+   toolkitmanage = imgui.ImBool(false),
 }
 
 local dialoghook = {
@@ -761,13 +762,13 @@ local hotkeysActivationCmds = {
 }
 
 local chatPrefixList = {
-   "", "!", "@", "$", "/b", "/c", "/r"
+   "", "!", "@", "$", "/b", "/c", "/r", "/f"
 }
 
 local chatPrefixNames = {
    u8"Не выбран", u8"Глобальный чат", u8"Чат игрового мира", 
    u8"Чат модераторов мира", u8"ООС чат", u8"Персональный чат",
-   u8"Сообщение в рацию"
+   u8"Сообщение в рацию", u8"Сообщение для команд"
 }
 
 local attCodes = {
@@ -922,9 +923,9 @@ function main()
       if doesFileExist('moonloader/resource/mappingtoolkit/resetsetting.txt') 
       or doesFileExist('moonloader/resetsetting.txt') then
          os.rename(getGameDirectory().."//moonloader//config//mappingtoolkit.ini", getGameDirectory().."//moonloader//config//prevconf_backup_mappingtoolkit.ini")
-         print("Настройки были сброшены на стандартные. Скрипт автоматически перезагрузится.")
+         print("Настройки были сброшены на стандартные. Тулкит автоматически перезагрузится.")
          print("Резервную копию ваших предыдущих настроек можно найти в moonloader/config.")
-         sampAddChatMessage("Настройки были сброшены на стандартные. Скрипт автоматически перезагрузится.",-1)
+         sampAddChatMessage("Настройки были сброшены на стандартные. Тулкит автоматически перезагрузится.",-1)
          sampAddChatMessage("Резервную копию ваших предыдущих настроек можно найти в moonloader/config.",-1)
          reloadScripts()
       end      
@@ -1248,7 +1249,7 @@ function main()
       -- Hide dialogs on ESC
       if isKeyJustPressed(0x1B) and not sampIsChatInputActive() 
       and not sampIsDialogActive() and not isPauseMenuActive() 
-      and not isSampfuncsConsoleActive() then 
+      and not isSampfuncsConsoleActive() then
          if dialog.main.v then dialog.main.v = false end
          if dialog.textures.v then dialog.textures.v = false end
          if dialog.playerstat.v then dialog.playerstat.v = false end
@@ -1257,6 +1258,7 @@ function main()
          if dialog.objectinfo.v then dialog.objectinfo.v = false end
          if dialog.dialogtext.v then dialog.dialogtext.v = false end
          if dialog.txdlist.v then dialog.txdlist.v = false end
+         if dialog.toolkitmanage.v then dialog.toolkitmanage.v = false end
          if tabmenu.main == 2 then -- durtyfix tab unfolding
             tabmenu.main = 1
          end
@@ -1939,17 +1941,26 @@ function imgui.OnDrawFrame()
       imgui.SameLine()
       imgui.Text("                               ")
       imgui.SameLine()
-      if imgui.Button(u8"Свернуть", imgui.ImVec2(70, 30)) then
+
+      if imgui.TooltipButton(u8" _ ", imgui.ImVec2(30, 25), u8"Свернуть окно тулкита") then
          dialog.main.v = not dialog.main.v
       end
       imgui.SameLine()
-      
-      imgui.TextQuestion("( ? )", u8"Информация о тулките")
-      if imgui.IsItemClicked() then 
+      if imgui.TooltipButton(u8" ? ", imgui.ImVec2(30, 25), u8"Информация о тулките") then
          tabmenu.main = 3
          tabmenu.info = 1
       end
-      
+      imgui.SameLine()
+      if dialog.toolkitmanage.v then
+         if imgui.TooltipButton(u8" < ", imgui.ImVec2(30, 25), u8"Управление") then
+            dialog.toolkitmanage.v = false
+         end
+      else
+         if imgui.TooltipButton(u8" > ", imgui.ImVec2(30, 25), u8"Управление") then
+            dialog.toolkitmanage.v = true
+         end
+      end
+
       imgui.Spacing()
       
       if tabmenu.main == 1 then
@@ -5982,7 +5993,7 @@ function imgui.OnDrawFrame()
                ini.settings.imguifont = tostring(uiFontsFilenames[combobox.uifontselect.v + 1])
                inicfg.save(ini, configIni)
                sampAddChatMessage("[SCRIPT]: {FFFFFF}Выбрана шрифт - "..tostring(uiFontsList[combobox.uifontselect.v + 1]), 0x0FF6600)
-               sampAddChatMessage("[SCRIPT]: {FFFFFF}Перезапустите скрипт чтобы увидеть изменения", 0x0FF6600)
+               sampAddChatMessage("[SCRIPT]: {FFFFFF}Перезапустите тулкит чтобы увидеть изменения", 0x0FF6600)
             end
             imgui.PopItemWidth()
             
@@ -6299,7 +6310,7 @@ function imgui.OnDrawFrame()
             imgui.TextQuestion("( ? )", u8"Автоматически зайдет в созданный мир при подключении\
             (при условии что он еще не был обнулен)")
             
-            if imgui.Checkbox(u8'Автоматически выгружать скрипт для других проектов', checkbox.serverlock) then
+            if imgui.Checkbox(u8'Автоматически выгружать тулкит для других проектов', checkbox.serverlock) then
                ini.settings.serverlock = checkbox.serverlock.v
                inicfg.save(ini, configIni)
             end
@@ -6334,7 +6345,7 @@ function imgui.OnDrawFrame()
                   -- -- sampAddChatMessage("[SCRIPT]: {FFFFFF}Резервную копию ваших предыдущих настроек можно найти в {696969}moonloader/config.",0x0FF6600)
                -- -- end
             -- else
-               -- if imgui.TooltipButton(u8'Установить авто-логин', imgui.ImVec2(250, 25), u8"Отправит вас на страницу скачивания скрипта авто-логина") then
+               -- if imgui.TooltipButton(u8'Установить авто-логин', imgui.ImVec2(250, 25), u8"Отправит вас на страницу скачивания тулкита авто-логина") then
                   -- os.execute('explorer "https://github.com/ins1x/moonloader-scripts/raw/refs/heads/main/training-sandbox/training-autologin/training-autologin.lua"')
                   -- sampAddChatMessage("[SCRIPT]: {FFFFFF}После загрузки файла скопируйте training-autologin.lua в папку moonloader", 0x0FF6600)
                   -- sampAddChatMessage("[SCRIPT]: {FFFFFF}При первом входе после установки авто-логин автоматически сохранит пароль (Только для TRAINING-SANDBOX)", 0x0FF6600)
@@ -7495,11 +7506,11 @@ function imgui.OnDrawFrame()
             local text = [[Если вы обнаружили ошибку сообщите о ней на форуме.
             Опишите, как и когда появляется ошибка и в чём именно она заключается.
             Чем подробнее будет описание, тем быстрее выйдет исправление этой ошибки.
-            При краше скрипта будет полезна информация из moonloader.log.
+            При краше тулкита будет полезна информация из moonloader.log.
             Так же вы можете приложить скриншот/видеозапись с воспроизведением ошибки.
             
             Перед публикацией убедитесь что ошибка относится к работе тулкита.
-            Вы можете выгрузить скрипт и попробовать воспроизвести проблему без тулкита.
+            Вы можете выгрузить тулкит и попробовать воспроизвести проблему без тулкита.
             ]] 
             text = string.gsub(text, "   ", "")
             imgui.Text(u8(text))
@@ -7533,46 +7544,7 @@ function imgui.OnDrawFrame()
          imgui.Spacing()
          imgui.Spacing()
          
-         if imgui.Button(u8"Перегрузить скрипт",imgui.ImVec2(160, 25)) then
-            sampAddChatMessage("{696969}Mapping Toolkit{FFFFFF} перезагружается.", -1)
-            sampAddChatMessage("Для перезапуска можно использовтаь комбинацию клавиш {696969}CTRL + R.", -1)
-            thisScript():unload()
-         end
-         imgui.SameLine()
-         if imgui.Button(u8"Выгрузить скрипт",imgui.ImVec2(160, 25)) then
-            sampAddChatMessage("{696969}Mapping Toolkit{FFFFFF} успешно выгружен.", -1)
-            sampAddChatMessage("Для повторного запуска используйте комбинацию клавиш {696969}CTRL + R.", -1)
-            thisScript():unload()
-         end
-         imgui.SameLine()
-         if imgui.TooltipButton(u8"Нашел баг", imgui.ImVec2(160, 25), u8"Жми не стесняйся") then
-            tabmenu.credits = 3
-         end
-         -- if imgui.Button(u8"Проверить обновления",imgui.ImVec2(160, 25)) then
-            -- if not checkScriptUpdates() then
-               -- sampAddChatMessage("{696969}Mapping Toolkit  {FFFFFF}Установлена актуальная версия {696969}"..thisScript().version, -1)
-               -- --os.execute('explorer https://github.com/ins1x/MappingToolkit/releases')
-            -- end
-         -- end
-         -- imgui.SameLine()
-         if imgui.TooltipButton(u8"Сбросить настройки",imgui.ImVec2(160, 25),u8"Сбросит настройки предварительно сохранив копию текущих настроек") then
-            os.rename(getGameDirectory().."//moonloader//config//mappingtoolkit.ini", getGameDirectory().."//moonloader//config//backup_mappingtoolkit.ini")
-            sampAddChatMessage("[SCRIPT]: {FFFFFF}Настройки были сброшены на стандартные. Скрипт автоматически перезагрузится.",0x0FF6600)
-            sampAddChatMessage("[SCRIPT]: {FFFFFF}Резервную копию ваших предыдущих настроек можно найти в {696969}moonloader/config.",0x0FF6600)
-            reloadScripts()
-         end
-         imgui.SameLine()
-         if imgui.Button(u8"Открыть конфиг",imgui.ImVec2(160, 25)) then
-            folder = getGameDirectory().. "\\moonloader\\config\\"
-            os.execute('explorer "'..folder..'"')
-         end
-         imgui.SameLine()
-         if imgui.TooltipButton(u8"Отладка", imgui.ImVec2(160, 25), u8"Открыть инструменты для отлдаки") then
-            tabmenu.info = 4
-         end
-
-         
-         if imgui.Button(u8"Проверить обновления",imgui.ImVec2(160, 25)) then
+         if imgui.TooltipButton(u8"Проверить обновления", imgui.ImVec2(180, 25), u8"Проверить наличие обновлений") then
             if not checkScriptUpdates() then
                sampAddChatMessage("{696969}Mapping Toolkit  {FFFFFF}Установлена актуальная версия {696969}"..thisScript().version, -1)
                --os.execute('explorer https://github.com/ins1x/MappingToolkit/releases')
@@ -7583,7 +7555,13 @@ function imgui.OnDrawFrame()
             ini.settings.checkupdates = checkbox.checkupdates.v
             inicfg.save(ini, configIni)
          end
-         
+         if imgui.TooltipButton(u8"Сообщить о ошибке", imgui.ImVec2(180, 25), u8"Жми не стесняйся") then
+            tabmenu.credits = 3
+         end
+         imgui.SameLine()
+         if imgui.TooltipButton(u8"Управление", imgui.ImVec2(160, 25), u8"Дополнительные возможности") then
+            dialog.toolkitmanage.v = not dialog.toolkitmanage.v
+         end
          imgui.Spacing()
          imgui.Spacing()
       elseif tabmenu.info == 3 then
@@ -8869,7 +8847,7 @@ function imgui.OnDrawFrame()
             imgui.Spacing()
          end
          
-      elseif tabmenu.info == 10 then
+      elseif tabmenu.info == 7 then
          local filepath = getGameDirectory().."//moonloader//resource//mappingtoolkit//cblist.txt"
          
          -- if imgui.TooltipButton(u8"Unlock IO", imgui.ImVec2(80, 25), u8:encode("разблокировать инпут если курсор забагался")) then
@@ -8960,6 +8938,7 @@ function imgui.OnDrawFrame()
          if imgui.Button(u8"Поиск", imgui.ImVec2(105, 30)) then tabmenu.info = 2 end
       end
       
+      -- if tabmenu.info == 4 then reserved for debug menu
       if tabmenu.info == 5 then
          imgui.PushStyleColor(imgui.Col.Button, imgui.GetStyle().Colors[imgui.Col.ButtonHovered])
          if imgui.Button(u8"Избранные", imgui.ImVec2(105, 30)) then tabmenu.info = 5 end
@@ -8985,12 +8964,12 @@ function imgui.OnDrawFrame()
       end
       
       if isTrainingSanbox then
-         if tabmenu.info == 10 then
+         if tabmenu.info == 7 then
             imgui.PushStyleColor(imgui.Col.Button, imgui.GetStyle().Colors[imgui.Col.ButtonHovered])
-            if imgui.Button(u8"КБ", imgui.ImVec2(105, 30)) then tabmenu.info = 10 end
+            if imgui.Button(u8"КБ", imgui.ImVec2(105, 30)) then tabmenu.info = 7 end
             imgui.PopStyleColor()
          else
-            if imgui.Button(u8"КБ", imgui.ImVec2(105, 30)) then tabmenu.info = 10 end
+            if imgui.Button(u8"КБ", imgui.ImVec2(105, 30)) then tabmenu.info = 7 end
          end
       end
       
@@ -9296,6 +9275,73 @@ function imgui.OnDrawFrame()
       imgui.InputTextMultiline('##dialogtext', textbuffer.dialogtext, imgui.ImVec2(320, 180),
       imgui.InputTextFlags.EnterReturnsTrue + imgui.InputTextFlags.AllowTabInput)
                
+      imgui.End()
+   end
+   
+   if dialog.toolkitmanage.v then
+      imgui.SetNextWindowPos(imgui.ImVec2(sizeX / 1.3, sizeY / 4),
+      imgui.Cond.FirstUseEver, imgui.ImVec2(0.5, 0.5))
+      imgui.Begin(u8"Управление", dialog.toolkitmanage)
+      
+      if imgui.Button(u8"Перегрузить тулкит",imgui.ImVec2(150, 25)) then
+         sampAddChatMessage("{696969}Mapping Toolkit{FFFFFF}  перезагружается.", -1)
+         --sampAddChatMessage("Для перезапуска можно использовтаь комбинацию клавиш {696969}CTRL + R.", -1)
+         thisScript():reload()
+      end
+      
+      if imgui.Button(u8"Выгрузить тулкит",imgui.ImVec2(150, 25)) then
+         sampAddChatMessage("{696969}Mapping Toolkit{FFFFFF}  успешно выгружен.", -1)
+         sampAddChatMessage("Для повторного запуска используйте комбинацию клавиш {696969}CTRL + R.", -1)
+         thisScript():unload()
+      end
+      
+      local thisscript = thisScript()
+      if thisscript.frozen then
+         if imgui.Button(u8"Снять с паузы",imgui.ImVec2(150, 25)) then
+            thisScript():resume()
+            dialog.main.v = true
+            sampAddChatMessage("{696969}Mapping Toolkit{FFFFFF}  поставлен на паузу.", -1)
+         end
+      else
+         if imgui.Button(u8"Поставить на паузу",imgui.ImVec2(150, 25)) then
+            thisScript():pause()
+            sampAddChatMessage("{696969}Mapping Toolkit{FFFFFF}  снят с паузы.", -1)
+         end
+      end
+      
+      if imgui.TooltipButton(u8"Сообщить о ошибке", imgui.ImVec2(150, 25), u8"Жми не стесняйся") then
+         tabmenu.main = 3
+         tabmenu.info = 1
+         tabmenu.credits = 3
+      end
+      -- if imgui.Button(u8"Проверить обновления",imgui.ImVec2(150, 25)) then
+         -- if not checkScriptUpdates() then
+            -- sampAddChatMessage("{696969}Mapping Toolkit  {FFFFFF}Установлена актуальная версия {696969}"..thisScript().version, -1)
+            -- --os.execute('explorer https://github.com/ins1x/MappingToolkit/releases')
+         -- end
+      -- end
+      -- imgui.SameLine()
+      if imgui.TooltipButton(u8"Сбросить настройки",imgui.ImVec2(150, 25),u8"Сбросит настройки предварительно сохранив копию текущих настроек") then
+         os.rename(getGameDirectory().."//moonloader//config//mappingtoolkit.ini", getGameDirectory().."//moonloader//config//backup_mappingtoolkit.ini")
+         sampAddChatMessage("[SCRIPT]: {FFFFFF}Настройки были сброшены на стандартные. Тулкит автоматически перезагрузится.",0x0FF6600)
+         sampAddChatMessage("[SCRIPT]: {FFFFFF}Резервную копию ваших предыдущих настроек можно найти в {696969}moonloader/config.",0x0FF6600)
+         reloadScripts()
+      end
+
+      if imgui.Button(u8"Открыть конфиг",imgui.ImVec2(150, 25)) then
+         folder = getGameDirectory().. "\\moonloader\\config\\"
+         os.execute('explorer "'..folder..'"')
+      end
+      if imgui.TooltipButton(u8"Обновление", imgui.ImVec2(150, 25), u8"Проверить наличие обновлений") then
+         if not checkScriptUpdates() then
+            sampAddChatMessage("{696969}Mapping Toolkit  {FFFFFF}Установлена актуальная версия {696969}"..thisScript().version, -1)
+            --os.execute('explorer https://github.com/ins1x/MappingToolkit/releases')
+         end
+      end
+      if imgui.TooltipButton(u8"Отладка", imgui.ImVec2(150, 25), u8"Открыть инструменты для отлдаки") then
+         tabmenu.main = 3
+         tabmenu.info = 4
+      end
       imgui.End()
    end
    
