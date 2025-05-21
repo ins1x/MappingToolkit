@@ -4,7 +4,7 @@ script_dependencies('imgui', 'lib.samp.events')
 script_properties("work-in-pause")
 script_url("https://github.com/ins1x/MappingToolkit")
 script_author("1NS") -- https://github.com/ins1x 
-script_version("4.12") -- R4
+script_version("4.12") -- R5
 -- License: MIT https://opensource.org/license/mit
 -- support sa-mp versions depends on SAMPFUNCS (0.3.7-R1, 0.3.7-R3-1, 0.3.7-R5, 0.3.DL)
 -- script_moonloader(16) moonloader v.0.26 
@@ -10976,9 +10976,8 @@ function sampev.onServerMessage(color, text)
             local closestObjectId = getClosestObjectId()
             if closestObjectId then
                sampAddChatMessage("Ближайший объект: {696969}"..getObjectModel(closestObjectId).." ("..tostring(sampObjectModelNames[getObjectModel(closestObjectId)])..") ", -1)
-            else
-               sampAddChatMessage("Можете попробовать объект: {696969}3374{FFFFFF} - Большие стаки сена", -1)
             end
+            sampAddChatMessage(("Можете попробовать объект: {696969}%d {FFFFFF}(%s)"):format(getSafeObjectModel(), tostring(sampObjectModelNames[getSafeObjectModel()])), -1)
          end)
       end
       
@@ -11667,6 +11666,7 @@ function sampev.onSendCommand(command)
    
    if isTrainingSanbox then
       if command:find("^/actionlist") or command:find("^/alist$") then
+         sampAddChatMessage("[SCRIPT]: {FFFFFF} Обратите внимание что internalid не совпадает с id сервера!", 0x0FF6600)
          sampAddChatMessage("Список 3d текстов (/action):", -1)
          for id = 1024, 2048 do -- on Training started 1024 
             if sampIs3dTextDefined(id) then
@@ -11921,10 +11921,25 @@ function sampev.onSendCommand(command)
             local closestObjectId = getClosestObjectId()
             if closestObjectId then
                sampAddChatMessage("Ближайший объект: {696969}"..getObjectModel(closestObjectId).." ("..tostring(sampObjectModelNames[getObjectModel(closestObjectId)])..") ", -1)
-            else
-               sampAddChatMessage("Можете попробовать объект: {696969}3374{FFFFFF} - Большие стаки сена", -1)
             end
+            sampAddChatMessage(("Можете попробовать объект: {696969}%d {FFFFFF}(%s)"):format(getSafeObjectModel(), tostring(sampObjectModelNames[getSafeObjectModel()])), -1)
          end)
+      end
+   end
+   
+   if isTrainingSanbox and command:find("^/oswap") then
+      if command:find('(/%a+) (.+) (.+)') then
+         local cmd, localid, modelid = command:match('(/%a+) (.+) (.+)')
+         local id = tonumber(localid)
+         local model = tonumber(modelid)
+         if type(id) == "number" and type(model) then
+            if model and isValidObjectModel(model) then 
+               -- LastRemovedObject.modelid = model
+               -- LastData.lastModel = model
+               local objectName = tostring(sampObjectModelNames[model])
+               sampAddChatMessage(("[SCRIPT]: {FFFFFF}Модель объекта %d заменена на %d (%s)"):format(id, model, objectName), 0x0FF6600)
+            end
+         end
       end
    end
    
@@ -11991,6 +12006,12 @@ function sampev.onSendCommand(command)
          if type(texture) == "string" then
             if texture:find("invis") then 
                local newcommand = string.gsub(command, texture, "8660")
+               return {newcommand}
+            end
+         end
+         if type(texture) == "string" then
+            if texture:find("none") then 
+               local newcommand = string.gsub(command, texture, "16")
                return {newcommand}
             end
          end
@@ -12826,7 +12847,7 @@ function sampev.onSendCommand(command)
    end
    
    if ini.settings.devmode and command:find("^/test") then   
-      
+      -- allowPauseInWidescreen(true)
       -- sampAddChatMessage("Test", -1)
       
       -- local rotationX, rotationY, rotationZ = 0.0
@@ -13863,6 +13884,9 @@ function onReceiveRpc(id, bs)
    
    if id == 116 then -- onEditAttachedObject
       playerdata.isPlayerEditAttachedObject = true
+   end
+   if id == 88 and playerdata.flymode then -- onSetPlayerSpecialAction
+      return false
    end
 end
 
@@ -15027,7 +15051,6 @@ function isObjectWithAnimation(modelid)
    return false
 end
 
-
 function isValidObjectModel(modelid)
    -- Checks valid GTA:SA and SA:MP models.
    if modelid >= 321 and modelid <= 328 or modelid >= 330 and modelid <= 331 then return true
@@ -15073,6 +15096,15 @@ function isValidObjectModel(modelid)
    elseif modelid >= 18860 and modelid <= 19274 or modelid >= 19275 and modelid <= 19595 then return true
    elseif modelid >= 19596 and modelid <= 19999 then return true 
    else return false end
+end
+
+function getSafeObjectModel()
+   local safeobjects = {
+       19353, 19383, 19399, 19426, 19445, -- walls
+       18762, 18763, 18764, 18765, 18766, -- concrete block
+       19789, 19790, 19791 -- square blocks
+    }
+   return safeobjects[math.random(#safeobjects)]
 end
 
 function getZoneName(x, y, z)
