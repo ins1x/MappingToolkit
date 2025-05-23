@@ -157,7 +157,8 @@ local ini = inicfg.load({
       position = 0, -- position (0 = bottom pos, 1 = upper pos)
       showfps = true,
       showmode = true,
-      showstreamedobj = true,
+      showstreameddynobjects = true,
+      showstreamedallobjects = true,
       showstreamedplayers = false,
       showstreamedvehs = false,
       showlastobject = true,
@@ -203,8 +204,6 @@ end
 -- should be global!
 vehiclesTotal = 0
 playersTotal = 0
-streamedObjects = 0
-packets = {rpcSend, rpcRecieve, packetSend, packetRecieve}
 
 local fixcam = {x = 0.0, y = 0.0, z = 0.0}
 local cam = {x = 0.0, y = 0.0, z = 0.0}
@@ -354,7 +353,8 @@ local checkbox = {
    showpanel = imgui.ImBool(ini.panel.showpanel),
    panelbackground = imgui.ImBool(ini.panel.background),
    panelshowfps = imgui.ImBool(ini.panel.showfps),
-   panelshowstreamedobj = imgui.ImBool(ini.panel.showstreamedobj),
+   panelshowstreamedobj = imgui.ImBool(ini.panel.showstreameddynobjects),
+   panelshowstreamedallobjects = imgui.ImBool(ini.panel.showstreamedallobjects),
    panelshowstreamedvehs = imgui.ImBool(ini.panel.showstreamedvehs),
    panelshowstreamedplayers = imgui.ImBool(ini.panel.showstreamedplayers),
    panelshowcursorpos = imgui.ImBool(ini.panel.showcursorpos),
@@ -1167,7 +1167,7 @@ function main()
             local ip, port = sampGetCurrentServerAddress()
             
             if not ip:find("127.0.0.1") and not servername:find("TRAINING") then
-               print("[Mapping Toolkit] was automatically unloaded")
+               print("was automatically unloaded [serverlock]")
                thisScript():unload()
             end
          end
@@ -1531,17 +1531,6 @@ function main()
          end
       end
       
-      -- Count streamed objects
-      streamedObjects = 0
-      for _, v in pairs(getAllObjects()) do
-         if isObjectOnScreen(v) then
-            local objectid = sampGetObjectSampIdByHandle(v)
-            --if objectid ~= -1 then -- count only dynamic objects
-            streamedObjects = streamedObjects + 1
-            --end
-         end
-      end
-      
       -- Objects render
       if checkbox.showobjectsmodel.v or checkbox.showobjectsname.v then
          if not isPauseMenuActive() then
@@ -1787,13 +1776,14 @@ function main()
             rendertext = rendertext.." | FPS: "..playerdata.fps..""
          end
          
-         if ini.panel.showstreamedobj then
-            if streamedObjects < 200 then
-               rendertext = rendertext.." | objects: "..streamedObjects..""
-            elseif streamedObjects > 200 and streamedObjects < 350 then
-               rendertext = rendertext.." | objects: {FFA500}"..streamedObjects.."{FFFFFF}"
+         if ini.panel.showstreameddynobjects then
+            local streamedobjects = getStreamedObjects(ini.panel.showstreamedallobjects)
+            if streamedobjects < 200 then
+               rendertext = rendertext.." | objects: "..streamedobjects..""
+            elseif streamedobjects > 200 and streamedobjects < 350 then
+               rendertext = rendertext.." | objects: {FFA500}"..streamedobjects.."{FFFFFF}"
             else
-               rendertext = rendertext.." | objects: {A00000}"..streamedObjects.."{FFFFFF}"
+               rendertext = rendertext.." | objects: {A00000}"..streamedobjects.."{FFFFFF}"
             end
          end
          
@@ -3369,13 +3359,14 @@ function imgui.OnDrawFrame()
          
          imgui.Spacing()
          imgui.Spacing()
-         if streamedObjects then
-            if streamedObjects < 200 then
-               imgui.TextColoredRGB("{696969}Объектов в области в стрима: "..streamedObjects)
-            elseif streamedObjects > 200 and streamedObjects < 350 then
-               imgui.TextColoredRGB("{696969}Объектов в области в стрима: {FFA500}"..streamedObjects)
+         local streamedobjects = getStreamedObjects(ini.panel.showstreamedallobjects)
+         if streamedobjects then
+            if streamedobjects < 200 then
+               imgui.TextColoredRGB("{696969}Объектов в области в стрима: "..streamedobjects)
+            elseif streamedobjects > 200 and streamedobjects < 350 then
+               imgui.TextColoredRGB("{696969}Объектов в области в стрима: {FFA500}"..streamedobjects)
             else
-               imgui.TextColoredRGB("{696969}Объектов в области в стрима: {A00000}"..streamedObjects)
+               imgui.TextColoredRGB("{696969}Объектов в области в стрима: {A00000}"..streamedobjects)
             end
          end
         
@@ -3966,7 +3957,7 @@ function imgui.OnDrawFrame()
             Restream()
          end
          imgui.SameLine()
-         imgui.TextColoredRGB(("{696969}streamed objects:  %i"):format(tostring(streamedObjects)))
+         imgui.TextColoredRGB(("{696969}streamed objects:  %i"):format(tostring(getStreamedObjects(ini.panel.showstreamedallobjects))))
          
          if imgui.Button(u8"Очистить streaming memory",imgui.ImVec2(195, 25)) then
             cleanStreamMemory()
@@ -6018,14 +6009,16 @@ function imgui.OnDrawFrame()
             end
 
             if imgui.Checkbox(u8'Показывать счетчик объектов на нижней панели', checkbox.panelshowstreamedobj) then
-               ini.panel.showstreamedobj = checkbox.panelshowstreamedobj.v
+               ini.panel.showstreameddynobjects = checkbox.panelshowstreamedobj.v
                inicfg.save(ini, configIni)
             end
             
             if imgui.Checkbox(u8'Показывать счетчик транспорта в стриме на нижней панели', checkbox.panelshowstreamedvehs) then
                ini.panel.showstreamedvehs = checkbox.panelshowstreamedvehs.v
                inicfg.save(ini, configIni)
-               sampAddChatMessage("[SCRIPT]: {FFFFFF}Данная опция может снижать фпс!", 0x0FF6600)
+               if checkbox.panelshowstreamedvehs.v then
+                  sampAddChatMessage("[SCRIPT]: {FFFFFF}Данная опция может снижать FPS!", 0x0FF6600)
+               end
             end
             
             if imgui.Checkbox(u8'Показывать счетчик игроков в стриме на нижней панели', checkbox.panelshowstreamedplayers) then
@@ -6603,8 +6596,7 @@ function imgui.OnDrawFrame()
                sampAddChatMessage("[SCRIPT]: {FFFFFF}Восстановлены стандартные значения", 0x0FF6600)
             end
             
-            imgui.TextColoredRGB("{696969}Ознакомиться со списком всех горячих клавиш возможно в разделе: ")
-            imgui.TextColoredRGB("{696969}Информация - Команды - Горячие клавиши.")
+            imgui.TextColoredRGB("{696969}Нет нужной клавиши? Воспользуйтесь биндером")
          end
          -- if imgui.CollapsingHeader(u8"Прочее:") then
             
@@ -9341,6 +9333,9 @@ function imgui.OnDrawFrame()
       if imgui.TooltipButton(u8"Отладка", imgui.ImVec2(150, 25), u8"Открыть инструменты для отлдаки") then
          tabmenu.main = 3
          tabmenu.info = 4
+      end
+      if imgui.TooltipButton(u8" << ", imgui.ImVec2(150, 25), u8"Свернуть") then
+         dialog.toolkitmanage.v = false
       end
       imgui.End()
    end
@@ -13855,10 +13850,6 @@ function onWindowMessage(msg, wparam, lparam)
 end
 
 function onReceiveRpc(id, bs)
-   local rpcName = raknetGetRpcName(id)
-   if rpcName then
-      packets.rpcRecieve = tostring(id.."."..rpcName)
-   end
    -- NOP's
    if nops.selecttextdraw.v and id == 83 then return false end
    if nops.health.v and id == 14 then return false end
@@ -13888,13 +13879,10 @@ function onReceiveRpc(id, bs)
    if id == 88 and playerdata.flymode then -- onSetPlayerSpecialAction
       return false
    end
+   
 end
 
 function onSendRpc(id, bs, priority, reliability, channel, shiftTimestamp)
-   local rpcName = raknetGetRpcName(id)
-   if rpcName then
-      packets.rpcSend = tostring(id.."."..rpcName)
-   end
    -- NOP's
    if nops.requestclass.v and id == 128 then return false end
    if nops.requestspawn.v and id == 129 then return false end
@@ -13917,11 +13905,11 @@ function onSendRpc(id, bs, priority, reliability, channel, shiftTimestamp)
       end
       return false
    end
-   
+
    if id == 116 then -- EditAttachedObject 
       playerdata.isPlayerEditAttachedObject = false
    end
-   
+
    if ini.settings.cberrorwarnings then
       -- Thanks Heroku for this function on !SAPatcher
       if id == 153 then
@@ -13950,19 +13938,6 @@ function onSendRpc(id, bs, priority, reliability, channel, shiftTimestamp)
    end
 end
 
-function onReceivePacket(id, bitStream)
-   local packetName = raknetGetPacketName(id)
-   if packetName then
-      packets.packetRecieve = tostring(id.."."..packetName)
-   end
-end
-
-function onSendPacket(id, bitStream, priority, reliability, orderingChannel)
-   local packetName = raknetGetPacketName(id)
-   if packetName then
-      packets.packetSend = tostring(id.."."..packetName)
-   end
-end
 -- END hooks
 
 -- Macros
@@ -15105,6 +15080,24 @@ function getSafeObjectModel()
        19789, 19790, 19791 -- square blocks
     }
    return safeobjects[math.random(#safeobjects)]
+end
+
+function getStreamedObjects(all) 
+-- param all - count all objects static and dynamic
+   local streamedObjectsOnScreen = 0
+   for _, v in pairs(getAllObjects()) do
+      if isObjectOnScreen(v) then
+         local objectid = sampGetObjectSampIdByHandle(v)
+         if all then
+            streamedObjectsOnScreen = streamedObjectsOnScreen + 1
+         else
+            if objectid ~= -1 then -- count only dynamic objects
+               streamedObjectsOnScreen = streamedObjectsOnScreen + 1
+            end
+         end
+      end
+   end
+   return streamedObjectsOnScreen 
 end
 
 function getZoneName(x, y, z)
