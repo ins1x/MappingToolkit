@@ -3,9 +3,7 @@ script_description("Assistant for mappers")
 script_dependencies('imgui', 'lib.samp.events')
 script_properties("work-in-pause")
 script_url("https://github.com/ins1x/MappingToolkit")
-script_author("1NS") -- https://github.com/ins1x 
-script_version("4.12") -- R5
--- License: MIT https://opensource.org/license/mit
+script_version("4.13") -- release
 -- support sa-mp versions depends on SAMPFUNCS (0.3.7-R1, 0.3.7-R3-1, 0.3.7-R5, 0.3.DL)
 -- script_moonloader(16) moonloader v.0.26 
 -- editor options: tabsize 3, Unix (LF), encoding Windows-1251
@@ -2539,7 +2537,7 @@ function imgui.OnDrawFrame()
                   imgui.SameLine()
                   imgui.TextQuestion(" [=] ", u8"Копировать координаты в буффер")
                   if imgui.IsItemClicked() then
-                     setClipboardText(string.format("%.2f, %.2f, %.2f", x, y, z))
+                     setClipboardText(string.format("%.2f, %.2f, %.2f", LastObject.position.x, LastObject.position.y, LastObject.position.z))
                      sampAddChatMessage("[SCRIPT]: {FFFFFF}Координаты скопированы в буффер обмена!", 0x0FF6600)
                   end
                end   
@@ -3359,14 +3357,15 @@ function imgui.OnDrawFrame()
          
          imgui.Spacing()
          imgui.Spacing()
-         local streamedobjects = getStreamedObjects(ini.panel.showstreamedallobjects)
+         local streamedobjects = getStreamedObjects(true)
+         local streamedobjectsdyn = getStreamedObjects(false)
          if streamedobjects then
             if streamedobjects < 200 then
-               imgui.TextColoredRGB("{696969}Объектов в области в стрима: "..streamedobjects)
+               imgui.TextColoredRGB(("{696969}Объектов на экране: %i (dynamic: %i)"):format(streamedobjects, streamedobjectsdyn))
             elseif streamedobjects > 200 and streamedobjects < 350 then
-               imgui.TextColoredRGB("{696969}Объектов в области в стрима: {FFA500}"..streamedobjects)
+               imgui.TextColoredRGB(("{696969}Объектов на экране: {FFA500}%i (dynamic: %i)"):format(streamedobjects, streamedobjectsdyn))
             else
-               imgui.TextColoredRGB("{696969}Объектов в области в стрима: {A00000}"..streamedobjects)
+               imgui.TextColoredRGB(("{696969}Объектов на экране: {A00000}%i (dynamic: %i)"):format(streamedobjects, streamedobjectsdyn))
             end
          end
         
@@ -7489,9 +7488,6 @@ function imgui.OnDrawFrame()
             imgui.SameLine()
             imgui.Link("https://encycolorpedia.ru/", "encycolorpedia.ru")            
             
-            imgui.TextColoredRGB("{CDCDCD}Мои open-source разработки на {333333}Git{696969}Hub{CDCDCD}:")
-            imgui.SameLine()
-            imgui.Link("https://github.com/ins1x/", "ins1x")
             
          elseif tabmenu.credits == 3 then
             imgui.Spacing()
@@ -10275,6 +10271,14 @@ function sampev.onShowDialog(dialogId, style, title, button1, button2, text)
             return {dialogId, style, title, button1, button2, newtext}
          end
          
+         if text:find('Показать гангзону игроку') then
+            LastData.lastLink = 'https://dev.prineside.com/gtasa_gangzone_editor/'
+            local newtext = "{FFFFFF}".. text .. 
+            "\n{007FFF}" .. LastData.lastLink ..
+            "\n{696969}Нажмите CTRL + SHIFT + L чтобы открыть ссылку в браузере\n"
+            return {dialogId, style, title, button1, button2, newtext}
+         end
+         
          if text:find('Укажите текст') then
             if dialoghook.action then
                local newtext = text ..
@@ -11893,6 +11897,21 @@ function sampev.onSendCommand(command)
       edit.mode = 3
    end
    
+   if isTrainingSanbox and command:find("^/ao") then -- /ao to /oa
+      if command:find('(/%a+) (.+)') then
+         local cmd, arg = command:match('(/%a+) (.+)')
+         local id = tonumber(arg)
+         if type(id) == "number" then
+            if isValidObjectModel(id) then
+               LastRemovedObject.modelid = id
+               LastData.lastModel = id            
+               sampSendChat("/oa "..id)
+               return false
+            end
+         end
+      end
+   end
+   
    if isTrainingSanbox and command:find("^/oa") then -- /oadd
       if command:find('(/%a+) (.+)') then
          local cmd, arg = command:match('(/%a+) (.+)')
@@ -12426,6 +12445,30 @@ function sampev.onSendCommand(command)
       return false
    end
    
+   if command:find("^/searchveh") or command:find("^/findveh") then
+      if command:find('(/%a+) (.+)') then
+         local cmd, arg = command:match('(/%a+) (.+)')
+         local id = tonumber(arg)
+         if type(id) == "number" then
+            if id > 400 and id < 611 then
+               sampAddChatMessage("[SCRIPT]: {FFFFFF} По id "..id..
+               " найден транспорт - "..VehicleNames[id-399], 0x0FF6600)
+            else
+               sampAddChatMessage("[ERROR]: {FFFFFF}Указан неверный ID транспорта", 0x0CC0000)
+            end
+         else
+            for k, v in pairs(VehicleNames) do
+               local model = string.lower(v)
+               if model:find(arg) then
+                  sampAddChatMessage("[SCRIPT]: {FFFFFF} Найдено совпадение ".. k+399 ..
+                  " транспорт - "..VehicleNames[k], 0x0FF6600)
+               end
+            end
+         end
+      end
+      return false
+   end
+   
    if command:find("^/cmdsearch") or command:find("^/findcmd") 
    or command:find("^/cmdfind") and isTrainingSanbox then
       if command:find('(/%a+) (.+)') then
@@ -12545,8 +12588,8 @@ function sampev.onSendCommand(command)
          end
          return false
       else 
-         sampAddChatMessage("Введите информацию для поиска", -1)
-         sampAddChatMessage("Например: /cbsearch tick", -1)
+         sampAddChatMessage("[SCRIPT]: Введите информацию для поиска", 0x0FF6600)
+         sampAddChatMessage("[SYNTAX]: {FFFFFF}/cbsearch tick", 0x09A9999)
          return false
       end
    end
