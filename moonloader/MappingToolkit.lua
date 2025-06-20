@@ -3,7 +3,7 @@ script_description("Assistant for mappers")
 script_dependencies('imgui', 'lib.samp.events')
 script_properties("work-in-pause")
 script_url("https://github.com/ins1x/MappingToolkit")
-script_version("4.13") -- release
+script_version("4.14") -- R1
 -- support sa-mp versions depends on SAMPFUNCS (0.3.7-R1, 0.3.7-R3-1, 0.3.7-R5, 0.3.DL)
 -- script_moonloader(16) moonloader v.0.26 
 -- editor options: tabsize 3, Unix (LF), encoding Windows-1251
@@ -38,6 +38,7 @@ local ini = inicfg.load({
       allchatoff = false,
       autodevmode = true,
       autoreconnect = true,
+      autocleanlogs = true,
       backtoworld = true,
       blockhamster = false,
       bigoffsetwarning = true,
@@ -167,6 +168,7 @@ local ini = inicfg.load({
       animationdata = "",
       osearch = "",
       worldname = "",
+      worldhoster = false,
       worlddescription = "",
       searchbar = "",
       disconnecttime = 0,
@@ -223,6 +225,7 @@ local edit = {
 
 local const = {
    txdmodelinfoid = 555,
+   maxlogfilesize = 65535, --(MAX unsigned short)
 }
 
 local playerdata = {
@@ -1084,6 +1087,19 @@ function main()
          writeMemory(getModuleHandle("samp.dll") + 0x63700, 1, 0xC3, true)
       end
       
+      if ini.settings.autocleanlogs then
+         local logpath = 'moonloader/resource/mappingtoolkit/history'
+         if getFileSize(logpath..'/texture.txt') > const.maxlogfilesize then
+            os.remove(logpath..'/texture.txt')
+         end
+         if getFileSize(logpath..'/worldlogs.txt') > const.maxlogfilesize then
+            os.remove(logpath..'/worldlogs.txt')
+         end
+         if getFileSize(logpath..'/pmmessages.txt') > const.maxlogfilesize then
+            os.remove(logpath..'/pmmessages.txt')
+         end
+      end
+      
       if ini.settings.streammemmax  >= 100 then
          checkbox.streammemmax.v = true
       end
@@ -1094,6 +1110,11 @@ function main()
       
       if ini.tmp.searchbar:len() > 1 then
          textbuffer.searchbar.v = ini.tmp.searchbar
+      end
+      
+      -- restore world hoster right if script reloaded
+      if ini.tmp.worldhoster then 
+         playerdata.isWorldHoster = true
       end
       
       textbuffer.vehiclename.v = 'bmx'
@@ -1142,6 +1163,7 @@ function main()
             cleanStreamMemory()
             playerdata.flymode = false
             playerdata.isWorldHoster = false
+            ini.tmp.worldhoster = false
             sampDisconnectWithReason(quit)
             --sampSetGamestate(5)-- GAMESTATE_DISCONNECTED
             sampAddChatMessage("Wait reconnecting...", 0xffb7d5ef)
@@ -3044,6 +3066,13 @@ function imgui.OnDrawFrame()
                imgui.PopItemWidth()
                imgui.SameLine()
                imgui.TextQuestion("( ? )", u8"Введите modelid от 615-18300 [GTASA], 18632-19521 [SAMP]")
+               imgui.SameLine()
+               if imgui.TooltipButton(u8"Ближайший", imgui.ImVec2(90, 25), u8"Вставить модель ближайшего объекта") then
+                  local closestObjectId = getClosestObjectId()
+                  if closestObjectId then
+                     input.rendselectedmodelid.v = getObjectModel(closestObjectId)
+                  end
+               end
             end
             
             imgui.Text(u8"Макс. дистанция поиска: ")
@@ -5557,12 +5586,13 @@ function imgui.OnDrawFrame()
                inicfg.save(ini, configIni)
             end
             
-            if isTrainingSanbox then
-               if imgui.ToggleButton(u8"Заткнуть хомяка (Бот Hamster)", checkbox.blockhamster) then
-                  ini.settings.blockhamster = checkbox.blockhamster.v
-                  inicfg.save(ini, configIni)
-               end
-            end
+            -- Outdate. Hamster deactivated on server
+            -- if isTrainingSanbox then
+               -- if imgui.ToggleButton(u8"Заткнуть хомяка (Бот Hamster)", checkbox.blockhamster) then
+                  -- ini.settings.blockhamster = checkbox.blockhamster.v
+                  -- inicfg.save(ini, configIni)
+               -- end
+            -- end
             
             if imgui.ToggleButton(u8"Скрывать все объявления и рекламу", checkbox.antiads) then
                ini.settings.antiads = checkbox.antiads.v
@@ -5570,6 +5600,12 @@ function imgui.OnDrawFrame()
             end  
             
             if imgui.ToggleButton(u8"Скрывать сообщения от ботов", checkbox.antichatbot) then
+               if checkbox.antichatbot.v then
+                  sampAddChatMessage("[SCRIPT]: {FFFFFF}Если не все сообщения ботов заблокировались воспользуйтесь расширенными чат-фильтрами", 0x0FF6600)
+                  if isTrainingSanbox then
+                     sampAddChatMessage("[SCRIPT]: {FFFFFF}Так же можно заблокировать сообщения от бота командой /ignore <id>", 0x0FF6600)
+                  end
+               end
                ini.settings.antichatbot = checkbox.antichatbot.v
                inicfg.save(ini, configIni)
             end  
@@ -9714,6 +9750,7 @@ function sampev.onSendDialogResponse(dialogId, button, listboxId, input)
    LastData.lastDialogInput = input
    LastData.lastListboxId = listboxId
    LastData.lastDialogButton = button
+   --print(LastData.lastDialogTitle, LastData.lastDialogStyle, LastData.lastDialogInput)
    
    if checkbox.logdialogresponse.v then
       print(string.format("dialogId: %d, button: %d, listboxId: %d, input: %s", dialogId, button, listboxId, input))
@@ -9776,6 +9813,7 @@ function sampev.onSendDialogResponse(dialogId, button, listboxId, input)
       -- Покинуть данный мир? 
       if button == 1 and dialoghook.exitdialog then
          playerdata.isWorldHoster = false
+         ini.tmp.worldhoster = false
          lua_thread.create(function()
             wait(250)
             sampSendChat("/clearzone")
@@ -10100,7 +10138,14 @@ function sampev.onSendDialogResponse(dialogId, button, listboxId, input)
 end
 
 function sampev.onShowDialog(dialogId, style, title, button1, button2, text)
-
+   -- Dialog styles from scripting referense:
+   -- DIALOG_STYLE_MXGBOX   0
+   -- DIALOG_STYLE_INPUT    1
+   -- DIALOG_STYLE_LIST     2
+   -- DIALOG_STYLE_PASSWORD 3
+   -- DIALOG_STYLE_TABLIST  4
+   -- DIALOG_STYLE_TABLIST_HEADERS 5
+   
    if checkbox.logdialogresponse.v then
       print(dialogId, style, title, button1, button2, text)
    end
@@ -10861,12 +10906,14 @@ function sampev.onServerMessage(color, text)
          -- "Создать игровой мир"
          if not playerdata.isWorldJoinUnavailable then
             playerdata.isWorldHoster = true
+            ini.tmp.worldhoster = true
             sampSendChat("/vw")
          end
          return false
       end
       if text:find("Меню управления миром") then
          playerdata.isWorldHoster = true
+         ini.tmp.worldhoster = true
          if ini.settings.hotkeys then
             sampAddChatMessage("[SERVER]: {FFFFFF}Меню управления миром - /vw или клавиша - M", 0x0FF6600)
          end
@@ -10995,6 +11042,7 @@ function sampev.onServerMessage(color, text)
       if text:find('Вы отправлены на спаун!') then
          sampSendChat("/spawnme")
          playerdata.isWorldHoster = false
+         ini.tmp.worldhoster = false
       end
       
       if text:find('Удален объект: (%d+)') then
@@ -11039,6 +11087,7 @@ function sampev.onServerMessage(color, text)
       end
       
       if text:find('[SERVER].+Данный аккаунт зарегистрирован') then
+         ini.tmp.worldhoster = false
          playerdata.isWorldHoster = false
          playerdata.flymode = false
       end
@@ -11052,6 +11101,7 @@ function sampev.onServerMessage(color, text)
       end
       
       if text:find('[SERVER].+Ваш мир был успешно удалён') then
+         ini.tmp.worldhoster = false
          playerdata.isWorldHoster = false
          LastData.lastLoadedWorldNumber = nil
       end
@@ -11461,6 +11511,7 @@ function sampev.onSendCommand(command)
    
    if command:find("^/exit") or command:find("^/выход") then
       playerdata.isWorldHoster = false
+      ini.tmp.worldhoster = false
       edit.mode = 0
       LastData.lastMinigame = nil
       LastData.lastWorldNumber = 0
@@ -12159,13 +12210,13 @@ function sampev.onSendCommand(command)
    end
    
    if isTrainingSanbox and command:find("^/tcopy") then
-      sampAddChatMessage("Используйте /texture чтобы установить текстуру, а затем /tpaste <id> чтобы применить на выбранный объект", -1)
+      sampAddChatMessage("[SYNTAX]: {FFFFFF}Используйте /texture чтобы установить текстуру, а затем /tpaste <id> чтобы применить на выбранный объект", 0x09A9999)
       return false
    end
    
    if isTrainingSanbox and command:find("^/tpaste") then
       if not LastObject.txdid or not LastObject.txdslot then
-         sampAddChatMessage("Нет последней использованной текстуры. Сперва наложите текстуру через /texture", -1)
+         sampAddChatMessage("[SCRIPT]: {FFFFFF}Нет последней использованной текстуры. Сперва наложите текстуру через /texture", 0x0FF6600)
          return false
       end
       
@@ -12246,6 +12297,14 @@ function sampev.onSendCommand(command)
          else
             sampAddChatMessage("[SCRIPT]: {FFFFFF}Объект не выбран!", 0x0FF6600)
          end
+      end
+      return false
+   end
+   
+   if isTrainingSanbox and command:find("^/healme") then
+      sampSendChat("/health 100")
+      if getCharHealth(playerPed) > 90.0 then
+         sampAddChatMessage("[SCRIPT]: {FFFFFF}Вы вылечили себя", 0x0FF6600)
       end
       return false
    end
@@ -12887,7 +12946,6 @@ function sampev.onSendCommand(command)
    if ini.settings.devmode and command:find("^/test") then   
       -- allowPauseInWidescreen(true)
       -- sampAddChatMessage("Test", -1)
-      
       -- local rotationX, rotationY, rotationZ = 0.0
       -- local rotationX, rotationY, rotationZ = getObjectRotationVelocity(LastObject.handle)
       -- local posX, posY, posZ = getObjectCoordinates(LastObject.handle)
@@ -13751,7 +13809,8 @@ function sampev.onSetPlayerAttachedObject(playerId, index, create, object)
    end
 end
 
-function sampev.onInitGame(playerId, hostName, settings, vehicleModels)      
+function sampev.onInitGame(playerId, hostName, settings, vehicleModels)
+   ini.tmp.worldhoster = false
    if hostName:find("TRAINING") then
       dialoghook.backtoworld = true
    end
@@ -14441,7 +14500,7 @@ function SaveReminder()
          local delay = tonumber(ini.settings.reminderdelay)
          wait(1000*60*delay)
          if playerdata.isWorldHoster then
-            sampAddChatMessage("[SCRIPT]: {FFFFFF}Вы давно не сохраняли мир. Сохраните его во избежание потери прогресса. (/savevw)", 0x0FF6600)
+            sampAddChatMessage("[SCRIPT]: {FFFFFF}Вы давно не сохраняли мир. Сохраните его во избежание потери прогресса. ( /savevw )", 0x0FF6600)
          end
       end
    end)
@@ -14449,6 +14508,7 @@ end
 
 function WorldJoinInit()
    playerdata.isWorldHoster = true
+   ini.tmp.worldhoster = true
    worldspawnpos.x, worldspawnpos.y, worldspawnpos.z = getCharCoordinates(playerPed)
    lua_thread.create(function()
       setPlayerControl(PLAYER_HANDLE, false)
@@ -14573,31 +14633,33 @@ function copyNearestPlayersToClipboard()
 end
 
 function checkScriptUpdates()
-   if doesFileExist(getGameDirectory() .. "\\moonloader\\lib\\requests.lua") then
-      local result, response = pcall(require('requests').get, 'https://raw.githubusercontent.com/ins1x/MappingToolkit/main/version.dat')
-      if result then
-         if response.status_code == 200 then
-            local text = response.text
-            local version = text:gsub("[.]", "")
-            local installedversion = tostring(thisScript().version)
-            installedversion = installedversion:gsub("[.]", "")
-            if tonumber(version) > tonumber(installedversion) then
-               sampAddChatMessage("{696969}Mapping Toolkit  {FFFFFF}Доступно обновление до версии {696969}"..text, -1)
-               return true
-            end
-         else
-            print("Mapping Toolkit: Check updates failed server not responded")
-            return false
-         end
-      else
-         print("Mapping Toolkit: Check updates failed server unavailable")
-         return false
-      end
-   else
-      print("Updates check: module <requests> not found.")
-      print("Install module from: https://luarocks.org/modules/jakeg/lua-requests")
-      return false
-   end
+   -- Updates check function deactivated at version 4.14
+   -- if doesFileExist(getGameDirectory() .. "\\moonloader\\lib\\requests.lua") then
+      -- local result, response = pcall(require('requests').get, 'https://raw.githubusercontent.com/ins1x/MappingToolkit/main/version.dat')
+      -- if result then
+         -- if response.status_code == 200 then
+            -- local text = response.text
+            -- local version = text:gsub("[.]", "")
+            -- local installedversion = tostring(thisScript().version)
+            -- installedversion = installedversion:gsub("[.]", "")
+            -- if tonumber(version) > tonumber(installedversion) then
+               -- sampAddChatMessage("{696969}Mapping Toolkit  {FFFFFF}Доступно обновление до версии {696969}"..text, -1)
+               -- return true
+            -- end
+         -- else
+            -- print("Mapping Toolkit: Check updates failed server not responded")
+            -- return false
+         -- end
+      -- else
+         -- print("Mapping Toolkit: Check updates failed server unavailable")
+         -- return false
+      -- end
+   -- else
+      -- print("Updates check: module <requests> not found.")
+      -- print("Install module from: https://luarocks.org/modules/jakeg/lua-requests")
+      -- return false
+   -- end
+   return true
 end
 
 function enableDialog(bool)
