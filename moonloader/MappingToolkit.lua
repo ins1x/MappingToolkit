@@ -3,7 +3,7 @@ script_description("Assistant for mappers")
 script_dependencies('imgui', 'lib.samp.events')
 script_properties("work-in-pause")
 script_url("https://github.com/ins1x/MappingToolkit")
-script_version("4.14") -- R1
+script_version("4.14") -- R2
 -- support sa-mp versions depends on SAMPFUNCS (0.3.7-R1, 0.3.7-R3-1, 0.3.7-R5, 0.3.DL)
 -- script_moonloader(16) moonloader v.0.26 
 -- editor options: tabsize 3, Unix (LF), encoding Windows-1251
@@ -109,6 +109,7 @@ local ini = inicfg.load({
       skiprules = false,
       streammemmax = 0,
       tabclickcopy = false,
+      tabclickstat = false,
       time = 12,
       txtmacros = true,
       trailerspawnfix = true,
@@ -752,14 +753,14 @@ local hotkeysActivationList = {
    u8"Откр/Закр транспорт", u8"Починить транспорт", u8"Открыть меню транспорта",
    u8"Сохранить мир", u8"Загрузить мир", u8"Список комадных блоков",
    u8"Повернуть объект на 90", u8"Повернуть объект на 45",
-   u8"Скрыть/Показать нижнюю панель",
+   u8"Скрыть/Показать нижнюю панель", u8"Открыть список миров"
 }
 
 local hotkeysActivationCmds = {
    "", "/jump", "/spawnme", "/slapme", "/jetpack", "/veh 481", "/weapon",
    "/veh", "/flymode", "/spec", "/oedit", "/csel", "/omenu", "/oinfo",
    "/animlist", "/cb", "/lock", "/fix", "/vmenu", "/savevw", "/loadvw",
-   "/cblist", "/rot", "/rot 45", "/panel"
+   "/cblist", "/rot", "/rot 45", "/panel", "/list"
 }
 
 local chatPrefixList = {
@@ -1115,6 +1116,7 @@ function main()
       -- restore world hoster right if script reloaded
       if ini.tmp.worldhoster then 
          playerdata.isWorldHoster = true
+         inicfg.save(ini, configIni)
       end
       
       textbuffer.vehiclename.v = 'bmx'
@@ -1164,6 +1166,7 @@ function main()
             playerdata.flymode = false
             playerdata.isWorldHoster = false
             ini.tmp.worldhoster = false
+            inicfg.save(ini, configIni)
             sampDisconnectWithReason(quit)
             --sampSetGamestate(5)-- GAMESTATE_DISCONNECTED
             sampAddChatMessage("Wait reconnecting...", 0xffb7d5ef)
@@ -9814,6 +9817,7 @@ function sampev.onSendDialogResponse(dialogId, button, listboxId, input)
       if button == 1 and dialoghook.exitdialog then
          playerdata.isWorldHoster = false
          ini.tmp.worldhoster = false
+         inicfg.save(ini, configIni)
          lua_thread.create(function()
             wait(250)
             sampSendChat("/clearzone")
@@ -9860,6 +9864,17 @@ function sampev.onSendDialogResponse(dialogId, button, listboxId, input)
             end
          end
          
+         if listboxId == 3 and input:find("Вернуться в свой статичный мир") then
+            if not playerdata.isWorldJoinUnavailable then
+               if worldspawnpos.x and worldspawnpos.x ~= 0 then
+                  sampSendChat(string.format("/xyz %f %f %f",
+                  worldspawnpos.x, worldspawnpos.y, worldspawnpos.z), 0x0FFFFFF)
+               end
+               playerdata.isWorldHoster = true
+               ini.tmp.worldhoster = true
+               inicfg.save(ini, configIni)
+            end
+         end
          -- if input:find("Список пользовательских миров") then
          -- end
          -- if listboxId == 2 and input:find("Создать игровой мир") then
@@ -10902,11 +10917,17 @@ function sampev.onServerMessage(color, text)
    -- end
    
    if isTrainingSanbox then
+      if text:find("Хочешь смешную шутку? А она тебя нет. Куда ты возращаться собрался ты и так тут") then
+         playerdata.isWorldHoster = true
+         ini.tmp.worldhoster = true
+         inicfg.save(ini, configIni)
+      end
       if text:find("Невозможно создать новый мир, за вами уже есть закрепленный мир") then
          -- "Создать игровой мир"
          if not playerdata.isWorldJoinUnavailable then
             playerdata.isWorldHoster = true
             ini.tmp.worldhoster = true
+            inicfg.save(ini, configIni)
             sampSendChat("/vw")
          end
          return false
@@ -10914,6 +10935,7 @@ function sampev.onServerMessage(color, text)
       if text:find("Меню управления миром") then
          playerdata.isWorldHoster = true
          ini.tmp.worldhoster = true
+         inicfg.save(ini, configIni)
          if ini.settings.hotkeys then
             sampAddChatMessage("[SERVER]: {FFFFFF}Меню управления миром - /vw или клавиша - M", 0x0FF6600)
          end
@@ -11043,6 +11065,7 @@ function sampev.onServerMessage(color, text)
          sampSendChat("/spawnme")
          playerdata.isWorldHoster = false
          ini.tmp.worldhoster = false
+         inicfg.save(ini, configIni)
       end
       
       if text:find('Удален объект: (%d+)') then
@@ -11090,6 +11113,7 @@ function sampev.onServerMessage(color, text)
          ini.tmp.worldhoster = false
          playerdata.isWorldHoster = false
          playerdata.flymode = false
+         inicfg.save(ini, configIni)
       end
       
       if text:find('[SERVER].+/accept (%d+)') then
@@ -11102,6 +11126,7 @@ function sampev.onServerMessage(color, text)
       
       if text:find('[SERVER].+Ваш мир был успешно удалён') then
          ini.tmp.worldhoster = false
+         inicfg.save(ini, configIni)
          playerdata.isWorldHoster = false
          LastData.lastLoadedWorldNumber = nil
       end
@@ -11512,6 +11537,7 @@ function sampev.onSendCommand(command)
    if command:find("^/exit") or command:find("^/выход") then
       playerdata.isWorldHoster = false
       ini.tmp.worldhoster = false
+      inicfg.save(ini, configIni)
       edit.mode = 0
       LastData.lastMinigame = nil
       LastData.lastWorldNumber = 0
@@ -13627,12 +13653,19 @@ function sampev.onInterpolateCamera(setPos, fromPos, destPos, time, mode)
 end
 
 function sampev.onSendClickPlayer(playerId, source)
+   -- if scoreboard.lua installed  - this code do nothing
    chosen.tabselectedplayer = playerId
    if checkbox.tabclickcopy.v then
       local nickname = sampGetPlayerNickname(playerId)
       local buffer = string.format("%s[%d]", nickname, playerId)
       setClipboardText(buffer)
       sampAddChatMessage("Ник {696969}"..nickname.." {FFFFFF}кликнутого в TAB игрока {696969}".. playerId.."{FFFFFF} скопирован в буффер", -1)
+   end
+   if ini.settings.tabclickstat then
+      lua_thread.create(function()
+         wait(250)
+         sampSendChat("/stats "..playerId)
+      end)
    end
 end
 
@@ -13811,6 +13844,7 @@ end
 
 function sampev.onInitGame(playerId, hostName, settings, vehicleModels)
    ini.tmp.worldhoster = false
+   inicfg.save(ini, configIni)
    if hostName:find("TRAINING") then
       dialoghook.backtoworld = true
    end
@@ -14509,6 +14543,7 @@ end
 function WorldJoinInit()
    playerdata.isWorldHoster = true
    ini.tmp.worldhoster = true
+   inicfg.save(ini, configIni)
    worldspawnpos.x, worldspawnpos.y, worldspawnpos.z = getCharCoordinates(playerPed)
    lua_thread.create(function()
       setPlayerControl(PLAYER_HANDLE, false)
