@@ -3,7 +3,7 @@ script_description("Assistant for mappers")
 script_dependencies('imgui', 'lib.samp.events')
 script_properties("work-in-pause")
 script_url("https://github.com/ins1x/MappingToolkit")
-script_version("4.14") -- R3
+script_version("4.14") -- R4
 -- support sa-mp versions depends on SAMPFUNCS (0.3.7-R1, 0.3.7-R3-1, 0.3.7-R5, 0.3.DL)
 -- script_moonloader(16) moonloader v.0.26 
 -- editor options: tabsize 3, Unix (LF), encoding Windows-1251
@@ -61,6 +61,7 @@ local ini = inicfg.load({
       devmodelabeldist = 50.0,
       drawdist = "450",
       editnocol = false,
+      deleteprotect = false,
       extendedmenues = true,
       fov = 70,
       fog = "200",
@@ -196,6 +197,7 @@ local streamedTextures = {}
 local streamedPickups = {}
 local streamed3dTexts = {}
 local streamedTexts = {}
+local streamed3dLabels = {}
 
 for i = 1, ini.settings.maxtableitems do
    table.insert(streamedTextures, "")
@@ -227,6 +229,7 @@ local edit = {
 
 local const = {
    txdmodelinfoid = 555,
+   deleteprotectdist = 50.0,
    maxlogfilesize = 65535, --(MAX unsigned short)
 }
 
@@ -275,8 +278,6 @@ local dialog = {
 local dialoghook = {
    action = false,
    animlist = false,
-   attachcode = false,
-   autoattach = false,
    backtoworld = false,
    cbnewactivation = false,
    suspendcbactivation = false,
@@ -353,6 +354,7 @@ local checkbox = {
    fixobjinfotext = imgui.ImBool(ini.settings.fixobjinfotext),
    serverlock = imgui.ImBool(ini.settings.serverlock),
    savepmmessages = imgui.ImBool(ini.settings.savepmmessages),
+   deleteprotect = imgui.ImBool(ini.settings.deleteprotect),
    
    showpanel = imgui.ImBool(ini.panel.showpanel),
    panelbackground = imgui.ImBool(ini.panel.background),
@@ -542,7 +544,6 @@ local tabmenu = {
 }
 
 local textbuffer = {
-   attachcode = imgui.ImBuffer(32),
    vehiclename = imgui.ImBuffer(64),
    findplayer = imgui.ImBuffer(32),
    rendcolor = imgui.ImBuffer(16),
@@ -773,23 +774,6 @@ local chatPrefixNames = {
    u8"Не выбран", u8"Глобальный чат", u8"Чат игрового мира", 
    u8"Чат модераторов мира", u8"ООС чат", u8"Персональный чат",
    u8"Сообщение в рацию", u8"Сообщение для команд"
-}
-
-local attCodes = {
-   "CC49-45A5-1EC8-4A50", -- пикачу
-   "21A4-748E-6B0B-4000", -- хедкраб
-   "CFB5-5106-DEC3-4F74", -- день рождения
-   "2E5A-3E8C-2D9F-4055", -- деловой ананимас
-   "7773-50CB-370A-48C9", -- пингвин
-   "1A4B-E5ED-6A03-41FA", -- немец
-   "31F0-321B-86E3-4A4F", -- самурай
-   "8286-DCEB-1BC4-4322", -- бабочка
-   "D52-818A-E71D-4B89", -- енот
-}
-
-local attCodeNames = {
-   u8"пикачу", u8"хедкраб", u8"день рождения", u8"деловой ананимас",
-   u8"пингвин", u8"немец", u8"самурай", u8"бабочка", u8"енот"
 }
 
 local weaponNames = {
@@ -1125,7 +1109,6 @@ function main()
       textbuffer.txdstring.v = "This is an ~y~example ~g~textdraw"
       textbuffer.txdsprite.v = "LD_TATT:11dice2"
       textbuffer.cbdefaultradius.v = string.format("%.1f", ini.settings.cbdefaultradius)
-      textbuffer.attachcode.v = tostring(attCodes[combobox.attname.v+1])
       
       -- legacy color fix
       local formattedcolor = tostring(ini.settings.rendercolor)
@@ -1338,13 +1321,6 @@ function main()
                end)
                LastData.lastTextBuffer = ""
             end
-            
-            -- if dialoghook.attachcode then
-               -- lua_thread.create(function()
-                  -- wait(50)
-                  -- sampSetCurrentDialogEditboxText("CC49-45A5-1EC8-4A50")
-               -- end)
-            -- end
             
             if LastData.lastOtext and dialoghook.otext then
                if LastData.lastOtext:len() > 1 then
@@ -3175,6 +3151,12 @@ function imgui.OnDrawFrame()
             imgui.SameLine()
             imgui.TextQuestion("( ? )", u8"Предупреждать при приближении к максимально возможному значению сдвига (offset) объекта")
             
+            if imgui.Checkbox(u8"Блокировать случайное удаление объектов", checkbox.deleteprotect) then
+               ini.settings.deleteprotect = checkbox.deleteprotect.v
+               inicfg.save(ini, configIni)
+            end
+            imgui.SameLine()
+            imgui.TextQuestion("( ? )", u8"Блокирует случайное удаление объектов вне стрима\n(Должен быть включен режим разработки в мире)")
             -- if imgui.Checkbox(u8("Показывать все скрытые объекты"), checkbox.showallhiddenobjects) then
             -- end
             -- imgui.SameLine()
@@ -3257,39 +3239,6 @@ function imgui.OnDrawFrame()
                   end
                end
                sampAddChatMessage("[SCRIPT]: {FFFFFF}Вы показали скрытые аттачи", 0x0FF6600)
-            end
-            
-            if isTrainingSanbox then
-               imgui.Spacing()
-               imgui.Text(u8"Применить сет аттачей по коду:")
-               imgui.PushItemWidth(170)
-               imgui.InputText("##TxtBufferAttachcode", textbuffer.attachcode)
-               imgui.PopItemWidth()
-               imgui.PushItemWidth(125)
-               imgui.SameLine()
-               if imgui.Combo(u8'##Attname', combobox.attname, attCodeNames) then
-                  textbuffer.attachcode.v = attCodes[combobox.attname.v+1]
-               end
-               
-               if imgui.Button(u8"Сбросить",imgui.ImVec2(150, 25)) then
-                  textbuffer.attachcode.v = attCodes[combobox.attname.v+1]
-                  sampSendChat("/mn")
-                  lua_thread.create(function()
-                     wait(50)
-                     sampSendChat("/mn")
-                     wait(200)
-                     sampSendDialogResponse(32700, 1, 3, "Наборы аттачей")
-                     wait(5)
-                     sampSendDialogResponse(32700, 1, 1, "Очистить надетые аттачи")
-                  end)
-               end
-               imgui.SameLine()
-               if imgui.Button(u8"Протестировать",imgui.ImVec2(150, 25)) then
-                  dialoghook.attachcode = true
-                  dialoghook.autoattach = true
-                  sampSendChat("/code")
-                  sampAddChatMessage("[SCRIPT]: {FFFFFF}Демонстрация сета - "..u8:decode(attCodeNames[combobox.attname.v+1]), 0x0FF6600)
-               end
             end
             
             imgui.Spacing()
@@ -9786,14 +9735,9 @@ function sampev.onSendDialogResponse(dialogId, button, listboxId, input)
       if button == 0 then 
          dialoghook.editdialog = false
          dialoghook.animlist = false
-         dialoghook.attachcode = false
          dialoghook.setsadstext = false
          dialoghook.setworldname = false
          dialoghook.setworlddescription = false
-      end
-      
-      if button == 1 and dialoghook.attachcode then
-         dialoghook.attachcode = false
       end
       
       if button == 1 and dialoghook.action then
@@ -10455,24 +10399,6 @@ function sampev.onShowDialog(dialogId, style, title, button1, button2, text)
          if text:find('Вернуться в свой мир.* сек') then
             sampSendDialogResponse(32700, 1, 3, "Вернуться в свой мир")
             dialoghook.backtoworld = false
-         end
-      end
-      
-      if text:find('Введите код') then
-         if dialoghook.autoattach and dialoghook.attachcode then
-            lua_thread.create(function()
-               wait(200)
-               sampSetCurrentDialogEditboxText(textbuffer.attachcode.v)
-               wait(50)
-               sampCloseCurrentDialogWithButton(1)
-            end)
-         else
-            dialoghook.attachcode = true
-            LastData.lastTextBuffer = "CC49-45A5-1EC8-4A50"
-            local newtext = "\
-            Например: сет аттачей - Пикачу {cdcdcd}CC49-45A5-1EC8-4A50\
-            Нажмите CTRL + SHIFT + V чтобы вставить этот пример."
-            return {dialogId, style, title, button1, button2, text..newtext}
          end
       end
       
@@ -11998,6 +11924,26 @@ function sampev.onSendCommand(command)
          if type(id) ~= "number" then
             sampAddChatMessage("[SCRIPT]: {FFFFFF}Введите корректный id!", 0x0FF6600)
             return false
+         end
+         if ini.settings.deleteprotect then
+            if next(streamed3dLabels) ~= nil then
+               for key, value in pairs(streamed3dLabels) do
+                  if value.id == id then
+                     local pX, pY, pZ = getCharCoordinates(playerPed)
+                     local absX= math.abs(pX-value.pos.x)
+                     local absY= math.abs(pY-value.pos.y)
+                     local absZ= math.abs(pZ-value.pos.z)
+                     
+                     if absX >= maxDist or absY >= maxDist or absZ >= maxDist then
+                        sampAddChatMessage("[SCRIPT]: {FFFFFF} Объект "..value.id.." вне зоны стрима!", 0x0FF0000)
+                        -- sampAddChatMessage(("posX: %.2f objectposX: %.2f absX: %.2f"):format(pX, value.pos.x, absX), -1) 
+                        -- sampAddChatMessage(("posY: %.2f objectposY: %.2f absY: %.2f"):format(pY, value.pos.y, absY), -1) 
+                        -- sampAddChatMessage(("posZ: %.2f objectposZ: %.2f absZ: %.2f"):format(pZ, value.pos.z, absZ), -1) 
+                        return false
+                     end
+                  end
+               end
+            end
          end
          if id == LastObject.localid then
             LastRemovedObject.modelid = LastObject.modelid
@@ -13642,6 +13588,16 @@ attachedPlayerId, attachedVehicleId, text)
             return {id, color, position, ini.settings.devmodelabeldist, testLOS, attachedPlayerId, attachedVehicleId, text}
          end
       end
+      
+      if ini.settings.deleteprotect then
+         local localid = text:match('id:(%d+)')
+         if localid then
+            local data = {id = tonumber(localid), pos = position}
+            table.insert(streamed3dLabels, id, data) 
+            --sampAddChatMessage(("added id: %i pos.x: %.2f pos.y: %.2f pos.z: %.2f")
+            --:format(data.id, data.pos.x, data.pos.y, data.pos.z), -1) 
+         end
+      end
    end
    
    if checkbox.hide3dtexts.v then 
@@ -13649,6 +13605,10 @@ attachedPlayerId, attachedVehicleId, text)
    else
       return {id, color, position, distance, testLOS, attachedPlayerId, attachedVehicleId, text}
    end
+end
+
+function sampev.onRemove3DTextLabel(textLabelId)
+   table.remove(streamed3dLabels, textLabelId)
 end
 
 function sampev.onTogglePlayerSpectating(state)
