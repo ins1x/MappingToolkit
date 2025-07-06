@@ -3,7 +3,7 @@ script_description("Assistant for mappers")
 script_dependencies('imgui', 'lib.samp.events')
 script_properties("work-in-pause")
 script_url("https://github.com/ins1x/MappingToolkit")
-script_version("4.14") -- R2
+script_version("4.14") -- R3
 -- support sa-mp versions depends on SAMPFUNCS (0.3.7-R1, 0.3.7-R3-1, 0.3.7-R5, 0.3.DL)
 -- script_moonloader(16) moonloader v.0.26 
 -- editor options: tabsize 3, Unix (LF), encoding Windows-1251
@@ -171,6 +171,7 @@ local ini = inicfg.load({
       worldname = "",
       worldhoster = false,
       worlddescription = "",
+      sadstext = "",
       searchbar = "",
       disconnecttime = 0,
    }
@@ -281,6 +282,7 @@ local dialoghook = {
    suspendcbactivation = false,
    saveworld = false,
    saveworldname = false,
+   setsadstext = false,
    setworldname = false,
    setworlddescription = false,
    loadworld = false,
@@ -1248,8 +1250,8 @@ function main()
       
       -- disable visual damage on gm car
       if ini.settings.novehiclevisualdamage then
-         if isCharInAnyCar(PLAYER_PED) then
-            local car = getCarCharIsUsing(PLAYER_PED)
+         if isCharInAnyCar(playerPed) then
+            local car = getCarCharIsUsing(playerPed)
             local health = getCarHealth(car)
             if health > 1000.0 then
                setCarCanBeVisiblyDamaged(car, false)
@@ -1306,6 +1308,16 @@ function main()
          end
       end
       
+      -- fix player stuck bug (Unfreeze)
+      -- LMB + W + (SHIFT or SPACE) 
+      if isKeyDown(0x01) and isKeyDown(0x57) then
+         if isKeyDown(0x10) or isKeyDown(0x20) then
+            freezeCharPosition(playerPed, false)
+            setPlayerControl(PLAYER_HANDLE, true)
+            lockPlayerControl(false)
+         end
+      end
+         
       if isTrainingSanbox then
          -- CTRL + SHIFT + V
          if isKeyDown(0x11) and isKeyDown(0x10) and isKeyDown(0x56) 
@@ -3221,7 +3233,7 @@ function imgui.OnDrawFrame()
 
             if imgui.Button(u8"Скрыть аттачи (Визуально)",imgui.ImVec2(200, 25)) then
                for i, objid in pairs(getAllObjects()) do
-                  pX, pY, pZ = getCharCoordinates(PLAYER_PED)
+                  pX, pY, pZ = getCharCoordinates(playerPed)
                   _, objX, objY, objZ = getObjectCoordinates(objid)
                   local ddist = getDistanceBetweenCoords3d(pX, pY, pZ, objX, objY, objZ)
                   if ddist < 1 and playerAtachedObjects[objid] ~= false then
@@ -3235,7 +3247,7 @@ function imgui.OnDrawFrame()
             if imgui.Button(u8"Показать аттачи (Визуально)",imgui.ImVec2(200, 25)) then
                for i, objid in pairs(getAllObjects()) do
                   if playerAtachedObjects[objid] == false then
-                     pX, pY, pZ = getCharCoordinates(PLAYER_PED)
+                     pX, pY, pZ = getCharCoordinates(playerPed)
                      _, objX, objY, objZ = getObjectCoordinates(objid)
                      local ddist = getDistanceBetweenCoords3d(pX, pY, pZ, objX, objY, objZ)
                      if playerAtachedObjects[objid] == false then
@@ -6215,7 +6227,16 @@ function imgui.OnDrawFrame()
             imgui.SameLine()
             imgui.TextQuestion("( ? )", u8"Устанавливать свою погоду и время при входе в мир")
             
-            imgui.Checkbox(u8'Устанавливать свой скин в мире', checkbox.saveskin)
+            if imgui.Checkbox(u8'Устанавливать свой скин в мире', checkbox.saveskin) then 
+               if checkbox.saveskin.v then
+                  ini.settings.saveskin = true
+                  --ini.settings.skinid = skinid
+               else
+                  ini.settings.saveskin = false
+                  ---ini.settings.skinid = skinid
+               end               
+               inicfg.save(ini, configIni)
+            end
             imgui.SameLine()
             imgui.TextQuestion("( ? )", u8"Будет выставлять скин при спавне в мире")
             
@@ -9766,6 +9787,7 @@ function sampev.onSendDialogResponse(dialogId, button, listboxId, input)
          dialoghook.editdialog = false
          dialoghook.animlist = false
          dialoghook.attachcode = false
+         dialoghook.setsadstext = false
          dialoghook.setworldname = false
          dialoghook.setworlddescription = false
       end
@@ -9791,6 +9813,12 @@ function sampev.onSendDialogResponse(dialogId, button, listboxId, input)
       if button == 1 and dialoghook.setworldname then
          dialoghook.setworldname = false
          ini.tmp.worldname = tostring(input)
+         inicfg.save(ini, configIni)
+      end
+      
+      if button == 1 and dialoghook.setsadstext then
+         dialoghook.setsadstext = false
+         ini.tmp.sadstext = tostring(input)
          inicfg.save(ini, configIni)
       end
       
@@ -10778,6 +10806,19 @@ function sampev.onShowDialog(dialogId, style, title, button1, button2, text)
             end
          end
          
+         
+         if title:find("ADS текст") then
+            dialoghook.setsadstext = true
+            if ini.tmp.sadstext then
+               if ini.tmp.sadstext:len() > 1 then
+                  lua_thread.create(function()
+                     wait(200)
+                     sampSetCurrentDialogEditboxText(tostring(ini.tmp.sadstext))
+                  end)
+               end
+            end
+         end
+         
          if text:find("Укажите желаемое описание мира") then
             dialoghook.setworlddescription = true
             if text:find("Текущее описание") then
@@ -11011,6 +11052,9 @@ function sampev.onServerMessage(color, text)
       if text:find("[SERVER].+Вы присоединились к лобби") then
          LastData.lastMinigame = 4
       end
+      
+      -- if text:find("[ERROR].+Вы находитесь не в статичном мире") then
+      -- end
       
       if text:find("Не используйте данную функцию часто") then
          dialoghook.loadworld = false
@@ -13923,7 +13967,7 @@ function toggleFlyMode(mode)
       setCharCollision(playerPed, false)
       -- hide player attaches
       for i, objid in pairs(getAllObjects()) do
-         pX, pY, pZ = getCharCoordinates(PLAYER_PED)
+         pX, pY, pZ = getCharCoordinates(playerPed)
          _, objX, objY, objZ = getObjectCoordinates(objid)
          local ddist = getDistanceBetweenCoords3d(pX, pY, pZ, objX, objY, objZ)
          if ddist < 1 and playerAtachedObjects[objid] ~= false then
@@ -13940,7 +13984,7 @@ function toggleFlyMode(mode)
       -- show player attaches
       for i, objid in pairs(getAllObjects()) do
          if playerAtachedObjects[objid] == false then
-            pX, pY, pZ = getCharCoordinates(PLAYER_PED)
+            pX, pY, pZ = getCharCoordinates(playerPed)
             _, objX, objY, objZ = getObjectCoordinates(objid)
             local ddist = getDistanceBetweenCoords3d(pX, pY, pZ, objX, objY, objZ)
             if playerAtachedObjects[objid] == false then
@@ -14061,10 +14105,10 @@ function onSendRpc(id, bs, priority, reliability, channel, shiftTimestamp)
          end
          
          -- Fixes the crash of SA-MP (0x006E3D17) associated with the installation of the skin in the car.	  
-         local result, myId = sampGetPlayerIdByCharHandle(PLAYER_PED)
+         local result, myId = sampGetPlayerIdByCharHandle(playerPed)
          if result then
             if playerId == myId then
-               if isCharInAnyCar(PLAYER_PED) then
+               if isCharInAnyCar(playerPed) then
                   sampAddChatMessage("[WARNING]: The server is trying to set the skin in the car.", 0x0FF6600)
                   return false
                end
@@ -14668,32 +14712,32 @@ function copyNearestPlayersToClipboard()
 end
 
 function checkScriptUpdates()
-   -- Updates check function deactivated at version 4.14
-   -- if doesFileExist(getGameDirectory() .. "\\moonloader\\lib\\requests.lua") then
-      -- local result, response = pcall(require('requests').get, 'https://raw.githubusercontent.com/ins1x/MappingToolkit/main/version.dat')
-      -- if result then
-         -- if response.status_code == 200 then
-            -- local text = response.text
-            -- local version = text:gsub("[.]", "")
-            -- local installedversion = tostring(thisScript().version)
-            -- installedversion = installedversion:gsub("[.]", "")
-            -- if tonumber(version) > tonumber(installedversion) then
-               -- sampAddChatMessage("{696969}Mapping Toolkit  {FFFFFF}Доступно обновление до версии {696969}"..text, -1)
-               -- return true
-            -- end
-         -- else
-            -- print("Mapping Toolkit: Check updates failed server not responded")
-            -- return false
-         -- end
-      -- else
-         -- print("Mapping Toolkit: Check updates failed server unavailable")
-         -- return false
-      -- end
-   -- else
-      -- print("Updates check: module <requests> not found.")
-      -- print("Install module from: https://luarocks.org/modules/jakeg/lua-requests")
-      -- return false
-   -- end
+   -- Updates check function require request lua module 
+   if doesFileExist(getGameDirectory() .. "\\moonloader\\lib\\requests.lua") then
+      local result, response = pcall(require('requests').get, 'https://raw.githubusercontent.com/ins1x/MappingToolkit/main/version.dat')
+      if result then
+         if response.status_code == 200 then
+            local text = response.text
+            local version = text:gsub("[.]", "")
+            local installedversion = tostring(thisScript().version)
+            installedversion = installedversion:gsub("[.]", "")
+            if tonumber(version) > tonumber(installedversion) then
+               sampAddChatMessage("{696969}Mapping Toolkit  {FFFFFF}Доступно обновление до версии {696969}"..text, -1)
+               return true
+            end
+         else
+            print("Mapping Toolkit: Check updates failed server not responded")
+            return false
+         end
+      else
+         print("Mapping Toolkit: Check updates failed server unavailable")
+         return false
+      end
+   else
+      print("Updates check: module <requests> not found.")
+      print("Install module from: https://luarocks.org/modules/jakeg/lua-requests")
+      return false
+   end
    return true
 end
 
