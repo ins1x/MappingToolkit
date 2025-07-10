@@ -3,7 +3,7 @@ script_description("Assistant for mappers")
 script_dependencies('imgui', 'lib.samp.events')
 script_properties("work-in-pause")
 script_url("https://github.com/ins1x/MappingToolkit")
-script_version("4.14") -- R4
+script_version("4.15") -- R1
 -- support sa-mp versions depends on SAMPFUNCS (0.3.7-R1, 0.3.7-R3-1, 0.3.7-R5, 0.3.DL)
 -- script_moonloader(16) moonloader v.0.26 
 -- editor options: tabsize 3, Unix (LF), encoding Windows-1251
@@ -1102,7 +1102,7 @@ function main()
       -- restore world hoster right if script reloaded
       if ini.tmp.worldhoster then 
          playerdata.isWorldHoster = true
-         inicfg.save(ini, configIni)
+         --inicfg.save(ini, configIni)
       end
       
       textbuffer.vehiclename.v = 'bmx'
@@ -1466,6 +1466,14 @@ function main()
                end
             end
          end
+         
+         -- fix broken cursor
+         -- if isKeyJustPressed(0x5B) or isKeyJustPressed(0x5C) then
+            -- if isPlayerEditObject then
+               -- print("triggered")
+               -- cancelEdit()
+            -- end
+         -- end
          
          if isTrainingSanbox then
             -- Backspace reset texturelist to 0 page
@@ -10031,6 +10039,10 @@ function sampev.onSendDialogResponse(dialogId, button, listboxId, input)
             end)
          end
          
+         if input:find("Сделать мир статичным") then
+            sampAddChatMessage("[SCRIPT]: {FFFFFF}Перед тем как сделать мир статичным, установите желаемое описание и название мира!", 0x0FF6600)
+            sampAddChatMessage("[SCRIPT]: {FFFFFF}Вы сможете менять эти параметры позже, но они будут возвращаться на текущие после рестарта сервера.", 0x0FF6600)
+         end
          -- /vmenu
          if input:find("Удалить транспорт") then
             if LastData.lastVehicle then
@@ -10270,10 +10282,13 @@ function sampev.onShowDialog(dialogId, style, title, button1, button2, text)
          end
          
          if text:find('Установить игроку иконку:') then
+            local px, py, pz = getCharCoordinates(playerPed)
+            LastData.lastTextBuffer = ("1 %.3f %.3f %.3f 35 0xCC0000FF 0"):format(px, py, pz)
             LastData.lastLink = 'https://www.open.mp/docs/scripting/resources/mapicons'
             local newtext = "{FFFFFF}".. text .. 
             "\n{007FFF}" .. LastData.lastLink ..
-            "\n{696969}Нажмите CTRL + SHIFT + L чтобы открыть ссылку в браузере\n"
+            "\n{696969}Нажмите CTRL + SHIFT + L чтобы открыть ссылку в браузере\n"..
+            "{696969}Нажмите CTRL + SHIFT + V чтобы вставить шаблон в поле\n"
             return {dialogId, style, title, button1, button2, newtext}
          end
          
@@ -10979,8 +10994,18 @@ function sampev.onServerMessage(color, text)
          LastData.lastMinigame = 4
       end
       
+      if text:find("[SERVER].+Ваш мир был обнулен") then
+         playerdata.isWorldHoster = false
+         ini.tmp.worldhoster = false
+         inicfg.save(ini, configIni)
+      end
+      
       -- if text:find("[ERROR].+Вы находитесь не в статичном мире") then
       -- end
+      
+      if text:find("[ERROR].+Это краш объект. Ты че кран") then
+         sampAddChatMessage("[SCRIPT]: {FFFFFF}Воспользуйтесь объектами: 1394, 16328", 0x0FF6600)
+      end
       
       if text:find("Не используйте данную функцию часто") then
          dialoghook.loadworld = false
@@ -13752,7 +13777,7 @@ function sampev.onSetMapIcon(iconId, position, type, color, style)
       end
       return false
    end
-   -- 1,2,4,56 map icons cause crashes
+   -- Marker type 1,2,4,56 will cause your game to crash if you have map legends enabled while viewing the map. 
    if (type == 1 or type == 2 or type == 4 or type == 56) then
       if ini.settings.cberrorwarnings then
          sampAddChatMessage(("[WARNING]: {FFFFFF}Mapicon %i указан багнутый тип иконки %i, возможен краш клиента"):format(iconId, type), 0x0FF6600)
