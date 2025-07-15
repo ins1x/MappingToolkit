@@ -3,7 +3,7 @@ script_description("Assistant for mappers")
 script_dependencies('imgui', 'lib.samp.events')
 script_properties("work-in-pause")
 script_url("https://github.com/ins1x/MappingToolkit")
-script_version("4.15") -- R1
+script_version("4.15") -- R2
 -- support sa-mp versions depends on SAMPFUNCS (0.3.7-R1, 0.3.7-R3-1, 0.3.7-R5, 0.3.DL)
 -- script_moonloader(16) moonloader v.0.26 
 -- editor options: tabsize 3, Unix (LF), encoding Windows-1251
@@ -108,6 +108,7 @@ local ini = inicfg.load({
       skipomenu = false,
       skipvehnotify = false,
       skiprules = false,
+      spawnafterloadvw = false,
       streammemmax = 0,
       tabclickcopy = false,
       tabclickstat = false,
@@ -355,6 +356,7 @@ local checkbox = {
    serverlock = imgui.ImBool(ini.settings.serverlock),
    savepmmessages = imgui.ImBool(ini.settings.savepmmessages),
    deleteprotect = imgui.ImBool(ini.settings.deleteprotect),
+   spawnafterloadvw = imgui.ImBool(ini.settings.spawnafterloadvw),
    
    showpanel = imgui.ImBool(ini.panel.showpanel),
    panelbackground = imgui.ImBool(ini.panel.background),
@@ -695,7 +697,7 @@ local LastData = {
    lastDialogId = 0,
    lastDialogButton = nil,
    lastListboxId = nil,
-   lastcb = nil,
+   lastCb = nil,
    lastActor = nil,
    lastAction = nil,
    lastPass = nil,
@@ -1076,14 +1078,20 @@ function main()
       
       if ini.settings.autocleanlogs then
          local logpath = 'moonloader/resource/mappingtoolkit/history'
-         if getFileSize(logpath..'/texture.txt') > const.maxlogfilesize then
-            os.remove(logpath..'/texture.txt')
+         if doesFileExist(getGameDirectory()..logpath..'/texture.txt') then
+            if getFileSize(logpath..'/texture.txt') > const.maxlogfilesize then
+               os.remove(logpath..'/texture.txt')
+            end
          end
-         if getFileSize(logpath..'/worldlogs.txt') > const.maxlogfilesize then
-            os.remove(logpath..'/worldlogs.txt')
+         if doesFileExist(getGameDirectory()..logpath..'/worldlogs.txt') then
+            if getFileSize(logpath..'/worldlogs.txt') > const.maxlogfilesize then
+               os.remove(logpath..'/worldlogs.txt')
+            end
          end
-         if getFileSize(logpath..'/pmmessages.txt') > const.maxlogfilesize then
-            os.remove(logpath..'/pmmessages.txt')
+         if doesFileExist(getGameDirectory()..logpath..'/pmmessages.txt') then
+            if getFileSize(logpath..'/pmmessages.txt') > const.maxlogfilesize then
+               os.remove(logpath..'/pmmessages.txt')
+            end
          end
       end
       
@@ -1154,8 +1162,8 @@ function main()
             inicfg.save(ini, configIni)
             sampDisconnectWithReason(quit)
             --sampSetGamestate(5)-- GAMESTATE_DISCONNECTED
-            sampAddChatMessage("Wait reconnecting...", 0xffb7d5ef)
-            wait(ini.settings.recontime + playerdata.reconattempt*3000)
+            sampAddChatMessage("Wait reconnecting after "..tostring((ini.settings.recontime + playerdata.reconattempt*2000) / 1000).." sec ...", 0xffb7d5ef)
+            wait(ini.settings.recontime + playerdata.reconattempt*2000)
             sampAddChatMessage("Try connecting to server...", 0xffb7d5ef)
             sampSetGamestate(1)-- GAMESTATE_WAIT_CONNECT
          end
@@ -1199,7 +1207,7 @@ function main()
                   sampSetChatInputEnabled(true)
                end
             else
-              sampSetChatInputEnabled(true)
+               sampSetChatInputEnabled(true)
             end
          end
       end
@@ -6184,6 +6192,13 @@ function imgui.OnDrawFrame()
             imgui.SameLine()
             imgui.TextQuestion("( ? )", u8"Устанавливать свою погоду и время при входе в мир")
             
+            if imgui.Checkbox(u8'Заспавниться после загрузки мира', checkbox.spawnafterloadvw) then
+               ini.settings.spawnafterloadvw = checkbox.spawnafterloadvw.v
+               inicfg.save(ini, configIni)
+            end
+            imgui.SameLine()
+            imgui.TextQuestion("( ? )", u8"Заспавнит вас автоматически после загрузки мира")
+            
             if imgui.Checkbox(u8'Устанавливать свой скин в мире', checkbox.saveskin) then 
                if checkbox.saveskin.v then
                   ini.settings.saveskin = true
@@ -9687,7 +9702,6 @@ function sampev.onVehicleStreamIn(vehId, data)
 end
 
 function sampev.onSendEnterVehicle(vehicleId, passenger)
-
    if ini.settings.cberrorwarnings then
       if isCharInAnyCar(playerPed) then
          sampAddChatMessage("[WARNING]: {FFFFFF}Попытка посадить в транспорт игрока который уже в транспорте отклонена (onSendEnterVehicle vehid:"..vehicleId..")", 0x0FF6600)
@@ -9790,6 +9804,33 @@ function sampev.onSendDialogResponse(dialogId, button, listboxId, input)
                   sampSendClickTextdraw(2118)
                end)
             end
+         end
+      end
+      
+      -- get cb id from dialog
+      if button == 1 then
+         local caption = sampGetDialogCaption()
+         if caption:find("Страница") then
+            local cblistitem = string.match(input, "%d.+NAME")
+            local cblistitemnew = string.match(input, "%d.+N.+A")
+            if cblistitem then
+               local cbid = cblistitem:gsub('NAME','')
+               LastData.lastCb = string.match(cbid, "(%d+)") 
+            end
+            if cblistitemnew then
+               local cbid = cblistitemnew:gsub('N.+A','')
+               LastData.lastCb = string.match(cbid, "(%d+)")
+            end
+         end
+      end
+      
+      if button == 1 and input:find("Удалить блок") then
+         if LastData.lastCb then
+            lua_thread.create(function()
+               sampCloseCurrentDialogWithButton(0)
+               wait(100)
+               sampSendChat("/cbdell "..LastData.lastCb) 
+            end)
          end
       end
       
@@ -10429,6 +10470,15 @@ function sampev.onShowDialog(dialogId, style, title, button1, button2, text)
          end
       end
       
+      if LastData.lastCb and style == 4 then
+         if text:find("Лимит повторений") and text:find("Имя блока") then
+            local newtitle = "cbid: "..LastData.lastCb
+            local newtext = text ..
+            "\n{FF0000}Удалить блок\n"
+            return {dialogId, style, newtitle, button1, button2, newtext}
+         end
+      end
+      
       if text:find("После подтверждения Вы отправитесь в") then
          dialoghook.exitdialog = true
          dialoghook.backtoworld = false
@@ -10982,6 +11032,9 @@ function sampev.onServerMessage(color, text)
          LastData.lastLoadedWorldNumber = nil
          LastData.lastMinigame = nil
          sampAddChatMessage("[SCRIPT]: {FFFFFF}Используйте /tpo или метку на карте чтобы телепортироваться.", 0x0FF6600)
+         if ini.settings.spawnafterloadvw then
+            sampSendChat("/spawnme")
+         end
       end
       
       if text:find("Виртуальный мир успешно создан") 
@@ -11028,6 +11081,10 @@ function sampev.onServerMessage(color, text)
       
       if text:find('Создан action: (%d+)') then
          LastData.lastAction = text:match('Создан action: (%d+)')
+      end
+      
+      if text:find('Блок: (%d+) был удален') then
+         LastData.lastCb = nil
       end
       
       if text:find('Данный объект запрещен или не существует') then
@@ -13880,6 +13937,11 @@ function sampev.onInitGame(playerId, hostName, settings, vehicleModels)
 end
 
 function sampev.onSendRequestSpawn()
+   if isCharInAnyCar(playerPed) then
+      if ini.settings.cberrorwarnings then
+         sampAddChatMessage("[WARNING]: {FFFFFF}Попытка спавна игрока в машине!", 0x0FF6600)
+      end
+   end
    -- clear streamed data tables
    streamedTextures = {}
    streamedPickups = {}
@@ -13894,7 +13956,6 @@ function sampev.onSendRequestSpawn()
 end
 
 function sampev.onSendSpawn()
-   
    if isCharInAnyCar(playerPed) then
       if ini.settings.cberrorwarnings then
          sampAddChatMessage("[WARNING]: {FFFFFF}Попытка спавна игрока в машине!", 0x0FF6600)
