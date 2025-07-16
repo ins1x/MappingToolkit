@@ -3,7 +3,7 @@ script_description("Assistant for mappers")
 script_dependencies('imgui', 'lib.samp.events')
 script_properties("work-in-pause")
 script_url("https://github.com/ins1x/MappingToolkit")
-script_version("4.15") -- R2
+script_version("4.15") -- R3
 -- support sa-mp versions depends on SAMPFUNCS (0.3.7-R1, 0.3.7-R3-1, 0.3.7-R5, 0.3.DL)
 -- script_moonloader(16) moonloader v.0.26 
 -- editor options: tabsize 3, Unix (LF), encoding Windows-1251
@@ -9658,6 +9658,15 @@ function sampev.onSetPlayerPos(position)
    end
 end
 
+function sampev.onSetPlayerSkin(playerId, skinId)
+   if ini.settings.cberrorwarnings then
+      if isCharInAnyCar(playerPed) then
+         sampAddChatMessage("[WARNING]: {FFFFFF}Попытка смена скина игрока в транспорте отклонена (onSetPlayerSkin: "..skinId.." )", 0x0FF6600)
+         return false
+      end
+   end
+end
+
 function sampev.onSetWorldBounds(maxX, minX, maxY, minY)
    if checkbox.logworlddouns.v then
       print(string.format("Server change world bounds: maxX:%.2f, mixX:%.2f, maxY:%.2f, mixY:%.2f", 
@@ -10751,6 +10760,13 @@ function sampev.onShowDialog(dialogId, style, title, button1, button2, text)
       
       -- cblist dialogs autocomplete
       if ini.settings.dialogautocomplete then
+         if text:find("Переместить игрока") then
+            lua_thread.create(function()
+               wait(200)
+               local px, py, pz = getCharCoordinates(playerPed)
+               sampSetCurrentDialogEditboxText(string.format("%.2f %.2f %.2f", px, py, pz))
+            end)
+         end
          if text:find("Установить игроку чекпоинт") then
             lua_thread.create(function()
                wait(200)
@@ -13367,7 +13383,7 @@ function sampev.onApplyActorAnimation(actorId, lib, name)
    end
 end
 
-function sampev.onApplyPlayerAnimation(playerId, animLib, animName, frameDelta, loop, lockX, lockY ,freeze, time)
+function sampev.onApplyPlayerAnimation(playerId, animLib, animName, frameDelta, loop, lockX, lockY, freeze, time)
    -- prevent bad animation crashes
    if name == "null" then
       return false
@@ -13376,6 +13392,13 @@ function sampev.onApplyPlayerAnimation(playerId, animLib, animName, frameDelta, 
    if isTrainingSanbox then   
       local res, id = sampGetPlayerIdByCharHandle(playerPed)
       if res and sampGetPlayerSpecialAction(id) == 2 then
+         return false
+      end
+   end
+   
+   if ini.settings.cberrorwarnings then
+      if isCharInAnyCar(playerPed) then
+         sampAddChatMessage("[WARNING]: {FFFFFF}Попытка воспроизвести анимацию в транспорте("..animLib.." , "..animName..")", 0x0FF6600)
          return false
       end
    end
