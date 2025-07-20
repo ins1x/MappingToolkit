@@ -3,7 +3,7 @@ script_description("Assistant for mappers")
 script_dependencies('imgui', 'lib.samp.events')
 script_properties("work-in-pause")
 script_url("https://github.com/ins1x/MappingToolkit")
-script_version("4.15") -- R3
+script_version("4.15") --
 -- support sa-mp versions depends on SAMPFUNCS (0.3.7-R1, 0.3.7-R3-1, 0.3.7-R5, 0.3.DL)
 -- script_moonloader(16) moonloader v.0.26 
 -- editor options: tabsize 3, Unix (LF), encoding Windows-1251
@@ -76,6 +76,7 @@ local ini = inicfg.load({
       imguifont = "trebucbd",
       imguifontsize = 14.0,
       imguitheme = 1,
+      loadworldname = true,
       lockserverweather = false,
       maxtableitems = 100,
       menukeychanged = false,
@@ -357,6 +358,7 @@ local checkbox = {
    savepmmessages = imgui.ImBool(ini.settings.savepmmessages),
    deleteprotect = imgui.ImBool(ini.settings.deleteprotect),
    spawnafterloadvw = imgui.ImBool(ini.settings.spawnafterloadvw),
+   loadworldname = imgui.ImBool(ini.settings.loadworldname),
    
    showpanel = imgui.ImBool(ini.panel.showpanel),
    panelbackground = imgui.ImBool(ini.panel.background),
@@ -715,6 +717,7 @@ local LastData = {
    lastTbvaluebuffer = nil,
    lastMinigame = nil,
    lastModelinfo = 0,
+   lastLoadedWorldName = nil,
    lastLoadedWorldNumber = nil
 }
 
@@ -1151,6 +1154,10 @@ function main()
       -- Required use reset_remove.asi fix
       if ini.settings.autoreconnect then
          local chatstring = sampGetChatString(99)
+         if chatstring:find("Connected to") then
+            playerdata.reconattempt = 0
+         end
+         
          if chatstring == "Server closed the connection." 
          or chatstring == "You are banned from this server."
          or chatstring == "Use /quit to exit or press ESC and select Quit Game" then
@@ -2018,6 +2025,9 @@ function imgui.OnDrawFrame()
                if string.len(LastData.lastWorldName) > 1 then
                   imgui.TextColoredRGB("Мир: "..LastData.lastWorldName)
                end
+               -- if string.len(LastData.lastLoadedWorldName) > 1 then
+                  -- imgui.TextColoredRGB("Мир: "..LastData.lastLoadedWorldName)
+               -- end
                if LastData.lastWorldNumber > 0 then               
                   imgui.Text(string.format(u8"Последний мир (номер): %s", LastData.lastWorldNumber))
                   if imgui.IsItemClicked() then
@@ -6146,7 +6156,6 @@ function imgui.OnDrawFrame()
                imgui.TextQuestion("( ? )", u8"Скрывает всплывающие подсказки внизу экрана при переключении опций транспорта")
             end
             imgui.Spacing()
-         
          end
          
          if imgui.CollapsingHeader(u8"Вход в мир:") then
@@ -6198,6 +6207,13 @@ function imgui.OnDrawFrame()
             end
             imgui.SameLine()
             imgui.TextQuestion("( ? )", u8"Заспавнит вас автоматически после загрузки мира")
+            
+            if imgui.Checkbox(u8'Загружать имя мира автоматически', checkbox.loadworldname) then
+               ini.settings.loadworldname = checkbox.loadworldname.v
+               inicfg.save(ini, configIni)
+            end
+            imgui.SameLine()
+            imgui.TextQuestion("( ? )", u8"Автоматически заполнит название мира из диалога /loadvw сразу при загрузке")
             
             if imgui.Checkbox(u8'Устанавливать свой скин в мире', checkbox.saveskin) then 
                if checkbox.saveskin.v then
@@ -9816,6 +9832,15 @@ function sampev.onSendDialogResponse(dialogId, button, listboxId, input)
          end
       end
       
+      if button == 1 and ini.settings.loadworldname then
+         if LastData.lastDialogTitle and LastData.lastDialogText then
+            if LastData.lastDialogTitle:find("Загрузка мира") then
+               local result = LastData.lastDialogText:match(listboxId.."%s+.FFFFFF.%a+")
+               LastData.lastLoadedWorldName = result:sub(2, result:len())
+            end
+         end
+      end
+      
       -- get cb id from dialog
       if button == 1 then
          local caption = sampGetDialogCaption()
@@ -10226,6 +10251,7 @@ function sampev.onShowDialog(dialogId, style, title, button1, button2, text)
                dialoghook.loadworld = false
             end)
          end
+         
       end
       
       if title:find('Редактор актера') then
@@ -10470,7 +10496,7 @@ function sampev.onShowDialog(dialogId, style, title, button1, button2, text)
       if title:find("Покинуть данный мир") then
          dialoghook.backtoworld = false
       end
-      
+
       if text:find("Создать игровой мир") then
          if text:find("сек") then
             playerdata.isWorldJoinUnavailable = true
@@ -11050,6 +11076,22 @@ function sampev.onServerMessage(color, text)
          sampAddChatMessage("[SCRIPT]: {FFFFFF}Используйте /tpo или метку на карте чтобы телепортироваться.", 0x0FF6600)
          if ini.settings.spawnafterloadvw then
             sampSendChat("/spawnme")
+         end
+         if ini.settings.loadworldname and LastData.lastLoadedWorldName then
+            lua_thread.create(function()
+               wait(500)
+               sampSendChat("/vw")
+               wait(500)
+               sampSendDialogResponse(32700, 1, nil)
+               wait(500)
+               sampSetCurrentDialogEditboxText(LastData.lastLoadedWorldName)
+               wait(500)
+               sampCloseCurrentDialogWithButton(0)
+               wait(250)
+               sampCloseCurrentDialogWithButton(0)
+               wait(250)
+               sampAddChatMessage("[SCRIPT]: {FFFFFF}Название мира было автоматически загружено.", 0x0FF6600)
+            end)
          end
       end
       
@@ -12947,12 +12989,12 @@ function sampev.onSendCommand(command)
       -- count dyn objects at stream to prevent save empty world
       local dynobjectsCounter = 0 
       for _, v in pairs(getAllObjects()) do
-         if isObjectOnScreen(v) then
+         --if isObjectOnScreen(v) then
             local objectid = sampGetObjectSampIdByHandle(v)
             if objectid ~= -1 then
                dynobjectsCounter = dynobjectsCounter + 1
             end
-         end
+         --end
       end
       if dynobjectsCounter == 0 then
          sampAddChatMessage("[WARNING]: {FFFFFF}Похоже мир пустой! не найдено объектов рядом, вы точно хотите его сохранить?", 0x0CC0000)
@@ -14870,6 +14912,8 @@ function cancelEdit()
 end
  
 function setMaterialObjectText(id, materialType, materialId, materialSize, fontName, fontSize, bold, fontColor, backGroundColor, align, text)
+   -- Vertex lightning of the object will disappear if material color is changed.
+   -- Color use ARGB color format, not RGBA like used in client messages etc.
    local bs = raknetNewBitStream()
    raknetBitStreamWriteInt16(bs,id)
    raknetBitStreamWriteInt8(bs, type)

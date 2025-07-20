@@ -56,9 +56,6 @@
 * [Описание работы тулкита](https://github.com/ins1x/MappingToolkit/wiki/%D0%9E%D0%BF%D0%B8%D1%81%D0%B0%D0%BD%D0%B8%D0%B5-%D1%80%D0%B0%D0%B1%D0%BE%D1%82%D1%8B)
 * [Команды и горячие клавиши](https://github.com/ins1x/MappingToolkit/wiki/%D0%9A%D0%BE%D0%BC%D0%B0%D0%BD%D0%B4%D1%8B-%D0%B8-%D0%B3%D0%BE%D1%80%D1%8F%D1%87%D0%B8%D0%B5-%D0%BA%D0%BB%D0%B0%D0%B2%D0%B8%D1%88%D0%B8)
 
-## Disclaimer
-С июня 2025 разработка и обновления MappingToolkit остановлены. Причина в том что MappingToolkit не пользуется популярностью у целевой аудитории, и нет смысла тратить время на его дальнейшую поддержку. Любой желающий может делать с исходным кодом что пожелает, код останется открытым, лицензия и авторство удалены. Вы можете использовать его полностью, либо выделить определенный функционал для своих проектов.
-
 ---------------------------------------------
 
 [![forum training](https://img.shields.io/badge/Forum-TRAINING_SANDBOX-yellow)](https://forum.training-server.com/d/19708-luamappingtoolkit/)
