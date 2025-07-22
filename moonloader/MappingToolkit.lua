@@ -3,7 +3,7 @@ script_description("Assistant for mappers")
 script_dependencies('imgui', 'lib.samp.events')
 script_properties("work-in-pause")
 script_url("https://github.com/ins1x/MappingToolkit")
-script_version("4.15") --
+script_version("4.16") -- R1
 -- support sa-mp versions depends on SAMPFUNCS (0.3.7-R1, 0.3.7-R3-1, 0.3.7-R5, 0.3.DL)
 -- script_moonloader(16) moonloader v.0.26 
 -- editor options: tabsize 3, Unix (LF), encoding Windows-1251
@@ -19,6 +19,7 @@ script_version("4.15") --
 -- More information on the toolkit's capabilities is on the wiki. 
 -- Designed for TRAINING-SANDBOX. It can work on other projects, 
 -- but most of the features will be unavailable.
+-- THANKS blast.hk and all GTA 3D Era community!
 
 local sampev = require 'lib.samp.events'
 local imgui = require 'imgui'
@@ -611,8 +612,10 @@ local nops = {
    position = imgui.ImBool(false),
    setdrunk = imgui.ImBool(false),
    setskin = imgui.ImBool(false),
+   setobjectmaterial = imgui.ImBool(false),
    setspecialaction = imgui.ImBool(false),
    setplayerattachedobject = imgui.ImBool(false),
+   setplayerinterior = imgui.ImBool(false),
    audiostream = imgui.ImBool(false)
 }
 
@@ -8262,6 +8265,9 @@ function imgui.OnDrawFrame()
             imgui.Checkbox(u8'SetDrunkLevel      ', nops.setdrunk)
             imgui.SameLine()
             imgui.Checkbox(u8'SetSpecialAction', nops.setspecialaction)
+            imgui.Checkbox(u8'SetObjectMaterial         ', nops.setobjectmaterial)
+            imgui.SameLine()
+            imgui.Checkbox(u8'SetPlayerInterior', nops.setplayerinterior)
          end
          
          if imgui.CollapsingHeader(u8"Dialogs:") then
@@ -13668,11 +13674,24 @@ function sampev.onCreatePickup(id, model, pickupType, position)
    end
    
    if ini.settings.cberrorwarnings then
-      if position.x > 4096 or position.x < -4094 then
-         sampAddChatMessage(("[WARNING]: {FFFFFF}Pickup ID:%i не будет отображаться из-за неккоректной координаты по оси X!"):format(id), 0x0FF6600)
+      if model then
+         local modelname = tostring(sampObjectModelNames[model])
+         if position.x > 4096 or position.x < -4094 then
+            sampAddChatMessage(("[WARNING]: {FFFFFF}Pickup ID:%i model:%i (%s) не будет отображаться из-за неккоректной координаты по оси X!"):format(id, model, modelname), 0x0FF6600)
+         end
+         if position.y > 4096 or position.y < -4094 then
+            sampAddChatMessage(("[WARNING]: {FFFFFF}Pickup ID:%i model:%i (%s) не будет отображаться из-за неккоректной координаты по оси Y!"):format(id, model, modelname), 0x0FF6600)
+         end
+      else
+         if position.x > 4096 or position.x < -4094 then
+            sampAddChatMessage(("[WARNING]: {FFFFFF}Pickup ID:%i не будет отображаться из-за неккоректной координаты по оси X!"):format(id), 0x0FF6600)
+         end
+         if position.y > 4096 or position.y < -4094 then
+            sampAddChatMessage(("[WARNING]: {FFFFFF}Pickup ID:%i не будет отображаться из-за неккоректной координаты по оси Y!"):format(id), 0x0FF6600)
+         end
       end
-      if position.y > 4096 or position.y < -4094 then
-         sampAddChatMessage(("[WARNING]: {FFFFFF}Pickup ID:%i не будет отображаться из-за неккоректной координаты по оси Y!"):format(id), 0x0FF6600)
+      if pickupType == 0 then
+         sampAddChatMessage(("[WARNING]: {FFFFFF}Pickup ID:%i Пикап не всегда отображается! При отображении его нельзя поднять, не запускает OnPlayerPickUpPickup, и он останется после выгрузки."):format(id), 0x0FF6600)      
       end
    end
 end
@@ -14161,7 +14180,9 @@ function onReceiveRpc(id, bs)
    if nops.setskin.v and id == 153 then return false end
    if nops.setdrunk.v and id == 35 then return false end
    if nops.setspecialaction.v and id == 88 then return false end
+   if nops.setobjectmaterial.v and id == 84 then return false end
    if nops.setplayerattachedobject.v and id == 113 then return false end
+   if nops.setplayerinterior.v and id == 156 then return false end
    if checkbox.hideattaches.v and id == 75 then return false end
    
    if id == 116 then -- onEditAttachedObject
