@@ -3,7 +3,7 @@ script_description("Assistant for mappers")
 script_dependencies('imgui', 'lib.samp.events')
 script_properties("work-in-pause")
 script_url("https://github.com/ins1x/MappingToolkit")
-script_version("4.16") -- R1
+script_version("4.16") -- R2
 -- support sa-mp versions depends on SAMPFUNCS (0.3.7-R1, 0.3.7-R3-1, 0.3.7-R5, 0.3.DL)
 -- script_moonloader(16) moonloader v.0.26 
 -- editor options: tabsize 3, Unix (LF), encoding Windows-1251
@@ -9841,8 +9841,10 @@ function sampev.onSendDialogResponse(dialogId, button, listboxId, input)
       if button == 1 and ini.settings.loadworldname then
          if LastData.lastDialogTitle and LastData.lastDialogText then
             if LastData.lastDialogTitle:find("Загрузка мира") then
-               local result = LastData.lastDialogText:match(listboxId.."%s+.FFFFFF.%a+")
-               LastData.lastLoadedWorldName = result:sub(2, result:len())
+               local result = LastData.lastDialogText:match(listboxId.."%s+.FFFFFF.[%a_-]+")
+               if result then
+                  LastData.lastLoadedWorldName = result:sub(2, result:len())
+               end
             end
          end
       end
@@ -10243,6 +10245,24 @@ function sampev.onShowDialog(dialogId, style, title, button1, button2, text)
             sampSendDialogResponse(32700, 1, nil)
             sampCloseCurrentDialogWithButton(1)
          end
+      end
+      
+      if title:find('Изменить 3D текст') then
+         if ini.settings.cbvalautocomplete then
+            local result = text:match('[:].*')
+            if result then
+               result = result:gsub("\n","")
+               result = result:gsub("  ","")
+               result = result:gsub(":","")
+               LastData.lastTextBuffer = result
+               lua_thread.create(function()
+                  wait(250)
+                  sampSetCurrentDialogEditboxText(tostring(LastData.lastTextBuffer))
+               end)
+            end
+         end
+         local newtext = text:gsub("\n","")
+         return {dialogId, style, title, button1, button2, newtext}
       end
       
       if title:find('Меню актера') then
@@ -11092,10 +11112,10 @@ function sampev.onServerMessage(color, text)
                wait(500)
                sampSetCurrentDialogEditboxText(LastData.lastLoadedWorldName)
                wait(500)
+               sampCloseCurrentDialogWithButton(1)
+               wait(500)
                sampCloseCurrentDialogWithButton(0)
-               wait(250)
-               sampCloseCurrentDialogWithButton(0)
-               wait(250)
+               wait(500)
                sampAddChatMessage("[SCRIPT]: {FFFFFF}Название мира было автоматически загружено.", 0x0FF6600)
             end)
          end
