@@ -3,7 +3,7 @@ script_description("Assistant for mappers")
 script_dependencies('imgui', 'lib.samp.events')
 script_properties("work-in-pause")
 script_url("https://github.com/ins1x/MappingToolkit")
-script_version("4.16") -- R2
+script_version("4.16") -- R3
 -- support sa-mp versions depends on SAMPFUNCS (0.3.7-R1, 0.3.7-R3-1, 0.3.7-R5, 0.3.DL)
 -- script_moonloader(16) moonloader v.0.26 
 -- editor options: tabsize 3, Unix (LF), encoding Windows-1251
@@ -49,6 +49,7 @@ local ini = inicfg.load({
       cbdefaultradius = 0.1,
       cbnewactivation = true,
       cbnewactivationitem = 31,
+      cbnewdialog = false,
       checkupdates = true,
       chatfilter = true,
       chathidecb = false,
@@ -1152,6 +1153,9 @@ function main()
       --- END init
       while true do
       wait(0)
+      
+      -- Speed x10 (Do not use on public, trigger anticheat)
+      -- setCharAnimSpeed(PLAYER_PED, 'RUN_OLD', 10)
       
       -- Autoreconnect
       -- Required use reset_remove.asi fix
@@ -3481,20 +3485,20 @@ function imgui.OnDrawFrame()
             imgui.TextQuestion("( ? )", u8"Будет полностью игнорировать смену камеры сервером")
          
             imgui.Text(u8"Прикрепить камеру:")
-            if imgui.Button(u8"Позади игрока", imgui.ImVec2(200, 25)) then
+            if imgui.Button(u8"Позади игрока", imgui.ImVec2(225, 25)) then
                if checkbox.fixcampos.v then checkbox.fixcampos.v = false end
                sampAddChatMessage("[SCRIPT]: {FFFFFF}Камера установлена позади игрока", 0x0FF6600)
                setCameraBehindPlayer()
             end
             imgui.SameLine()
-            if imgui.Button(u8"В текущей точке", imgui.ImVec2(200, 25)) then
+            if imgui.Button(u8"Фиксированная в текущей точке", imgui.ImVec2(225, 25)) then
                local mode = 15 -- Fixed camera (non-moving) - used for Pay 'n' Spray, chase camera, tune shops, entering buildings, buying food etc.
                local switchstyle = 1 --(1 - CAMERA_MOVE 2 - CAMERA_CUT)
                pointCameraAtChar(playerPed, mode, switchstyle)
                sampAddChatMessage("[SCRIPT]: {FFFFFF}Камера закреплена в текущей точке", 0x0FF6600)
             end
             
-            if imgui.Button(u8"На ближайшего игрока", imgui.ImVec2(200, 25)) then
+            if imgui.Button(u8"На ближайшего игрока", imgui.ImVec2(225, 25)) then
                if getClosestPlayerId() ~= -1 and getClosestPlayerId() ~= getLocalPlayerId() then
                   local result, ped = sampGetCharHandleBySampPlayerId(getClosestPlayerId())
                   local mode = 4 -- https://sampwiki.blast.hk/wiki/CameraModes
@@ -3506,7 +3510,7 @@ function imgui.OnDrawFrame()
                end
             end
             imgui.SameLine()
-            if imgui.Button(u8"На ближайший транспорт", imgui.ImVec2(200, 25)) then
+            if imgui.Button(u8"На ближайший транспорт", imgui.ImVec2(225, 25)) then
                local closestcarhandle, closestcarid = getClosestCar()
                if closestcarhandle then
                   local mode = 18 -- Normal car (+skimmer+helicopter+airplane), several variable distances.
@@ -8007,7 +8011,7 @@ function imgui.OnDrawFrame()
             
             if imgui.Button(u8"Скопировать") then
                setClipboardText(textbuffer.rgb.v)
-            sampAddChatMessage("[SCRIPT]: {FFFFFF}Текст скопирован в буффер обмена", 0x0FF6600)
+               sampAddChatMessage("[SCRIPT]: {FFFFFF}Текст скопирован в буффер обмена", 0x0FF6600)
             end
             imgui.SameLine()
             if imgui.Button(u8"Сбросить") then
@@ -8021,11 +8025,37 @@ function imgui.OnDrawFrame()
             end
             imgui.SameLine()
             if imgui.Button(u8"Протестировать") then
-               sampAddChatMessage(u8:decode(textbuffer.rgb.v), -1)
+               if string.len(textbuffer.rgb.v) > 1 then
+                  sampAddChatMessage(u8:decode(textbuffer.rgb.v), -1)
+               else
+                  local hexcolor = tostring(intToHexRgb(join_argb(input.colorpicker.v[4] * 255,
+                  input.colorpicker.v[1] * 255, input.colorpicker.v[2] * 255, input.colorpicker.v[3] * 255)))
+                  textbuffer.rgb.v = "{"..string.upper(hexcolor).."}Text"
+                  sampAddChatMessage(u8:decode(textbuffer.rgb.v), -1)
+               end
             end
          end
          
          if imgui.CollapsingHeader(u8"Тест GameText") then
+            local colorcodes = [[
+            ~r~    red
+            ~g~    green
+            ~b~    blue
+            ~w~    white
+            ~y~    yellow
+            ~p~    purple
+            ~l~    black
+            ~h~    lighter color
+            ]]
+            
+            local styletips = u8[[
+            STYLE 0: Отображается в течение 9 секунд независимо от настройки времени.
+            Скрывает текстдравы и любой другой игровой текст на экране.
+            STYLE 1: Гаснет через 8 секунд независимо от установленного времени.
+            Если у вас установлено более длительное время, оно появится снова после исчезновения и будет повторяться до тех пор, пока время не закончится.
+            STYLE 2: Не исчезает, пока игрок не заспавнится.
+            STYLE 5: Отображается в течение 3 секунд независимо от установленного времени. Не покажется, если им "спамят".
+            ]]
             imgui.TextColoredRGB("Пример: {FFFFFF}~w~Hello this is {0000FF}~b~blue {FFFFFF}~w~and this is {FF0000}~r~red")
             imgui.SameLine()
             imgui.TextQuestion(u8" [ ] ", u8"Вставить текст из примера")
@@ -8037,24 +8067,25 @@ function imgui.OnDrawFrame()
                "Style 0", "Style 1", "Style 2", "Style 3", "Style 4", "Style 5", "Style 6"
             }
             
-            imgui.PushItemWidth(100)
-            imgui.Combo(u8'##GameTextStylesCombo', combobox.gametextstyles, gametextstyles)
+            imgui.PushItemWidth(80)
+            if imgui.Combo(u8'##GameTextStylesCombo', combobox.gametextstyles, gametextstyles) then
+               if combobox.gametextstyles.v == 0 then
+                  input.gametexttime.v = 9000
+               elseif combobox.gametextstyles.v == 1 then
+                  input.gametexttime.v = 8000
+               elseif combobox.gametextstyles.v == 5 then
+                  input.gametexttime.v = 3000
+               end
+            end
             imgui.PopItemWidth()
             imgui.SameLine()
             imgui.PushItemWidth(55)
             imgui.InputInt('ms.##GameTextTime', input.gametexttime, 0)
             imgui.PopItemWidth()
             imgui.SameLine()
-            imgui.TextQuestion(u8"   Подсказка по цветам", [[
-            ~r~    red
-            ~g~    green
-            ~b~    blue
-            ~w~    white
-            ~y~    yellow
-            ~p~    purple
-            ~l~    black
-            ~h~    lighter color
-            ]])
+            imgui.TextQuestion(u8" Цвета", colorcodes:gsub("  ",""))
+            imgui.SameLine()
+            imgui.TextQuestion(u8" Стили", styletips:gsub("  ",""))
             imgui.PushItemWidth(375)
             if imgui.InputText("##GameTextClr", textbuffer.gametextclr) then
             end
@@ -8128,7 +8159,10 @@ function imgui.OnDrawFrame()
             imgui.Text(isPlayerControlLocked(playerPed) and u8('Управление: Заблокированно') or u8('Управление: Доступно'))
             imgui.Text(sampIsLocalPlayerSpawned() and u8('Заспавнен: Да') or u8('Заспавнен: Нет'))
             imgui.Text(string.format(u8"Курсор: %s", cursormodesList[cursormode+1]))
+            
             imgui.Spacing()
+            
+            imgui.TextColoredRGB("{FF0000}Эти функции могут триггерить античит! Будьте разумны в использовании")
             if imgui.Button(u8'Выйти из спектатора', imgui.ImVec2(180, 25)) then
                local bs = raknetNewBitStream()
                raknetBitStreamWriteInt32(bs, 0)
@@ -9866,13 +9900,15 @@ function sampev.onSendDialogResponse(dialogId, button, listboxId, input)
          end
       end
       
-      if button == 1 and input:find("Удалить блок") then
-         if LastData.lastCb then
-            lua_thread.create(function()
-               sampCloseCurrentDialogWithButton(0)
-               wait(100)
-               sampSendChat("/cbdell "..LastData.lastCb) 
-            end)
+      if ini.settings.cbnewdialog then
+         if button == 1 and input:find("Удалить блок") then
+            if LastData.lastCb then
+               lua_thread.create(function()
+                  sampCloseCurrentDialogWithButton(0)
+                  wait(100)
+                  sampSendChat("/cbdell "..LastData.lastCb) 
+               end)
+            end
          end
       end
       
@@ -10531,12 +10567,14 @@ function sampev.onShowDialog(dialogId, style, title, button1, button2, text)
          end
       end
       
-      if LastData.lastCb and style == 4 then
-         if text:find("Лимит повторений") and text:find("Имя блока") then
-            local newtitle = "cbid: "..LastData.lastCb
-            local newtext = text ..
-            "\n{FF0000}Удалить блок\n"
-            return {dialogId, style, newtitle, button1, button2, newtext}
+      if ini.settings.cbnewdialog then
+         if LastData.lastCb and style == 4 then
+            if text:find("Лимит повторений") and text:find("Имя блока") then
+               local newtitle = "cbid: "..LastData.lastCb
+               local newtext = text ..
+               "\n{FF0000}Удалить блок\n"
+               return {dialogId, style, newtitle, button1, button2, newtext}
+            end
          end
       end
       
@@ -11130,6 +11168,8 @@ function sampev.onServerMessage(color, text)
       if text:find("[SERVER].+Вы присоединились к лобби") then
          LastData.lastMinigame = 4
       end
+      
+      --if text:find("[SERVER].+Данный игрок ограничил круг лиц, которые могут подключаться") then
       
       if text:find("[SERVER].+Ваш мир был обнулен") then
          playerdata.isWorldHoster = false
@@ -13470,6 +13510,7 @@ function sampev.onApplyPlayerAnimation(playerId, animLib, animName, frameDelta, 
          return false
       end
    end
+   
 end
 
 function onExitScript()
@@ -13941,7 +13982,10 @@ function sampev.onSetMapIcon(iconId, position, type, color, style)
    -- Marker type 1,2,4,56 will cause your game to crash if you have map legends enabled while viewing the map. 
    if (type == 1 or type == 2 or type == 4 or type == 56) then
       if ini.settings.cberrorwarnings then
-         sampAddChatMessage(("[WARNING]: {FFFFFF}Mapicon %i указан багнутый тип иконки %i, возможен краш клиента"):format(iconId, type), 0x0FF6600)
+         lua_thread.create(function()
+            sampAddChatMessage(("[WARNING]: {FFFFFF}Mapicon %i указан багнутый тип иконки %i, возможен краш клиента"):format(iconId, type), 0x0FF6600)
+            wait(1000*60*5)
+         end)
       end
       return {iconId, position, 57, color, style}
    end
