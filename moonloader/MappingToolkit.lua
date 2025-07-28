@@ -3,7 +3,7 @@ script_description("Assistant for mappers")
 script_dependencies('imgui', 'lib.samp.events')
 script_properties("work-in-pause")
 script_url("https://github.com/ins1x/MappingToolkit")
-script_version("4.16") -- R3
+script_version("4.16") -- pre-release 4
 -- support sa-mp versions depends on SAMPFUNCS (0.3.7-R1, 0.3.7-R3-1, 0.3.7-R5, 0.3.DL)
 -- script_moonloader(16) moonloader v.0.26 
 -- editor options: tabsize 3, Unix (LF), encoding Windows-1251
@@ -281,6 +281,7 @@ local dialog = {
 
 local dialoghook = {
    action = false,
+   attinfo = false,
    animlist = false,
    backtoworld = false,
    cbnewactivation = false,
@@ -715,12 +716,14 @@ local LastData = {
    lastWeather = 1,
    lastLink = "",
    lastOtext = "",
+   lastOtextObjectId = nil,
    lastPickupBlip = nil,
    lastVehinfoModelid = 0,
    lastCbvaluebuffer = nil,
    lastTbvaluebuffer = nil,
    lastMinigame = nil,
    lastModelinfo = 0,
+   lastAttEditSlot = nil,
    lastLoadedWorldName = nil,
    lastLoadedWorldNumber = nil
 }
@@ -9859,6 +9862,25 @@ function sampev.onSendDialogResponse(dialogId, button, listboxId, input)
          inicfg.save(ini, configIni)
       end
       
+      if button == 1 and LastData.lastAttEditSlot then
+         local caption = sampGetDialogCaption()
+         if caption:find("Редактирование") then
+            if input:find("Информация") then
+               lua_thread.create(function()
+                  wait(250)
+                  sampSendChat("/attinfo "..LastData.lastAttEditSlot)
+               end)
+            end
+         end
+      end
+      
+      if button == 1 then
+         local caption = sampGetDialogCaption()
+         if caption:find("Выбор слота") then
+            LastData.lastAttEditSlot = listboxId + 1
+         end
+      end
+      
       if button == 0 and ini.settings.skipomenu then
          local caption = sampGetDialogCaption()
          if LastData.lastDialogTitle then
@@ -10606,6 +10628,15 @@ function sampev.onShowDialog(dialogId, style, title, button1, button2, text)
             end
          end
          
+         if title:find('Редактирование') then
+            if text:find("Изменить цвет") then
+               if LastData.lastAttEditSlot then
+                  local newtext = "\nИнформация"
+                  return {dialogId, style, title, button1, button2, text..newtext}
+               end
+            end
+         end
+         
          -- Added new features to /omenu
          if title:find("Редактирование / Клонирование") then
             dialoghook.editdialog = true
@@ -10640,6 +10671,15 @@ function sampev.onShowDialog(dialogId, style, title, button1, button2, text)
                   sampSendDialogResponse(32700, 1, nil, LastObject.localid)
                   sampCloseCurrentDialogWithButton(0)
                end
+               
+               if LastData.lastOtextObjectId then
+                  if ini.settings.dialogautocomplete then
+                     lua_thread.create(function()
+                        wait(200)
+                        sampSetCurrentDialogEditboxText(LastData.lastOtextObjectId)
+                     end)
+                  end   
+               end               
             end
             if text:find("Укажите цвет шрифта") or text:find("Укажите цвет фона") then
                if ini.settings.dialogautocomplete then
@@ -10674,6 +10714,12 @@ function sampev.onShowDialog(dialogId, style, title, button1, button2, text)
                
                return {dialogId, style, title, button1, button2, newtext}
             end
+            -- if text:find("Цвет шрифта") then
+               -- local result = text:match("Цвет шрифта.+(%d).")
+               -- if result then
+                  -- sampAddChatMessage("[SCRIPT]: {FFFFFF}Укажите цвет!"..result, 0x0FF6600)
+               -- end
+            -- end
          end
          
          -- Extend cb set components dialog
@@ -11079,6 +11125,17 @@ function sampev.onServerMessage(color, text)
          end
          return false
       end
+      
+      if dialoghook.attinfo then
+         local result = text:match(".SERVER.+%d+ | %d+ ")
+         if result then
+            local result = result:gsub(" | "," ")
+            local result = result:sub(19, result:len()) -- -[SERVER]: {FFFFFF}
+            setClipboardText(result)
+            sampAddChatMessage("[SCRIPT]: {FFFFFF}Текст скопирован в буффер обмена", 0x0FF6600)
+         end
+         dialoghook.attinfo = false
+      end
    end
    
    if ini.settings.antiads then
@@ -11151,7 +11208,7 @@ function sampev.onServerMessage(color, text)
                sampSetCurrentDialogEditboxText(LastData.lastLoadedWorldName)
                wait(500)
                sampCloseCurrentDialogWithButton(1)
-               wait(500)
+               wait(250)
                sampCloseCurrentDialogWithButton(0)
                wait(500)
                sampAddChatMessage("[SCRIPT]: {FFFFFF}Название мира было автоматически загружено.", 0x0FF6600)
@@ -11849,6 +11906,17 @@ function sampev.onSendCommand(command)
       sampAddChatMessage("Включен режим редактирования объекта", 0x000FF00)
       enterEditObject()
       return false
+   end
+
+   if isTrainingSanbox and command:find("^/otext") then
+      if command:find('(/%a+) (.+)') then
+         local cmd, arg = command:match('(/%a+) (.+)')
+         local id = tonumber(arg)
+         if type(id) == "number" then
+            LastData.lastOtextObjectId = id
+            print(id, LastData.lastOtextObjectId)
+         end
+      end
    end
    
    if isTrainingSanbox and command:find("^/action") then
@@ -13065,6 +13133,19 @@ function sampev.onSendCommand(command)
       if dynobjectsCounter == 0 then
          sampAddChatMessage("[WARNING]: {FFFFFF}Похоже мир пустой! не найдено объектов рядом, вы точно хотите его сохранить?", 0x0CC0000)
          printStyledString('~r~ WARNING ~w~Attempt to save an empty world ~r~', 7000, 4)         
+      end
+   end
+   
+   if isTrainingSanbox then 
+      if command:find("^/attinfo") or command:find("^/attachinfo") then
+         if command:find('(/%a+) (.+)') then
+            local cmd, arg = command:match('(/%a+) (.+)')
+            local id = tonumber(arg)
+            if type(id) == "number" then
+               LastData.lastAttEditSlot = id
+               dialoghook.attinfo = true
+            end
+         end
       end
    end
    
