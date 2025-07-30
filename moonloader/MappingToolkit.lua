@@ -3,7 +3,7 @@ script_description("Assistant for mappers")
 script_dependencies('imgui', 'lib.samp.events')
 script_properties("work-in-pause")
 script_url("https://github.com/ins1x/MappingToolkit")
-script_version("4.16") -- pre-release 4
+script_version("4.16") -- pre-release 5
 -- support sa-mp versions depends on SAMPFUNCS (0.3.7-R1, 0.3.7-R3-1, 0.3.7-R5, 0.3.DL)
 -- script_moonloader(16) moonloader v.0.26 
 -- editor options: tabsize 3, Unix (LF), encoding Windows-1251
@@ -202,6 +202,7 @@ local streamedPickups = {}
 local streamed3dTexts = {}
 local streamedTexts = {}
 local streamed3dLabels = {}
+local streamedMapIcons = {iconId = nil, position = nil, type = nil, color = nil, style = nil}
 
 for i = 1, ini.settings.maxtableitems do
    table.insert(streamedTextures, "")
@@ -892,6 +893,19 @@ local PopularFonts = {
    "Candara","Trebuchet MS","Tahoma",
    "Sylfaen","Segoe UI","Webdings",
    "Wingdings","Symbol","GTAWEAPON3"
+}
+
+local MapiconsNames = {
+   "Colored Square/Triangle","White Square","Player Position","Player (Menu Map)",
+   "North", "Air Yard","Ammunation","Barber","Big Smoke","Boat Yard","Burger Shot",
+   "Quarry","Catalina","Cesar","Cluckin Bell","Carl Johnson","C.R.A.S.H",
+   "Diner","Emmet","Enemy Attack","Fire","Girlfriend","Hospital","Loco","Madd Dogg",
+   "Caligulas","OG Loc", "Mod garage","OG Loc","Well Stacked Pizza Co","Police",
+   "Free Property", "Unav Property","Race","Ryder","Save Game","School","Unknown",
+   "Sweet","Tattoo","The Truth","Waypoint","Toreno","Triads","Triads Casino","Clothes",
+   "Woozie","Zero","Club","Bar","Restaurant","Truck","Robbery","Race","Gym","Car",
+   "Light","Closest airport","Varrios Los Aztecas","Ballas","Los Santos Vagos",
+   "San Fierro Rifa","Grove street","Pay-n-Spray"
 }
 
 -- imported tables from moonloader/resource/mappingtoolkit/data
@@ -6170,21 +6184,23 @@ function imgui.OnDrawFrame()
          
          if imgui.CollapsingHeader(u8"Вход в мир:") then
             imgui.resetIO()
-            if imgui.Checkbox(u8'Включать режим разработчика при входе в мир', checkbox.autodevmode) then
-               ini.settings.autodevmode = checkbox.autodevmode.v
-               inicfg.save(ini, configIni)
+            if isTrainingSanbox then
+               if imgui.Checkbox(u8'Включать режим разработчика при входе в мир', checkbox.autodevmode) then
+                  ini.settings.autodevmode = checkbox.autodevmode.v
+                  inicfg.save(ini, configIni)
+               end
+               imgui.SameLine()
+               imgui.TextQuestion("( ? )", u8"Будет выставлять автоматически режим разработчика в мире (необходимо для перехвата локальных ид объектов)")
+               
+               if imgui.Checkbox(u8("Включать логи мира при входе"), checkbox.worldlogson) then
+                  ini.settings.worldlogson = checkbox.worldlogson.v
+                  inicfg.save(ini, configIni)
+                  dialoghook.logstoggle = true
+                  sampSendChat("/vw")
+               end
+               imgui.SameLine()
+               imgui.TextQuestion("( ? )", u8"Включает текстдрав с логами мира")
             end
-            imgui.SameLine()
-            imgui.TextQuestion("( ? )", u8"Будет выставлять автоматически режим разработчика в мире (необходимо для перехвата локальных ид объектов)")
-
-            if imgui.Checkbox(u8("Включать логи мира при входе"), checkbox.worldlogson) then
-               ini.settings.worldlogson = checkbox.worldlogson.v
-               inicfg.save(ini, configIni)
-               dialoghook.logstoggle = true
-               sampSendChat("/vw")
-            end
-            imgui.SameLine()
-            imgui.TextQuestion("( ? )", u8"Включает текстдрав с логами мира")
             
             if imgui.Checkbox(u8("Отключить audiostream"), nops.audiostream) then
                if nops.audiostream.v then
@@ -6196,13 +6212,15 @@ function imgui.OnDrawFrame()
             imgui.SameLine()
             imgui.TextQuestion("( ? )", u8"Отключает аудиострим (убирает музыку в мирах)")
             
-            if imgui.Checkbox(u8'Включать бессмертие в мире', checkbox.setgm) then
-               sampSendChat("/gm")
-               ini.settings.setgm = checkbox.setgm.v
-               inicfg.save(ini, configIni)
+            if isTrainingSanbox then
+               if imgui.Checkbox(u8'Включать бессмертие в мире', checkbox.setgm) then
+                  sampSendChat("/gm")
+                  ini.settings.setgm = checkbox.setgm.v
+                  inicfg.save(ini, configIni)
+               end
+               imgui.SameLine()
+               imgui.TextQuestion("( ? )", u8"Будет выставлять бессмертие при спавне в мире")
             end
-            imgui.SameLine()
-            imgui.TextQuestion("( ? )", u8"Будет выставлять бессмертие при спавне в мире")
             
             if imgui.Checkbox(u8'Устанавливать свою погоду и время', checkbox.saveweather) then
                ini.settings.saveweather = checkbox.saveweather.v
@@ -6211,128 +6229,131 @@ function imgui.OnDrawFrame()
             imgui.SameLine()
             imgui.TextQuestion("( ? )", u8"Устанавливать свою погоду и время при входе в мир")
             
-            if imgui.Checkbox(u8'Заспавниться после загрузки мира', checkbox.spawnafterloadvw) then
-               ini.settings.spawnafterloadvw = checkbox.spawnafterloadvw.v
-               inicfg.save(ini, configIni)
-            end
-            imgui.SameLine()
-            imgui.TextQuestion("( ? )", u8"Заспавнит вас автоматически после загрузки мира")
-            
-            if imgui.Checkbox(u8'Загружать имя мира автоматически', checkbox.loadworldname) then
-               ini.settings.loadworldname = checkbox.loadworldname.v
-               inicfg.save(ini, configIni)
-            end
-            imgui.SameLine()
-            imgui.TextQuestion("( ? )", u8"Автоматически заполнит название мира из диалога /loadvw сразу при загрузке")
-            
-            if imgui.Checkbox(u8'Устанавливать свой скин в мире', checkbox.saveskin) then 
-               if checkbox.saveskin.v then
-                  ini.settings.saveskin = true
-                  --ini.settings.skinid = skinid
-               else
-                  ini.settings.saveskin = false
-                  ---ini.settings.skinid = skinid
-               end               
-               inicfg.save(ini, configIni)
-            end
-            imgui.SameLine()
-            imgui.TextQuestion("( ? )", u8"Будет выставлять скин при спавне в мире")
-            
-            if checkbox.saveskin.v then
-               -- imgui.Text("Skinid:")
-               -- imgui.SameLine()
-               imgui.PushItemWidth(45)
-               imgui.InputText("ID##saveskin", textbuffer.saveskin, imgui.InputTextFlags.CharsDecimal)
-               imgui.PopItemWidth()
-               local skinid = tonumber(textbuffer.saveskin.v)
-               local currentskin = getCharModel(playerPed)
-               if string.len(textbuffer.saveskin.v) < 1 then
-                  textbuffer.saveskin.v = tostring(currentskin)
+            if isTrainingSanbox then
+               if imgui.Checkbox(u8'Заспавниться после загрузки мира', checkbox.spawnafterloadvw) then
+                  ini.settings.spawnafterloadvw = checkbox.spawnafterloadvw.v
+                  inicfg.save(ini, configIni)
                end
+               imgui.SameLine()
+               imgui.TextQuestion("( ? )", u8"Заспавнит вас автоматически после загрузки мира")
                
-               imgui.SameLine()
-               if imgui.Button(u8"Сменить скин", imgui.ImVec2(110, 25)) then
-                  if isValidSkin(skinid) then
-                     sampSendChat("/skin "..skinid)
-                     sampAddChatMessage("[SCRIPT]: {FFFFFF}Вы cменили скин {696969}"..currentskin.."{FFFFFF} на {696969}"..skinid, 0x0FF6600)
-                  end
+               if imgui.Checkbox(u8'Загружать имя мира автоматически', checkbox.loadworldname) then
+                  ini.settings.loadworldname = checkbox.loadworldname.v
+                  inicfg.save(ini, configIni)
                end
                imgui.SameLine()
-               if imgui.Button(u8"Сохранить скин", imgui.ImVec2(110, 25)) then
-                  if isValidSkin(skinid) then
-                     sampSendChat("/skin "..skinid)
+               imgui.TextQuestion("( ? )", u8"Автоматически заполнит название мира из диалога /loadvw сразу при загрузке")
+               
+               if imgui.Checkbox(u8'Устанавливать свой скин в мире', checkbox.saveskin) then 
+                  if checkbox.saveskin.v then
                      ini.settings.saveskin = true
-                     ini.settings.skinid = skinid
-                     inicfg.save(ini, configIni)
-                     sampAddChatMessage("[SCRIPT]: {FFFFFF}Вы сохранили скин {696969}"..skinid, 0x0FF6600)
-                  end
+                     --ini.settings.skinid = skinid
+                  else
+                     ini.settings.saveskin = false
+                     ---ini.settings.skinid = skinid
+                  end               
+                  inicfg.save(ini, configIni)
                end
                imgui.SameLine()
-               if imgui.Button(u8"Сменить скин (Визуал)", imgui.ImVec2(150, 25)) then
-                  if isValidSkin(skinid) then
-                     setPlayerModel(skinid)
-                     sampAddChatMessage("[SCRIPT]: {FFFFFF}Вы визуально cменили скин {696969}"..currentskin.."{FFFFFF} на {696969}"..skinid, 0x0FF6600)
+               imgui.TextQuestion("( ? )", u8"Будет выставлять скин при спавне в мире")
+               
+               if checkbox.saveskin.v then
+                  -- imgui.Text("Skinid:")
+                  -- imgui.SameLine()
+                  imgui.PushItemWidth(45)
+                  imgui.InputText("ID##saveskin", textbuffer.saveskin, imgui.InputTextFlags.CharsDecimal)
+                  imgui.PopItemWidth()
+                  local skinid = tonumber(textbuffer.saveskin.v)
+                  local currentskin = getCharModel(playerPed)
+                  if string.len(textbuffer.saveskin.v) < 1 then
+                     textbuffer.saveskin.v = tostring(currentskin)
+                  end
+                  
+                  imgui.SameLine()
+                  if imgui.Button(u8"Сменить скин", imgui.ImVec2(110, 25)) then
+                     if isValidSkin(skinid) then
+                        sampSendChat("/skin "..skinid)
+                        sampAddChatMessage("[SCRIPT]: {FFFFFF}Вы cменили скин {696969}"..currentskin.."{FFFFFF} на {696969}"..skinid, 0x0FF6600)
+                     end
+                  end
+                  imgui.SameLine()
+                  if imgui.Button(u8"Сохранить скин", imgui.ImVec2(110, 25)) then
+                     if isValidSkin(skinid) then
+                        sampSendChat("/skin "..skinid)
+                        ini.settings.saveskin = true
+                        ini.settings.skinid = skinid
+                        inicfg.save(ini, configIni)
+                        sampAddChatMessage("[SCRIPT]: {FFFFFF}Вы сохранили скин {696969}"..skinid, 0x0FF6600)
+                     end
+                  end
+                  imgui.SameLine()
+                  if imgui.Button(u8"Сменить скин (Визуал)", imgui.ImVec2(150, 25)) then
+                     if isValidSkin(skinid) then
+                        setPlayerModel(skinid)
+                        sampAddChatMessage("[SCRIPT]: {FFFFFF}Вы визуально cменили скин {696969}"..currentskin.."{FFFFFF} на {696969}"..skinid, 0x0FF6600)
+                     end
                   end
                end
             end
          end
          
-         if imgui.CollapsingHeader(u8"Автодополнение:") then
-            
-            if imgui.Checkbox(u8'Автодополнение имени мира (при сохранении)', checkbox.saveworldname) then
-               ini.settings.saveworldname = checkbox.saveworldname.v
-               inicfg.save(ini, configIni)
-            end
-            imgui.SameLine()
-            imgui.TextQuestion("( ? )", u8"При сохранении мира поставит в поле ввода предыдущее имя (только для TRAINING)")
-            
-            if imgui.Checkbox(u8'Автодополнение в диалогах КБ', checkbox.cbvalautocomplete) then
-               ini.settings.cbvalautocomplete = checkbox.cbvalautocomplete.v
-               inicfg.save(ini, configIni)
-            end
-            imgui.SameLine()
-            imgui.TextQuestion("( ? )", u8"Использовать авто-дополнение текущих значений в /cblist (только для TRAINING)")
-            
-            if imgui.Checkbox(u8'Изменять способ активации при создании КБ', checkbox.cbnewactivation) then
-               ini.settings.cbnewactivation = checkbox.cbnewactivation.v
-               inicfg.save(ini, configIni)
-            end
-            imgui.SameLine()
-            imgui.TextQuestion("( ? )", u8"При создании КБ изменяет активацию по-умолчанию на вашу")
-            
-            if checkbox.cbnewactivation.v then
-               imgui.PushItemWidth(200)
-               if imgui.Combo(u8'<- Выберите активацию КБ по-умолчанию##cbactivations', combobox.cbactivations, cbActivationItemsList) then
-                  ini.settings.cbnewactivationitem = combobox.cbactivations.v
+         if isTrainingSanbox then
+            if imgui.CollapsingHeader(u8"Автодополнение:") then
+               
+               if imgui.Checkbox(u8'Автодополнение имени мира (при сохранении)', checkbox.saveworldname) then
+                  ini.settings.saveworldname = checkbox.saveworldname.v
                   inicfg.save(ini, configIni)
+               end
+               imgui.SameLine()
+               imgui.TextQuestion("( ? )", u8"При сохранении мира поставит в поле ввода предыдущее имя (только для TRAINING)")
+               
+               if imgui.Checkbox(u8'Автодополнение в диалогах КБ', checkbox.cbvalautocomplete) then
+                  ini.settings.cbvalautocomplete = checkbox.cbvalautocomplete.v
+                  inicfg.save(ini, configIni)
+               end
+               imgui.SameLine()
+               imgui.TextQuestion("( ? )", u8"Использовать авто-дополнение текущих значений в /cblist (только для TRAINING)")
+               
+               if imgui.Checkbox(u8'Изменять способ активации при создании КБ', checkbox.cbnewactivation) then
+                  ini.settings.cbnewactivation = checkbox.cbnewactivation.v
+                  inicfg.save(ini, configIni)
+               end
+               imgui.SameLine()
+               imgui.TextQuestion("( ? )", u8"При создании КБ изменяет активацию по-умолчанию на вашу")
+               
+               if checkbox.cbnewactivation.v then
+                  imgui.PushItemWidth(200)
+                  if imgui.Combo(u8'<- Выберите активацию КБ по-умолчанию##cbactivations', combobox.cbactivations, cbActivationItemsList) then
+                     ini.settings.cbnewactivationitem = combobox.cbactivations.v
+                     inicfg.save(ini, configIni)
+                  end
+                  imgui.PopItemWidth()
+               end
+               
+               imgui.Text(u8"Радиус активации КБ по-умолчанию:")
+               imgui.SameLine()
+               imgui.PushItemWidth(60)
+               --if imgui.InputFloat("##inputcbdefaultradius", input.cbdefaultradius, 0.1, 9999, '%.2f') then
+               if imgui.InputText("##Buffercbdefaultradius", textbuffer.cbdefaultradius, imgui.InputTextFlags.CharsDecimal) then
+                  if tonumber(textbuffer.cbdefaultradius.v) > 0.1 and tonumber(textbuffer.cbdefaultradius.v) <= 9999.9 then
+                     ini.settings.cbdefaultradius = string.format("%.1f", textbuffer.cbdefaultradius.v)
+                     inicfg.save(ini, configIni)
+                  else
+                     textbuffer.cbdefaultradius.v = "0.1"
+                  end
                end
                imgui.PopItemWidth()
-            end
-            
-            imgui.Text(u8"Радиус активации КБ по-умолчанию:")
-            imgui.SameLine()
-            imgui.PushItemWidth(60)
-            --if imgui.InputFloat("##inputcbdefaultradius", input.cbdefaultradius, 0.1, 9999, '%.2f') then
-            if imgui.InputText("##Buffercbdefaultradius", textbuffer.cbdefaultradius, imgui.InputTextFlags.CharsDecimal) then
-               if tonumber(textbuffer.cbdefaultradius.v) > 0.1 and tonumber(textbuffer.cbdefaultradius.v) <= 9999.9 then
-                  ini.settings.cbdefaultradius = string.format("%.1f", textbuffer.cbdefaultradius.v)
+               imgui.SameLine()
+               imgui.TextQuestion("( ? )", u8"При создании КБ изменяет радиус активации (Принимает значения от 0.1 до 9999)")
+                  
+               if imgui.Checkbox(u8'Скипать меню выбора объектов при отмене в /omenu', checkbox.skipomenu) then
+                  ini.settings.skipomenu = checkbox.skipomenu.v
                   inicfg.save(ini, configIni)
-               else
-                  textbuffer.cbdefaultradius.v = "0.1"
                end
+               imgui.SameLine()
+               imgui.TextQuestion("( ? )", u8"Автоматически пропускает меню выбора объектов при отмене в /omenu")
             end
-            imgui.PopItemWidth()
-            imgui.SameLine()
-            imgui.TextQuestion("( ? )", u8"При создании КБ изменяет радиус активации (Принимает значения от 0.1 до 9999)")
-               
-            if imgui.Checkbox(u8'Скипать меню выбора объектов при отмене в /omenu', checkbox.skipomenu) then
-               ini.settings.skipomenu = checkbox.skipomenu.v
-               inicfg.save(ini, configIni)
-            end
-            imgui.SameLine()
-            imgui.TextQuestion("( ? )", u8"Автоматически пропускает меню выбора объектов при отмене в /omenu")
          end
-
          if imgui.CollapsingHeader(u8"Подключение:") then
            
             if isTrainingSanbox then   
@@ -6352,13 +6373,15 @@ function imgui.OnDrawFrame()
             imgui.TextQuestion("( ? )", u8"Автоматически переподключит вас к серверу при потере соединения\
             (Исправляет так же сообщение You are bannded on this server)")
             
-            if imgui.Checkbox(u8'Возвращаться обратно в свой мир при вылете', checkbox.backtoworld) then
-               ini.settings.backtoworld = checkbox.backtoworld.v
-               inicfg.save(ini, configIni)
+            if isTrainingSanbox then
+               if imgui.Checkbox(u8'Возвращаться обратно в свой мир при вылете', checkbox.backtoworld) then
+                  ini.settings.backtoworld = checkbox.backtoworld.v
+                  inicfg.save(ini, configIni)
+               end
+               imgui.SameLine()
+               imgui.TextQuestion("( ? )", u8"Автоматически зайдет в созданный мир при подключении\
+               (при условии что он еще не был обнулен)")
             end
-            imgui.SameLine()
-            imgui.TextQuestion("( ? )", u8"Автоматически зайдет в созданный мир при подключении\
-            (при условии что он еще не был обнулен)")
             
             if imgui.Checkbox(u8'Автоматически выгружать тулкит для других проектов', checkbox.serverlock) then
                ini.settings.serverlock = checkbox.serverlock.v
@@ -6754,10 +6777,10 @@ function imgui.OnDrawFrame()
          
        imgui.Text(u8"Выберите сущность:")
        imgui.SameLine()
-       imgui.PushItemWidth(100)
+       imgui.PushItemWidth(120)
        local selecttableitems = {
           u8'Игроки', u8'Транспорт', u8'Объекты', u8'Текстуры', 
-          u8'Пикапы', u8'3d-тексты'--, u8'Надписи'
+          u8'Пикапы', u8'3d-тексты', u8'Иконки карты' --, u8'Надписи'
        }
        imgui.Combo(u8'##ComboBoxSelecttable', combobox.selecttable, 
        selecttableitems, #selecttableitems)
@@ -6831,16 +6854,15 @@ function imgui.OnDrawFrame()
                       file:write(string.format("\n", element))
                    end
                 end
-             -- elseif combobox.selecttable.v == 6 then
-                -- file:write("MappingTollkit: Exported MaterialTexts:\n")
-                -- for k, v in ipairs(streamedTexts) do
-                   -- if string.len(v) > 1 then
-                      -- for element in string.gmatch(v, "[^,]+") do
-                         -- file:write(string.format(" %s ", element))
-                      -- end
-                      -- file:write(string.format("\n", element))
-                   -- end
-                -- end
+             elseif combobox.selecttable.v == 6 then
+                file:write("MappingTollkit: Exported Mapicons:\n")
+                if next(streamedMapIcons) ~= nil then
+                   for k, value in ipairs(streamedMapIcons) do
+                      file:write(("%i  %i  %i  %.2f %.2f %.2f\n"):format(
+                      value.iconId, value.type, value.style,
+                      value.position.x, value.position.y, value.position.z))
+                   end
+                end
              end
              file:close()
              sampAddChatMessage("[SCRIPT]: {FFFFFF}Список был сохранен в /moonloader/resource/mappingtoolkit/export/exportdata.txt", 0x0FF6600)
@@ -6941,10 +6963,16 @@ function imgui.OnDrawFrame()
                    end
                    elementCount = 0
                 end
-             -- elseif combobox.selecttable.v == 6 then
-                -- file:write("// MappingTollkit: Exported Texts:\n")
-                -- file:write('// SetObjectMaterialText(objectid, text[], materialindex = 0, materialsize = OBJECT_MATERIAL_SIZE_256x128, fontface[] = "Arial", fontsize = 24, bold = 1, fontcolor = 0xFFFFFFFF, backcolor = 0, textalignment = 0);\n')
-                -- sampAddChatMessage("[SCRIPT]: {FFFFFF}Недоступно в текущей версии", 0x0FF6600)
+             elseif combobox.selecttable.v == 6 then
+                file:write("// MappingTollkit: Exported Mapicons:\n")
+                file:write("// SetPlayerMapIcon(playerid, iconid, Float:x, Float:y, Float:z, markertype, color, style);\n\n")
+                if next(streamedMapIcons) ~= nil then
+                   for k, value in ipairs(streamedMapIcons) do
+                      file:write(("SetPlayerMapIcon(playerid, %i, %.2f, %.2f, %.2f, %i, %i, %i);\n"):format(
+                      value.iconId, value.position.x, value.position.y, value.position.z,
+                      value.type, value.color, value.style))
+                   end
+                end
              end
              file:close()  
              sampAddChatMessage("[SCRIPT]: {FFFFFF}Список был сохранен в /moonloader/resource/mappingtoolkit/export/exportdata.pwn", 0x0FF6600)
@@ -7246,7 +7274,9 @@ function imgui.OnDrawFrame()
             end
          end
          imgui.Text(u8"Всего объектов в таблице: ".. objectsInTable)
+         
       elseif combobox.selecttable.v == 3 then
+      
          imgui.Separator()
          imgui.Columns(6)
          imgui.TextQuestion("TxdId", u8"ID текстуры (/tsearch)")
@@ -7296,6 +7326,7 @@ function imgui.OnDrawFrame()
             end
          end
          imgui.Text(u8"Всего текстур в таблице: ".. texturesInTable)
+         
       elseif combobox.selecttable.v == 4 then
          imgui.Separator()
          imgui.Columns(6)
@@ -7416,6 +7447,55 @@ function imgui.OnDrawFrame()
 
          imgui.Text(u8"Всего 3D текстов в таблице: ".. textsInTable)
       elseif combobox.selecttable.v == 6 then
+      
+         local mapiconStyleNames = {
+            "MAPICON_LOCAL", "MAPICON_GLOBAL",
+            "MAPICON_LOCAL_CHECKPOINT","MAPICON_GLOBAL_CHECKPOINT"
+         }
+         
+         local textsInTable = 0
+         
+         imgui.Separator()
+         imgui.Columns(4)
+         imgui.Text("Id")
+         imgui.SetColumnWidth(-1, 40)
+         imgui.NextColumn()
+         imgui.Text("Type")
+         imgui.SetColumnWidth(-1, 150)
+         imgui.NextColumn()
+         imgui.Text("Style")
+         imgui.SetColumnWidth(-1, 150)
+         imgui.NextColumn()
+         imgui.Text("Position")
+         --imgui.SetColumnWidth(-1, 200)
+         imgui.Columns(1)
+         imgui.Separator()
+         
+         if next(streamedMapIcons) ~= nil then
+            for i, value in ipairs(streamedMapIcons) do
+               textsInTable = i
+               imgui.Columns(4)
+               imgui.TextColoredRGB(tostring(value.iconId))
+               imgui.NextColumn()
+               imgui.TextColoredRGB(tostring(value.type.." ("..tostring(MapiconsNames[value.type+1])..")"))
+               imgui.NextColumn()
+               imgui.TextColoredRGB(tostring(value.style.."  "..tostring(mapiconStyleNames[value.style+1])))
+               imgui.NextColumn()
+               local pos = ("%.2f %.2f %.2f"):format(value.position.x, value.position.y, value.position.z)
+               imgui.TextColoredRGB("{696969}"..tostring(pos))
+               if imgui.IsItemClicked() then
+                  setClipboardText(tostring(pos))
+                  sampAddChatMessage("[SCRIPT]: {FFFFFF}Координаты скопированы в буффер обмена", 0x0FF6600)
+               end
+               imgui.Columns(1)
+               imgui.Separator()
+            end
+         end
+         
+         imgui.Text(u8"Всего иконок в таблице: ".. textsInTable)
+      elseif combobox.selecttable.v == 7 then
+         local textsInTable = 0
+         
          imgui.Separator()
          imgui.Columns(2)
          imgui.Text("Id")
@@ -13584,14 +13664,6 @@ function sampev.onApplyPlayerAnimation(playerId, animLib, animName, frameDelta, 
          return false
       end
    end
-   
-   if ini.settings.cberrorwarnings then
-      if isCharInAnyCar(playerPed) then
-         sampAddChatMessage("[WARNING]: {FFFFFF}Попытка воспроизвести анимацию в транспорте("..animLib.." , "..animName..")", 0x0FF6600)
-         return false
-      end
-   end
-   
 end
 
 function onExitScript()
@@ -13666,7 +13738,6 @@ function sampev.onSetObjectMaterial(id, data)
          table.insert(streamedTextures, #streamedTextures+1, newdata)
       end
    end
-
 end
 
 function sampev.onSetObjectMaterialText(id, data)
@@ -14049,10 +14120,12 @@ function sampev.onTextDrawSetString(id, text)
          end
       end
    end
-   
 end
 
 function sampev.onSetMapIcon(iconId, position, type, color, style)
+   
+   table.insert(streamedMapIcons, {iconId = iconId, position = position, type = type, color = color, style = style})
+   
    local MAX_SAMP_MARKERS = 63
    if type > MAX_SAMP_MARKERS then
       if ini.settings.cberrorwarnings then
@@ -14069,6 +14142,17 @@ function sampev.onSetMapIcon(iconId, position, type, color, style)
          end)
       end
       return {iconId, position, 57, color, style}
+   end
+end
+
+function sampev.onRemoveMapIcon(iconId)
+   if next(streamedMapIcons) ~= nil then
+      for i, value in ipairs(streamedMapIcons) do
+         print(tonumber(value.iconId), iconId)
+         if tonumber(value.iconId) == iconId then
+            table.remove(streamedMapIcons, i)
+         end
+      end
    end
 end
 
