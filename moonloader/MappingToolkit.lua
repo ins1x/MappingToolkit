@@ -3,7 +3,7 @@ script_description("Assistant for mappers")
 script_dependencies('imgui', 'lib.samp.events')
 script_properties("work-in-pause")
 script_url("https://github.com/ins1x/MappingToolkit")
-script_version("4.16") -- pre-release 6
+script_version("4.16") -- pre-release 7
 -- support sa-mp versions depends on SAMPFUNCS (0.3.7-R1, 0.3.7-R3-1, 0.3.7-R5, 0.3.DL)
 -- script_moonloader(16) moonloader v.0.26 
 -- editor options: tabsize 3, Unix (LF), encoding Windows-1251
@@ -198,8 +198,13 @@ local chatbuffer = {}
 local chatfilter = {}
 local hiddenPlayerObjects = {}
 
-local streamedTexts = {} -- unused
 local streamed3dLabels = {} -- dup
+local streamedTexts = {
+   id = nil, type = nil, materialId = nil, materialSize = nil,
+   fontName = nil, fontSize = nil, bold = nil, fontColor = nil,
+   backGroundColor = nil, align = nil, text = nil
+}
+
 local streamedTextures = {
    id = nil, type = nil, materialId = nil, modelId = nil,
    libraryName = nil, textureName = nil, color = nil
@@ -6785,7 +6790,7 @@ function imgui.OnDrawFrame()
        imgui.PushItemWidth(120)
        local selecttableitems = {
           u8'Игроки', u8'Транспорт', u8'Объекты', u8'Текстуры', 
-          u8'Пикапы', u8'3d-тексты', u8'Иконки карты' --, u8'Надписи'
+          u8'Пикапы', u8'3d-тексты', u8'Иконки карты', u8'Надписи'
        }
        imgui.Combo(u8'##ComboBoxSelecttable', combobox.selecttable, 
        selecttableitems, #selecttableitems)
@@ -6868,6 +6873,17 @@ function imgui.OnDrawFrame()
                       value.position.x, value.position.y, value.position.z))
                    end
                 end
+             --elseif combobox.selecttable.v == 7 then
+                --file:write("MappingTollkit - Exported texts:\n")
+                -- if next(streamedTexts) ~= nil then
+                   -- for k, value in ipairs(streamedTexts) do
+                      -- file:write(("%i  %i  %i  %s  %i  %i  %i  %i   %i  %s\n"):format(
+                      -- value.type, value.materialId, value.materialSize,
+                      -- value.fontName, value.fontSize, value.bold,
+                      -- value.fontColor, value.backGroundColor, 
+                      -- value.align, value.text))
+                   -- end
+                -- end
              end
              file:close()
              sampAddChatMessage("[SCRIPT]: {FFFFFF}Список был сохранен в /moonloader/resource/mappingtoolkit/export/exportdata.txt", 0x0FF6600)
@@ -6946,6 +6962,19 @@ function imgui.OnDrawFrame()
                       value.type, value.color, value.style))
                    end
                 end
+             -- elseif combobox.selecttable.v == 7 then
+                -- file:write("// MappingTollkit - Exported texts:\n")
+                -- file:write('// SetObjectMaterialText(objectid, text[], materialindex, materialsize, fontface[], fontsize, bold, fontcolor, backcolor, textalignment);\n\n')
+                -- file:write("new tmpobjid;\n")
+                -- if next(streamedTexts) ~= nil then
+                   -- for k, value in ipairs(streamedTexts) do
+                      -- file:write(("SetObjectMaterialText(tmpobjid, %s, %i, %i, %s, %i, %i, %i, %i, %i);\n"):format(
+                      -- value.text, value.type, value.materialId, value.materialSize,
+                      -- value.fontName, value.fontSize, value.bold,
+                      -- value.fontColor, value.backGroundColor, 
+                      -- value.align))
+                   -- end
+                -- end
              end
              file:close()  
              sampAddChatMessage("[SCRIPT]: {FFFFFF}Список был сохранен в /moonloader/resource/mappingtoolkit/export/exportdata.pwn", 0x0FF6600)
@@ -6963,6 +6992,8 @@ function imgui.OnDrawFrame()
                    streamed3dTexts = {}
                 elseif combobox.selecttable.v == 6 then
                    streamedMapIcons = {}
+                elseif combobox.selecttable.v == 7 then
+                   streamedTexts = {}
                 end
                 sampAddChatMessage("[SCRIPT]: {FFFFFF}Таблица была очищена", 0x0FF6600)
              else
@@ -7453,7 +7484,7 @@ function imgui.OnDrawFrame()
             for i, value in ipairs(streamedMapIcons) do
                textsInTable = i
                imgui.Columns(4)
-               imgui.TextColoredRGB(tostring(value.iconId))
+               imgui.Text(tostring(value.iconId))
                imgui.NextColumn()
                imgui.TextColoredRGB(tostring(value.type.." ("..tostring(MapiconsNames[value.type+1])..")"))
                imgui.NextColumn()
@@ -7472,51 +7503,52 @@ function imgui.OnDrawFrame()
          
          imgui.Text(u8"Всего иконок в таблице: ".. textsInTable)
       elseif combobox.selecttable.v == 7 then
-         local textsInTable = 0
-         
          imgui.Separator()
-         imgui.Columns(2)
-         imgui.Text("Id")
-         imgui.SetColumnWidth(-1, 40)
+         imgui.Columns(6)
+         imgui.Text("Size")
+         imgui.SetColumnWidth(-1, 35)
+         imgui.NextColumn()
+         imgui.Text("fName")
+         imgui.SetColumnWidth(-1, 120)
+         imgui.NextColumn()
+         imgui.Text("fSize")
+         imgui.SetColumnWidth(-1, 35)
+         imgui.NextColumn()
+         imgui.Text("fColor | fBackgr")
+         imgui.SetColumnWidth(-1, 120)
+         imgui.NextColumn()
+         imgui.Text("fAttr")
+         imgui.SetColumnWidth(-1, 100)
          imgui.NextColumn()
          imgui.Text("Text")
-         imgui.SetColumnWidth(-1, 550)
          imgui.Columns(1)
          imgui.Separator()
          
-         imgui.TextColoredRGB("{FF0000}Доступно только для экспорта")
-         -- local textsInTable = 0
-         -- local elementCount = 0
-         -- for k, v in ipairs(streamedTexts) do
-            -- if string.len(v) > 1 then
-               -- textsInTable = textsInTable + 1
-               -- imgui.Columns(2)           
-               -- for element in string.gmatch(v, "[^,]+") do
-                  -- elementCount = elementCount + 1
-                  -- if elementCount <= 2 then
-                     -- if element:find('"') then
-                        -- element = element:gsub('"','')
-                     -- end
-                     -- local result = string.match(element, "%D")
-                     -- if result then
-                        -- if elementCount == 2 and element:find('[.]') then
-                           -- element = element:gsub('[.]','\n')
-                           -- element = element:gsub('%s%s','\n')
-                        -- end
-                        -- imgui.TextColoredRGB(""..element)
-                     -- else
-                        -- imgui.TextColoredRGB("{696969}"..element)
-                     -- end
-                     -- imgui.NextColumn()
-                  -- end
-               -- end
-               -- elementCount = 0
-               -- imgui.Columns(1)
-               -- imgui.Separator()
-            -- end
-         -- end
-         
-         imgui.Text(u8"Всего текстов в таблице: ".. textsInTable)
+         local texturesInTable = 0
+         if next(streamedTexts) ~= nil then
+            for i, value in ipairs(streamedTexts) do
+               texturesInTable = i
+               imgui.Columns(6)
+               imgui.Text(tostring(value.materialSize))
+               imgui.NextColumn()
+               imgui.Text(value.fontName)
+               imgui.NextColumn()
+               imgui.Text(tostring(value.fontSize))
+               imgui.NextColumn()
+               imgui.Text(DecToARGB(tostring(value.fontColor)).." | "..DecToARGB(tostring(value.backGroundColor)))
+               imgui.NextColumn()
+               local aligns = {"LEFT", "CENTER", "RIGHT"}
+               imgui.Text(("%s | %s"):format(value.bold and "bold" or "std", aligns[value.align+1]))
+               imgui.NextColumn()
+               local text = tostring(value.text)
+               text = string.wrap(text, 64, "", "\n")
+               imgui.TextColoredRGB(text)
+               imgui.NextColumn()
+               imgui.Columns(1)
+               imgui.Separator()
+            end
+         end
+         imgui.Text(u8"Всего текстов в таблице: ".. texturesInTable)
       end
 
    elseif tabmenu.main == 3 then
@@ -13680,6 +13712,14 @@ function sampev.onDestroyObject(objectId)
          end
       end
    end
+   
+   if next(streamedTexts) ~= nil then
+      for i, value in ipairs(streamedTexts) do
+         if tonumber(value.id) == objectId then
+            table.remove(streamedTexts, i)
+         end
+      end
+   end
 end
 
 function sampev.onSetObjectMaterial(id, data)
@@ -13716,19 +13756,24 @@ function sampev.onSetObjectMaterial(id, data)
          break
       end
    end
-   
 end
 
 function sampev.onSetObjectMaterialText(id, data)
    	
-   -- if streamedTexts[#streamedTexts] then
-      -- local newdata = string.format("%i,%s,%i,%s,%s,%i,%i,%s,%s,%i", 
-      -- id, data.text, data.materialId, data.materialSize, data.fontName, 
-      -- data.fontSize, data.bold, data.fontColor, data.backGroundColor, data.align)
-      -- table.remove(streamedTexts, 1)
-      -- table.insert(streamedTexts, #streamedTexts+1, newdata)
-   -- end
-   
+   table.insert(streamedTexts, {
+      id = id,
+      type = data.type,
+      materialId = data.materialId,
+      materialSize = data.materialSize,
+      fontName = data.fontName,
+      fontSize = data.fontSize,
+      bold = data.bold,
+      fontColor = data.fontColor,
+      backGroundColor = data.backGroundColor,
+      align = data.align,
+      text = data.text
+    })
+      
    if checkbox.hidematerialtext.v then
       return false
    end
@@ -14506,6 +14551,28 @@ function string.wrap(str, limit, indent, indent1)
 
    return indent1 .. str:gsub("(%s+)()(%S+)()", check)
 end
+
+function DecToARGB(color)
+   color = color or "none"
+   local clr
+   if tonumber(color) ~= -1 then
+      clr = string.format("%X", color)
+      clr = string.sub(clr, 9, string.len(clr))
+      local clr = string.reverse(clr)
+      -- convert to ARGB format
+      local RGB = string.sub(clr, 0, string.len(clr)-2)
+      local Alpha = string.sub(clr, string.len(clr)-1, string.len(clr))
+      clr = string.format("%s%s", Alpha, RGB)
+   else
+      --clr = color
+      clr = "FFFFFFFF"
+   end
+   
+   if string.len(clr) <= 1 then
+      clr = "none"
+   end
+   return clr
+end 
 
 function isRpNickname(name)
    return name:match('^%u%l+_%u%a+$')
@@ -15402,6 +15469,10 @@ function imgui.ToggleButton(str_id, bool)
 end
 
 function imgui.TextColoredRGB(text)
+   if not text then 
+      return imgui.Text(" ")
+   end
+   
    local style = imgui.GetStyle()
    local colors = style.Colors
    local ImVec4 = imgui.ImVec4
