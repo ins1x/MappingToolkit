@@ -3,7 +3,7 @@ script_description("Assistant for mappers")
 script_dependencies('imgui', 'lib.samp.events')
 script_properties("work-in-pause")
 script_url("https://github.com/ins1x/MappingToolkit")
-script_version("4.16") -- pre-release 5
+script_version("4.16") -- pre-release 6
 -- support sa-mp versions depends on SAMPFUNCS (0.3.7-R1, 0.3.7-R3-1, 0.3.7-R5, 0.3.DL)
 -- script_moonloader(16) moonloader v.0.26 
 -- editor options: tabsize 3, Unix (LF), encoding Windows-1251
@@ -197,19 +197,24 @@ local hiddenObjects = {}
 local chatbuffer = {}
 local chatfilter = {}
 local hiddenPlayerObjects = {}
-local streamedTextures = {}
-local streamedPickups = {}
-local streamed3dTexts = {}
-local streamedTexts = {}
-local streamed3dLabels = {}
-local streamedMapIcons = {iconId = nil, position = nil, type = nil, color = nil, style = nil}
 
-for i = 1, ini.settings.maxtableitems do
-   table.insert(streamedTextures, "")
-   table.insert(streamedPickups, "")
-   table.insert(streamed3dTexts, "")
-   table.insert(streamedTexts, "")
-end
+local streamedTexts = {} -- unused
+local streamed3dLabels = {} -- dup
+local streamedTextures = {
+   id = nil, type = nil, materialId = nil, modelId = nil,
+   libraryName = nil, textureName = nil, color = nil
+}
+local streamedPickups = {
+   id = nil, model = nil, pickupType = nil, position = nil
+}
+local streamed3dTexts = {
+   id = nil, color = nil, position = nil, distance = nil, testLOS = nil,
+   attachedPlayerId = nil, attachedVehicleId = nil, text = nil
+}
+local streamedMapIcons = {
+   iconId = nil, position = nil, type = nil, color = nil, style = nil
+}
+
 -- should be global!
 vehiclesTotal = 0
 playersTotal = 0
@@ -6775,7 +6780,7 @@ function imgui.OnDrawFrame()
        -- imgui.PopStyleVar()
        -- imgui.Spacing()
          
-       imgui.Text(u8"Выберите сущность:")
+       imgui.TextNotify(" >> ", u8"Выберите сущность")
        imgui.SameLine()
        imgui.PushItemWidth(120)
        local selecttableitems = {
@@ -6792,7 +6797,7 @@ function imgui.OnDrawFrame()
        imgui.SameLine()
        imgui.PushItemWidth(65)
        local exportformat = {
-          u8'Text', u8'Pawn',
+          u8'Raw', u8'Pawn',
        }
        imgui.Combo(u8'##ComboBoxExportformat', combobox.exportformat, 
        exportformat, #exportformat)
@@ -6803,19 +6808,19 @@ function imgui.OnDrawFrame()
              local filepath = getGameDirectory().."//moonloader//resource//mappingtoolkit//export//exportdata.txt"
              local file = io.open(filepath, "w")
              if combobox.selecttable.v == 0 then
-                file:write("MappingTollkit: Exported players:\n")
+                file:write("MappingTollkit - Exported players:\n")
                 for k, v in pairs(playersTable) do
                    file:write(string.format("%s(%d)\n", sampGetPlayerNickname(v), v))
                 end
              elseif combobox.selecttable.v == 1 then
-                file:write("MappingTollkit: Exported vehicles:\n")
+                file:write("MappingTollkit - Exported vehicles:\n")
                 for k, v in ipairs(getAllVehicles()) do
                    local streamed, id = sampGetVehicleIdByCarHandle(v)
                    local vehmodelname = string.format("%s", VehicleNames[getCarModel(v)-399])
                    file:write(string.format("%d. %s\n", id, vehmodelname))
                 end
              elseif combobox.selecttable.v == 2 then
-                file:write("MappingTollkit: Exported objects:\n")
+                file:write("MappingTollkit - Exported objects:\n")
                 for k, v in ipairs(getAllObjects()) do
                    if isObjectOnScreen(v) then
                       local model = getObjectModel(v)
@@ -6825,37 +6830,37 @@ function imgui.OnDrawFrame()
                    end
                 end
              elseif combobox.selecttable.v == 3 then
-                file:write("MappingTollkit: Exported textures:\n")
-                for k, v in ipairs(streamedTextures) do
-                   if string.len(v) > 1 then
-                      for element in string.gmatch(v, "[^,]+") do
-                         file:write(string.format(" %s ", element))
-                      end
-                      file:write(string.format("\n", element))
+                file:write("MappingTollkit - Exported textures:\n")
+                if next(streamedTextures) ~= nil then
+                   for k, value in ipairs(streamedTextures) do
+                      file:write(("%i  %i  %i  %i %s  %s  %i\n"):format(
+                      value.id, value.type, value.materialId, value.modelId, 
+                      value.libraryName, value.textureName, value.color))
                    end
                 end
              elseif combobox.selecttable.v == 4 then
-                file:write("MappingTollkit: Exported pickups:\n")
-                for k, v in ipairs(streamedPickups) do
-                   if string.len(v) > 1 then
-                      for element in string.gmatch(v, "[^,]+") do
-                         file:write(string.format(" %s ", element))
-                      end
-                      file:write(string.format("\n", element))
+                file:write("MappingTollkit - Exported pickups:\n")
+                if next(streamedPickups) ~= nil then
+                   for k, value in ipairs(streamedPickups) do
+                      file:write(("%i  %i  %i  %.2f %.2f %.2f\n"):format(
+                      value.id, value.model, value.pickupType, 
+                      value.position.x, value.position.y, value.position.z))
                    end
                 end
              elseif combobox.selecttable.v == 5 then
-                file:write("MappingTollkit: Exported 3dTexts:\n")
-                for k, v in ipairs(streamed3dTexts) do
-                   if string.len(v) > 1 then
-                      for element in string.gmatch(v, "[^,]+") do
-                         file:write(string.format(" %s ", element))
-                      end
-                      file:write(string.format("\n", element))
+                file:write("MappingTollkit - Exported 3dTexts:\n")
+                if next(streamed3dTexts) ~= nil then
+                   for k, value in ipairs(streamed3dTexts) do
+                      local text = string.clear(tostring(value.text))
+                      file:write(("%i  %i  %.2f %.2f %.2f  %.2f  %s  %i  %i  %s\n"):format(
+                      value.id, value.color, value.position.x, 
+                      value.position.y, value.position.z, value.distance, 
+                      tostring(value.testLOS), value.attachedPlayerId, 
+                      value.attachedVehicleId, text))
                    end
                 end
              elseif combobox.selecttable.v == 6 then
-                file:write("MappingTollkit: Exported Mapicons:\n")
+                file:write("MappingTollkit - Exported mapicons:\n")
                 if next(streamedMapIcons) ~= nil then
                    for k, value in ipairs(streamedMapIcons) do
                       file:write(("%i  %i  %i  %.2f %.2f %.2f\n"):format(
@@ -6872,7 +6877,7 @@ function imgui.OnDrawFrame()
              if combobox.selecttable.v == 0 then
                 sampAddChatMessage("[SCRIPT]: {FFFFFF}Недоступно! (Вы серьезно хотели экспортировать игроков?)", 0x0FF6600)
              elseif combobox.selecttable.v == 1 then
-                file:write("// MappingTollkit: Exported vehicles:\n")
+                file:write("// MappingTollkit - Exported vehicles:\n")
                 file:write("// CreateVehicle(vehicletype, Float:x, Float:y, Float:z, Float:rotation, color1, color2, respawn_delay)\n")
                 for k, v in ipairs(getAllVehicles()) do
                    local streamed, id = sampGetVehicleIdByCarHandle(v)
@@ -6884,7 +6889,7 @@ function imgui.OnDrawFrame()
                    getCarModel(v), pX, pY, pZ, angle, primaryColor, secondaryColor, -1, vehmodelname))
                 end
              elseif combobox.selecttable.v == 2 then
-                file:write("// MappingTollkit: Exported objects\n")
+                file:write("// MappingTollkit - Exported objects\n")
                 file:write("// CreateObject(modelid, Float:X, Float:Y, Float:Z, Float:rX, Float:rY, Float:rZ, Float:DrawDistance = 0.0)\n")
                 for k, v in ipairs(getAllObjects()) do
                    if isObjectOnScreen(v) then
@@ -6899,72 +6904,40 @@ function imgui.OnDrawFrame()
                 end
                 sampAddChatMessage("[SCRIPT]: {FFFFFF}Важно! На данный момент не сохраняет корректно Rx и Ry значения поворота объекта!", 0x0FF6600)
              elseif combobox.selecttable.v == 3 then
-                file:write("// MappingTollkit: Exported textures:\n")
+                file:write("// MappingTollkit - Exported textures:\n")
                 file:write("// SetObjectMaterial(objectid, materialindex, modelid, txdname[], texturename[], materialcolor)\n")
                 file:write("new tmpobjid;\n")
-                local elementCount = 0
-                for k, v in ipairs(streamedTextures) do
-                   if string.len(v) > 1 then
-                      file:write("SetObjectMaterial(tmpobjid, ")
-                      for element in string.gmatch(v, "[^,]+") do
-                         elementCount = elementCount + 1
-                         if elementCount > 1 then
-                            local result = string.match(element, "%D")
-                            if result then
-                               if elementCount == 6 then
-                                  if string.find(element, "none") then
-                                     file:write(' 0')
-                                  else
-                                     file:write(string.format(' 0x%s', element))
-                                  end
-                               else
-                                  file:write(string.format(' "%s",', element))
-                               end
-                            else
-                               file:write(string.format(' %s,', element))
-                            end
-                         end
-                      end
-                      file:write(string.format(");\n", element))
-                      elementCount = 0
+                
+                if next(streamedTextures) ~= nil then
+                   for k, value in ipairs(streamedTextures) do
+                      file:write(('SetObjectMaterial(tmpobjid, %i, %i, "%s", "%s", %i);\n'):format(
+                      value.materialId, value.modelId, 
+                      value.libraryName, value.textureName, value.color))
                    end
                 end
              elseif combobox.selecttable.v == 4 then
-                file:write("// MappingTollkit: Exported pickups:\n")
+                file:write("// MappingTollkit - Exported pickups:\n")
                 file:write("// CreatePickup(model, type, Float:X, Float:Y, Float:Z, virtualworld);\n")
-                local elementCount = 0
-                for k, v in ipairs(streamedPickups) do
-                   if string.len(v) > 1 then
-                      file:write("CreatePickup(")
-                      for element in string.gmatch(v, "[^,]+") do
-                         elementCount = elementCount + 1
-                         if elementCount > 1 then
-                            file:write(string.format(' %s,', element))
-                         end
-                      end
-                      file:write(string.format(" -1 );\n", element))
+                if next(streamedPickups) ~= nil then
+                   for k, value in ipairs(streamedPickups) do
+                      file:write(("CreatePickup(%i, %i, %.2f, %.2f, %.2f, -1);\n"):format(
+                      value.model, value.pickupType, 
+                      value.position.x, value.position.y, value.position.z))
                    end
-                   elementCount = 0
                 end
              elseif combobox.selecttable.v == 5 then
-                file:write("// MappingTollkit: Exported 3DTexts:\n")
-                file:write("// Create3DTextLabel(text[], color, Float:X, Float:Y, Float:Z, Float:DrawDistance, virtualworld, testLOS);\n")
-                local elementCount = 0
-                for k, v in ipairs(streamed3dTexts) do
-                   if string.len(v) > 1 then
-                      file:write('Create3DTextLabel(')
-                      for element in string.gmatch(v, "[^,]+") do
-                         elementCount = elementCount + 1
-                         if elementCount > 1 then
-                            file:write(string.format(' %s,', element))
-                         end
-                      end
-                      file:write(string.format(" -1 );\n", element))
+                file:write("// MappingTollkit - Exported 3DTexts:\n")
+                file:write("// Create3DTextLabel(text[], color, Float:X, Float:Y, Float:Z, Float:DrawDistance, virtualworld, testLOS);\n\n")
+                if next(streamed3dTexts) ~= nil then
+                   for k, value in ipairs(streamed3dTexts) do
+                      local text = string.clear(tostring(value.text))
+                      file:write(('Create3DTextLabel("%s", %i, %.2f, %.2f, %.2f, %.2f, -1, %s);\n'):format(
+                      text, value.color, value.position.x, value.position.y, value.position.z, 
+                      value.distance, tostring(value.testLOS)))
                    end
-                   elementCount = 0
                 end
              elseif combobox.selecttable.v == 6 then
-                file:write("// MappingTollkit: Exported Mapicons:\n")
+                file:write("// MappingTollkit - Exported Mapicons:\n")
                 file:write("// SetPlayerMapIcon(playerid, iconid, Float:x, Float:y, Float:z, markertype, color, style);\n\n")
                 if next(streamedMapIcons) ~= nil then
                    for k, value in ipairs(streamedMapIcons) do
@@ -6984,24 +6957,12 @@ function imgui.OnDrawFrame()
              if combobox.selecttable.v >= 3 then
                 if combobox.selecttable.v == 3 then
                    streamedTextures = {}
-                   for i = 1, ini.settings.maxtableitems do
-                      table.insert(streamedTextures, "")
-                   end
                 elseif combobox.selecttable.v == 4 then
-                   for i = 1, ini.settings.maxtableitems do
-                      table.insert(streamedPickups, "")
-                   end
                    streamedPickups = {}
                 elseif combobox.selecttable.v == 5 then
-                   for i = 1, ini.settings.maxtableitems do
-                      table.insert(streamed3dTexts, "")
-                   end
                    streamed3dTexts = {}
                 elseif combobox.selecttable.v == 6 then
-                   for i = 1, ini.settings.maxtableitems do
-                      table.insert(streamedTexts, "")
-                   end
-                   streamedTexts = {}
+                   streamedMapIcons = {}
                 end
                 sampAddChatMessage("[SCRIPT]: {FFFFFF}Таблица была очищена", 0x0FF6600)
              else
@@ -7282,10 +7243,14 @@ function imgui.OnDrawFrame()
          imgui.TextQuestion("TxdId", u8"ID текстуры (/tsearch)")
          imgui.SetColumnWidth(-1, 50)
          imgui.NextColumn()
-         imgui.Text("Slot")
+         if isTrainingSanbox then 
+            imgui.Text("Slot")
+         else
+            imgui.Text("MaterialId")
+         end
          imgui.SetColumnWidth(-1, 40)
          imgui.NextColumn()
-         imgui.Text("Modelid")
+         imgui.Text("ModelId")
          imgui.SetColumnWidth(-1, 80)
          imgui.NextColumn()
          imgui.Text("TxdName")
@@ -7300,36 +7265,62 @@ function imgui.OnDrawFrame()
          imgui.Separator()
          
          local texturesInTable = 0
-         
-         for k, v in ipairs(streamedTextures) do
-            if string.len(v) > 1 then
-               texturesInTable = texturesInTable + 1
-               imgui.Columns(6)
-               for element in string.gmatch(v, "[^,]+") do
-                  local result = string.match(element, "%D")
-                  if result then
-                     if imgui.Selectable(" "..element) then
-                        setClipboardText(element)
-                        sampAddChatMessage("{696969}"..element.." {FFFFFF}скопирован в буффер обмена", -1)
-                     end
-                  else
-                     imgui.TextColoredRGB("{696969}"..element)
-                     if imgui.IsItemClicked() then
-                        setClipboardText(element)
-                        sampAddChatMessage("{696969}"..element.." {FFFFFF}скопирован в буффер обмена", -1)
-                     end
-                  end
-                  imgui.NextColumn()
+         if next(streamedTextures) ~= nil then
+            for i, value in ipairs(streamedTextures) do
+               texturesInTable = i
+               
+               -- format color to readable format
+               local hexcolor = string.format("%X", value.color)
+               local hexcolor = string.sub(hexcolor, 9, string.len(hexcolor))
+               local hexcolor = string.reverse(hexcolor)
+               -- convert to ARGB format
+               local RGB = string.sub(hexcolor, 0, string.len(hexcolor)-2)
+               local Alpha = string.sub(hexcolor, string.len(hexcolor)-1, string.len(hexcolor))
+               local hexcolor = string.format("%s%s", Alpha, RGB)
+               
+               if string.len(hexcolor) <= 1 then
+                  hexcolor = "none"
                end
+               
+               imgui.Columns(6)
+               imgui.Text(tostring(value.id))
+               if imgui.IsItemClicked() then
+                  setClipboardText(tostring(value.id))
+                  sampAddChatMessage("[SCRIPT]: {FFFFFF}Значение скопировано в буффер обмена", 0x0FF6600)
+               end
+               imgui.NextColumn()
+               imgui.Text(tostring(value.materialId))
+               imgui.NextColumn()
+               imgui.Text(tostring(value.modelId))
+               if imgui.IsItemClicked() then
+                  setClipboardText(tostring(value.modelId))
+                  sampAddChatMessage("[SCRIPT]: {FFFFFF}Значение скопировано в буффер обмена", 0x0FF6600)
+               end
+               imgui.NextColumn()
+               imgui.TextColoredRGB("{696969}"..tostring(value.textureName))
+               if imgui.IsItemClicked() then
+                  setClipboardText(tostring(value.textureName))
+                  sampAddChatMessage("[SCRIPT]: {FFFFFF}Значение скопировано в буффер обмена", 0x0FF6600)
+               end
+               imgui.NextColumn()
+               imgui.TextColoredRGB("{696969}"..tostring(value.libraryName))
+               if imgui.IsItemClicked() then
+                  setClipboardText(tostring(value.libraryName))
+                  sampAddChatMessage("[SCRIPT]: {FFFFFF}Значение скопировано в буффер обмена", 0x0FF6600)
+               end
+               imgui.NextColumn()
+               imgui.TextColoredRGB(hexcolor)
+               imgui.NextColumn()
                imgui.Columns(1)
                imgui.Separator()
             end
          end
+         
          imgui.Text(u8"Всего текстур в таблице: ".. texturesInTable)
          
       elseif combobox.selecttable.v == 4 then
          imgui.Separator()
-         imgui.Columns(6)
+         imgui.Columns(4)
          imgui.Text("Id")
          imgui.SetColumnWidth(-1, 50)
          imgui.NextColumn()
@@ -7342,104 +7333,91 @@ function imgui.OnDrawFrame()
          end
          imgui.SetColumnWidth(-1, 50)
          imgui.NextColumn()
-         imgui.Text("x")
-         imgui.SetColumnWidth(-1, 120)
-         imgui.NextColumn()
-         imgui.Text("y")
-         imgui.SetColumnWidth(-1, 120)
-         imgui.NextColumn()
-         imgui.Text("z")
-         imgui.SetColumnWidth(-1, 120)
+         imgui.Text("Position")
+         imgui.SetColumnWidth(-1, 190)
          imgui.NextColumn()
          imgui.Columns(1)
          imgui.Separator()
          
          local pickupsInTable = 0
-         local elementCount = 0
          
-         for k, v in ipairs(streamedPickups) do
-            if string.len(v) > 1 then
-               pickupsInTable = pickupsInTable + 1
-               imgui.Columns(6)           
-               for element in string.gmatch(v, "[^,]+") do
-                  elementCount = elementCount + 1
-                  if elementCount == 2 then
-                     if isValidObjectModel(tonumber(element)) then
-                        local modelName = tostring(sampObjectModelNames[tonumber(element)])
-                        imgui.TextColoredRGB(("%s {696969}(%s)"):format(element, modelName))
-                        if imgui.IsItemClicked() then
-                           sampAddChatMessage("model скопирован в буффер обмена", -1)
-                           setClipboardText(tonumber(element))
-                        end
-                     else
-                        imgui.TextColoredRGB("{696969}"..element)
-                     end
-                  else
-                     local result = string.match(element, "%D")
-                     if result then
-                        imgui.TextColoredRGB("{696969}"..element)
-                     else
-                        imgui.TextColoredRGB("{FFFFFF}"..element)
-                     end
+         if next(streamedPickups) ~= nil then
+            for i, value in ipairs(streamedPickups) do
+               pickupsInTable = i
+               imgui.Columns(4)
+               imgui.TextColoredRGB(tostring(value.id))
+               imgui.NextColumn()
+               if isValidObjectModel(tonumber(value.model)) then
+                  local modelName = tostring(sampObjectModelNames[value.model])
+                  imgui.TextColoredRGB(("%i {696969}(%s)"):format(value.model, modelName))
+                  if imgui.IsItemClicked() then
+                     sampAddChatMessage("[SCRIPT]: {FFFFFF}model скопирована в буффер обмена", 0x0FF6600)
+                     setClipboardText(tonumber(value.model))
                   end
-                  imgui.NextColumn()
+               else
+                  imgui.TextColoredRGB("{696969}"..value.model)
                end
-               elementCount = 0
+               imgui.NextColumn()
+               imgui.TextColoredRGB(tostring(value.pickupType))
+               imgui.NextColumn()
+               local pos = ("%.2f %.2f %.2f"):format(value.position.x, value.position.y, value.position.z)
+               imgui.TextColoredRGB("{696969}"..tostring(pos))
+               if imgui.IsItemClicked() then
+                  setClipboardText(tostring(pos))
+                  sampAddChatMessage("[SCRIPT]: {FFFFFF}Координаты скопированы в буффер обмена", 0x0FF6600)
+               end
                imgui.Columns(1)
                imgui.Separator()
             end
          end
+         
          imgui.Text(u8"Всего пикапов в таблице: ".. pickupsInTable)
       elseif combobox.selecttable.v == 5 then
          imgui.Separator()
          imgui.Columns(3)
          imgui.Text("Id")
-         imgui.SetColumnWidth(-1, 37)
+         imgui.SetColumnWidth(-1, 40)
          imgui.NextColumn()
          imgui.Text("Text")
-         imgui.SetColumnWidth(-1, 510)
+         imgui.SetColumnWidth(-1, 490)
          imgui.NextColumn()
          imgui.TextQuestion("Color", u8"Цвет указан в формате RRGGBBAA (-1 без цвета)")
          imgui.SetColumnWidth(-1, 70)
-         -- imgui.NextColumn()
-         -- imgui.Text("xyz")
-         -- imgui.SetColumnWidth(-1, 60)
-         -- imgui.NextColumn()
-         -- imgui.Text("y")
-         -- imgui.SetColumnWidth(-1, 60)
-         -- imgui.NextColumn()
-         -- imgui.Text("z")
-         -- imgui.SetColumnWidth(-1, 60)
-         -- imgui.NextColumn()
          imgui.Columns(1)
          imgui.Separator()
          
          local textsInTable = 0
-         local elementCount = 0
-         for k, v in ipairs(streamed3dTexts) do
-            if string.len(v) > 1 then
-               textsInTable = textsInTable + 1
-               imgui.Columns(3)           
-               for element in string.gmatch(v, "[^,]+") do
-                  elementCount = elementCount + 1
-                  if elementCount <= 3 then
-                     if element:find('"') then
-                        element = element:gsub('"','')
-                     end
-                     local result = string.match(element, "%D")
-                     if result then
-                        if elementCount == 2 and element:find('[.]') then
-                           element = element:gsub('[.]','\n')
-                           element = element:gsub('%s%s','\n')
-                        end
-                        imgui.TextColoredRGB(""..element)
-                     else
-                        imgui.TextColoredRGB("{696969}"..element)
-                     end
-                     imgui.NextColumn()
-                  end
+         if next(streamed3dTexts) ~= nil then
+            for i, value in ipairs(streamed3dTexts) do
+               textsInTable = i
+               imgui.Columns(3)
+               imgui.TextColoredRGB(tostring(value.id))
+               imgui.NextColumn()
+               local text = string.clear(tostring(value.text))
+               text = string.wrap(text, 64, "", "\n")
+               imgui.TextColoredRGB(text)
+               if imgui.IsItemClicked() then
+                  setClipboardText(text)
+                  sampAddChatMessage("[SCRIPT]: {FFFFFF}Текст скопирован в буффер обмена", 0x0FF6600)
                end
-               elementCount = 0
+               
+               imgui.NextColumn()
+               local clr
+               if tonumber(value.color) ~= -1 then
+                  clr = string.format("%X", value.color)
+                  clr = string.sub(clr, 9, string.len(clr))
+                  local clr = string.reverse(clr)
+                  -- convert to ARGB format
+                  local RGB = string.sub(clr, 0, string.len(clr)-2)
+                  local Alpha = string.sub(clr, string.len(clr)-1, string.len(clr))
+                  clr = string.format("%s%s", Alpha, RGB)
+               else
+                  clr = value.color
+               end
+               if string.len(clr) <= 1 then
+                  clr = "none"
+               end
+               imgui.TextColoredRGB(clr)
                imgui.Columns(1)
                imgui.Separator()
             end
@@ -7450,7 +7428,7 @@ function imgui.OnDrawFrame()
       
          local mapiconStyleNames = {
             "MAPICON_LOCAL", "MAPICON_GLOBAL",
-            "MAPICON_LOCAL_CHECKPOINT","MAPICON_GLOBAL_CHECKPOINT"
+            "MAPICON_LOCAL_CHECKPOINT", "MAPICON_GLOBAL_CHECKPOINT"
          }
          
          local textsInTable = 0
@@ -13694,8 +13672,30 @@ function sampev.onCreateObject(objectId, data)
    end
 end
 
+function sampev.onDestroyObject(objectId)
+   if next(streamedTextures) ~= nil then
+      for i, value in ipairs(streamedTextures) do
+         if tonumber(value.id) == objectId then
+            table.remove(streamedTextures, i)
+         end
+      end
+   end
+end
+
 function sampev.onSetObjectMaterial(id, data)
    local objecthandle = sampGetObjectHandleBySampId(id)
+   
+   -- ignore /texture menu blocks (Texture Studio and TRAINING)
+   if getObjectModel(objecthandle) ~= 2661 then 
+      table.insert(streamedTextures, {
+      id = id, 
+      type = data.type, 
+      materialId = data.materialId,
+      modelId = data.modelId,
+      libraryName = data.libraryName,
+      textureName = data.textureName,
+      color = data.color})   
+   end
    --local print(getObjectModel(objecthandle))
    if id == LastObject.id then 
       LastObject.txdlibname = data.libraryName
@@ -13717,27 +13717,6 @@ function sampev.onSetObjectMaterial(id, data)
       end
    end
    
-   if streamedTextures[#streamedTextures] then
-      -- ignore /texture menu blocks (Texture Studio and TRAINING)
-      if getObjectModel(objecthandle) ~= 2661 then 
-         -- format color to readable format
-         local hexcolor = string.format("%X", data.color)
-         local hexcolor = string.sub(hexcolor, 9, string.len(hexcolor))
-         local hexcolor = string.reverse(hexcolor)
-         -- convert to ARGB format
-         local RGB = string.sub(hexcolor, 0, string.len(hexcolor)-2)
-         local Alpha = string.sub(hexcolor, string.len(hexcolor)-1, string.len(hexcolor))
-         local hexcolor = string.format("%s%s", Alpha, RGB)
-         
-         if string.len(hexcolor) <= 1 then
-            hexcolor = "none"
-         end
-         local newdata = string.format("%i,%i,%i,%s,%s,%s", 
-         txdlocalid, data.materialId, data.modelId, data.textureName, data.libraryName, hexcolor)
-         table.remove(streamedTextures, 1)
-         table.insert(streamedTextures, #streamedTextures+1, newdata)
-      end
-   end
 end
 
 function sampev.onSetObjectMaterialText(id, data)
@@ -13879,12 +13858,7 @@ function sampev.onSendPickedUpPickup(pickupId)
 end
 
 function sampev.onCreatePickup(id, model, pickupType, position)
-   if streamedPickups[#streamedPickups] then
-      local newdata = string.format("%i,%i,%i,%.2f,%.2f,%.2f", 
-      id, model, pickupType, position.x, position.y, position.z)
-      table.remove(streamedPickups, 1)
-      table.insert(streamedPickups, #streamedPickups+1, newdata)
-   end
+   table.insert(streamedPickups, {id = id, model = model, pickupType = pickupType, position = position})
    
    if ini.settings.cberrorwarnings then
       if model then
@@ -13909,6 +13883,16 @@ function sampev.onCreatePickup(id, model, pickupType, position)
    end
 end
 
+function sampev.onDestroyPickup(id)
+   if next(streamedPickups) ~= nil then
+      for i, value in ipairs(streamedPickups) do
+         if tonumber(value.id) == id then
+            table.remove(streamedPickups, i)
+         end
+      end
+   end
+end
+
 function sampev.onDisplayGameText(style, time, text)
    if checkbox.loggametexts.v then
       print(("Gametext: %s style: %i, time: %i ms"):format(text, style, time))
@@ -13922,39 +13906,22 @@ attachedPlayerId, attachedVehicleId, text)
       attachedPlayerId, attachedVehicleId, text)
    end
    
-   if streamed3dTexts[#streamed3dTexts] then
-      local clr
-      if tonumber(color) ~= -1 then
-         clr = string.format("%X", color)
-         clr = string.sub(clr, 9, string.len(clr))
-         local clr = string.reverse(clr)
-         -- convert to ARGB format
-         local RGB = string.sub(clr, 0, string.len(clr)-2)
-         local Alpha = string.sub(clr, string.len(clr)-1, string.len(clr))
-         clr = string.format("%s%s", Alpha, RGB)
-      else
-         clr = color
+   if isTrainingSanbox then
+      if not text:find("obj:") then -- ignore system 3d text
+         table.insert(streamed3dTexts, {
+         id = id, color = color, position = position, distance = distance, 
+         testLOS = testLOS, attachedPlayerId = attachedPlayerId, 
+         attachedVehicleId = attachedVehicleId, text = text
+         })
       end
-      if string.len(clr) <= 1 then
-         clr = "none"
-      end
-      
-      local newtext = text
-      local newtext = newtext:gsub(",", "  ")
-      local newtext = newtext:gsub("'", " ")
-      local newtext = newtext:gsub("%s%s%s", "")
-      
-      local newdata = string.format('%i,"%s",%s,%.2f,%.2f,%.2f', 
-      id, newtext, clr, position.x, position.y, position.z)
-      table.remove(streamed3dTexts, 1)
-      if isTrainingSanbox then
-         if not text:find("obj:") then -- ignore system 3d text
-            table.insert(streamed3dTexts, #streamed3dTexts+1, newdata)
-         end
-      else
-         table.insert(streamed3dTexts, #streamed3dTexts+1, newdata)
-      end
+   else
+      table.insert(streamed3dTexts, {
+      id = id, color = color, position = position, distance = distance, 
+      testLOS = testLOS, attachedPlayerId = attachedPlayerId, 
+      attachedVehicleId = attachedVehicleId, text = text
+      })
    end
+      
    -- Get local id from textdraw info
    if isTrainingSanbox then
       --if color == 8436991 or color == 16211740 then
@@ -13987,7 +13954,13 @@ attachedPlayerId, attachedVehicleId, text)
 end
 
 function sampev.onRemove3DTextLabel(textLabelId)
-   table.remove(streamed3dLabels, textLabelId)
+   if next(streamed3dLabels) ~= nil then
+      for i, value in ipairs(streamed3dLabels) do
+         if tonumber(value.id) == textLabelId then
+            table.remove(streamed3dLabels, i)
+         end
+      end
+   end
 end
 
 function sampev.onTogglePlayerSpectating(state)
@@ -14148,7 +14121,6 @@ end
 function sampev.onRemoveMapIcon(iconId)
    if next(streamedMapIcons) ~= nil then
       for i, value in ipairs(streamedMapIcons) do
-         print(tonumber(value.iconId), iconId)
          if tonumber(value.iconId) == iconId then
             table.remove(streamedMapIcons, i)
          end
@@ -14259,13 +14231,8 @@ function sampev.onSendRequestSpawn()
    streamedTextures = {}
    streamedPickups = {}
    streamed3dTexts = {}
+   streamedMapIcons = {}
    streamedTexts = {}
-   for i = 1, ini.settings.maxtableitems do
-      table.insert(streamedTextures, "")
-      table.insert(streamedPickups, "")
-      table.insert(streamed3dTexts, "")
-      table.insert(streamedTexts, "")
-   end
 end
 
 function sampev.onSendSpawn()
@@ -14513,6 +14480,31 @@ function string.nupper(s)
       res[i] = lu_rus[ch] or ch
    end
    return concat(res)
+end
+
+function string.clear(str)
+   clean_str = str
+   clean_str = clean_str:gsub("\n", "")
+   clean_str = clean_str:gsub("\r", "")
+   clean_str = clean_str:gsub("'", "")
+   clean_str = clean_str:gsub("%s%s%s", "")
+   return clean_str
+end
+
+function string.wrap(str, limit, indent, indent1)
+   indent = indent or ""
+   indent1 = indent1 or indent
+   limit = limit or 64
+
+   local here = 1 - #indent1
+   local function check(sp, st, word, fi)
+       if fi - here > limit then
+           here = st - #indent
+           return "\n" .. indent .. word
+       end
+   end
+
+   return indent1 .. str:gsub("(%s+)()(%S+)()", check)
 end
 
 function isRpNickname(name)
