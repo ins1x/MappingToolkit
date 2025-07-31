@@ -3,7 +3,7 @@ script_description("Assistant for mappers")
 script_dependencies('imgui', 'lib.samp.events')
 script_properties("work-in-pause")
 script_url("https://github.com/ins1x/MappingToolkit")
-script_version("4.16") -- release
+script_version("4.17") -- release
 -- support sa-mp versions depends on SAMPFUNCS (0.3.7-R1, 0.3.7-R3-1, 0.3.7-R5, 0.3.DL)
 -- script_moonloader(16) moonloader v.0.26 
 -- editor options: tabsize 3, Unix (LF), encoding Windows-1251
@@ -75,20 +75,16 @@ local ini = inicfg.load({
       freezechat = false,
       hotkeys = true,
       hotkeystips = true,
-      imguifont = "trebucbd",
-      imguifontsize = 14.0,
-      imguitheme = 1,
       loadworldname = true,
       lockserverweather = false,
       maxtableitems = 100,
       menukeychanged = false,
       menukey = "0x2D",
-      multilinefont = "trebucbd",
-      multilinefontsize = 13.0,
       noaltenter = false,
       nointeriorradar = false,
       nopagekeys = false,
       novehiclevisualdamage = false,
+      oinfotxd = true,
       recontime = 15500,
       renderfont = "Arial",
       renderfontsize = 7,
@@ -170,6 +166,14 @@ local ini = inicfg.load({
       showlasttxd = true,
       showcursorpos = true,
    },
+   ui = { -- imgui sets
+      imguifont = "trebucbd",
+      imguifontsize = 14.0,
+      imguitheme = 1,
+      movetabwindow = true,
+      multilinefont = "trebucbd",
+      multilinefontsize = 13.0,
+   },
    tmp = {
       animationdata = "",
       osearch = "",
@@ -197,14 +201,13 @@ local hiddenObjects = {}
 local chatbuffer = {}
 local chatfilter = {}
 local hiddenPlayerObjects = {}
+local streamed3dLabels = {} -- deleteprotect function
 
-local streamed3dLabels = {} -- dup
 local streamedTexts = {
    id = nil, type = nil, materialId = nil, materialSize = nil,
    fontName = nil, fontSize = nil, bold = nil, fontColor = nil,
    backGroundColor = nil, align = nil, text = nil
 }
-
 local streamedTextures = {
    id = nil, type = nil, materialId = nil, modelId = nil,
    libraryName = nil, textureName = nil, color = nil
@@ -666,7 +669,7 @@ local combobox = {
    attname = imgui.ImInt(0),
    chatselect = imgui.ImInt(0),
    fonts = imgui.ImInt(0),
-   selecttable = imgui.ImInt(2),
+   selecttable = imgui.ImInt(0),
    objects = imgui.ImInt(0),
    weaponselect = imgui.ImInt(0),
    itemad = imgui.ImInt(0),
@@ -757,7 +760,7 @@ local editmodes = {
 }
 
 local trainingGamemodes = {
-   "Deathmatch", "WoT", "GunGame", "Copchase", "Derby"
+   "Deathmatch", "WoT", "GunGame", "Copchase", "Derby", "Soccer"
 }
 
 local cbActivationItemsList = {
@@ -958,9 +961,9 @@ function main()
          reloadScripts()
       end      
       
-      if not doesFileExist(getFolderPath(0x14)..'\\'..ini.settings.imguifont..'.ttf') then
-         ini.settings.imguifont = "trebucbd"
-         ini.settings.imguifontsize = 14
+      if not doesFileExist(getFolderPath(0x14)..'\\'..ini.ui.imguifont..'.ttf') then
+         ini.ui.imguifont = "trebucbd"
+         ini.ui.imguifontsize = 14
       end
       
       -- training-autologin already have a skip rules function
@@ -1097,7 +1100,7 @@ function main()
          chatfilterfile:close()
       end
       
-      sampRegisterChatCommand("toolkit", function() dialog.main.v = not dialog.main.v end)
+      sampRegisterChatCommand("toolkit", imgui.toggleMainDialog)
       
       -- set drawdist and figdist
       memory.setfloat(12044272, ini.settings.drawdist, true)
@@ -1165,7 +1168,7 @@ function main()
       combobox.chatprefix.v = ini.settings.chatprefix
       
       for k, v in ipairs(uiFontsFilenames) do
-         if v == ini.settings.imguifont then
+         if v == ini.ui.imguifont then
             combobox.uifontselect.v = k-1
             break
          end
@@ -1182,8 +1185,8 @@ function main()
       end
       
       -- new dialog scheme
-      tabmenu.main = 1
-      dialog.general.v = true
+      -- tabmenu.main = 1
+      -- dialog.general.v = true
       
       --- END init
       while true do
@@ -1330,6 +1333,7 @@ function main()
          -- if tabmenu.main == 2 then -- durtyfix tab unfolding
             -- tabmenu.main = 1
          -- end
+         sampTextdrawDelete(const.txdmodelinfoid)
       end 
       
       if ini.settings.menukeychanged then
@@ -1341,13 +1345,10 @@ function main()
             end
          end
       else
-         -- ALT+X (Main menu activation)
+         -- ALT + X (Main menu activation)
          if isKeyDown(0x12) and isKeyJustPressed(0x58) 
          and not sampIsChatInputActive() and not isPauseMenuActive() then 
-            dialog.main.v = not dialog.main.v
-            if ini.panel.showpanel then 
-               checkbox.showpanel.v = true
-            end
+            imgui.toggleMainDialog()
          end
       end
       
@@ -1963,13 +1964,13 @@ end
 function imgui.BeforeDrawFrame()
    if fonts.defaultfont == nil then
       fonts.defaultfont = imgui.GetIO().Fonts:AddFontFromFileTTF(
-      getFolderPath(0x14) .. '\\'..ini.settings.imguifont..'.ttf',
-      ini.settings.imguifontsize, nil, imgui.GetIO().Fonts:GetGlyphRangesCyrillic())
+      getFolderPath(0x14) .. '\\'..ini.ui.imguifont..'.ttf',
+      ini.ui.imguifontsize, nil, imgui.GetIO().Fonts:GetGlyphRangesCyrillic())
    end
    if fonts.multilinetextfont == nil then
       fonts.multilinetextfont = imgui.GetIO().Fonts:AddFontFromFileTTF(
-      getFolderPath(0x14) .. '\\'..ini.settings.multilinefont..'.ttf',
-      ini.settings.multilinefontsize, nil, imgui.GetIO().Fonts:GetGlyphRangesCyrillic())
+      getFolderPath(0x14) .. '\\'..ini.ui.multilinefont..'.ttf',
+      ini.ui.multilinefontsize, nil, imgui.GetIO().Fonts:GetGlyphRangesCyrillic())
    end
 end
 
@@ -1978,9 +1979,7 @@ function imgui.OnDrawFrame()
    if dialog.main.v then
       imgui.SetNextWindowPos(imgui.ImVec2(sizeX / 2, sizeY / 6),
       imgui.Cond.FirstUseEver, imgui.ImVec2(0.5, 0.5))
-      --imgui.SetNextWindowSize(imgui.ImVec2(640, 500))
       imgui.SetNextWindowSize(imgui.ImVec2(const.windowsize.x, 80))
-      --const.windowsize.x, const.windowsize.y
       imgui.Begin((".::  Mapping Toolkit v%s ::."):format(thisScript().version), dialog.main, 
       imgui.WindowFlags.NoResize + imgui.WindowFlags.NoMove + imgui.WindowFlags.NoScrollbar + imgui.WindowFlags.NoCollapse)
       
@@ -2012,13 +2011,11 @@ function imgui.OnDrawFrame()
       imgui.SameLine()
       if tabmenu.main == 2 then
          imgui.PushStyleColor(imgui.Col.Button, imgui.GetStyle().Colors[imgui.Col.ButtonHovered])
-         --if imgui.Button(u8"Зона стрима", imgui.ImVec2(125, 30)) then tabmenu.main = 2 end
          if imgui.Button(u8"Зона стрима", imgui.ImVec2(125, 30)) then 
             imgui.selectTabMenu(2)
          end
          imgui.PopStyleColor()
       else
-         --if imgui.Button(u8"Зона стрима", imgui.ImVec2(125, 30)) then tabmenu.main = 2 end
          if imgui.Button(u8"Зона стрима", imgui.ImVec2(125, 30)) then 
             imgui.selectTabMenu(2)
          end
@@ -2029,12 +2026,13 @@ function imgui.OnDrawFrame()
       imgui.SameLine()
 
       if imgui.TooltipButton(u8" _ ", imgui.ImVec2(30, 25), u8"Свернуть окно тулкита") then
-         dialog.main.v = not dialog.main.v
+         imgui.toggleMainDialog()
       end
       imgui.SameLine()
       if imgui.TooltipButton(u8" ? ", imgui.ImVec2(30, 25), u8"Информация о тулките") then
-         tabmenu.info = 1
          imgui.selectTabMenu(3, 1)
+         tabmenu.credits = 1
+         tabmenu.info = 1
       end
       imgui.SameLine()
       if dialog.toolkitmanage.v then
@@ -2207,11 +2205,15 @@ function imgui.OnDrawFrame()
    end
    
    if dialog.general.v then
-      imgui.SetNextWindowPos(imgui.ImVec2(sizeX / 2, sizeY / 2),
-      imgui.Cond.FirstUseEver, imgui.ImVec2(0.5, 0.5))
+      imgui.SetNextWindowPos(imgui.ImVec2(sizeX / 2, sizeY / 2), 
+      imgui.Cond.Appearing, imgui.ImVec2(0.5, 0.5))
       imgui.SetNextWindowSize(imgui.ImVec2(const.windowsize.x, const.windowsize.y))
-      imgui.Begin(u8"General", dialog.general, imgui.WindowFlags.NoTitleBar)
-      
+      if ini.ui.movetabwindow then
+         imgui.Begin(u8"General", dialog.general, imgui.WindowFlags.NoTitleBar)
+      else
+         imgui.Begin(u8"General", dialog.general, imgui.WindowFlags.NoTitleBar + imgui.WindowFlags.NoMove)
+      end
+
       imgui.Columns(2)
       imgui.SetColumnWidth(-1, 510)
 
@@ -3172,9 +3174,8 @@ function imgui.OnDrawFrame()
             end
             imgui.SameLine()
             if imgui.TooltipButton(u8"Поиск", imgui.ImVec2(60, 25), u8:encode("Открыть вкладку поиска текстур")) then
-               tabmenu.info = 2
                tabmenu.onlinesearch = 2
-               imgui.selectTabMenu(1, 1)
+               imgui.selectTabMenu(3, 2)
             end
             
             --imgui.Spacing()
@@ -3207,8 +3208,7 @@ function imgui.OnDrawFrame()
             imgui.TextQuestion(u8" ( ? ) ", u8"Цвет в формате AARRGGBB")
             imgui.SameLine()
             if imgui.TooltipButton(u8"Палитра", imgui.ImVec2(85, 25), u8:encode("Перейти на вкладку выбора цвета")) then
-               tabmenu.info = 3
-               imgui.selectTabMenu(3, 1)
+               imgui.selectTabMenu(3, 3)
             end
             
             if imgui.TooltipButton(u8"Затемнить", imgui.ImVec2(105, 25), u8:encode("Затемнить объект")) then
@@ -6215,7 +6215,7 @@ function imgui.OnDrawFrame()
             imgui.SameLine()
             imgui.PushItemWidth(120)
             if imgui.Combo(u8'##imguitheme', combobox.imguitheme, imguiThemeNames) then
-               ini.settings.imguitheme = combobox.imguitheme.v
+               ini.ui.imguitheme = combobox.imguitheme.v
                inicfg.save(ini, configIni)
                apply_custom_style()
                sampAddChatMessage("[SCRIPT]: {FFFFFF}Выбрана тема - "..tostring(imguiThemeNames[combobox.imguitheme.v+1]), 0x0FF6600)
@@ -6229,7 +6229,7 @@ function imgui.OnDrawFrame()
             imgui.SameLine()
             imgui.PushItemWidth(120)
             if imgui.Combo(u8'##uifontselect', combobox.uifontselect, uiFontsList) then
-               ini.settings.imguifont = tostring(uiFontsFilenames[combobox.uifontselect.v + 1])
+               ini.ui.imguifont = tostring(uiFontsFilenames[combobox.uifontselect.v + 1])
                inicfg.save(ini, configIni)
                sampAddChatMessage("[SCRIPT]: {FFFFFF}Выбрана шрифт - "..tostring(uiFontsList[combobox.uifontselect.v + 1]), 0x0FF6600)
                sampAddChatMessage("[SCRIPT]: {FFFFFF}Перезапустите тулкит чтобы увидеть изменения", 0x0FF6600)
@@ -6959,9 +6959,13 @@ function imgui.OnDrawFrame()
    
    if dialog.info.v then
       imgui.SetNextWindowPos(imgui.ImVec2(sizeX / 2, sizeY / 2),
-      imgui.Cond.FirstUseEver, imgui.ImVec2(0.5, 0.5))
+      imgui.Cond.Appearing, imgui.ImVec2(0.5, 0.5))
       imgui.SetNextWindowSize(imgui.ImVec2(const.windowsize.x, const.windowsize.y))
-      imgui.Begin(u8"Info", dialog.info, imgui.WindowFlags.NoTitleBar)
+      if ini.ui.movetabwindow then
+         imgui.Begin(u8"Info", dialog.info, imgui.WindowFlags.NoTitleBar)
+      else
+         imgui.Begin(u8"Info", dialog.info, imgui.WindowFlags.NoTitleBar + imgui.WindowFlags.NoMove)
+      end
       
       imgui.Columns(2)
       imgui.SetColumnWidth(-1, 510)
@@ -8569,9 +8573,13 @@ function imgui.OnDrawFrame()
    
    if dialog.streameditems.v then
       imgui.SetNextWindowPos(imgui.ImVec2(sizeX / 2, sizeY / 2),
-      imgui.Cond.FirstUseEver, imgui.ImVec2(0.5, 0.5))
+      imgui.Cond.Appearing, imgui.ImVec2(0.5, 0.5))
       imgui.SetNextWindowSize(imgui.ImVec2(const.windowsize.x, const.windowsize.y))
-      imgui.Begin(u8"Streamed", dialog.streameditems, imgui.WindowFlags.NoTitleBar)
+      if ini.ui.movetabwindow then
+         imgui.Begin(u8"Streamed", dialog.streameditems, imgui.WindowFlags.NoTitleBar)
+      else
+         imgui.Begin(u8"Streamed", dialog.streameditems, imgui.WindowFlags.NoTitleBar + imgui.WindowFlags.NoMove)
+      end
       
        --imgui.resetIO()
        -- if dialog.extendedtab.v then
@@ -8747,7 +8755,7 @@ function imgui.OnDrawFrame()
                 if next(streamed3dTexts) ~= nil then
                    for k, value in ipairs(streamed3dTexts) do
                       local text = string.clear(tostring(value.text))
-                      file:write(('Create3DTextLabel("%s", %i, %.2f, %.2f, %.2f, %.2f, -1, %s);\n'):format(
+                      file:write(('Create3DTextLabel("%s", %i, %.2f, %.2f, %.2f, %.2f, -1, "%s");\n'):format(
                       text, value.color, value.position.x, value.position.y, value.position.z, 
                       value.distance, tostring(value.testLOS)))
                    end
@@ -8768,7 +8776,7 @@ function imgui.OnDrawFrame()
                 file:write("new tmpobjid;\n")
                 if next(streamedTexts) ~= nil then
                    for k, value in ipairs(streamedTexts) do
-                      file:write(("SetObjectMaterialText(tmpobjid, %s, %i, %i, %i, %s, %i, %i, %i, %i);\n"):format(
+                      file:write(('SetObjectMaterialText(tmpobjid, "%s", %i, %i, %i, "%s", %i, %i, %i, %i);\n'):format(
                       value.text, value.type, value.materialId, value.materialSize,
                       value.fontName, value.fontSize, value.bold,
                       value.fontColor, value.backGroundColor, 
@@ -9100,19 +9108,6 @@ function imgui.OnDrawFrame()
             for i, value in ipairs(streamedTextures) do
                texturesInTable = i
                
-               -- format color to readable format
-               local hexcolor = string.format("%X", value.color)
-               local hexcolor = string.sub(hexcolor, 9, string.len(hexcolor))
-               local hexcolor = string.reverse(hexcolor)
-               -- convert to ARGB format
-               local RGB = string.sub(hexcolor, 0, string.len(hexcolor)-2)
-               local Alpha = string.sub(hexcolor, string.len(hexcolor)-1, string.len(hexcolor))
-               local hexcolor = string.format("%s%s", Alpha, RGB)
-               
-               if string.len(hexcolor) <= 1 then
-                  hexcolor = "none"
-               end
-               
                imgui.Columns(6)
                imgui.Text(tostring(value.id))
                if imgui.IsItemClicked() then
@@ -9140,7 +9135,7 @@ function imgui.OnDrawFrame()
                   sampAddChatMessage("[SCRIPT]: {FFFFFF}Значение скопировано в буффер обмена", 0x0FF6600)
                end
                imgui.NextColumn()
-               imgui.TextColoredRGB(hexcolor)
+               imgui.TextColoredRGB(DecToARGB(value.color))
                imgui.NextColumn()
                imgui.Columns(1)
                imgui.Separator()
@@ -9220,37 +9215,31 @@ function imgui.OnDrawFrame()
          local textsInTable = 0
          if next(streamed3dTexts) ~= nil then
             for i, value in ipairs(streamed3dTexts) do
-               textsInTable = i
-               imgui.Columns(3)
-               imgui.TextColoredRGB(tostring(value.id))
-               imgui.NextColumn()
-               local text = string.clear(tostring(value.text))
-               text = string.wrap(text, 64, "", "\n")
-               imgui.TextColoredRGB(text)
-               if imgui.IsItemClicked() then
-                  setClipboardText(text)
-                  sampAddChatMessage("[SCRIPT]: {FFFFFF}Текст скопирован в буффер обмена", 0x0FF6600)
-               end
-               
-               imgui.NextColumn()
-               local clr
-               if tonumber(value.color) ~= -1 then
-                  clr = string.format("%X", value.color)
-                  clr = string.sub(clr, 9, string.len(clr))
-                  local clr = string.reverse(clr)
-                  -- convert to ARGB format
-                  local RGB = string.sub(clr, 0, string.len(clr)-2)
-                  local Alpha = string.sub(clr, string.len(clr)-1, string.len(clr))
-                  clr = string.format("%s%s", Alpha, RGB)
-               else
-                  clr = value.color
-               end
-               if string.len(clr) <= 1 then
-                  clr = "none"
-               end
-               imgui.TextColoredRGB(clr)
-               imgui.Columns(1)
-               imgui.Separator()
+               --if tonumber(value.color) ~= -1 then -- ignore empty or broken 3dtexts 
+                  textsInTable = i
+                  imgui.Columns(3)
+                  imgui.TextColoredRGB(tostring(value.id))
+                  imgui.NextColumn()
+                  if string.len(tostring(value.text)) > 1 then
+                     local text = string.clear(tostring(value.text))
+                     text = string.wrap(text, 64, "", "\n")
+                     imgui.TextColoredRGB(text)
+                  else
+                     imgui.Text(u8"none"..value.text)
+                  end                  
+                  if imgui.IsItemClicked() then
+                     setClipboardText(text)
+                     sampAddChatMessage("[SCRIPT]: {FFFFFF}Текст скопирован в буффер обмена", 0x0FF6600)
+                  end
+                  imgui.NextColumn()
+                  imgui.TextColoredRGB(DecToARGB(value.color))
+                  if imgui.IsItemClicked() then
+                     setClipboardText(DecToARGB(value.color))
+                     sampAddChatMessage("[SCRIPT]: {FFFFFF}Цвет скопирован в буффер обмена", 0x0FF6600)
+                  end
+                  imgui.Columns(1)
+                  imgui.Separator()
+               --end
             end
          end
 
@@ -9258,8 +9247,8 @@ function imgui.OnDrawFrame()
       elseif combobox.selecttable.v == 6 then
       
          local mapiconStyleNames = {
-            "MAPICON_LOCAL", "MAPICON_GLOBAL",
-            "MAPICON_LOCAL_CHECKPOINT", "MAPICON_GLOBAL_CHECKPOINT"
+            "LOCAL", "GLOBAL",
+            "LOCAL CHECKPOINT", "GLOBAL CHECKPOINT"
          }
          
          local textsInTable = 0
@@ -9273,7 +9262,7 @@ function imgui.OnDrawFrame()
          imgui.SetColumnWidth(-1, 150)
          imgui.NextColumn()
          imgui.Text("Style")
-         imgui.SetColumnWidth(-1, 150)
+         imgui.SetColumnWidth(-1, 175)
          imgui.NextColumn()
          imgui.Text("Position")
          --imgui.SetColumnWidth(-1, 200)
@@ -9304,36 +9293,49 @@ function imgui.OnDrawFrame()
          imgui.Text(u8"Всего иконок в таблице: ".. textsInTable)
       elseif combobox.selecttable.v == 7 then
          imgui.Separator()
-         imgui.Columns(6)
-         imgui.Text("Size")
-         imgui.SetColumnWidth(-1, 35)
-         imgui.NextColumn()
+         imgui.Columns(5)
          imgui.Text("fName")
          imgui.SetColumnWidth(-1, 120)
          imgui.NextColumn()
          imgui.Text("fSize")
          imgui.SetColumnWidth(-1, 35)
          imgui.NextColumn()
-         imgui.Text("fColor | fBackgr")
-         imgui.SetColumnWidth(-1, 120)
+         imgui.Text("   fColor   |   fBackgr   ")
+         imgui.SetColumnWidth(-1, 140)
          imgui.NextColumn()
          imgui.Text("fAttr")
-         imgui.SetColumnWidth(-1, 100)
+         imgui.SetColumnWidth(-1, 95)
          imgui.NextColumn()
          imgui.Text("Text")
          imgui.Columns(1)
          imgui.Separator()
          
+         local materialSizes = {
+            [10] = '32x32',
+            [20] = '64x32',
+            [30] = '64x64',
+            [40] = '128x32',
+            [50] = '128x64',
+            [60] = '128x128',
+            [70] = '256x32',
+            [80] = '256x64',
+            [90] = '256x128',
+            [100] = '256x256',
+            [110] = '512x64',
+            [120] = '512x128',
+            [130] = '512x256',
+            [140] = '512x512'
+         }
          local texturesInTable = 0
+         
          if next(streamedTexts) ~= nil then
             for i, value in ipairs(streamedTexts) do
                texturesInTable = i
-               imgui.Columns(6)
-               imgui.Text(tostring(value.materialSize))
-               imgui.NextColumn()
+               imgui.Columns(5)
                imgui.Text(value.fontName)
                imgui.NextColumn()
-               imgui.Text(tostring(value.fontSize))
+               --imgui.Text(tostring(value.fontSize))
+               imgui.TextNotify(tostring(value.fontSize), ("%s"):format(materialSizes[tonumber(value.materialSize)]))
                imgui.NextColumn()
                imgui.Text(DecToARGB(tostring(value.fontColor)).." | "..DecToARGB(tostring(value.backGroundColor)))
                imgui.NextColumn()
@@ -9523,7 +9525,6 @@ function imgui.OnDrawFrame()
       
       if imgui.TooltipButton(u8"Сообщить о ошибке", imgui.ImVec2(150, 25), u8"Жми не стесняйся") then
          imgui.selectTabMenu(3, 1)
-         tabmenu.info = 1
          tabmenu.credits = 3
       end
       -- if imgui.Button(u8"Проверить обновления",imgui.ImVec2(150, 25)) then
@@ -9551,7 +9552,6 @@ function imgui.OnDrawFrame()
          end
       end
       if imgui.TooltipButton(u8"Отладка", imgui.ImVec2(150, 25), u8"Открыть инструменты для отлдаки") then
-         tabmenu.info = 4
          imgui.selectTabMenu(3, 4)
       end
       if imgui.TooltipButton(u8" << ", imgui.ImVec2(150, 25), u8"Свернуть") then
@@ -10637,16 +10637,18 @@ function sampev.onShowDialog(dialogId, style, title, button1, button2, text)
             return {dialogId, style, title, button1, button2, newtext}
          end
          
-         if text:find('{80BCFF}Модель.+{FFFFFF}') then
-            dialoghook.modelinfo = true
-            LastData.lastModelinfo = text:match('{80BCFF}Модель.+{FFFFFF}(%d+)\n')
-            if LastData.lastModelinfo ~= 0 then
-               sampTextdrawCreate(const.txdmodelinfoid, LastData.lastModelinfo, 20.0, 170.0)
-               sampTextdrawSetStyle(const.txdmodelinfoid, 5)
-               sampTextdrawSetBoxColorAndSize(const.txdmodelinfoid, 1, 0, 150.0, 150.0)
-               sampTextdrawSetModelRotationZoomVehColor(const.txdmodelinfoid, 
-               LastData.lastModelinfo, -10.0, 0, 45.0, 1.25, -1, -1)
-               sampTextdrawSetShadow(const.txdmodelinfoid, 0, 1)
+         if ini.settings.oinfotxd then
+            if text:find('{80BCFF}Модель.+{FFFFFF}') then
+               dialoghook.modelinfo = true
+               LastData.lastModelinfo = text:match('{80BCFF}Модель.+{FFFFFF}(%d+)\n')
+               if LastData.lastModelinfo ~= 0 then
+                  sampTextdrawCreate(const.txdmodelinfoid, LastData.lastModelinfo, 20.0, 170.0)
+                  sampTextdrawSetStyle(const.txdmodelinfoid, 5)
+                  sampTextdrawSetBoxColorAndSize(const.txdmodelinfoid, 1, 0, 150.0, 150.0)
+                  sampTextdrawSetModelRotationZoomVehColor(const.txdmodelinfoid, 
+                  LastData.lastModelinfo, -10.0, 0, 45.0, 1.25, -1, -1)
+                  sampTextdrawSetShadow(const.txdmodelinfoid, 0, 1)
+               end
             end
          end
       end
@@ -10709,7 +10711,7 @@ function sampev.onShowDialog(dialogId, style, title, button1, button2, text)
             dialoghook.backtoworld = false
          end
       end
-      
+
       if title:find("Покинуть данный мир") then
          dialoghook.backtoworld = false
       end
@@ -11370,6 +11372,10 @@ function sampev.onServerMessage(color, text)
       -- if text:find("[ERROR].+Вы находитесь не в статичном мире") then
       -- end
       
+      -- admin trollolo
+      --{ffa500}[SERVER]: {ffffff}Приносим свои извинения, в качестве компенсации за ущерб купон:
+      --{80bcff}https://training-server.com/coupon/s0s1-hy1-t3b3-4-n3-kyp0n-e55c4aefd877894
+
       if text:find("[ERROR].+Это краш объект. Ты че кран") then
          sampAddChatMessage("[SCRIPT]: {FFFFFF}Воспользуйтесь объектами: 1394, 16328", 0x0FF6600)
       end
@@ -11513,6 +11519,13 @@ function sampev.onServerMessage(color, text)
       end
       
       if text:find('[SERVER].+Хост.+вернулся в мир!') then
+         LastData.lastMinigame = nil
+         if ini.settings.backtoworld and dialoghook.backtoworld then
+            dialoghook.backtoworld = false
+         end
+      end
+      
+      if text:find('[ERROR].+Сейчас нет никого в игре') then
          LastData.lastMinigame = nil
       end
       
@@ -11703,6 +11716,7 @@ function sampev.onSendCommand(command)
       end
    end
    
+   -- minigames
    if isTrainingSanbox then
       if command:find("^/dm") then
          LastData.lastMinigame = 1
@@ -11714,6 +11728,8 @@ function sampev.onSendCommand(command)
          LastData.lastMinigame = 2
       elseif command:find("^/derby") then
          LastData.lastMinigame = 5
+      elseif command:find("^/soccer") then
+         LastData.lastMinigame = 6
       end
    end
    
@@ -13322,28 +13338,21 @@ function sampev.onSendCommand(command)
    end
    
    if command:find("^/picker") then
-      if not dialog.main.v then
-         dialog.main.v = true 
-      end
       imgui.selectTabMenu(3, 3)
-      tabmenu.info = 3
+      return false
+   end
+         
+   if command:find("^/dbg") then
+      imgui.selectTabMenu(3, 4)
       return false
    end
    
    if command:find("^/favlist") then
-      if not dialog.main.v then
-         dialog.main.v = true 
-      end
       imgui.selectTabMenu(3, 5)
-      tabmenu.info = 5
       return false
    end
    
    if command:find("^/cmdlist") then
-      if not dialog.main.v then
-         dialog.main.v = true 
-      end
-      tabmenu.info = 6
       imgui.selectTabMenu(3, 6)
       return false
    end
@@ -14042,10 +14051,10 @@ attachedPlayerId, attachedVehicleId, text)
 end
 
 function sampev.onRemove3DTextLabel(textLabelId)
-   if next(streamed3dLabels) ~= nil then
-      for i, value in ipairs(streamed3dLabels) do
+   if next(streamed3dTexts) ~= nil then
+      for i, value in ipairs(streamed3dTexts) do
          if tonumber(value.id) == textLabelId then
-            table.remove(streamed3dLabels, i)
+            table.remove(streamed3dTexts, i)
          end
       end
    end
@@ -14344,10 +14353,13 @@ function sampev.onSendSpawn()
    
    if ini.settings.backtoworld and dialoghook.backtoworld then
       local delta = tonumber(os.time()) - tonumber(ini.tmp.disconnecttime)
-      if delta < 300 then
+      print(delta)
+      if delta < 500 then
          lua_thread.create(function()
             wait(1000)
             sampSendChat("/world")
+            -- wait(500)
+            -- sampAddChatMessage("[SCRIPT]: {FFFFFF}Нажмите на M или введите /world чтобы вернуться в мир!", 0x0FF6600)
          end)
       end
    end
@@ -14572,8 +14584,8 @@ end
 
 function string.clear(str)
    clean_str = str
-   clean_str = clean_str:gsub("\n", "")
-   clean_str = clean_str:gsub("\r", "")
+   clean_str = clean_str:gsub("\n", " ")
+   clean_str = clean_str:gsub("\r", " ")
    clean_str = clean_str:gsub("'", "")
    clean_str = clean_str:gsub("%s%s%s", "")
    return clean_str
@@ -14596,6 +14608,7 @@ function string.wrap(str, limit, indent, indent1)
 end
 
 function DecToARGB(color)
+   -- format color to readable format
    color = color or "none"
    local clr
    if tonumber(color) ~= -1 then
@@ -15095,10 +15108,10 @@ end
 
 function Recon(delay)
    lua_thread.create(function()
-   sampDisconnectWithReason(quit)
-   wait(delay)
-   local ip, port = sampGetCurrentServerAddress()
-   sampConnectToServer(ip, port) 
+      sampDisconnectWithReason(quit)
+      wait(delay)
+      local ip, port = sampGetCurrentServerAddress()
+      sampConnectToServer(ip, port) 
    end)
 end
 
@@ -15452,7 +15465,26 @@ function getSampVersionId()
 end
 
 -- imgui fuctions
+function imgui.toggleMainDialog()
+   if dialog.main.v then
+      dialog.general.v = false
+      dialog.main.v = false
+   else
+      tabmenu.main = 1
+      dialog.main.v = true
+      dialog.general.v = true
+      if ini.panel.showpanel then 
+         checkbox.showpanel.v = true
+      end
+   end
+end
+
 function imgui.selectTabMenu(tab, submenu)
+   -- tabmenu selector
+   -- tab (1 - general, 2 - sreameditems, 3 - info)
+   if not dialog.main.v then
+      dialog.main.v = true 
+   end
    tab = tab or 1
    submenu = submenu or 1
    if tab == 1 then
@@ -15460,7 +15492,7 @@ function imgui.selectTabMenu(tab, submenu)
       dialog.general.v = true
       dialog.info.v = false
       dialog.streameditems.v = false
-      if submenu < 1 then
+      if submenu >= 1 then
          tabmenu.settings = submenu
       end
    elseif tab == 2 then
@@ -15468,14 +15500,14 @@ function imgui.selectTabMenu(tab, submenu)
       dialog.general.v = false
       dialog.info.v = false
       dialog.streameditems.v = true
-      if submenu < 1 then
-         tabmenu.info = submenu
-      end
    elseif tab == 3 then
       tabmenu.main = 3
       dialog.general.v = false
       dialog.info.v = true
       dialog.streameditems.v = false
+      if submenu >= 1 then
+         tabmenu.info = submenu
+      end
    end
 end
 
@@ -16181,7 +16213,7 @@ function apply_custom_style()
    local ImVec4 = imgui.ImVec4
 
    style.WindowPadding = imgui.ImVec2(15, 15)
-   style.WindowRounding = 1.5
+   style.WindowRounding = 5.5
    style.FramePadding = imgui.ImVec2(5, 5)
    style.FrameRounding = 4.0
    style.ItemSpacing = imgui.ImVec2(6, 4)
@@ -16195,7 +16227,7 @@ function apply_custom_style()
    --imgui.SetColorEditOptions(imgui.ColorEditFlags.HEX)
   
    -- STYLE 1 Dark
-   if ini.settings.imguitheme == 0 then
+   if ini.ui.imguitheme == 0 then
       colors[clr.Text] = ImVec4(0.80, 0.80, 0.83, 1.00)
       colors[clr.TextDisabled] = ImVec4(0.24, 0.23, 0.29, 1.00)
       colors[clr.WindowBg] = ImVec4(0.06, 0.05, 0.07, 1.00)
@@ -16237,7 +16269,7 @@ function apply_custom_style()
       colors[clr.TextSelectedBg] = ImVec4(0.25, 1.00, 0.00, 0.43)
       colors[clr.ModalWindowDarkening] = ImVec4(1.00, 0.98, 0.95, 0.73)
    -- STYLE 2 Grey-Blue
-   elseif ini.settings.imguitheme == 1 then
+   elseif ini.ui.imguitheme == 1 then
       colors[clr.Text] = ImVec4(0.95, 0.96, 0.98, 1.00)
       colors[clr.TextDisabled] = ImVec4(0.36, 0.42, 0.47, 1.00)
       colors[clr.WindowBg] = ImVec4(0.11, 0.15, 0.17, 1.00)
@@ -16279,7 +16311,7 @@ function apply_custom_style()
       colors[clr.TextSelectedBg] = ImVec4(0.25, 1.00, 0.00, 0.43)
       colors[clr.ModalWindowDarkening] = ImVec4(1.00, 0.98, 0.95, 0.73)
       -- STYLE 3 Brutal
-   elseif ini.settings.imguitheme == 2 then
+   elseif ini.ui.imguitheme == 2 then
       colors[clr.Text] = ImVec4(0.95, 0.96, 0.98, 1.00)
       colors[clr.TextDisabled] = ImVec4(0.29, 0.29, 0.29, 1.00)
       colors[clr.WindowBg] = ImVec4(0.14, 0.14, 0.14, 1.00)
@@ -16321,7 +16353,7 @@ function apply_custom_style()
       colors[clr.TextSelectedBg] = ImVec4(1.00, 0.32, 0.32, 1.00)
       colors[clr.ModalWindowDarkening] = ImVec4(0.26, 0.26, 0.26, 0.60)
       -- STYLE 4: TRAINING Colors theme
-   elseif ini.settings.imguitheme == 3 then
+   elseif ini.ui.imguitheme == 3 then
       colors[clr.Text] = ImVec4(0.80, 0.80, 0.83, 1.00)
       colors[clr.TextDisabled] = ImVec4(0.24, 0.23, 0.29, 1.00)
       colors[clr.WindowBg] = ImVec4(0.06, 0.05, 0.07, 1.00)
@@ -16363,7 +16395,7 @@ function apply_custom_style()
       colors[clr.TextSelectedBg] = ImVec4(0.56, 0.42, 0.01, 1.00)
       colors[clr.ModalWindowDarkening] = ImVec4(1.00, 0.98, 0.95, 0.73)
    -- STYLE 5: Halloween Colors theme
-   elseif ini.settings.imguitheme == 4 then 
+   elseif ini.ui.imguitheme == 4 then 
       colors[clr.Text] = ImVec4(0.80, 0.80, 0.83, 1.00)
       colors[clr.TextDisabled] = ImVec4(0.24, 0.23, 0.29, 1.00)
       colors[clr.WindowBg] = ImVec4(0.06, 0.05, 0.07, 1.00)
