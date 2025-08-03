@@ -3,7 +3,7 @@ script_description("Assistant for mappers")
 script_dependencies('imgui', 'lib.samp.events')
 script_properties("work-in-pause")
 script_url("https://github.com/ins1x/MappingToolkit")
-script_version("4.17") -- release
+script_version("4.17") -- release fix 1
 -- support sa-mp versions depends on SAMPFUNCS (0.3.7-R1, 0.3.7-R3-1, 0.3.7-R5, 0.3.DL)
 -- script_moonloader(16) moonloader v.0.26 
 -- editor options: tabsize 3, Unix (LF), encoding Windows-1251
@@ -173,6 +173,8 @@ local ini = inicfg.load({
       movetabwindow = true,
       multilinefont = "trebucbd",
       multilinefontsize = 13.0,
+      windowsizex = 640,
+      windowsizey = 440
    },
    tmp = {
       animationdata = "",
@@ -246,7 +248,6 @@ local edit = {
 }
 
 local const = {
-   windowsize = {x = 640, y = 440},
    txdmodelinfoid = 555,
    deleteprotectdist = 50.0,
    maxlogfilesize = 65535, --(MAX unsigned short)
@@ -1979,7 +1980,7 @@ function imgui.OnDrawFrame()
    if dialog.main.v then
       imgui.SetNextWindowPos(imgui.ImVec2(sizeX / 2, sizeY / 6),
       imgui.Cond.FirstUseEver, imgui.ImVec2(0.5, 0.5))
-      imgui.SetNextWindowSize(imgui.ImVec2(const.windowsize.x, 80))
+      imgui.SetNextWindowSize(imgui.ImVec2(ini.ui.windowsizex, 80))
       imgui.Begin((".::  Mapping Toolkit v%s ::."):format(thisScript().version), dialog.main, 
       imgui.WindowFlags.NoResize + imgui.WindowFlags.NoMove + imgui.WindowFlags.NoScrollbar + imgui.WindowFlags.NoCollapse)
       
@@ -2207,7 +2208,7 @@ function imgui.OnDrawFrame()
    if dialog.general.v then
       imgui.SetNextWindowPos(imgui.ImVec2(sizeX / 2, sizeY / 2), 
       imgui.Cond.Appearing, imgui.ImVec2(0.5, 0.5))
-      imgui.SetNextWindowSize(imgui.ImVec2(const.windowsize.x, const.windowsize.y))
+      imgui.SetNextWindowSize(imgui.ImVec2(ini.ui.windowsizex, ini.ui.windowsizey))
       if ini.ui.movetabwindow then
          imgui.Begin(u8"General", dialog.general, imgui.WindowFlags.NoTitleBar)
       else
@@ -6960,7 +6961,7 @@ function imgui.OnDrawFrame()
    if dialog.info.v then
       imgui.SetNextWindowPos(imgui.ImVec2(sizeX / 2, sizeY / 2),
       imgui.Cond.Appearing, imgui.ImVec2(0.5, 0.5))
-      imgui.SetNextWindowSize(imgui.ImVec2(const.windowsize.x, const.windowsize.y))
+      imgui.SetNextWindowSize(imgui.ImVec2(ini.ui.windowsizex, ini.ui.windowsizey))
       if ini.ui.movetabwindow then
          imgui.Begin(u8"Info", dialog.info, imgui.WindowFlags.NoTitleBar)
       else
@@ -8574,7 +8575,7 @@ function imgui.OnDrawFrame()
    if dialog.streameditems.v then
       imgui.SetNextWindowPos(imgui.ImVec2(sizeX / 2, sizeY / 2),
       imgui.Cond.Appearing, imgui.ImVec2(0.5, 0.5))
-      imgui.SetNextWindowSize(imgui.ImVec2(const.windowsize.x, const.windowsize.y))
+      imgui.SetNextWindowSize(imgui.ImVec2(ini.ui.windowsizex, ini.ui.windowsizey))
       if ini.ui.movetabwindow then
          imgui.Begin(u8"Streamed", dialog.streameditems, imgui.WindowFlags.NoTitleBar)
       else
@@ -9265,7 +9266,7 @@ function imgui.OnDrawFrame()
          imgui.SetColumnWidth(-1, 175)
          imgui.NextColumn()
          imgui.Text("Position")
-         --imgui.SetColumnWidth(-1, 200)
+         imgui.SetColumnWidth(-1, 200)
          imgui.Columns(1)
          imgui.Separator()
          
@@ -12063,7 +12064,6 @@ function sampev.onSendCommand(command)
          local id = tonumber(arg)
          if type(id) == "number" then
             LastData.lastOtextObjectId = id
-            print(id, LastData.lastOtextObjectId)
          end
       end
    end
@@ -14353,7 +14353,6 @@ function sampev.onSendSpawn()
    
    if ini.settings.backtoworld and dialoghook.backtoworld then
       local delta = tonumber(os.time()) - tonumber(ini.tmp.disconnecttime)
-      print(delta)
       if delta < 500 then
          lua_thread.create(function()
             wait(1000)
