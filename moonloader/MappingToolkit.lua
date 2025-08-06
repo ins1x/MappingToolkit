@@ -3,7 +3,7 @@ script_description("Assistant for mappers")
 script_dependencies('imgui', 'lib.samp.events')
 script_properties("work-in-pause")
 script_url("https://github.com/ins1x/MappingToolkit")
-script_version("4.17") -- release fix 1
+script_version("4.18") -- pre-release 1
 -- support sa-mp versions depends on SAMPFUNCS (0.3.7-R1, 0.3.7-R3-1, 0.3.7-R5, 0.3.DL)
 -- script_moonloader(16) moonloader v.0.26 
 -- editor options: tabsize 3, Unix (LF), encoding Windows-1251
@@ -250,6 +250,7 @@ local edit = {
 local const = {
    txdmodelinfoid = 555,
    deleteprotectdist = 50.0,
+   --txdbadvalue = 24639793, 
    maxlogfilesize = 65535, --(MAX unsigned short)
 }
 
@@ -486,6 +487,8 @@ local checkbox = {
    lockcamfront = imgui.ImBool(false),
    streammemmax = imgui.ImBool(false),
    drunkcam = imgui.ImBool(false),
+   cordlinedatetime = imgui.ImBool(false),
+   cordlineseparator = imgui.ImBool(false),
    test = imgui.ImBool(false)
 }
 
@@ -493,6 +496,7 @@ local input = {
    readonly = true,
    isbot = false,
    error = false,
+   txdselected = false,
    camdelay = imgui.ImInt(5000),
    camshake = imgui.ImInt(500),
    gametexttime = imgui.ImInt(5000),
@@ -578,6 +582,8 @@ local textbuffer = {
    txdboxcolor = imgui.ImBuffer(16),
    txdsprite = imgui.ImBuffer(32),
    cbdefaultradius = imgui.ImBuffer(6),
+   possavename = imgui.ImBuffer(24),
+   cordline = imgui.ImBuffer(48),
    colorsearch = imgui.ImBuffer(24),
    ocolor = imgui.ImBuffer(12),
    objectid = imgui.ImBuffer(48),
@@ -608,6 +614,7 @@ local textbuffer = {
    favtxt = imgui.ImBuffer(65536),
    cmdlist = imgui.ImBuffer(65536),
    animlist = imgui.ImBuffer(65536),
+   cordlist = imgui.ImBuffer(65536),
    cblist = imgui.ImBuffer(65536)
 }
 
@@ -669,6 +676,7 @@ local combobox = {
    
    attname = imgui.ImInt(0),
    chatselect = imgui.ImInt(0),
+   cordformats = imgui.ImInt(0),
    fonts = imgui.ImInt(0),
    selecttable = imgui.ImInt(0),
    objects = imgui.ImInt(0),
@@ -1077,6 +1085,17 @@ function main()
          file:write(u8"Файл поврежден либо не найден\n")
          file:write(u8"Скачать стандартный можно по ссылке:\n")
          file:write("https://github.com/ins1x/MappingToolkit/blob/main/moonloader/resource/mappingtoolkit/cblist.txt")
+         file:close()
+      end
+      
+      if doesFileExist(getGameDirectory()..'\\moonloader\\resource\\mappingtoolkit\\favorites\\cordlist.txt') then
+         local file = io.open(getGameDirectory()..
+         "//moonloader//resource//mappingtoolkit//favorites//cordlist.txt", "r")
+         textbuffer.cordlist.v = file:read('*a')
+         file:close()
+      else
+         local file = io.open("moonloader/resource/mappingtoolkit/favorites/cordlist.txt", "w")
+         --file:write(u8"Файл поврежден либо не найден\n")
          file:close()
       end
       
@@ -2300,6 +2319,19 @@ function imgui.OnDrawFrame()
             end
          end
          
+         imgui.SameLine()
+         if tabmenu.coords == 3 then
+            imgui.PushStyleColor(imgui.Col.Button, imgui.GetStyle().Colors[imgui.Col.ButtonHovered])
+            if imgui.Button(u8"Сохраненные", imgui.ImVec2(100, 30)) then 
+               tabmenu.coords = 3 
+            end
+            imgui.PopStyleColor()
+         else
+            if imgui.Button(u8"Сохраненные", imgui.ImVec2(100, 30)) then 
+               tabmenu.coords = 3
+            end
+         end
+         
          imgui.Spacing()
          
          if tabmenu.coords == 1 then
@@ -2707,6 +2739,128 @@ function imgui.OnDrawFrame()
                   setCharCoordinates(playerPed, posX, posY, posZ-input.tpstep.v)
                end
             end
+       elseif tabmenu.coords == 3 then
+          -- if imgui.TooltipButton("/savepos", imgui.ImVec2(75, 25), u8"Сохранить позицию в буффер") then
+             -- sampSendChat("/savepos")
+          -- end
+          if imgui.TooltipButton(u8"", imgui.ImVec2(15, 25), u8"Вставить координаты") then
+          end
+          imgui.SameLine()
+          imgui.TextColoredRGB("Комментарий")
+          imgui.SameLine()
+          imgui.PushItemWidth(170)
+          if string.len(textbuffer.possavename.v) < 1 then 
+             textbuffer.possavename.v = tostring(zone)
+          end
+          if imgui.InputText("##possavenamer", textbuffer.possavename) then
+          end
+          imgui.PopItemWidth()
+          
+          imgui.SameLine()
+          imgui.Checkbox(u8"датавремя", checkbox.cordlinedatetime)
+          imgui.SameLine()
+          imgui.Checkbox(u8"разделитель", checkbox.cordlineseparator)
+          
+          if imgui.TooltipButton(u8"Вставить", imgui.ImVec2(95, 25), u8"Вставить координаты") then
+             --if sampIsLocalPlayerSpawned() then
+             local posX, posY, posZ = getCharCoordinates(playerPed)
+             local angle = math.ceil(getCharHeading(playerPed))
+             local camX, camY, camZ = getActiveCameraCoordinates()
+             --end
+         -- imgui.Text(string.format(u8"Направление: %s  %i°", direction(), angle))
+         -- local camX, camY, camZ = getActiveCameraCoordinates()
+         -- imgui.Text(string.format(u8"Камера x: %.1f, y: %.1f, z: %.1f",
+         -- camX, camY, camZ))
+         -- if imgui.IsItemClicked() then
+            -- setClipboardText(string.format(u8"%.1f, %.1f, %.1f", camX, camY, camZ))
+            -- sampAddChatMessage("[SCRIPT]: {FFFFFF}Позиция скопирована в буффер обмена", 0x0FF6600)
+         -- end
+                  -- local rX, rY, rZ = getActiveCameraPointAt()
+         -- imgui.Text(string.format(u8"Камера rx: %.1f, ry: %.1f, rz: %.1f",
+         -- rX, rY, rZ))
+         
+             local filepath = getGameDirectory().."//moonloader//resource//mappingtoolkit//favorites//cordlist.txt"
+             local file = io.open(filepath, "a")
+             local line = nil
+             
+             if file then
+                if combobox.cordformats.v == 0 then
+                   if checkbox.cordlineseparator.v then
+                      line = ("%.2f, %.2f, %.2f    %s "):format(posX, posY, posZ, textbuffer.possavename.v)
+                   else
+                      line = ("%.2f %.2f %.2f    %s "):format(posX, posY, posZ, textbuffer.possavename.v)
+                   end
+                elseif combobox.cordformats.v == 1 then
+                   if checkbox.cordlineseparator.v then
+                      line = ("%.2f, %.2f, %.2f, %.2f    %s "):format(posX, posY, posZ, angle, textbuffer.possavename.v)
+                   else
+                      line = ("%.2f %.2f %.2f %.2f    %s "):format(posX, posY, posZ, angle, textbuffer.possavename.v)
+                   end
+                elseif combobox.cordformats.v == 2 then
+                   if checkbox.cordlineseparator.v then
+                      line = ("%.2f, %.2f, %.2f    %s "):format(camX, camY, camZ, textbuffer.possavename.v)
+                   else
+                      line = ("%.2f %.2f %.2f    %s "):format(camX, camY, camZ, textbuffer.possavename.v)
+                   end
+                end
+                
+                if checkbox.cordlinedatetime.v then
+                   local hours, mins = getTimeOfDay()
+                   line = line..tostring(os.date("%d.%m.%Y %H:%M"))
+                end
+                
+                if line then
+                   if textbuffer.cordline.v then
+                      if textbuffer.cordline.v ~= line then
+                         textbuffer.cordline.v = line
+                         file:write(line)
+                         file:write("\n")
+                      end
+                   else
+                      textbuffer.cordline.v = line
+                      file:write(line)
+                      file:write("\n")
+                   end
+                end
+                file:close()
+             end
+
+             file = io.open(filepath, "r")
+             textbuffer.cordlist.v = file:read('*a')
+             file:close()
+          end
+          imgui.SameLine()
+          if imgui.TooltipButton(u8"Очистить", imgui.ImVec2(95, 25), u8"Полностью очистить список кооррдинат") then
+             local filepath = getGameDirectory().."//moonloader//resource//mappingtoolkit//favorites//cordlist.txt"
+             local file = io.open(filepath, "w")
+             file:write("")
+             file:close()
+
+             file = io.open(filepath, "r")
+             textbuffer.cordlist.v = file:read('*a')
+             file:close()
+             
+             textbuffer.cordline.v = ""
+          end
+          imgui.SameLine()
+          local cordformatsList = {
+             "<x> <y> <z>", 
+             "<x> <y> <z> a>",
+             "<camx> <camy> camz>", 
+          }
+          imgui.PushItemWidth(170)
+          imgui.TextColoredRGB("Формат")
+          imgui.SameLine()
+          if imgui.Combo(u8'##cordformats', combobox.cordformats, cordformatsList) then
+             -- ini.settings.cbnewactivationitem = combobox.cordformats.v
+             -- inicfg.save(ini, configIni)
+          end
+          imgui.PopItemWidth()
+          
+          imgui.PushFont(fonts.multilinetextfont)
+          imgui.InputTextMultiline('##cordlist', textbuffer.cordlist, imgui.ImVec2(490, 200),
+          imgui.InputTextFlags.EnterReturnsTrue + imgui.InputTextFlags.AllowTabInput + imgui.InputTextFlags.ReadOnly)
+          imgui.PopFont()
        end
         
       elseif tabmenu.settings == 2 then
@@ -4695,7 +4849,7 @@ function imgui.OnDrawFrame()
             imgui.Spacing()
             if imgui.TooltipButton(u8"Применить", imgui.ImVec2(125, 30), u8"Обновить и применить текущие параметры") then
                imgui.resetIO()
-               
+               input.txdselected = true
                local letColorU32 = join_argb(255, input.txdletcolorrgba.v[1]*255, input.txdletcolorrgba.v[2]*255, input.txdletcolorrgba.v[3]*255)
                local outlineColorU32 = join_argb(255, input.txdoutlinecolorrgba.v[1]*255, input.txdoutlinecolorrgba.v[2]*255, input.txdoutlinecolorrgba.v[3]*255)
                local boxColorU32 = join_argb(255, input.txdboxcolorrgba.v[1]*255, input.txdboxcolorrgba.v[2]*255, input.txdboxcolorrgba.v[3]*255)
@@ -4769,6 +4923,7 @@ function imgui.OnDrawFrame()
             if imgui.TooltipButton(u8"Очистить", imgui.ImVec2(75, 30), u8"Очистить текущий текстдрав") then
                imgui.resetIO()
                sampTextdrawDelete(input.txdid.v)
+               input.txdselected = false
                
                input.txdposx.v = 50.0
                input.txdposy.v = 250.0
@@ -4824,6 +4979,7 @@ function imgui.OnDrawFrame()
             end
             imgui.SameLine()
             if imgui.TooltipButton(u8"Получить", imgui.ImVec2(125, 30), u8"Сдампить параметры с выбранного текстдрава") then
+               input.txdselected = true
                local id = input.txdid.v
                local style = sampTextdrawGetStyle(id)
                if style < 16 then
@@ -4909,18 +5065,23 @@ function imgui.OnDrawFrame()
                   textbuffer.txdstring.v = tostring(text)
                else
                   sampAddChatMessage("[SCRIPT]: {FFFFFF}Текстдрав несуществует! Укажите реальный ID", 0x0FF6600)
+                  input.txdselected = false
                end
             end
             
          elseif tabmenu.txd == 2 then
-         
-            local txdExportFormatsList = {u8"KБ", u8"TextDraw", u8"PlayerTextDraw"}
-            imgui.Text(u8"Выберите формат:")
-            imgui.PushItemWidth(125)
-            imgui.SameLine()
-            if imgui.Combo(u8'##txdexport', combobox.txdexport, txdExportFormatsList) then
+            if input.txdselected then
+               local txdExportFormatsList = {u8"KБ", u8"TextDraw", u8"PlayerTextDraw"}
+               imgui.Text(u8"Выберите формат:")
+               imgui.PushItemWidth(125)
+               imgui.SameLine()
+               if imgui.Combo(u8'##txdexport', combobox.txdexport, txdExportFormatsList) then
+               end
+               imgui.PopItemWidth()
+            else
+               imgui.Spacing()
+               imgui.TextColoredRGB("{FF0000}Не выбран текстдрав для экспорта")
             end
-            imgui.PopItemWidth()
             imgui.Spacing()
             
             local id = input.txdid.v
@@ -4969,95 +5130,97 @@ function imgui.OnDrawFrame()
             if combobox.txdexport.v == 0 then
                --local textdata = {lines = 0, symbols}
                --textdata.symbols = math.floor(string.len(textbuffer.txdcbstring.v)/2) --RU
-               textdata.symbols = math.floor(string.len(textbuffer.txdcbstring.v))
-               for s in string.gmatch(textbuffer.txdcbstring.v, "\n" ) do
-                  textdata.lines = textdata.lines + 1
+               if input.txdselected then
+                  textdata.symbols = math.floor(string.len(textbuffer.txdcbstring.v))
+                  for s in string.gmatch(textbuffer.txdcbstring.v, "\n" ) do
+                     textdata.lines = textdata.lines + 1
+                  end
+                  imgui.PushStyleVar(imgui.StyleVar.ItemSpacing, imgui.ImVec2(3, 3))
+                  if combobox.txdtype.v > 0 then
+                     imgui.TextColoredRGB(("Показать текстдрав (бокс type %i):"):format(combobox.txdtype.v))
+                     imgui.TextNotify(("{696969}%i"):format(id), "<slot 0-99>")
+                     imgui.SameLine()
+                     imgui.TextNotify(("{FF6600}%.2f"):format(posX), "<posX>")
+                     imgui.SameLine()
+                     imgui.TextNotify(("{FF6600}%.2f"):format(posY), "<posY>")
+                     imgui.SameLine()
+                     imgui.TextNotify(("{FF6600}%.2f"):format(boxSizeX), "<sizeX>")
+                     imgui.SameLine()
+                     imgui.TextNotify(("{FF6600}%.2f"):format(boxSizeY), "<sizeY>")
+                     imgui.SameLine()
+                     imgui.TextNotify(("{CDCDCD}0x%s"):format(boxColorAbgr), "<boxColor> 0xFFBBGGRR")
+                     imgui.SameLine()
+                     imgui.TextNotify(("{FF6600}%i"):format(reversedAlign), u8"<aligment> выравнивание (1 - право | 2 - центр | 3 - лево)")
+                     if type == 0 then
+                        imgui.SameLine()
+                        imgui.TextNotify(("{FF6600}%i"):format(type), u8"*<type 0/1/2> (0 - обычный бокс | 1 - модель(скин, тс, объект, оружие) | 2 - TXD спрайт)")
+                     elseif type == 1 then
+                        imgui.SameLine()
+                        imgui.TextNotify(("{FF6600}%i"):format(type), u8"*<type 0/1/2> (0 - обычный бокс | 1 - модель(скин, тс, объект, оружие) | 2 - TXD спрайт)")
+                        imgui.SameLine()
+                        imgui.TextNotify(("{696969}%i"):format(model), "<modelid>")
+                        imgui.SameLine()
+                        imgui.TextNotify(("{FF6600}%.2f"):format(rotX), "<rotX>")
+                        imgui.SameLine()
+                        imgui.TextNotify(("{FF6600}%.2f"):format(rotY), "<rotY>")
+                        imgui.SameLine()
+                        imgui.TextNotify(("{FF6600}%.2f"):format(rotZ), "<rotZ>")
+                        imgui.SameLine()
+                        imgui.TextNotify(("{FF6600}%.2f"):format(zoom), "<zoom>")
+                        imgui.SameLine()
+                        imgui.TextNotify(("{696969}%i"):format(clr1), "<color1> 0-255")
+                        imgui.SameLine()
+                        imgui.TextNotify(("{696969}%i"):format(clr2), "<color2> 0-255")
+                     elseif type == 2 then
+                        imgui.SameLine()
+                        imgui.TextNotify(("{FF6600}%i"):format(type), u8"*<type 0/1/2> (0 - обычный бокс | 1 - модель(скин, тс, объект, оружие) | 2 - TXD спрайт)")
+                     end
+                     imgui.SameLine()
+                     imgui.TextNotify(("{FF6600}%i"):format(clickable), "<clickable 0/1>")
+                     imgui.SameLine()
+                     imgui.TextNotify(("{FF6600}%i"):format(showtime), "<showTime -1>")
+                     if type == 2 then
+                        imgui.SameLine()
+                        imgui.TextNotify(("{FFFFFF}%s"):format(textbuffer.txdsprite.v), u8"<spriteName TXDName:TXDSprite>")
+                     end
+                  else
+                     imgui.TextColoredRGB("Показать текстдрав (текст):")
+                     imgui.TextNotify(("{696969}%i"):format(id), "<slot 0-99>")
+                     imgui.SameLine()
+                     imgui.TextNotify(("{FF6600}%.2f"):format(posX), "<posX>")
+                     imgui.SameLine()
+                     imgui.TextNotify(("{FF6600}%.2f"):format(posY), "<posY>")
+                     imgui.SameLine()
+                     imgui.TextNotify(("{FF6600}%.2f"):format(boxSizeX), "<sizeX>")
+                     imgui.SameLine()
+                     imgui.TextNotify(("{FF6600}%.2f"):format(boxSizeY), "<sizeY>")
+                     imgui.SameLine()
+                     imgui.TextNotify(("{FF6600}%i"):format(style), "<style(font 0-3)>")
+                     imgui.SameLine()
+                     imgui.TextNotify(("{FF6600}%.2f"):format(letSizeX), "<letsizeX>")
+                     imgui.SameLine()
+                     imgui.TextNotify(("{FF6600}%.2f"):format(letSizeY), "<letsizeY>")
+                     imgui.SameLine()
+                     imgui.TextNotify(("{CDCDCD}0x%s"):format(letColorAbgr), "<textColor> 0xFFBBGGRR")
+                     imgui.SameLine()
+                     imgui.TextNotify(("{CDCDCD}0x%s"):format(outlineColorAbgr), "<backgroundColor> 0xFFBBGGRR")
+                     imgui.SameLine()
+                     imgui.TextNotify(("{FF6600}%i"):format(outline), "<outline>")
+                     imgui.SameLine()
+                     imgui.TextNotify(("{FF6600}%i"):format(shadow), "<shadow>")
+                     imgui.SameLine()
+                     
+                     imgui.TextNotify(("{FF6600}%i"):format(reversedAlign), u8"<aligment> выравнивание (1 - право | 2 - центр | 3 - лево)")
+                     imgui.SameLine()
+                     imgui.TextNotify(("{FF6600}%i"):format(clickable), "<clickable 0/1>")
+                     imgui.SameLine()
+                     imgui.TextNotify(("{FF6600}%i"):format(showtime), "<showTime -1>")
+                     if not text:match("_") then
+                        imgui.TextNotify(("{%s}%s"):format(letColorRgb, tagTextRGB), "<text (max 255)>")
+                     end
+                  end
+                  imgui.PopStyleVar()
                end
-               imgui.PushStyleVar(imgui.StyleVar.ItemSpacing, imgui.ImVec2(3, 3))
-               if combobox.txdtype.v > 0 then
-                  imgui.TextColoredRGB(("Показать текстдрав (бокс type %i):"):format(combobox.txdtype.v))
-                  imgui.TextNotify(("{696969}%i"):format(id), "<slot 0-99>")
-                  imgui.SameLine()
-                  imgui.TextNotify(("{FF6600}%.2f"):format(posX), "<posX>")
-                  imgui.SameLine()
-                  imgui.TextNotify(("{FF6600}%.2f"):format(posY), "<posY>")
-                  imgui.SameLine()
-                  imgui.TextNotify(("{FF6600}%.2f"):format(boxSizeX), "<sizeX>")
-                  imgui.SameLine()
-                  imgui.TextNotify(("{FF6600}%.2f"):format(boxSizeY), "<sizeY>")
-                  imgui.SameLine()
-                  imgui.TextNotify(("{CDCDCD}0x%s"):format(boxColorAbgr), "<boxColor> 0xFFBBGGRR")
-                  imgui.SameLine()
-                  imgui.TextNotify(("{FF6600}%i"):format(reversedAlign), u8"<aligment> выравнивание (1 - право | 2 - центр | 3 - лево)")
-                  if type == 0 then
-                     imgui.SameLine()
-                     imgui.TextNotify(("{FF6600}%i"):format(type), u8"*<type 0/1/2> (0 - обычный бокс | 1 - модель(скин, тс, объект, оружие) | 2 - TXD спрайт)")
-                  elseif type == 1 then
-                     imgui.SameLine()
-                     imgui.TextNotify(("{FF6600}%i"):format(type), u8"*<type 0/1/2> (0 - обычный бокс | 1 - модель(скин, тс, объект, оружие) | 2 - TXD спрайт)")
-                     imgui.SameLine()
-                     imgui.TextNotify(("{696969}%i"):format(model), "<modelid>")
-                     imgui.SameLine()
-                     imgui.TextNotify(("{FF6600}%.2f"):format(rotX), "<rotX>")
-                     imgui.SameLine()
-                     imgui.TextNotify(("{FF6600}%.2f"):format(rotY), "<rotY>")
-                     imgui.SameLine()
-                     imgui.TextNotify(("{FF6600}%.2f"):format(rotZ), "<rotZ>")
-                     imgui.SameLine()
-                     imgui.TextNotify(("{FF6600}%.2f"):format(zoom), "<zoom>")
-                     imgui.SameLine()
-                     imgui.TextNotify(("{696969}%i"):format(clr1), "<color1> 0-255")
-                     imgui.SameLine()
-                     imgui.TextNotify(("{696969}%i"):format(clr2), "<color2> 0-255")
-                  elseif type == 2 then
-                     imgui.SameLine()
-                     imgui.TextNotify(("{FF6600}%i"):format(type), u8"*<type 0/1/2> (0 - обычный бокс | 1 - модель(скин, тс, объект, оружие) | 2 - TXD спрайт)")
-                  end
-                  imgui.SameLine()
-                  imgui.TextNotify(("{FF6600}%i"):format(clickable), "<clickable 0/1>")
-                  imgui.SameLine()
-                  imgui.TextNotify(("{FF6600}%i"):format(showtime), "<showTime -1>")
-                  if type == 2 then
-                     imgui.SameLine()
-                     imgui.TextNotify(("{FFFFFF}%s"):format(textbuffer.txdsprite.v), u8"<spriteName TXDName:TXDSprite>")
-                  end
-               else
-                  imgui.TextColoredRGB("Показать текстдрав (текст):")
-                  imgui.TextNotify(("{696969}%i"):format(id), "<slot 0-99>")
-                  imgui.SameLine()
-                  imgui.TextNotify(("{FF6600}%.2f"):format(posX), "<posX>")
-                  imgui.SameLine()
-                  imgui.TextNotify(("{FF6600}%.2f"):format(posY), "<posY>")
-                  imgui.SameLine()
-                  imgui.TextNotify(("{FF6600}%.2f"):format(boxSizeX), "<sizeX>")
-                  imgui.SameLine()
-                  imgui.TextNotify(("{FF6600}%.2f"):format(boxSizeY), "<sizeY>")
-                  imgui.SameLine()
-                  imgui.TextNotify(("{FF6600}%i"):format(style), "<style(font 0-3)>")
-                  imgui.SameLine()
-                  imgui.TextNotify(("{FF6600}%.2f"):format(letSizeX), "<letsizeX>")
-                  imgui.SameLine()
-                  imgui.TextNotify(("{FF6600}%.2f"):format(letSizeY), "<letsizeY>")
-                  imgui.SameLine()
-                  imgui.TextNotify(("{CDCDCD}0x%s"):format(letColorAbgr), "<textColor> 0xFFBBGGRR")
-                  imgui.SameLine()
-                  imgui.TextNotify(("{CDCDCD}0x%s"):format(outlineColorAbgr), "<backgroundColor> 0xFFBBGGRR")
-                  imgui.SameLine()
-                  imgui.TextNotify(("{FF6600}%i"):format(outline), "<outline>")
-                  imgui.SameLine()
-                  imgui.TextNotify(("{FF6600}%i"):format(shadow), "<shadow>")
-                  imgui.SameLine()
-                  
-                  imgui.TextNotify(("{FF6600}%i"):format(reversedAlign), u8"<aligment> выравнивание (1 - право | 2 - центр | 3 - лево)")
-                  imgui.SameLine()
-                  imgui.TextNotify(("{FF6600}%i"):format(clickable), "<clickable 0/1>")
-                  imgui.SameLine()
-                  imgui.TextNotify(("{FF6600}%i"):format(showtime), "<showTime -1>")
-                  if not text:match("_") then
-                     imgui.TextNotify(("{%s}%s"):format(letColorRgb, tagTextRGB), "<text (max 255)>")
-                  end
-               end
-               imgui.PopStyleVar()
                imgui.Spacing()
                imgui.Spacing()
                imgui.Spacing()
@@ -5066,6 +5229,7 @@ function imgui.OnDrawFrame()
                -- imgui.SetCursorPosX((imgui.GetWindowWidth() - imgui.CalcTextSize(u8"строки").x) / 2.0)
                -- imgui.Text(string.format(u8"строки: %i символы: %i/255", textdata.lines, textdata.symbols))
                imgui.PushStyleVar(imgui.StyleVar.ItemSpacing, imgui.ImVec2(2, 2))
+               imgui.TextColoredRGB("Рекомендации:")
                imgui.TextColoredRGB("Координаты указывайте на основе разрешения 640х480 (центр: 320x240)")
                imgui.TextColoredRGB("Цвет для КБ указывается в формате 0xFF{0000FF}BB{008000}GG{FF0000}RR{CDCDCD} (0xFF<инвертируйте ваш hex код>)")
                if imgui.TreeNode(u8"Дополнительная информация по параметрам:") then
@@ -5105,29 +5269,32 @@ function imgui.OnDrawFrame()
                   id, posX, posY, boxSizeX, boxSizeY, style, letSizeX, letSizeY, letColorArgb, outlineColorArgb, 
                   outline, shadow, reversedAlign, clickable, showtime, text)
                end
-                  
-               if imgui.TooltipButton(u8"Скопировать", imgui.ImVec2(125, 30), u8"Скопировать в буффер обмена") then
-                  setClipboardText(exportText)
-                  sampAddChatMessage("[SCRIPT]: {FFFFFF}Параметры текстдрава скопированы в буффер обмена в формате КБ", 0x0FF6600)
+               if input.txdselected then
+                  if imgui.TooltipButton(u8"Скопировать", imgui.ImVec2(125, 30), u8"Скопировать в буффер обмена") then
+                     setClipboardText(exportText)
+                     sampAddChatMessage("[SCRIPT]: {FFFFFF}Параметры текстдрава скопированы в буффер обмена в формате КБ", 0x0FF6600)
+                  end
                end
                imgui.SameLine()
-               if imgui.TooltipButton(u8"Сохранить в файл", imgui.ImVec2(125, 30), u8"Сохранить в текстовый файл") then
-                  local filepath = getGameDirectory().."//moonloader//resource//mappingtoolkit//export//export_txdtocb.txt"
-                  local file = io.open(filepath, "w")
-                  file:write("// MappingTollkit: Exported TXDtoCB format:\n")
-                  if type == 0 then
-                     file:write("// text: <slot 0-99> <posX> <posY> <sizeX> <sizeY> <font> <letterSizeX> <letterSizeY> <textColor> <backColor> <outline> <shadow> <aligment> <clickable 0/1> <showTime -1> <text 255>\n")
-                     file:write("// box: <slot 0-99> <posX> <posY> <sizeX> <sizeY> <boxColor 0xFFBBGGRR> <aligment> *<type 0/1/2> ... <clickable 0/1> <showTime -1>\n")
-                     file:write("// <*type> 0 - обычный бокс | 1 - модель(скин, тс, объект, оружие) | 2 - TXD спрайт\n")
-                  elseif type == 1 then
-                     file:write("// <type> 1 ... <modelid> <rx> <ry> <rz> <zoom 1.0> *<color1> <color2> <clickable 0/1> <showTime -1>\n")
-                  elseif type == 2 then
-                     file:write("// <type> 2 ... <clickable 0/1> <showTime -1> <spriteName TXDName:TXDSprite>\n")
+               if input.txdselected then
+                  if imgui.TooltipButton(u8"Сохранить в файл", imgui.ImVec2(125, 30), u8"Сохранить в текстовый файл") then
+                     local filepath = getGameDirectory().."//moonloader//resource//mappingtoolkit//export//export_txdtocb.txt"
+                     local file = io.open(filepath, "w")
+                     file:write("// MappingTollkit: Exported TXDtoCB format:\n")
+                     if type == 0 then
+                        file:write("// text: <slot 0-99> <posX> <posY> <sizeX> <sizeY> <font> <letterSizeX> <letterSizeY> <textColor> <backColor> <outline> <shadow> <aligment> <clickable 0/1> <showTime -1> <text 255>\n")
+                        file:write("// box: <slot 0-99> <posX> <posY> <sizeX> <sizeY> <boxColor 0xFFBBGGRR> <aligment> *<type 0/1/2> ... <clickable 0/1> <showTime -1>\n")
+                        file:write("// <*type> 0 - обычный бокс | 1 - модель(скин, тс, объект, оружие) | 2 - TXD спрайт\n")
+                     elseif type == 1 then
+                        file:write("// <type> 1 ... <modelid> <rx> <ry> <rz> <zoom 1.0> *<color1> <color2> <clickable 0/1> <showTime -1>\n")
+                     elseif type == 2 then
+                        file:write("// <type> 2 ... <clickable 0/1> <showTime -1> <spriteName TXDName:TXDSprite>\n")
+                     end
+                     file:write(exportText)
+                     file:write("\n\n")
+                     file:close()
+                     sampAddChatMessage("[SCRIPT]: {FFFFFF}Текстдрав был сохранен в /moonloader/resource/mappingtoolkit/export/export_txdtocb.txt", 0x0FF6600)
                   end
-                  file:write(exportText)
-                  file:write("\n\n")
-                  file:close()
-                  sampAddChatMessage("[SCRIPT]: {FFFFFF}Текстдрав был сохранен в /moonloader/resource/mappingtoolkit/export/export_txdtocb.txt", 0x0FF6600)
                end
             
             elseif combobox.txdexport.v == 1 then
@@ -5167,41 +5334,43 @@ function imgui.OnDrawFrame()
                imgui.Link("https://www.open.mp/docs/scripting/functions/TextDrawCreate", "open.mp")
                
                imgui.Spacing()
-               if imgui.TooltipButton(u8"Сохранить в файл", imgui.ImVec2(125, 30), u8"Сохранить в текстовый файл") then
-                  local filepath = getGameDirectory().."//moonloader//resource//mappingtoolkit//export//export_textdraw.pwn"
-                  local file = io.open(filepath, "w")
-                  file:write(('new Text:TextDraw%i;\n'):format(id))
-                  if text:len() > 32 then
-                     file:write(('TextDraw%i = TextDrawCreate(%.2f, %.2f,'):format(id, posX, posY))
-                     file:write(('"%s");\n'):format(text))
-                  else
-                     file:write(('TextDraw%i = TextDrawCreate(%.2f, %.2f, "%s");\n'):format(id, posX, posY, text))
+               if input.txdselected then
+                  if imgui.TooltipButton(u8"Сохранить в файл", imgui.ImVec2(125, 30), u8"Сохранить в текстовый файл") then
+                     local filepath = getGameDirectory().."//moonloader//resource//mappingtoolkit//export//export_textdraw.pwn"
+                     local file = io.open(filepath, "w")
+                     file:write(('new Text:TextDraw%i;\n'):format(id))
+                     if text:len() > 32 then
+                        file:write(('TextDraw%i = TextDrawCreate(%.2f, %.2f,'):format(id, posX, posY))
+                        file:write(('"%s");\n'):format(text))
+                     else
+                        file:write(('TextDraw%i = TextDrawCreate(%.2f, %.2f, "%s");\n'):format(id, posX, posY, text))
+                     end
+                     --file:write(('TextDrawSetString(Textdraw%i, "%s");\n'):format(id, text))
+                     file:write(("TextDrawLetterSize(Textdraw%i, %.2f, %.2f);\n"):format(id, letSizeX, letSizeY))
+                     file:write(("TextDrawColor(Textdraw%i, 0x%s);\n"):format(id, letColorArgb))
+                     file:write(("TextDrawAlignment(Textdraw%i, %d);\n"):format(id, align))
+                     file:write(("TextDrawFont(Textdraw%i, %d);\n"):format(id, style))
+                     file:write(("TextDrawSetOutline(Textdraw%i, %d);\n"):format(id, outline))
+                     file:write(("TextDrawSetProportional(Textdraw%i, %d);\n"):format(id, prop))
+                     file:write(("TextDrawSetShadow(Textdraw%i, %d);\n"):format(id, shadow))
+                     if checkbox.txdusebox.v then
+                        file:write(("TextDrawUseBox(Textdraw%i, %d);\n"):format(id, box))
+                        file:write(("TextDrawTextSize(Textdraw%i, %.2f, %.2f);\n"):format(id, boxSizeX, boxSizeY))
+                        file:write(("TextDrawBoxColor(Textdraw%i, 0x%s);\n"):format(id, boxColorArgb))
+                        file:write(("TextDrawBackgroundColor(Textdraw%i, 0x%s);\n"):format(id, shadowColorArgb))    
+                     end
+                     if combobox.txdtype.v == 1 then
+                        file:write(("TextDrawSetPreviewModel(Textdraw%i, %i);\n"):format(id, model))
+                        file:write(("TextDrawSetPreviewRot(Textdraw%i, %f, %f, %f, %f);\n"):format(id, rotX, rotY, rotZ, zoom))
+                        file:write(("TextDrawSetPreviewVehCol(Textdraw%i, %i, %i);\n"):format(id, clr1, clr2))
+                     end
+                     if checkbox.txdsetselectable.v then
+                        file:write(("TextDrawSetSelectable(Textdraw%i, %i);\n"):format(id, clickable))
+                     end
+                     file:write("\n")
+                     file:close()
+                     sampAddChatMessage("[SCRIPT]: {FFFFFF}Текстдрав был сохранен в /moonloader/resource/mappingtoolkit/export/export_textdraw.pwn", 0x0FF6600)
                   end
-                  --file:write(('TextDrawSetString(Textdraw%i, "%s");\n'):format(id, text))
-                  file:write(("TextDrawLetterSize(Textdraw%i, %.2f, %.2f);\n"):format(id, letSizeX, letSizeY))
-                  file:write(("TextDrawColor(Textdraw%i, 0x%s);\n"):format(id, letColorArgb))
-                  file:write(("TextDrawAlignment(Textdraw%i, %d);\n"):format(id, align))
-                  file:write(("TextDrawFont(Textdraw%i, %d);\n"):format(id, style))
-                  file:write(("TextDrawSetOutline(Textdraw%i, %d);\n"):format(id, outline))
-                  file:write(("TextDrawSetProportional(Textdraw%i, %d);\n"):format(id, prop))
-                  file:write(("TextDrawSetShadow(Textdraw%i, %d);\n"):format(id, shadow))
-                  if checkbox.txdusebox.v then
-                     file:write(("TextDrawUseBox(Textdraw%i, %d);\n"):format(id, box))
-                     file:write(("TextDrawTextSize(Textdraw%i, %.2f, %.2f);\n"):format(id, boxSizeX, boxSizeY))
-                     file:write(("TextDrawBoxColor(Textdraw%i, 0x%s);\n"):format(id, boxColorArgb))
-                     file:write(("TextDrawBackgroundColor(Textdraw%i, 0x%s);\n"):format(id, shadowColorArgb))    
-                  end
-                  if combobox.txdtype.v == 1 then
-                     file:write(("TextDrawSetPreviewModel(Textdraw%i, %i);\n"):format(id, model))
-                     file:write(("TextDrawSetPreviewRot(Textdraw%i, %f, %f, %f, %f);\n"):format(id, rotX, rotY, rotZ, zoom))
-                     file:write(("TextDrawSetPreviewVehCol(Textdraw%i, %i, %i);\n"):format(id, clr1, clr2))
-                  end
-                  if checkbox.txdsetselectable.v then
-                     file:write(("TextDrawSetSelectable(Textdraw%i, %i);\n"):format(id, clickable))
-                  end
-                  file:write("\n")
-                  file:close()
-                  sampAddChatMessage("[SCRIPT]: {FFFFFF}Текстдрав был сохранен в /moonloader/resource/mappingtoolkit/export/export_textdraw.pwn", 0x0FF6600)
                end
             elseif combobox.txdexport.v == 2 then
                imgui.TextColoredRGB(('{CDCDCD}new PlayerText:{696969}PlayerTextDraw%i[MAX_PLAYERS];{CDCDCD}'):format(id))
@@ -5240,41 +5409,43 @@ function imgui.OnDrawFrame()
                imgui.Link("https://sampwiki.blast.hk/wiki/CreatePlayerTextDraw", "sampwiki.blast.hk")
                
                imgui.Spacing()
-               if imgui.TooltipButton(u8"Сохранить в файл", imgui.ImVec2(125, 30), u8"Сохранить в текстовый файл") then
-                  local filepath = getGameDirectory().."//moonloader//resource//mappingtoolkit//export//export_playertextdraw.pwn"
-                  local file = io.open(filepath, "w")
-                  file:write(('new PlayerText:PlayerTextDraw%i[MAX_PLAYERS];\n'):format(id))
-                  if text:len() > 32 then
-                     file:write(('PlayerTextDraw%i[playerid] = PlayerTextDrawCreate(playerid, %.2f, %.2f,'):format(id, posX, posY))
-                     file:write(('"%s");\n'):format(text))
-                  else
-                     file:write(('PlayerTextDraw%i[playerid] = PlayerTextDrawCreate(playerid, %.2f, %.2f, "%s");\n'):format(id, posX, posY, text))
+               if input.txdselected then
+                  if imgui.TooltipButton(u8"Сохранить в файл", imgui.ImVec2(125, 30), u8"Сохранить в текстовый файл") then
+                     local filepath = getGameDirectory().."//moonloader//resource//mappingtoolkit//export//export_playertextdraw.pwn"
+                     local file = io.open(filepath, "w")
+                     file:write(('new PlayerText:PlayerTextDraw%i[MAX_PLAYERS];\n'):format(id))
+                     if text:len() > 32 then
+                        file:write(('PlayerTextDraw%i[playerid] = PlayerTextDrawCreate(playerid, %.2f, %.2f,'):format(id, posX, posY))
+                        file:write(('"%s");\n'):format(text))
+                     else
+                        file:write(('PlayerTextDraw%i[playerid] = PlayerTextDrawCreate(playerid, %.2f, %.2f, "%s");\n'):format(id, posX, posY, text))
+                     end
+                     
+                     file:write(("PlayerTextDrawLetterSize(playerid, PlayerTextDraw%i[playerid], %.2f, %.2f);\n"):format(id, letSizeX, letSizeY))
+                     file:write(("PlayerTextDrawColor(playerid, PlayerTextDraw%i[playerid], 0x%s);\n"):format(id, letColorArgb))
+                     file:write(("PlayerTextDrawAlignment(playerid, PlayerTextDraw%i[playerid], %d);\n"):format(id, align))
+                     file:write(("PlayerTextDrawFont(playerid, PlayerTextDraw%i[playerid], %d);\n"):format(id, style))
+                     file:write(("PlayerTextDrawSetOutline(playerid, PlayerTextDraw%i[playerid], %d);\n"):format(id, outline))
+                     file:write(("PlayerTextDrawSetProportional(playerid, PlayerTextDraw%i[playerid], %d);\n"):format(id, prop))
+                     file:write(("PlayerTextDrawSetShadow(playerid, PlayerTextDraw%i[playerid], %d);\n"):format(id, shadow))
+                     if checkbox.txdusebox.v then
+                        file:write(("PlayerTextDrawUseBox(playerid, PlayerTextDraw%i[playerid], %d);\n"):format(id, box))
+                        file:write(("PlayerTextDrawTextSize(playerid, PlayerTextDraw%i[playerid], %.2f, %.2f);\n"):format(id, boxSizeX, boxSizeY))
+                        file:write(("PlayerTextDrawBoxColor(playerid, PlayerTextDraw%i[playerid], 0x%s);\n"):format(id, boxColorArgb))
+                        file:write(("PlayerTextDrawBackgroundColor(playerid, PlayerTextDraw%i[playerid], 0x%s);\n"):format(id, shadowColorArgb))    
+                     end
+                     if combobox.txdtype.v == 1 then
+                        file:write(("PlayerTextDrawSetPreviewModel(playerid, PlayerTextDraw%i[playerid], %i);\n"):format(id, model))
+                        file:write(("PlayerTextDrawSetPreviewRot(playerid, PlayerTextDraw%i[playerid], %f, %f, %f, %f);\n"):format(id, rotX, rotY, rotZ, zoom))
+                        file:write(("PlayerTextDrawSetPreviewVehCol(playerid, PlayerTextDraw%i[playerid], %i, %i);\n"):format(id, clr1, clr2))
+                     end
+                     if checkbox.txdsetselectable.v then
+                        file:write(("PlayerTextDrawSetSelectable(playerid, PlayerTextDraw%i[playerid], %i);\n"):format(id, clickable))
+                     end
+                     file:write("\n")
+                     file:close()
+                     sampAddChatMessage("[SCRIPT]: {FFFFFF}Текстдрав был сохранен в /moonloader/resource/mappingtoolkit/export/export_playertextdraw.pwn", 0x0FF6600)
                   end
-                  
-                  file:write(("PlayerTextDrawLetterSize(playerid, PlayerTextDraw%i[playerid], %.2f, %.2f);\n"):format(id, letSizeX, letSizeY))
-                  file:write(("PlayerTextDrawColor(playerid, PlayerTextDraw%i[playerid], 0x%s);\n"):format(id, letColorArgb))
-                  file:write(("PlayerTextDrawAlignment(playerid, PlayerTextDraw%i[playerid], %d);\n"):format(id, align))
-                  file:write(("PlayerTextDrawFont(playerid, PlayerTextDraw%i[playerid], %d);\n"):format(id, style))
-                  file:write(("PlayerTextDrawSetOutline(playerid, PlayerTextDraw%i[playerid], %d);\n"):format(id, outline))
-                  file:write(("PlayerTextDrawSetProportional(playerid, PlayerTextDraw%i[playerid], %d);\n"):format(id, prop))
-                  file:write(("PlayerTextDrawSetShadow(playerid, PlayerTextDraw%i[playerid], %d);\n"):format(id, shadow))
-                  if checkbox.txdusebox.v then
-                     file:write(("PlayerTextDrawUseBox(playerid, PlayerTextDraw%i[playerid], %d);\n"):format(id, box))
-                     file:write(("PlayerTextDrawTextSize(playerid, PlayerTextDraw%i[playerid], %.2f, %.2f);\n"):format(id, boxSizeX, boxSizeY))
-                     file:write(("PlayerTextDrawBoxColor(playerid, PlayerTextDraw%i[playerid], 0x%s);\n"):format(id, boxColorArgb))
-                     file:write(("PlayerTextDrawBackgroundColor(playerid, PlayerTextDraw%i[playerid], 0x%s);\n"):format(id, shadowColorArgb))    
-                  end
-                  if combobox.txdtype.v == 1 then
-                     file:write(("PlayerTextDrawSetPreviewModel(playerid, PlayerTextDraw%i[playerid], %i);\n"):format(id, model))
-                     file:write(("PlayerTextDrawSetPreviewRot(playerid, PlayerTextDraw%i[playerid], %f, %f, %f, %f);\n"):format(id, rotX, rotY, rotZ, zoom))
-                     file:write(("PlayerTextDrawSetPreviewVehCol(playerid, PlayerTextDraw%i[playerid], %i, %i);\n"):format(id, clr1, clr2))
-                  end
-                  if checkbox.txdsetselectable.v then
-                     file:write(("PlayerTextDrawSetSelectable(playerid, PlayerTextDraw%i[playerid], %i);\n"):format(id, clickable))
-                  end
-                  file:write("\n")
-                  file:close()
-                  sampAddChatMessage("[SCRIPT]: {FFFFFF}Текстдрав был сохранен в /moonloader/resource/mappingtoolkit/export/export_playertextdraw.pwn", 0x0FF6600)
                end
             end
             
