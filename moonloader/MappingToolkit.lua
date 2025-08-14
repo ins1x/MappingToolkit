@@ -3,7 +3,7 @@ script_description("Assistant for mappers")
 script_dependencies('imgui', 'lib.samp.events')
 script_properties("work-in-pause")
 script_url("https://github.com/ins1x/MappingToolkit")
-script_version("4.18") -- pre-release 1
+script_version("4.18") -- pre-release 2
 -- support sa-mp versions depends on SAMPFUNCS (0.3.7-R1, 0.3.7-R3-1, 0.3.7-R5, 0.3.DL)
 -- script_moonloader(16) moonloader v.0.26 
 -- editor options: tabsize 3, Unix (LF), encoding Windows-1251
@@ -2354,7 +2354,7 @@ function imgui.OnDrawFrame()
             
             imgui.Spacing()
             
-            if imgui.TooltipButton(u8"Получить", imgui.ImVec2(130, 25), u8"Получить текущую позицию игрока и сохранить") then
+            if imgui.TooltipButton(u8"Получить", imgui.ImVec2(72, 25), u8"Получить текущую позицию игрока и сохранить") then
                tpcpos.x = positionX
                tpcpos.y = positionY
                tpcpos.z = positionZ
@@ -2368,6 +2368,14 @@ function imgui.OnDrawFrame()
                sampAddChatMessage(string.format("Ваши координаты: {696969}%.2f %.2f %.2f {FFFFFF}Угол поворота: {696969}%.2f", tpcpos.x, tpcpos.y, tpcpos.z, posA), -1)
                if isTrainingSanbox and playerdata.isWorldHoster then
                   sampAddChatMessage(string.format("Используйте: /xyz {696969}%.2f %.2f %.2f", tpcpos.x, tpcpos.y, tpcpos.z), -1)
+               end
+            end
+            imgui.SameLine()
+            if imgui.TooltipButton(u8"Метка", imgui.ImVec2(55, 25), u8"Поставить метку на карте в текущей точке") then
+               local posX, posY, posZ = getCharCoordinates(playerPed)
+          	   local result = setTargetBlipCoordinates(posX, posY, posZ)
+               if result then
+                  sampAddChatMessage("[SCRIPT]: {FFFFFF}Метка установлена в текущей точке!", 0x0FF6600)
                end
             end
             imgui.SameLine()
@@ -2541,6 +2549,7 @@ function imgui.OnDrawFrame()
                imgui.SameLine()
                imgui.TextColoredRGB(string.format("Дистанция {696969}%.1f m.",
                getDistanceBetweenCoords3d(positionX, positionY, positionZ, bX, bY, bZ)))
+               imgui.Spacing()
             end 
             
             imgui.Text(u8"Телепорт по координатам:")
@@ -2743,29 +2752,78 @@ function imgui.OnDrawFrame()
           -- if imgui.TooltipButton("/savepos", imgui.ImVec2(75, 25), u8"Сохранить позицию в буффер") then
              -- sampSendChat("/savepos")
           -- end
-          if imgui.TooltipButton(u8"", imgui.ImVec2(15, 25), u8"Вставить координаты") then
+          
+          if imgui.TooltipButton(u8"[ ]##cordsinsert", imgui.ImVec2(40, 25), u8"Вставить название текущей локации") then
+             textbuffer.possavename.v = tostring(zone)
           end
           imgui.SameLine()
-          imgui.TextColoredRGB("Комментарий")
+          imgui.TextColoredRGB("Комментарий  ")
           imgui.SameLine()
-          imgui.PushItemWidth(170)
           if string.len(textbuffer.possavename.v) < 1 then 
              textbuffer.possavename.v = tostring(zone)
           end
+          imgui.PushItemWidth(175)
           if imgui.InputText("##possavenamer", textbuffer.possavename) then
           end
           imgui.PopItemWidth()
           
-          imgui.SameLine()
-          imgui.Checkbox(u8"датавремя", checkbox.cordlinedatetime)
+          local posX, posY, posZ = getCharCoordinates(playerPed)
+          local angle = math.ceil(getCharHeading(playerPed))
+          local camX, camY, camZ = getActiveCameraCoordinates()
+          
+          -- refactoring this part later
+          local line = nil
+          if combobox.cordformats.v == 0 then
+             if checkbox.cordlineseparator.v then
+                line = ("%.2f, %.2f, %.2f    %s "):format(posX, posY, posZ, textbuffer.possavename.v)
+             else
+                line = ("%.2f %.2f %.2f    %s "):format(posX, posY, posZ, textbuffer.possavename.v)
+             end
+          elseif combobox.cordformats.v == 1 then
+             if checkbox.cordlineseparator.v then
+                line = ("%.2f, %.2f, %.2f, %.2f    %s "):format(posX, posY, posZ, angle, textbuffer.possavename.v)
+             else
+                line = ("%.2f %.2f %.2f %.2f    %s "):format(posX, posY, posZ, angle, textbuffer.possavename.v)
+             end
+          elseif combobox.cordformats.v == 2 then
+             if checkbox.cordlineseparator.v then
+                line = ("%.2f, %.2f, %.2f    %s "):format(camX, camY, camZ, textbuffer.possavename.v)
+             else
+                line = ("%.2f %.2f %.2f    %s "):format(camX, camY, camZ, textbuffer.possavename.v)
+             end
+          end
+          
+          if checkbox.cordlinedatetime.v then
+             local hours, mins = getTimeOfDay()
+             line = line..tostring(os.date("%d.%m.%Y %H:%M"))
+          end
+          
+          if line then
+             imgui.TextColoredRGB("{696969}"..line)
+          end
+          
+          local cordformatsList = {
+             "<x> <y> <z>", 
+             "<x> <y> <z> a>",
+             "<camx> <camy> camz>", 
+          }
+          imgui.PushItemWidth(175)
+          --imgui.TextColoredRGB("Формат")
+          --imgui.SameLine()
+          if imgui.Combo(u8'Формат##cordformats', combobox.cordformats, cordformatsList) then
+             -- ini.settings.cbnewactivationitem = combobox.cordformats.v
+             -- inicfg.save(ini, configIni)
+          end
+          imgui.PopItemWidth()
+           imgui.SameLine()
+          imgui.Checkbox(u8"дата-время", checkbox.cordlinedatetime)
           imgui.SameLine()
           imgui.Checkbox(u8"разделитель", checkbox.cordlineseparator)
+          --imgui.SameLine()
           
-          if imgui.TooltipButton(u8"Вставить", imgui.ImVec2(95, 25), u8"Вставить координаты") then
+          imgui.SetCursorPosX((imgui.GetWindowWidth() - imgui.CalcTextSize(u8"Добавить##addtocordslist").x) / 2)
+          if imgui.TooltipButton(u8"Добавить##addtocordslist", imgui.ImVec2(100, 30), u8"Добавить текущие координаты") then
              --if sampIsLocalPlayerSpawned() then
-             local posX, posY, posZ = getCharCoordinates(playerPed)
-             local angle = math.ceil(getCharHeading(playerPed))
-             local camX, camY, camZ = getActiveCameraCoordinates()
              --end
          -- imgui.Text(string.format(u8"Направление: %s  %i°", direction(), angle))
          -- local camX, camY, camZ = getActiveCameraCoordinates()
@@ -2781,7 +2839,7 @@ function imgui.OnDrawFrame()
          
              local filepath = getGameDirectory().."//moonloader//resource//mappingtoolkit//favorites//cordlist.txt"
              local file = io.open(filepath, "a")
-             local line = nil
+             --local line = nil
              
              if file then
                 if combobox.cordformats.v == 0 then
@@ -2830,7 +2888,7 @@ function imgui.OnDrawFrame()
              file:close()
           end
           imgui.SameLine()
-          if imgui.TooltipButton(u8"Очистить", imgui.ImVec2(95, 25), u8"Полностью очистить список кооррдинат") then
+          if imgui.TooltipButton(u8"Очистить", imgui.ImVec2(100, 25), u8"Полностью очистить список кооррдинат") then
              local filepath = getGameDirectory().."//moonloader//resource//mappingtoolkit//favorites//cordlist.txt"
              local file = io.open(filepath, "w")
              file:write("")
@@ -2842,25 +2900,14 @@ function imgui.OnDrawFrame()
              
              textbuffer.cordline.v = ""
           end
-          imgui.SameLine()
-          local cordformatsList = {
-             "<x> <y> <z>", 
-             "<x> <y> <z> a>",
-             "<camx> <camy> camz>", 
-          }
-          imgui.PushItemWidth(170)
-          imgui.TextColoredRGB("Формат")
-          imgui.SameLine()
-          if imgui.Combo(u8'##cordformats', combobox.cordformats, cordformatsList) then
-             -- ini.settings.cbnewactivationitem = combobox.cordformats.v
-             -- inicfg.save(ini, configIni)
-          end
-          imgui.PopItemWidth()
+          imgui.Spacing()
+          imgui.Spacing()
           
           imgui.PushFont(fonts.multilinetextfont)
-          imgui.InputTextMultiline('##cordlist', textbuffer.cordlist, imgui.ImVec2(490, 200),
+          imgui.InputTextMultiline('##cordlist', textbuffer.cordlist, imgui.ImVec2(490, 150),
           imgui.InputTextFlags.EnterReturnsTrue + imgui.InputTextFlags.AllowTabInput + imgui.InputTextFlags.ReadOnly)
           imgui.PopFont()
+          
        end
         
       elseif tabmenu.settings == 2 then
@@ -7266,11 +7313,17 @@ function imgui.OnDrawFrame()
          end
          imgui.Spacing()
          imgui.Spacing()
-         
+         if imgui.TooltipButton(u8"Сообщить о ошибке", imgui.ImVec2(180, 25), u8"Жми не стесняйся") then
+            tabmenu.credits = 3
+         end
          if imgui.TooltipButton(u8"Проверить обновления", imgui.ImVec2(180, 25), u8"Проверить наличие обновлений") then
             if not checkScriptUpdates() then
                sampAddChatMessage("{696969}Mapping Toolkit  {FFFFFF}Установлена актуальная версия {696969}"..thisScript().version, -1)
                --os.execute('explorer https://github.com/ins1x/MappingToolkit/releases')
+            else
+               sampAddChatMessage("[SCRIPT]: {FFFFFF}Скачать последню версию можно", 0x0FF6600)
+               sampAddChatMessage("[SCRIPT]: {FFFFFF}GitHub: https://github.com/ins1x/MappingToolkit/releases", 0x0FF6600)
+               sampAddChatMessage("[SCRIPT]: {FFFFFF}GoogleDrive: https://drive.google.com/drive/folders/1v-LmqAgKGpYYeA1C7aT-rlODTa2OfulT", 0x0FF6600)
             end
          end
          imgui.SameLine()
@@ -7278,13 +7331,7 @@ function imgui.OnDrawFrame()
             ini.settings.checkupdates = checkbox.checkupdates.v
             inicfg.save(ini, configIni)
          end
-         if imgui.TooltipButton(u8"Сообщить о ошибке", imgui.ImVec2(180, 25), u8"Жми не стесняйся") then
-            tabmenu.credits = 3
-         end
-         imgui.SameLine()
-         if imgui.TooltipButton(u8"Управление", imgui.ImVec2(160, 25), u8"Дополнительные возможности") then
-            dialog.toolkitmanage.v = not dialog.toolkitmanage.v
-         end
+
          imgui.Spacing()
          imgui.Spacing()
       elseif tabmenu.info == 3 then
@@ -8035,6 +8082,20 @@ function imgui.OnDrawFrame()
             imgui.SameLine()
             imgui.Text(u8'Последний ID диалога: ' .. sampGetCurrentDialogId())
          end
+         
+         if imgui.TooltipButton(u8"Сбросить настройки",imgui.ImVec2(150, 25),u8"Сбросит настройки предварительно сохранив копию текущих настроек") then
+            os.rename(getGameDirectory().."//moonloader//config//mappingtoolkit.ini", getGameDirectory().."//moonloader//config//backup_mappingtoolkit.ini")
+            sampAddChatMessage("[SCRIPT]: {FFFFFF}Настройки были сброшены на стандартные. Тулкит автоматически перезагрузится.",0x0FF6600)
+            sampAddChatMessage("[SCRIPT]: {FFFFFF}Резервную копию ваших предыдущих настроек можно найти в {696969}moonloader/config.",0x0FF6600)
+            reloadScripts()
+         end
+         imgui.SameLine()
+         if imgui.TooltipButton(u8"Открыть конфиг",imgui.ImVec2(150, 25),u8"Открыть файл настроек в текстовом редакторе") then
+            folder = getGameDirectory().. "\\moonloader\\config\\"
+            os.execute('explorer "'..folder..'"')
+         end
+         
+         
          
       elseif tabmenu.info == 5 then
          
@@ -9695,36 +9756,39 @@ function imgui.OnDrawFrame()
          end
       end
       
-      if imgui.TooltipButton(u8"Сообщить о ошибке", imgui.ImVec2(150, 25), u8"Жми не стесняйся") then
-         imgui.selectTabMenu(3, 1)
-         tabmenu.credits = 3
-      end
-      -- if imgui.Button(u8"Проверить обновления",imgui.ImVec2(150, 25)) then
-         -- if not checkScriptUpdates() then
-            -- sampAddChatMessage("{696969}Mapping Toolkit  {FFFFFF}Установлена актуальная версия {696969}"..thisScript().version, -1)
-            -- --os.execute('explorer https://github.com/ins1x/MappingToolkit/releases')
-         -- end
+      -- if imgui.TooltipButton(u8"Сбросить настройки",imgui.ImVec2(150, 25),u8"Сбросит настройки предварительно сохранив копию текущих настроек") then
+         -- os.rename(getGameDirectory().."//moonloader//config//mappingtoolkit.ini", getGameDirectory().."//moonloader//config//backup_mappingtoolkit.ini")
+         -- sampAddChatMessage("[SCRIPT]: {FFFFFF}Настройки были сброшены на стандартные. Тулкит автоматически перезагрузится.",0x0FF6600)
+         -- sampAddChatMessage("[SCRIPT]: {FFFFFF}Резервную копию ваших предыдущих настроек можно найти в {696969}moonloader/config.",0x0FF6600)
+         -- reloadScripts()
       -- end
-      -- imgui.SameLine()
-      if imgui.TooltipButton(u8"Сбросить настройки",imgui.ImVec2(150, 25),u8"Сбросит настройки предварительно сохранив копию текущих настроек") then
-         os.rename(getGameDirectory().."//moonloader//config//mappingtoolkit.ini", getGameDirectory().."//moonloader//config//backup_mappingtoolkit.ini")
-         sampAddChatMessage("[SCRIPT]: {FFFFFF}Настройки были сброшены на стандартные. Тулкит автоматически перезагрузится.",0x0FF6600)
-         sampAddChatMessage("[SCRIPT]: {FFFFFF}Резервную копию ваших предыдущих настроек можно найти в {696969}moonloader/config.",0x0FF6600)
-         reloadScripts()
-      end
 
-      if imgui.Button(u8"Открыть конфиг",imgui.ImVec2(150, 25)) then
+      if imgui.TooltipButton(u8"Открыть конфиг",imgui.ImVec2(150, 25),u8"Открыть файл настроек в текстовом редакторе") then
          folder = getGameDirectory().. "\\moonloader\\config\\"
          os.execute('explorer "'..folder..'"')
       end
+      
       if imgui.TooltipButton(u8"Обновление", imgui.ImVec2(150, 25), u8"Проверить наличие обновлений") then
          if not checkScriptUpdates() then
             sampAddChatMessage("{696969}Mapping Toolkit  {FFFFFF}Установлена актуальная версия {696969}"..thisScript().version, -1)
             --os.execute('explorer https://github.com/ins1x/MappingToolkit/releases')
+         else
+            sampAddChatMessage("[SCRIPT]: {FFFFFF}Скачать последню версию можно", 0x0FF6600)
+            sampAddChatMessage("[SCRIPT]: {FFFFFF}GitHub: https://github.com/ins1x/MappingToolkit/releases", 0x0FF6600)
+            sampAddChatMessage("[SCRIPT]: {FFFFFF}GoogleDrive: https://drive.google.com/drive/folders/1v-LmqAgKGpYYeA1C7aT-rlODTa2OfulT", 0x0FF6600)
          end
       end
       if imgui.TooltipButton(u8"Отладка", imgui.ImVec2(150, 25), u8"Открыть инструменты для отлдаки") then
          imgui.selectTabMenu(3, 4)
+      end
+      if imgui.TooltipButton(u8"Вики", imgui.ImVec2(72, 25), u8"Открыть wiki по тулкиту на github (Online)") then
+         sampAddChatMessage("Сейчас вас перенаправит на вики по Mapping Toolkit", -1)
+         os.execute('explorer "https://github.com/ins1x/MappingToolkit/wiki"')
+      end
+      imgui.SameLine()
+      if imgui.TooltipButton(u8"FAQ", imgui.ImVec2(72, 25), u8"Открыть FAQ по тулкиту на github (Online)") then
+         sampAddChatMessage("Сейчас вас перенаправит на FAQ по Mapping Toolkit", -1)
+         os.execute('explorer "https://github.com/ins1x/MappingToolkit/wiki/FAQ-%D0%BF%D0%BE-MappingToolkit"')
       end
       if imgui.TooltipButton(u8" << ", imgui.ImVec2(150, 25), u8"Свернуть") then
          dialog.toolkitmanage.v = false
@@ -14779,7 +14843,7 @@ end
 
 function DecToARGB(color)
    -- format color to readable format
-   color = color or "none"
+   -- color = color or "none"
    local clr
    if tonumber(color) ~= -1 then
       clr = string.format("%X", color)
