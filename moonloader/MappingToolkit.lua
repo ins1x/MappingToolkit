@@ -3,7 +3,7 @@ script_description("Assistant for mappers")
 script_dependencies('imgui', 'lib.samp.events')
 script_properties("work-in-pause")
 script_url("https://github.com/ins1x/MappingToolkit")
-script_version("4.18") -- pre-release 2
+script_version("4.18") -- pre-release 3
 -- support sa-mp versions depends on SAMPFUNCS (0.3.7-R1, 0.3.7-R3-1, 0.3.7-R5, 0.3.DL)
 -- script_moonloader(16) moonloader v.0.26 
 -- editor options: tabsize 3, Unix (LF), encoding Windows-1251
@@ -170,6 +170,8 @@ local ini = inicfg.load({
       imguifont = "trebucbd",
       imguifontsize = 14.0,
       imguitheme = 1,
+      imguiwindowalign = 0,
+      imguiantialiasingstyle = 0,
       movetabwindow = true,
       multilinefont = "trebucbd",
       multilinefontsize = 13.0,
@@ -1997,8 +1999,19 @@ end
 function imgui.OnDrawFrame()
    imgui.PushFont(fonts.defaultfont)
    if dialog.main.v then
-      imgui.SetNextWindowPos(imgui.ImVec2(sizeX / 2, sizeY / 6),
-      imgui.Cond.FirstUseEver, imgui.ImVec2(0.5, 0.5))
+      if ini.ui.imguiwindowalign == 0 then -- center
+         imgui.SetNextWindowPos(imgui.ImVec2(sizeX / 2, sizeY / 6),
+         imgui.Cond.FirstUseEver, imgui.ImVec2(0.5, 0.5))
+      elseif ini.ui.imguiwindowalign == 1 then -- left
+         imgui.SetNextWindowPos(imgui.ImVec2(sizeX / 6, sizeY / 6),
+         imgui.Cond.FirstUseEver, imgui.ImVec2(0.5, 0.5))
+      elseif ini.ui.imguiwindowalign == 2 then -- right
+         imgui.SetNextWindowPos(imgui.ImVec2(sizeX / 1.35, sizeY / 6),
+         imgui.Cond.FirstUseEver, imgui.ImVec2(0.5, 0.5))
+      else -- as default use center align
+         imgui.SetNextWindowPos(imgui.ImVec2(sizeX / 2, sizeY / 6),
+         imgui.Cond.FirstUseEver, imgui.ImVec2(0.5, 0.5))
+      end
       imgui.SetNextWindowSize(imgui.ImVec2(ini.ui.windowsizex, 80))
       imgui.Begin((".::  Mapping Toolkit v%s ::."):format(thisScript().version), dialog.main, 
       imgui.WindowFlags.NoResize + imgui.WindowFlags.NoMove + imgui.WindowFlags.NoScrollbar + imgui.WindowFlags.NoCollapse)
@@ -2225,8 +2238,20 @@ function imgui.OnDrawFrame()
    end
    
    if dialog.general.v then
-      imgui.SetNextWindowPos(imgui.ImVec2(sizeX / 2, sizeY / 2), 
-      imgui.Cond.Appearing, imgui.ImVec2(0.5, 0.5))
+      if ini.ui.imguiwindowalign == 0 then -- center
+         imgui.SetNextWindowPos(imgui.ImVec2(sizeX / 2, sizeY / 2),
+         imgui.Cond.Appearing, imgui.ImVec2(0.5, 0.5))
+      elseif ini.ui.imguiwindowalign == 1 then -- left
+         imgui.SetNextWindowPos(imgui.ImVec2(sizeX / 6, sizeY / 2),
+         imgui.Cond.Appearing, imgui.ImVec2(0.5, 0.5))
+      elseif ini.ui.imguiwindowalign == 2 then -- right
+         imgui.SetNextWindowPos(imgui.ImVec2(sizeX / 1.35, sizeY / 2),
+         imgui.Cond.Appearing, imgui.ImVec2(0.5, 0.5))
+      else -- as default use center align
+         imgui.SetNextWindowPos(imgui.ImVec2(sizeX / 2, sizeY / 2),
+         imgui.Cond.Appearing, imgui.ImVec2(0.5, 0.5))
+      end
+      
       imgui.SetNextWindowSize(imgui.ImVec2(ini.ui.windowsizex, ini.ui.windowsizey))
       if ini.ui.movetabwindow then
          imgui.Begin(u8"General", dialog.general, imgui.WindowFlags.NoTitleBar)
@@ -7177,8 +7202,20 @@ function imgui.OnDrawFrame()
    end
    
    if dialog.info.v then
-      imgui.SetNextWindowPos(imgui.ImVec2(sizeX / 2, sizeY / 2),
-      imgui.Cond.Appearing, imgui.ImVec2(0.5, 0.5))
+      if ini.ui.imguiwindowalign == 0 then -- center
+         imgui.SetNextWindowPos(imgui.ImVec2(sizeX / 2, sizeY / 2),
+         imgui.Cond.Appearing, imgui.ImVec2(0.5, 0.5))
+      elseif ini.ui.imguiwindowalign == 1 then -- left
+         imgui.SetNextWindowPos(imgui.ImVec2(sizeX / 6, sizeY / 2),
+         imgui.Cond.Appearing, imgui.ImVec2(0.5, 0.5))
+      elseif ini.ui.imguiwindowalign == 2 then -- right
+         imgui.SetNextWindowPos(imgui.ImVec2(sizeX / 1.35, sizeY / 2),
+         imgui.Cond.Appearing, imgui.ImVec2(0.5, 0.5))
+      else -- as default use center align
+         imgui.SetNextWindowPos(imgui.ImVec2(sizeX / 2, sizeY / 2),
+         imgui.Cond.Appearing, imgui.ImVec2(0.5, 0.5))
+      end
+      
       imgui.SetNextWindowSize(imgui.ImVec2(ini.ui.windowsizex, ini.ui.windowsizey))
       if ini.ui.movetabwindow then
          imgui.Begin(u8"Info", dialog.info, imgui.WindowFlags.NoTitleBar)
@@ -8805,8 +8842,20 @@ function imgui.OnDrawFrame()
    end
    
    if dialog.streameditems.v then
-      imgui.SetNextWindowPos(imgui.ImVec2(sizeX / 2, sizeY / 2),
-      imgui.Cond.Appearing, imgui.ImVec2(0.5, 0.5))
+      if ini.ui.imguiwindowalign == 0 then -- center
+         imgui.SetNextWindowPos(imgui.ImVec2(sizeX / 2, sizeY / 2),
+         imgui.Cond.Appearing, imgui.ImVec2(0.5, 0.5))
+      elseif ini.ui.imguiwindowalign == 1 then -- left
+         imgui.SetNextWindowPos(imgui.ImVec2(sizeX / 6, sizeY / 2),
+         imgui.Cond.Appearing, imgui.ImVec2(0.5, 0.5))
+      elseif ini.ui.imguiwindowalign == 2 then -- right
+         imgui.SetNextWindowPos(imgui.ImVec2(sizeX / 1.35, sizeY / 2),
+         imgui.Cond.Appearing, imgui.ImVec2(0.5, 0.5))
+      else -- as default use center align
+         imgui.SetNextWindowPos(imgui.ImVec2(sizeX / 2, sizeY / 2),
+         imgui.Cond.Appearing, imgui.ImVec2(0.5, 0.5))
+      end
+      
       imgui.SetNextWindowSize(imgui.ImVec2(ini.ui.windowsizex, ini.ui.windowsizey))
       if ini.ui.movetabwindow then
          imgui.Begin(u8"Streamed", dialog.streameditems, imgui.WindowFlags.NoTitleBar)
@@ -16446,18 +16495,23 @@ function apply_custom_style()
    local clr = imgui.Col
    local ImVec4 = imgui.ImVec4
 
-   style.WindowPadding = imgui.ImVec2(15, 15)
-   style.WindowRounding = 5.5
-   style.FramePadding = imgui.ImVec2(5, 5)
-   style.FrameRounding = 4.0
-   style.ItemSpacing = imgui.ImVec2(6, 4)
-   style.ItemInnerSpacing = imgui.ImVec2(8, 6)
-   style.IndentSpacing = 20.0
-   style.ScrollbarSize = 12.0
-   style.ScrollbarRounding = 9.0
-   style.GrabMinSize = 5.0
-   style.GrabRounding = 3.0
+   style.WindowPadding = imgui.ImVec2(15, 15) --  Padding within a window
+   style.WindowRounding = 5.5 -- Radius of window corners rounding. Set to 0.0f to have rectangular windows
+   style.WindowTitleAlign = imgui.ImVec2(0.5, 0.5) -- Alignment for title bar text. Defaults to (0.0f,0.5f) for left-aligned,vertically centered.
+   style.FramePadding = imgui.ImVec2(5, 5) -- Padding within a framed rectangle (used by most widgets)
+   style.FrameRounding = 4.0 --  Radius of frame corners rounding. Set to 0.0f to have rectangular frame (used by most widgets).
+   style.ItemSpacing = imgui.ImVec2(6, 4) -- Horizontal and vertical spacing between widgets/lines
+   style.ItemInnerSpacing = imgui.ImVec2(8, 6) -- Horizontal and vertical spacing between within elements of a composed widget (e.g. a slider and its label)
+   style.IndentSpacing = 20.0 -- Horizontal indentation when e.g. entering a tree node. Generally == (FontSize + FramePadding.x*2).
+   style.ScrollbarSize = 12.0 --  Width of the vertical scrollbar, Height of the horizontal scrollbar
+   style.ScrollbarRounding = 9.0 -- Radius of grab corners for scrollbar
+   style.GrabMinSize = 5.0 -- Minimum width/height of a grab box for slider/scrollbar.
+   style.GrabRounding = 3.0 -- Radius of grabs corners rounding. Set to 0.0f to have rectangular slider grabs.
    
+   if not ini.ui.imguiantialiasingstyle then
+      style.AntiAliasedLines = false -- Enable anti-aliasing on lines/borders. Disable if you are really tight on CPU/GPU.
+      style.AntiAliasedShapes = false -- Enable anti-aliasing on filled shapes (rounded rectangles, circles, etc.)
+   end
    --imgui.SetColorEditOptions(imgui.ColorEditFlags.HEX)
   
    -- STYLE 1 Dark
