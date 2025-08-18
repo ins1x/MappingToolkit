@@ -10259,6 +10259,13 @@ function sampev.onSendDialogResponse(dialogId, button, listboxId, input)
          dialoghook.otext = false
          if string.len(input) > 1 then 
             LastData.lastOtext = input
+            local rgbtag = input:match(".%x+.")
+            local rus = input:match("[йцукенгшщзхъфывапролджэячсмить].+")
+            if rus then
+               if not rgbtag then
+                  sampAddChatMessage("[SCRIPT]: {FFFFFF}Русские буквы не будут отображаться без заданного цвета. Используйте формат: {FFFFFF}Текст", 0x0FF6600)
+               end
+            end
          end
       end
       
@@ -10717,7 +10724,7 @@ function sampev.onShowDialog(dialogId, style, title, button1, button2, text)
    if isTrainingSanbox and dialogId == 32700 then
       -- TRAINING Skip cmdbinds dialog
       if ini.settings.skiprules then
-         if text:find('1. Общее положение') and style == 0 and button1 == "Принимаю" then
+         if text:find('1. Общие правила') and style == 0 and button1 == "Принимаю" then
             sampSendDialogResponse(32700, 1, nil)
             sampCloseCurrentDialogWithButton(1)
          end
