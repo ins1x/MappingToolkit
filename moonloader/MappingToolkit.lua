@@ -3,7 +3,7 @@ script_description("Assistant for mappers")
 script_dependencies('imgui', 'lib.samp.events')
 script_properties("work-in-pause")
 script_url("https://github.com/ins1x/MappingToolkit")
-script_version("4.18") -- pre-release 3
+script_version("4.18") -- pre-release 5
 -- support sa-mp versions depends on SAMPFUNCS (0.3.7-R1, 0.3.7-R3-1, 0.3.7-R5, 0.3.DL)
 -- script_moonloader(16) moonloader v.0.26 
 -- editor options: tabsize 3, Unix (LF), encoding Windows-1251
@@ -251,9 +251,10 @@ local edit = {
 
 local const = {
    txdmodelinfoid = 555,
-   deleteprotectdist = 50.0,
+   maxDeleteProtectDist = 50.0,
    --txdbadvalue = 24639793, 
-   maxlogfilesize = 65535, --(MAX unsigned short)
+   maxOffsetDistance = 220.0,
+   maxLogfileSize = 65535, --(MAX unsigned short)
 }
 
 local playerdata = {
@@ -298,7 +299,7 @@ local dialog = {
    objectinfo = imgui.ImBool(false),
    dialogtext = imgui.ImBool(false),
    txdlist = imgui.ImBool(false),
-   toolkitmanage = imgui.ImBool(false),
+   toolkitmanage = imgui.ImBool(false), 
 }
 
 local dialoghook = {
@@ -572,7 +573,8 @@ local tabmenu = {
    info = 1,
    mp = 1,
    cb = 1,
-   cmds = 1
+   cmds = 1,
+   lastmenu = 1,
 }
 
 local textbuffer = {
@@ -1142,17 +1144,17 @@ function main()
       if ini.settings.autocleanlogs then
          local logpath = 'moonloader/resource/mappingtoolkit/history'
          if doesFileExist(getGameDirectory()..logpath..'/texture.txt') then
-            if getFileSize(logpath..'/texture.txt') > const.maxlogfilesize then
+            if getFileSize(logpath..'/texture.txt') > const.maxLogfileSize then
                os.remove(logpath..'/texture.txt')
             end
          end
          if doesFileExist(getGameDirectory()..logpath..'/worldlogs.txt') then
-            if getFileSize(logpath..'/worldlogs.txt') > const.maxlogfilesize then
+            if getFileSize(logpath..'/worldlogs.txt') > const.maxLogfileSize then
                os.remove(logpath..'/worldlogs.txt')
             end
          end
          if doesFileExist(getGameDirectory()..logpath..'/pmmessages.txt') then
-            if getFileSize(logpath..'/pmmessages.txt') > const.maxlogfilesize then
+            if getFileSize(logpath..'/pmmessages.txt') > const.maxLogfileSize then
                os.remove(logpath..'/pmmessages.txt')
             end
          end
@@ -1205,10 +1207,6 @@ function main()
       if ini.settings.checkupdates then
          checkScriptUpdates()
       end
-      
-      -- new dialog scheme
-      -- tabmenu.main = 1
-      -- dialog.general.v = true
       
       --- END init
       while true do
@@ -1340,21 +1338,7 @@ function main()
       if isKeyJustPressed(0x1B) and not sampIsChatInputActive() 
       and not sampIsDialogActive() and not isPauseMenuActive() 
       and not isSampfuncsConsoleActive() then
-         if dialog.main.v then dialog.main.v = false end
-         if dialog.info.v then dialog.info.v = false end
-         if dialog.general.v then dialog.general.v = false end
-         if dialog.textures.v then dialog.textures.v = false end
-         if dialog.streameditems.v then dialog.streameditems.v = false end
-         if dialog.playerstat.v then dialog.playerstat.v = false end
-         if dialog.vehstat.v then dialog.vehstat.v = false end
-         if dialog.extendedtab.v then dialog.extendedtab.v = false end
-         if dialog.objectinfo.v then dialog.objectinfo.v = false end
-         if dialog.dialogtext.v then dialog.dialogtext.v = false end
-         if dialog.txdlist.v then dialog.txdlist.v = false end
-         if dialog.toolkitmanage.v then dialog.toolkitmanage.v = false end
-         -- if tabmenu.main == 2 then -- durtyfix tab unfolding
-            -- tabmenu.main = 1
-         -- end
+         imgui.closeDialogs()
          sampTextdrawDelete(const.txdmodelinfoid)
       end 
       
@@ -1948,20 +1932,19 @@ function main()
          end
          if ini.settings.bigoffsetwarning then
             if math.abs(offset.x) ~= math.abs(LastObject.position.x) then
-               local maxOffsetDistance = 220.0
-               if math.abs(offset.x) > maxOffsetDistance - 25 then
+               if math.abs(offset.x) > const.maxOffsetDistance - 25 then
                   printStyledString('~y~ WARNING ~w~to much offset ~n~distance: ~y~'..math.abs(math.floor(offset.x)), 2000, 4)
-               elseif math.abs(offset.y) > maxOffsetDistance - 25 then
+               elseif math.abs(offset.y) > const.maxOffsetDistance - 25 then
                   printStyledString('~y~ WARNING ~w~to much offset ~n~distance: ~y~'..math.abs(math.floor(offset.y)), 2000, 4)
-               elseif math.abs(offset.z) > maxOffsetDistance - 25 then
+               elseif math.abs(offset.z) > const.maxOffsetDistance - 25 then
                   printStyledString('~y~ WARNING ~w~to much offset ~n~distance: ~y~'..math.abs(math.floor(offset.z)), 2000, 4)
                end
                
-               if math.abs(offset.x) > maxOffsetDistance then
+               if math.abs(offset.x) > const.maxOffsetDistance then
                   printStyledString('~r~ WARNING ~w~to much offset ~n~distance: ~r~'..math.abs(math.floor(offset.x)), 2000, 4)
-               elseif math.abs(offset.y) > maxOffsetDistance then 
+               elseif math.abs(offset.y) > const.maxOffsetDistance then 
                   printStyledString('~r~ WARNING ~w~to much offset ~n~distance: ~r~'..math.abs(math.floor(offset.y)), 2000, 4)
-               elseif math.abs(offset.z) > maxOffsetDistance then 
+               elseif math.abs(offset.z) > const.maxOffsetDistance then 
                   printStyledString('~r~ WARNING ~w~to much offset ~n~distance: ~r~'..math.abs(math.floor(offset.z)), 2000, 4)
                end
             end
@@ -7917,7 +7900,13 @@ function imgui.OnDrawFrame()
                u8"4 - Управление мышкой заблокировано, курсор отключен"
             }
             
-            imgui.Text(string.format(u8"В игре: %.0f сек.", localClock()))
+            if localClock() > 60 then
+               local whole_minutes = math.floor(localClock() / 60)
+               local remaining_seconds = localClock() % 60
+               imgui.Text(string.format(u8"В игре: %i мин. %i сек.", whole_minutes, remaining_seconds))
+            else
+               imgui.Text(string.format(u8"В игре: %.0f сек.", localClock()))
+            end
             imgui.Text(playerdata.isPlayerSpectating and u8('В наблюдении: Да') or u8('В наблюдении: Нет'))
             imgui.Text(playerdata.flymode and u8('В режиме полета: Да') or u8('В режиме полета: Нет'))
             imgui.Text(isPlayerControlLocked(playerPed) and u8('Управление: Заблокированно') or u8('Управление: Доступно'))
@@ -8120,18 +8109,23 @@ function imgui.OnDrawFrame()
             imgui.Text(u8'Последний ID диалога: ' .. sampGetCurrentDialogId())
          end
          
-         if imgui.TooltipButton(u8"Сбросить настройки",imgui.ImVec2(150, 25),u8"Сбросит настройки предварительно сохранив копию текущих настроек") then
+         if imgui.TooltipButton(u8"Сбросить настройки",imgui.ImVec2(155, 25),u8"Сбросит настройки предварительно сохранив копию текущих настроек") then
             os.rename(getGameDirectory().."//moonloader//config//mappingtoolkit.ini", getGameDirectory().."//moonloader//config//backup_mappingtoolkit.ini")
             sampAddChatMessage("[SCRIPT]: {FFFFFF}Настройки были сброшены на стандартные. Тулкит автоматически перезагрузится.",0x0FF6600)
             sampAddChatMessage("[SCRIPT]: {FFFFFF}Резервную копию ваших предыдущих настроек можно найти в {696969}moonloader/config.",0x0FF6600)
             reloadScripts()
          end
          imgui.SameLine()
-         if imgui.TooltipButton(u8"Открыть конфиг",imgui.ImVec2(150, 25),u8"Открыть файл настроек в текстовом редакторе") then
+         if imgui.TooltipButton(u8"Открыть конфиг",imgui.ImVec2(155, 25),u8"Открыть файл настроек в текстовом редакторе") then
             folder = getGameDirectory().. "\\moonloader\\config\\"
             os.execute('explorer "'..folder..'"')
          end
-         
+         imgui.SameLine()
+         if imgui.TooltipButton(u8"Откат версии",imgui.ImVec2(155, 25),u8"Откатиться на предыдущую версию") then
+            local scriptParams = thisScript()
+            local previousversion = tonumber(scriptParams.version) - 0.01
+            os.execute('explorer "https://github.com/ins1x/MappingToolkit/releases/tag/v'..tostring(previousversion)..'"')
+         end
          
          
       elseif tabmenu.info == 5 then
@@ -9796,10 +9790,14 @@ function imgui.OnDrawFrame()
          if imgui.Button(u8"Снять с паузы",imgui.ImVec2(150, 25)) then
             thisScript():resume()
             dialog.main.v = true
+            dialog.general.v = true
             sampAddChatMessage("{696969}Mapping Toolkit{FFFFFF}  поставлен на паузу.", -1)
          end
       else
          if imgui.Button(u8"Поставить на паузу",imgui.ImVec2(150, 25)) then
+            dialog.general.v = false
+            dialog.info.v = false
+            dialog.streameditems.v = false
             thisScript():pause()
             sampAddChatMessage("{696969}Mapping Toolkit{FFFFFF}  снят с паузы.", -1)
          end
@@ -12648,7 +12646,7 @@ function sampev.onSendCommand(command)
                      local absY= math.abs(pY-value.pos.y)
                      local absZ= math.abs(pZ-value.pos.z)
                      
-                     if absX >= maxDist or absY >= maxDist or absZ >= maxDist then
+                     if absX >= maxDeleteProtectDist or absY >= maxDeleteProtectDist or absZ >= maxDeleteProtectDist then
                         sampAddChatMessage("[SCRIPT]: {FFFFFF} Объект "..value.id.." вне зоны стрима!", 0x0FF0000)
                         -- sampAddChatMessage(("posX: %.2f objectposX: %.2f absX: %.2f"):format(pX, value.pos.x, absX), -1) 
                         -- sampAddChatMessage(("posY: %.2f objectposY: %.2f absY: %.2f"):format(pY, value.pos.y, absY), -1) 
@@ -13680,6 +13678,7 @@ function sampev.onSendCommand(command)
    end
    
    if ini.settings.devmode and command:find("^/test") then   
+      imgui.closeDialogs()
       -- allowPauseInWidescreen(true)
       -- sampAddChatMessage("Test", -1)
       -- local rotationX, rotationY, rotationZ = 0.0
@@ -15760,9 +15759,21 @@ function imgui.toggleMainDialog()
       dialog.general.v = false
       dialog.main.v = false
    else
-      tabmenu.main = 1
+      --tabmenu.main = 1
       dialog.main.v = true
-      dialog.general.v = true
+      if tabmenu.last == 1 then
+         tabmenu.main = 1
+         dialog.general.v = true
+      elseif tabmenu.last == 2 then
+         tabmenu.main = 2
+         dialog.streameditems.v = true
+      elseif tabmenu.last == 3 then
+         tabmenu.main = 3
+         dialog.info.v = true
+      else
+         tabmenu.main = 1
+         dialog.general.v = true
+      end
       if ini.panel.showpanel then 
          checkbox.showpanel.v = true
       end
@@ -15782,16 +15793,19 @@ function imgui.selectTabMenu(tab, submenu)
       dialog.general.v = true
       dialog.info.v = false
       dialog.streameditems.v = false
+      tabmenu.last = 1
       if submenu >= 1 then
          tabmenu.settings = submenu
       end
    elseif tab == 2 then
       tabmenu.main = 2
+      tabmenu.last = 2
       dialog.general.v = false
       dialog.info.v = false
       dialog.streameditems.v = true
    elseif tab == 3 then
       tabmenu.main = 3
+      tabmenu.last = 3
       dialog.general.v = false
       dialog.info.v = true
       dialog.streameditems.v = false
@@ -15799,6 +15813,31 @@ function imgui.selectTabMenu(tab, submenu)
          tabmenu.info = submenu
       end
    end
+end
+
+function imgui.closeDialogs()
+   -- print("call")
+   -- for i, value in pairs(dialog) do
+      -- print(i, value)
+      -- dialog.value.v = false
+   -- end
+   
+   if dialog.main.v then dialog.main.v = false end
+   if dialog.info.v then dialog.info.v = false end
+   if dialog.general.v then dialog.general.v = false end
+   if dialog.textures.v then dialog.textures.v = false end
+   if dialog.streameditems.v then dialog.streameditems.v = false end
+   if dialog.playerstat.v then dialog.playerstat.v = false end
+   if dialog.vehstat.v then dialog.vehstat.v = false end
+   if dialog.extendedtab.v then dialog.extendedtab.v = false end
+   if dialog.objectinfo.v then dialog.objectinfo.v = false end
+   if dialog.dialogtext.v then dialog.dialogtext.v = false end
+   if dialog.txdlist.v then dialog.txdlist.v = false end
+   if dialog.toolkitmanage.v then dialog.toolkitmanage.v = false end
+   
+   -- if tabmenu.main == 2 then -- durtyfix tab unfolding
+      -- tabmenu.main = 1
+   -- end
 end
 
 function imgui.ToggleButton(str_id, bool)
