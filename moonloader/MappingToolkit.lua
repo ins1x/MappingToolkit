@@ -3,7 +3,7 @@ script_description("Assistant for mappers")
 script_dependencies('imgui', 'lib.samp.events')
 script_properties("work-in-pause")
 script_url("https://github.com/ins1x/MappingToolkit")
-script_version("4.18") -- pre-release 5
+script_version("4.18") -- pre-release 6
 -- support sa-mp versions depends on SAMPFUNCS (0.3.7-R1, 0.3.7-R3-1, 0.3.7-R5, 0.3.DL)
 -- script_moonloader(16) moonloader v.0.26 
 -- editor options: tabsize 3, Unix (LF), encoding Windows-1251
@@ -1284,6 +1284,11 @@ function main()
          end
       end
       
+      -- Fix camera after player death
+      if getCharHealth(playerPed) <= 0 then
+         setCameraBehindPlayer()
+      end
+      
       -- if isKeyDown(0x09) and dialog.main.v then -- TAB
          -- sampToggleScoreboard(true)
       -- end
@@ -2127,7 +2132,11 @@ function imgui.OnDrawFrame()
       end
       
       imgui.Text(tostring(u8"Скин: ".. skinid))
-      imgui.TextColoredRGB(string.format("Анимация: %i {696969}(%s)", animid, animname))
+      if chosen.player then
+         if chosen.player == getLocalPlayerId() then
+            imgui.TextColoredRGB(string.format("Анимация: %i {696969}(%s)", animid, animname))
+         end
+      end
       if imgui.IsItemClicked() then
          setClipboardText(string.format(u8"%s, %s", animlib, animname))
          sampAddChatMessage("Параметры анимации скопированы в буффер обмена", -1)
@@ -14347,6 +14356,15 @@ function sampev.onRemove3DTextLabel(textLabelId)
             table.remove(streamed3dTexts, i)
          end
       end
+   end
+end
+
+function sampev.onSpectateVehicle(vehId, camType)
+   -- Removes hydraulics from vehicles while tracking 
+   -- to restore the ability to look around vertically with the mouse.
+   local result, car = sampGetCarHandleBySampVehicleId(vehId)
+   if result then
+      setCarHydraulics(car, false)
    end
 end
 
