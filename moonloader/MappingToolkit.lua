@@ -3,7 +3,7 @@ script_description("Assistant for mappers")
 script_dependencies('imgui', 'lib.samp.events')
 script_properties("work-in-pause")
 script_url("https://github.com/ins1x/MappingToolkit")
-script_version("4.18") -- pre-release 6
+script_version("4.18") -- pre-release 7
 -- support sa-mp versions depends on SAMPFUNCS (0.3.7-R1, 0.3.7-R3-1, 0.3.7-R5, 0.3.DL)
 -- script_moonloader(16) moonloader v.0.26 
 -- editor options: tabsize 3, Unix (LF), encoding Windows-1251
@@ -85,6 +85,7 @@ local ini = inicfg.load({
       nopagekeys = false,
       novehiclevisualdamage = false,
       oinfotxd = true,
+      pauseinwidescreen = false,
       recontime = 15500,
       renderfont = "Arial",
       renderfontsize = 7,
@@ -262,6 +263,10 @@ local playerdata = {
    isLockPlayerControl = false,
    isPlayerEditAttachedObject = false,
    isPlayerEditObject = false,
+   isCameraLookAt = false,
+   cameraLookAtCutType = 0,
+   isCameraInterpolate = false,
+   cameraInterpolateMode = 0,
    isChatFreezed = false,
    isWorldHoster = false,
    isWorldJoinUnavailable = false,
@@ -561,6 +566,7 @@ local tabmenu = {
    main = 1,
    objects = 1,
    settings = 9,
+   chat = 1,
    coords = 1,
    credits = 1,
    effects = 1,
@@ -605,7 +611,7 @@ local textbuffer = {
    pid = imgui.ImBuffer(4),
    tpstep = imgui.ImBuffer(2),
    saveskin = imgui.ImBuffer(4),
-   searchbar = imgui.ImBuffer(32),
+   searchbar = imgui.ImBuffer(128),
    pattern = imgui.ImBuffer(144),
    strtest = imgui.ImBuffer(144),
    txdstring = imgui.ImBuffer(256),
@@ -1164,6 +1170,10 @@ function main()
          checkbox.streammemmax.v = true
       end
       
+      if ini.settings.pauseinwidescreen then
+         allowPauseInWidescreen(true)
+      end
+      
       if ini.tmp.osearch:len() > 1 then
          textbuffer.objectid.v = ini.tmp.osearch
       end
@@ -1207,7 +1217,7 @@ function main()
       if ini.settings.checkupdates then
          checkScriptUpdates()
       end
-      
+
       --- END init
       while true do
       wait(0)
@@ -1367,9 +1377,11 @@ function main()
       -- LMB + W + (SHIFT or SPACE) 
       if isKeyDown(0x01) and isKeyDown(0x57) then
          if isKeyDown(0x10) or isKeyDown(0x20) then
-            freezeCharPosition(playerPed, false)
-            setPlayerControl(PLAYER_HANDLE, true)
-            lockPlayerControl(false)
+            if not playerdata.isCameraLookAt then
+               freezeCharPosition(playerPed, false)
+               setPlayerControl(PLAYER_HANDLE, true)
+               lockPlayerControl(false)
+            end
          end
       end
          
@@ -1937,20 +1949,22 @@ function main()
          end
          if ini.settings.bigoffsetwarning then
             if math.abs(offset.x) ~= math.abs(LastObject.position.x) then
-               if math.abs(offset.x) > const.maxOffsetDistance - 25 then
-                  printStyledString('~y~ WARNING ~w~to much offset ~n~distance: ~y~'..math.abs(math.floor(offset.x)), 2000, 4)
-               elseif math.abs(offset.y) > const.maxOffsetDistance - 25 then
-                  printStyledString('~y~ WARNING ~w~to much offset ~n~distance: ~y~'..math.abs(math.floor(offset.y)), 2000, 4)
-               elseif math.abs(offset.z) > const.maxOffsetDistance - 25 then
-                  printStyledString('~y~ WARNING ~w~to much offset ~n~distance: ~y~'..math.abs(math.floor(offset.z)), 2000, 4)
-               end
-               
-               if math.abs(offset.x) > const.maxOffsetDistance then
-                  printStyledString('~r~ WARNING ~w~to much offset ~n~distance: ~r~'..math.abs(math.floor(offset.x)), 2000, 4)
-               elseif math.abs(offset.y) > const.maxOffsetDistance then 
-                  printStyledString('~r~ WARNING ~w~to much offset ~n~distance: ~r~'..math.abs(math.floor(offset.y)), 2000, 4)
-               elseif math.abs(offset.z) > const.maxOffsetDistance then 
-                  printStyledString('~r~ WARNING ~w~to much offset ~n~distance: ~r~'..math.abs(math.floor(offset.z)), 2000, 4)
+               if math.abs(offset.x) < maxOffsetDistance * 2 then -- ignore false positives
+                  if math.abs(offset.x) > const.maxOffsetDistance - 25 then
+                     printStyledString('~y~ WARNING ~w~to much offset ~n~distance: ~y~'..math.abs(math.floor(offset.x)), 2000, 4)
+                  elseif math.abs(offset.y) > const.maxOffsetDistance - 25 then
+                     printStyledString('~y~ WARNING ~w~to much offset ~n~distance: ~y~'..math.abs(math.floor(offset.y)), 2000, 4)
+                  elseif math.abs(offset.z) > const.maxOffsetDistance - 25 then
+                     printStyledString('~y~ WARNING ~w~to much offset ~n~distance: ~y~'..math.abs(math.floor(offset.z)), 2000, 4)
+                  end
+                  
+                  if math.abs(offset.x) > const.maxOffsetDistance then
+                     printStyledString('~r~ WARNING ~w~to much offset ~n~distance: ~r~'..math.abs(math.floor(offset.x)), 2000, 4)
+                  elseif math.abs(offset.y) > const.maxOffsetDistance then 
+                     printStyledString('~r~ WARNING ~w~to much offset ~n~distance: ~r~'..math.abs(math.floor(offset.y)), 2000, 4)
+                  elseif math.abs(offset.z) > const.maxOffsetDistance then 
+                     printStyledString('~r~ WARNING ~w~to much offset ~n~distance: ~r~'..math.abs(math.floor(offset.z)), 2000, 4)
+                  end
                end
             end
          end
@@ -2003,7 +2017,7 @@ function imgui.OnDrawFrame()
       imgui.SetNextWindowSize(imgui.ImVec2(ini.ui.windowsizex, 80))
       imgui.Begin((".::  Mapping Toolkit v%s ::."):format(thisScript().version), dialog.main, 
       imgui.WindowFlags.NoResize + imgui.WindowFlags.NoMove + imgui.WindowFlags.NoScrollbar + imgui.WindowFlags.NoCollapse)
-      
+
       if tabmenu.main == 1 then
          imgui.PushStyleColor(imgui.Col.Button, imgui.GetStyle().Colors[imgui.Col.ButtonHovered])
          if imgui.Button(u8"Основное", imgui.ImVec2(125, 30)) then 
@@ -2046,7 +2060,7 @@ function imgui.OnDrawFrame()
       imgui.Text("                               ")
       imgui.SameLine()
 
-      if imgui.TooltipButton(u8" _ ", imgui.ImVec2(30, 25), u8"Свернуть окно тулкита") then
+      if imgui.TooltipButton(u8" _ ", imgui.ImVec2(30, 25), u8"Свернуть окна тулкита") then
          imgui.toggleMainDialog()
       end
       imgui.SameLine()
@@ -2065,7 +2079,7 @@ function imgui.OnDrawFrame()
             dialog.toolkitmanage.v = true
          end
       end
-
+      
       imgui.Spacing()
       
       imgui.End()
@@ -3613,7 +3627,7 @@ function imgui.OnDrawFrame()
             imgui.TextQuestion("( ? )", u8"Показывает угол поворота объекта (Rx, Ry, Rz) при перемещении в редакторе карт")
             
             if imgui.Checkbox(u8("Предупреждать о превышении макс. сдвига"), checkbox.bigoffsetwarning) then
-               ini.settings.bigoffsetwarning = checkbox.showobjectrot.v
+               ini.settings.bigoffsetwarning = checkbox.bigoffsetwarning.v
                inicfg.save(ini, configIni)
             end
             imgui.SameLine()
@@ -3831,26 +3845,76 @@ function imgui.OnDrawFrame()
          end
         
       elseif tabmenu.settings == 3 then
-
-         local angle = math.ceil(getCharHeading(playerPed))
-         imgui.Text(string.format(u8"Направление: %s  %i°", direction(), angle))
-         local camX, camY, camZ = getActiveCameraCoordinates()
-         imgui.Text(string.format(u8"Камера x: %.1f, y: %.1f, z: %.1f",
-         camX, camY, camZ))
-         if imgui.IsItemClicked() then
-            setClipboardText(string.format(u8"%.1f, %.1f, %.1f", camX, camY, camZ))
-            sampAddChatMessage("[SCRIPT]: {FFFFFF}Позиция скопирована в буффер обмена", 0x0FF6600)
+         --imgui.SetNextTreeNodeOpen(true)
+         if imgui.CollapsingHeader(u8"Параметры камеры") then
+            imgui.PushStyleVar(imgui.StyleVar.ItemSpacing, imgui.ImVec2(0.5, 2))
+            local angle = math.ceil(getCharHeading(playerPed))
+            local dir = direction()
+            if dir then 
+               if dir:find("Север") then
+                  imgui.TextColoredRGB(string.format("Направление: {1e90ff}%s  %i°", u8:decode(direction()), angle))
+               else
+                  imgui.TextColoredRGB(string.format("Направление: {b22222}%s  %i°", u8:decode(direction()), angle))
+               end
+            end
+            local camX, camY, camZ = getActiveCameraCoordinates()
+            imgui.TextColoredRGB(string.format("Поизиция камеры {007DFF}x: %.1f, {e0364e}y: %.1f, {26b85d}z: %.1f",
+            camX, camY, camZ))
+            if imgui.IsItemClicked() then
+               setClipboardText(string.format(u8"%.1f, %.1f, %.1f", camX, camY, camZ))
+               sampAddChatMessage("[SCRIPT]: {FFFFFF}Позиция скопирована в буффер обмена", 0x0FF6600)
+            end
+            local rX, rY, rZ = getActiveCameraPointAt()
+            imgui.TextColoredRGB(string.format("Камера смотрит на точку {007DFF}rx: %.2f, {e0364e}ry: %.2f, {26b85d}rz: %.2f",
+            rX, rY, rZ))
+              if imgui.IsItemClicked() then
+               setClipboardText(string.format(u8"%.4f, %.4f, %.4f", rX, rY, rZ))
+               sampAddChatMessage("[SCRIPT]: {FFFFFF}Позиция скопирована в буффер обмена", 0x0FF6600)
+            end
+            local cameraCutTypes = {"NONE","CAMERA_MOVE","CAMERA_CUT"}
+            imgui.TextColoredRGB(playerdata.isCameraInterpolate and ('Интерполяция камеры:{FF6600} Да') or ('Интерполяция камеры:{696969} Нет'))
+            if playerdata.isCameraInterpolate then
+               imgui.SameLine()
+               imgui.TextColoredRGB(("  Режим камеры: %s (%d)"):format(cameraCutTypes[playerdata.cameraInterpolateMode], playerdata.cameraInterpolateMode))
+            end
+            imgui.TextColoredRGB(playerdata.isCameraLookAt and ('Камера изменена:{FF6600} Да') or ('Камера изменена:{696969} Нет'))
+            if playerdata.isCameraLookAt then
+               imgui.SameLine()
+               imgui.TextColoredRGB(("  Режим камеры: %s (%d)"):format(cameraCutTypes[playerdata.cameraLookAtCutType], playerdata.cameraLookAtCutType))
+            end
+            imgui.TextColoredRGB(playerdata.isPlayerSpectating and ('В наблюдении:{FF6600} Да') or ('В наблюдении:{696969} Нет'))
+            
+            local vehCamModes = {
+               [0] = "NONE",
+               [1] = "UNKNOWN",
+               [2] = "MODE_VEH_BEHINDCAR",
+               [3] = "MODE_TRAIN_BEHINDCAR",
+               [4] = "MODE_FOLLOWPED",
+               [7] = "MODE_SNIPER",
+               [8] = "MODE_ROCKETLAUNCHER",
+               [15] = "MODE_FIXED",
+               [16] = "MODE_1STPERSON",
+               [18] = "MODE_CAM_ON_A_STRING",
+               [22] = "MODE_BEHINDBOAT",
+               [46] = "MODE_CAMERA",
+               [51] = "MODE_ROCKETLAUNCHER_HS",
+               [53] = "MODE_AIMWEAPON",
+               [55] = "MODE_AIMWEAPON_FROMCAR",
+               [56] = "MODE_DW_HELI_CHASE",
+               [57] = "MODE_DW_CAM_MAN",
+               [58] = "MODE_DW_BIRDY",
+               [59] = "MODE_DW_PLANE_SPOTTER",
+               [62] = "MODE_DW_PLANECAM1",
+               [63] = "MODE_DW_PLANECAM2",
+               [64] = "MODE_DW_PLANECAM3",
+            }
+            if isCharInAnyCar(playerPed) then 
+               imgui.TextColoredRGB(string.format("Режим камеры в транспорте:{696969} %s (%d)", 
+               vehCamModes[getPlayerInCarCameraMode()], getPlayerInCarCameraMode()))
+            end
+            imgui.PopStyleVar()
+            imgui.Spacing()
          end
-         
-         -- local rX, rY, rZ = getActiveCameraPointAt()
-         -- imgui.Text(string.format(u8"Камера rx: %.1f, ry: %.1f, rz: %.1f",
-         -- rX, rY, rZ))
-         
-         if isCharInAnyCar(playerPed) then 
-            imgui.Text(string.format(u8"Режим камеры в транспорте: %d", getPlayerInCarCameraMode()))
-         end
-         imgui.Spacing()
-         imgui.Spacing()
          
          if imgui.CollapsingHeader(u8"Зафиксированная камера") then
             if imgui.Checkbox(u8("Зафиксировать камеру на координатах"), checkbox.fixcampos) then
@@ -3976,9 +4040,11 @@ function imgui.OnDrawFrame()
                cam.x = camX           
                cam.y = camY           
                cam.z = camZ
-               textbuffer.camx.v = string.format("%.1f", cam.x)
-               textbuffer.camy.v = string.format("%.1f", cam.y)
-               textbuffer.camz.v = string.format("%.1f", cam.z)
+               if cam.z and cam.y and cam.z then
+                  textbuffer.camx.v = string.format("%.1f", cam.x)
+                  textbuffer.camy.v = string.format("%.1f", cam.y)
+                  textbuffer.camz.v = string.format("%.1f", cam.z)
+               end
             end
             
             imgui.Text(u8"Начальная позиция:")
@@ -4253,6 +4319,7 @@ function imgui.OnDrawFrame()
             if checkbox.fixcampos.v then checkbox.fixcampos.v = false end
             sampAddChatMessage("[SCRIPT]: {FFFFFF}Камера возвращена на исходные", 0x0FF6600)
             restoreCamera()
+            restoreCameraJumpcut()
          end
          
          imgui.Spacing()
@@ -5856,50 +5923,297 @@ function imgui.OnDrawFrame()
          
       -- elseif tabmenu.settings == 7 then
       elseif tabmenu.settings == 8 then
-         if ini.settings.allchatoff then 
-            imgui.TextColoredRGB("{FF0000}Chat OFF")
+         if tabmenu.chat == 1 then
+            imgui.PushStyleColor(imgui.Col.Button, imgui.GetStyle().Colors[imgui.Col.ButtonHovered])
+            if imgui.Button(u8"Опции", imgui.ImVec2(100, 30)) then tabmenu.chat = 1 end
+            imgui.PopStyleColor()
          else
-            imgui.TextColoredRGB("{696969}Chat")
+            if imgui.Button(u8"Опции", imgui.ImVec2(100, 30)) then tabmenu.chat = 1 end
          end
          imgui.SameLine()
-         if imgui.TooltipButton(u8"очистить", imgui.ImVec2(90, 25), u8"Очистить чат (Для себя)") then
-            ClearChat()
-            sampAddChatMessage("[SCRIPT]: {FFFFFF}Чат был очищен!", 0x0FF6600)
+         if tabmenu.chat == 2 then
+            imgui.PushStyleColor(imgui.Col.Button, imgui.GetStyle().Colors[imgui.Col.ButtonHovered])
+            if imgui.Button(u8"Фильтры", imgui.ImVec2(100, 30)) then tabmenu.chat = 2 end
+            imgui.PopStyleColor()
+         else
+            if imgui.Button(u8"Фильтры", imgui.ImVec2(100, 30)) then tabmenu.chat = 2 end
          end
          imgui.SameLine()
-         if imgui.TooltipButton(u8"chatlog", imgui.ImVec2(90, 25), u8"Открыть лог чата (chatlog.txt)") then
-            os.execute('explorer '..getFolderPath(5) ..'\\GTA San Andreas User Files\\SAMP\\chatlog.txt')
+         if tabmenu.chat == 3 then
+            imgui.PushStyleColor(imgui.Col.Button, imgui.GetStyle().Colors[imgui.Col.ButtonHovered])
+            if imgui.Button(u8"Поиск", imgui.ImVec2(100, 30)) then tabmenu.chat = 3 end
+            imgui.PopStyleColor()
+         else
+            if imgui.Button(u8"Поиск", imgui.ImVec2(100, 30)) then tabmenu.chat = 3 end
          end
-         imgui.SameLine()
-         if imgui.TooltipButton(u8"timestamp", imgui.ImVec2(90, 25), u8"Отображать время в чате") then
-            sampProcessChatInput("/timestamp")
-         end
-         if isTrainingSanbox then
-            imgui.SameLine()
-            if ini.settings.savepmmessages then
-               --imgui.PushStyleColor(imgui.Col.Button, imgui.ImVec4(1.0, 1.0, 0.0, 1.0))
-               if imgui.TooltipButton(u8"pmh", imgui.ImVec2(60, 25), u8"История личных сообщений /pmh") then
-                  sampSendChat("/pmh")
-               end
-               --imgui.PopStyleColor()
-            end
-         end
-         imgui.SameLine()
-         if imgui.TooltipButton(u8"getids", imgui.ImVec2(60, 25), u8"Получить id и ники игроков рядом") then
-            copyNearestPlayersToClipboard()
-         end
-         
          imgui.Spacing()
-
-         if imgui.CollapsingHeader(u8"Поиск:") then
+         imgui.Spacing()
+         
+         if tabmenu.chat == 1 then
+            if ini.settings.allchatoff then 
+               imgui.TextColoredRGB("{FF0000}Chat OFF")
+            else
+               imgui.TextColoredRGB("{696969}Chat")
+            end
+            imgui.SameLine()
+            if imgui.TooltipButton(u8"очистить чат", imgui.ImVec2(90, 25), u8"Очистить чат (Для себя)") then
+               ClearChat()
+               sampAddChatMessage("[SCRIPT]: {FFFFFF}Чат был очищен!", 0x0FF6600)
+            end
+            imgui.SameLine()
+            if imgui.TooltipButton(u8"timestamp", imgui.ImVec2(90, 25), u8"Отображать время в чате") then
+               sampProcessChatInput("/timestamp")
+            end
+            if isTrainingSanbox then
+               imgui.SameLine()
+               if ini.settings.savepmmessages then
+                  --imgui.PushStyleColor(imgui.Col.Button, imgui.ImVec4(1.0, 1.0, 0.0, 1.0))
+                  if imgui.TooltipButton(u8"pmh", imgui.ImVec2(60, 25), u8"История личных сообщений /pmh") then
+                     sampSendChat("/pmh")
+                  end
+                  --imgui.PopStyleColor()
+               end
+            end
+            imgui.SameLine()
+            if imgui.TooltipButton(u8"getids", imgui.ImVec2(60, 25), u8"Получить id и ники игроков рядом") then
+               copyNearestPlayersToClipboard()
+            end
+            
+            
+            imgui.Spacing()
+            imgui.Spacing()
+            
+            if isTrainingSanbox then
+               if imgui.TooltipButton(u8"mute", imgui.ImVec2(60, 25), u8"Настройки чата, позволяет заглушить указанный тип сообщений /mute") then
+                  if dialog.main.v then dialog.main.v = false end
+                  sampSendChat("/mute")
+               end
+               imgui.SameLine()
+            end
+            
+            imgui.PushItemWidth(175)
+            if imgui.Combo(u8'Чат по-умолчанию##cahtprefixcombo', combobox.chatprefix, chatPrefixNames) then
+               ini.settings.chatprefix = combobox.chatprefix.v
+               inicfg.save(ini, configIni)
+            end
+            imgui.PopItemWidth()
+            
+            if imgui.ToggleButton(u8"Останавливать чат при открытии поля ввода", checkbox.freezechat) then
+               if checkbox.freezechat.v then 
+                  playerdata.isChatFreezed = true 
+               else
+                  playerdata.isChatFreezed = false
+               end
+               ini.settings.freezechat = checkbox.freezechat.v
+               inicfg.save(ini, configIni)
+            end
+            
+            if imgui.ToggleButton(u8"Отключить весь чат", checkbox.allchatoff) then
+               ini.settings.allchatoff = checkbox.allchatoff.v
+               inicfg.save(ini, configIni)
+               if checkbox.allchatoff.v then
+                  sampAddChatMessage("[SCRIPT]: {FFFFFF}Все сообщения в чат будут игнорироваться", 0x0FF6600)
+               end
+            end     
+            
+            if imgui.ToggleButton(u8(checkbox.hidechat.v and 'Показать панель с чатотм' or 'Скрыть панель с чатом'), checkbox.hidechat) then
+               memory.fill(getModuleHandle("samp.dll") + 0x63DA0, checkbox.hidechat.v and 0x90909090 or 0x0A000000, 4, true)
+               sampSetChatInputEnabled(checkbox.hidechat.v)
+            end
+            
+            if imgui.ToggleButton(u8"Очищать строку ввода после закрытия", checkbox.chatinputdrop) then
+               ini.settings.chatinputdrop = checkbox.chatinputdrop.v
+               inicfg.save(ini, configIni)
+            end
+            
+            if imgui.ToggleButton(u8"Копировать ник кликнутого игрока в TAB", checkbox.tabclickcopy) then
+               ini.settings.tabclickcopy = checkbox.tabclickcopy.v
+               inicfg.save(ini, configIni)
+               if ini.settings.tabclickcopy then
+                  sampAddChatMessage("[SCRIPT]: {FFFFFF}Кликните на игрока чтобы скопировать его никнейм", 0x0FF6600)
+               end
+            end
+            
+            if imgui.ToggleButton(u8"Сохранять историю персональных сообщений /pmh", checkbox.savepmmessages) then
+               ini.settings.savepmmessages = checkbox.savepmmessages.v
+               inicfg.save(ini, configIni)
+               if ini.settings.savepmmessages then
+                  sampAddChatMessage("[SCRIPT]: {FFFFFF}История персональных сообщений доступна через команду /pmh", 0x0FF6600)
+               end
+            end
+            
+            -- imgui.Spacing()
+            -- if imgui.Button(u8"Получить id и ники игроков рядом", imgui.ImVec2(300, 25)) then
+               -- copyNearestPlayersToClipboard()
+            -- end
+         elseif tabmenu.chat == 2 then
+            
+            if imgui.ToggleButton(u8"Анти-капс для сообщений в чате", checkbox.anticaps) then
+               ini.settings.anticaps = checkbox.anticaps.v
+               inicfg.save(ini, configIni)
+            end
+            
+            -- Outdate. Hamster deactivated on server
+            -- if isTrainingSanbox then
+               -- if imgui.ToggleButton(u8"Заткнуть хомяка (Бот Hamster)", checkbox.blockhamster) then
+                  -- ini.settings.blockhamster = checkbox.blockhamster.v
+                  -- inicfg.save(ini, configIni)
+               -- end
+            -- end
+            
+            if imgui.ToggleButton(u8"Скрывать все объявления и рекламу", checkbox.antiads) then
+               ini.settings.antiads = checkbox.antiads.v
+               inicfg.save(ini, configIni)
+            end  
+            
+            if imgui.ToggleButton(u8"Скрывать сообщения от ботов", checkbox.antichatbot) then
+               if checkbox.antichatbot.v then
+                  sampAddChatMessage("[SCRIPT]: {FFFFFF}Если не все сообщения ботов заблокировались воспользуйтесь расширенными чат-фильтрами", 0x0FF6600)
+                  if isTrainingSanbox then
+                     sampAddChatMessage("[SCRIPT]: {FFFFFF}Так же можно заблокировать сообщения от бота командой /ignore <id>", 0x0FF6600)
+                  end
+               end
+               ini.settings.antichatbot = checkbox.antichatbot.v
+               inicfg.save(ini, configIni)
+            end  
+            
+            if imgui.ToggleButton(u8"Скрывать отыгровки (/me, /do, /ame ..)", checkbox.chathiderp) then
+               ini.settings.chathiderp = checkbox.chathiderp.v
+               inicfg.save(ini, configIni)
+            end
+            
+            if imgui.ToggleButton(u8"Скрывать все сообщения кроме системных", checkbox.chatonlysystem) then
+               ini.settings.chatonlysystem = checkbox.chatonlysystem.v
+               inicfg.save(ini, configIni)
+            end
+            
+            if isTrainingSanbox then
+               if imgui.ToggleButton(u8"Скрывать приставку [CB] в чате", checkbox.chathidecb) then
+                  ini.settings.chathidecb = checkbox.chathidecb.v
+                  inicfg.save(ini, configIni)
+               end
+            end
+            imgui.Spacing()
+            
+            
+            if imgui.CollapsingHeader(u8"Расширенные настройки фильтров:") then
+               local filedata = {filepath, lines, symbols}
+               filedata.filepath = getGameDirectory().."//moonloader//resource//mappingtoolkit//chatfilter.txt"
+               filedata.lines = 1
+               filedata.symbols = 0
+               
+               imgui.TextColoredRGB("Вы можете убрать для себя надоедливые сообщения в чате")
+               imgui.TextColoredRGB("определив правила фильтрации по паттренам.")
+               
+               imgui.Spacing()
+               if ini.settings.chatfilter then
+               
+                  filedata.symbols = math.floor(string.len(textbuffer.chatfilters.v)/2)
+                  for s in string.gmatch(textbuffer.chatfilters.v, "\n" ) do
+                     filedata.lines = filedata.lines + 1
+                  end
+                  
+                  if filedata.symbols == 0 then
+                     local file = io.open(filedata.filepath, "r")
+                     textbuffer.chatfilters.v = file:read('*a')
+                     file:close()
+                  end
+                  
+                  if imgui.TooltipButton(u8"Обновить", imgui.ImVec2(80, 25), u8:encode("Загрузить шаблоны из файла chatfilter.txt")) then
+                     local file = io.open(filedata.filepath, "r")
+                     textbuffer.chatfilters.v = file:read('*a')
+                     file:close()
+                  end
+                  imgui.SameLine()
+                  if imgui.TooltipButton(u8"Изменить", imgui.ImVec2(80, 25), u8:encode("Разблокировать для редактирования")) then
+                     input.readonly = false
+                  end
+                  imgui.SameLine()
+                  if imgui.TooltipButton(u8"Сохранить", imgui.ImVec2(80, 25), u8:encode("Сохранить шаблоны в chatfilter.txt")) then
+                     if not input.readonly then
+                        local file = io.open(filedata.filepath, "w")
+                        file:write(textbuffer.chatfilters.v)
+                        file:close()
+                        sampAddChatMessage("Сохранено в файл: /moonloader/resource/mappingtoolkit/chatfilter.txt", -1)
+                     else
+                        sampAddChatMessage("Недоступно в режмие для чтения. Снимте режим RO (Readonly)", -1)
+                     end
+                  end
+                  imgui.SameLine()
+                  if imgui.TooltipButton(u8"Помощь", imgui.ImVec2(80, 25), u8:encode("Гайд по паттернам (Онлайн)")) then
+                     os.execute('explorer https://www.blast.hk/threads/62661/')
+                  end
+                  imgui.SameLine()
+                  if imgui.TooltipButton(u8"Отключить", imgui.ImVec2(80, 25), u8"Отключить расширенные фильтры для чата") then
+                     ini.settings.chatfilter = false
+                     inicfg.save(ini, configIni)
+                  end
+                  
+                  imgui.PushFont(fonts.multilinetextfont)
+                  if input.readonly then
+                     imgui.InputTextMultiline('##chatfilters', textbuffer.chatfilters, imgui.ImVec2(450, 145),
+                     imgui.InputTextFlags.EnterReturnsTrue + imgui.InputTextFlags.AllowTabInput + imgui.InputTextFlags.ReadOnly)
+                  else 
+                     imgui.InputTextMultiline('##chatfilters', textbuffer.chatfilters, imgui.ImVec2(450, 145),
+                     imgui.InputTextFlags.EnterReturnsTrue + imgui.InputTextFlags.AllowTabInput)
+                  end
+                  imgui.PopFont()
+                  
+                  imgui.Text("lines: "..filedata.lines.." symbols: "..filedata.symbols)
+                  imgui.SameLine()
+                  imgui.Text("                                      ")
+                  imgui.SameLine()
+                  if imgui.Selectable(input.readonly and "RO" or "W", false, 0, imgui.ImVec2(25, 15)) then
+                     input.readonly = not input.readonly
+                  end
+                  imgui.SameLine()
+                  if imgui.Selectable("Unlock IO", false, 0, imgui.ImVec2(50, 15)) then
+                     imgui.resetIO()
+                  end
+                  imgui.SameLine()
+                  imgui.TextQuestion("( ? )", u8"RO - Включить режим ReadOnly\nUnlock IO - разблокировать инпут если курсор забагался")
+               else
+                  if imgui.TooltipButton(u8"Включить расширенные фильтры", imgui.ImVec2(220, 25), u8"Активирует расширенные фильтры для чата") then
+                     ini.settings.chatfilter = true
+                     inicfg.save(ini, configIni)
+                  end
+               end
+               imgui.Spacing()
+            end
+         elseif tabmenu.chat == 3 then
+            
             local statistics = {lines = 0, results = 0}
+            imgui.TextColoredRGB("{696969}Поиск по чатлогу")
+            imgui.SameLine()
+            imgui.SetCursorPosX((imgui.GetWindowWidth() - imgui.CalcTextSize(u8"Экспорт##textsearch").x) / 2)
+            if imgui.TooltipButton(u8"Экспорт##textsearch", imgui.ImVec2(85, 25), u8"Сохранить результаты поиска") then
+               if #searchresults >= 1 then
+                  local filepath = getGameDirectory().."//moonloader//resource//mappingtoolkit//export//exportchat.txt"
+                  local file = io.open(filepath, "w")
+                  file:write("MappingTollkit: Exported search chat results:\n")
+                  for i, line in ipairs(searchresults) do
+                     file:write(tostring(u8:encode(line)))   
+                  end
+                  file:close()
+                  sampAddChatMessage("[SCRIPT]: {FFFFFF}Результаты поиска были сохранены в /moonloader/resource/mappingtoolkit/export/exportchat.txt", 0x0FF6600)
+               else
+                  sampAddChatMessage("[SCRIPT]: {FFFFFF}Нет результатов для сохранения!", 0x0FF6600)
+               end
+            end
+            imgui.SameLine()
+            if imgui.TooltipButton(u8"chatlog", imgui.ImVec2(85, 25), u8"Открыть лог чата (chatlog.txt)") then
+               os.execute('explorer '..getFolderPath(5) ..'\\GTA San Andreas User Files\\SAMP\\chatlog.txt')
+            end
+            
+            imgui.Spacing()
+            imgui.Text(u8"Введите ключевое слово для поиска:")
             
             imgui.PushItemWidth(270)
             if imgui.InputText("##searchbar", textbuffer.searchbar, imgui.InputTextFlags.EnterReturnsTrue) then
             end
             imgui.PopItemWidth()
             imgui.SameLine()
-            if imgui.TooltipButton(u8"Найти", imgui.ImVec2(65, 25), u8"Найти в чатлоге") then
+            if imgui.TooltipButton(u8"Найти", imgui.ImVec2(65, 25), u8"Найти ключевое слово в чатлоге") then
                imgui.resetIO()
                if string.len(textbuffer.searchbar.v) >= 2 then
                   local filepath = getFolderPath(5)..'\\GTA San Andreas User Files\\SAMP\\chatlog.txt'
@@ -5907,7 +6221,8 @@ function imgui.OnDrawFrame()
                      local file = io.open(filepath, "r")
                      searchresults = {}
                      local pattern = nil
-                     
+                     ini.tmp.searchbar = textbuffer.searchbar.v
+                     inicfg.save(ini, configIni)
                      for line in file:lines() do
                         if line:len() > 1 then
                            if checkbox.searchregexp.v then
@@ -5933,7 +6248,10 @@ function imgui.OnDrawFrame()
                      if statistics.results > 0 then
                         sampAddChatMessage(("[SCRIPT]: {FFFFFF}Найдено %d совпадений в %d строках"):format(statistics.results, statistics.lines), 0x0FF6600)
                      else
-                        sampAddChatMessage("[SCRIPT]: {FFFFFF}Не найдено совпадений", 0x0FF6600)
+                        sampAddChatMessage("[SCRIPT]: {FFFFFF}Не найдено совпадений.", 0x0FF6600)
+                        if not checkbox.searchregexp.v then
+                           sampAddChatMessage("[SCRIPT]: {FFFFFF}Попробуйте ввести ключевое слово для поиска без спецсимволов", 0x0FF6600)
+                        end
                         --table.insert(searchresults, "Совпадений не найдено")
                      end
                      file:close()
@@ -5941,28 +6259,14 @@ function imgui.OnDrawFrame()
                      sampAddChatMessage("[SCRIPT]: {FFFFFF}Чатлог не найден!", 0x0FF6600)
                   end
                else
-                  sampAddChatMessage("[SCRIPT]: {FFFFFF}Введите 2 и более символа для посика!", 0x0FF6600)
+                  sampAddChatMessage("[SCRIPT]: {FFFFFF}Введите 2 и более символа для поиcка!", 0x0FF6600)
                end
             end
             imgui.SameLine()
             if imgui.TooltipButton(u8"Очистить", imgui.ImVec2(70, 25), u8"Очистить результаты поиска") then
                imgui.resetIO()
                searchresults = {}
-            end
-            imgui.SameLine()
-            if imgui.TooltipButton(u8"Экспорт", imgui.ImVec2(70, 25), u8"Сохранить результаты поиска") then
-               if #searchresults >= 1 then
-                  local filepath = getGameDirectory().."//moonloader//resource//mappingtoolkit//export//exportchat.txt"
-                  local file = io.open(filepath, "w")
-                  file:write("MappingTollkit: Exported search chat results:\n")
-                  for i, line in ipairs(searchresults) do
-                     file:write(tostring(u8:encode(line)))   
-                  end
-                  file:close()
-                  sampAddChatMessage("[SCRIPT]: {FFFFFF}Результаты поиска были сохранены в /moonloader/resource/mappingtoolkit/export/exportchat.txt", 0x0FF6600)
-               else
-                  sampAddChatMessage("[SCRIPT]: {FFFFFF}Нет результатов для сохранения!", 0x0FF6600)
-               end
+               textbuffer.searchbar.v = ""
             end
             
             if imgui.Checkbox(u8"Игнорировать регистр", checkbox.searchaslower) then
@@ -6027,209 +6331,8 @@ function imgui.OnDrawFrame()
                   end
                end
             end
-            
-         end
-         if imgui.CollapsingHeader(u8"Фильтры:") then
-            if imgui.ToggleButton(u8"Анти-капс для сообщений в чате", checkbox.anticaps) then
-               ini.settings.anticaps = checkbox.anticaps.v
-               inicfg.save(ini, configIni)
-            end
-            
-            -- Outdate. Hamster deactivated on server
-            -- if isTrainingSanbox then
-               -- if imgui.ToggleButton(u8"Заткнуть хомяка (Бот Hamster)", checkbox.blockhamster) then
-                  -- ini.settings.blockhamster = checkbox.blockhamster.v
-                  -- inicfg.save(ini, configIni)
-               -- end
-            -- end
-            
-            if imgui.ToggleButton(u8"Скрывать все объявления и рекламу", checkbox.antiads) then
-               ini.settings.antiads = checkbox.antiads.v
-               inicfg.save(ini, configIni)
-            end  
-            
-            if imgui.ToggleButton(u8"Скрывать сообщения от ботов", checkbox.antichatbot) then
-               if checkbox.antichatbot.v then
-                  sampAddChatMessage("[SCRIPT]: {FFFFFF}Если не все сообщения ботов заблокировались воспользуйтесь расширенными чат-фильтрами", 0x0FF6600)
-                  if isTrainingSanbox then
-                     sampAddChatMessage("[SCRIPT]: {FFFFFF}Так же можно заблокировать сообщения от бота командой /ignore <id>", 0x0FF6600)
-                  end
-               end
-               ini.settings.antichatbot = checkbox.antichatbot.v
-               inicfg.save(ini, configIni)
-            end  
-            
-            if imgui.ToggleButton(u8"Скрывать отыгровки (/me, /do, /ame ..)", checkbox.chathiderp) then
-               ini.settings.chathiderp = checkbox.chathiderp.v
-               inicfg.save(ini, configIni)
-            end
-            
-            if imgui.ToggleButton(u8"Скрывать все сообщения кроме системных", checkbox.chatonlysystem) then
-               ini.settings.chatonlysystem = checkbox.chatonlysystem.v
-               inicfg.save(ini, configIni)
-            end
-            
-            if isTrainingSanbox then
-               if imgui.ToggleButton(u8"Скрывать приставку [CB] в чате", checkbox.chathidecb) then
-                  ini.settings.chathidecb = checkbox.chathidecb.v
-                  inicfg.save(ini, configIni)
-               end
-            end
-            imgui.Spacing()
-         end
-         
-         if imgui.CollapsingHeader(u8"Расширенные настройки фильтров:") then
-            local filedata = {filepath, lines, symbols}
-            filedata.filepath = getGameDirectory().."//moonloader//resource//mappingtoolkit//chatfilter.txt"
-            filedata.lines = 1
-            filedata.symbols = 0
-            
-            imgui.TextColoredRGB("Вы можете убрать для себя надоедливые сообщения в чате")
-            imgui.TextColoredRGB("определив правила фильтрации по паттренам.")
-            
-            imgui.Spacing()
-            if ini.settings.chatfilter then
-            
-               filedata.symbols = math.floor(string.len(textbuffer.chatfilters.v)/2)
-               for s in string.gmatch(textbuffer.chatfilters.v, "\n" ) do
-                  filedata.lines = filedata.lines + 1
-               end
                
-               if filedata.symbols == 0 then
-                  local file = io.open(filedata.filepath, "r")
-                  textbuffer.chatfilters.v = file:read('*a')
-                  file:close()
-               end
-               
-               if imgui.TooltipButton(u8"Обновить", imgui.ImVec2(80, 25), u8:encode("Загрузить шаблоны из файла chatfilter.txt")) then
-                  local file = io.open(filedata.filepath, "r")
-                  textbuffer.chatfilters.v = file:read('*a')
-                  file:close()
-               end
-               imgui.SameLine()
-               if imgui.TooltipButton(u8"Изменить", imgui.ImVec2(80, 25), u8:encode("Разблокировать для редактирования")) then
-                  input.readonly = false
-               end
-               imgui.SameLine()
-               if imgui.TooltipButton(u8"Сохранить", imgui.ImVec2(80, 25), u8:encode("Сохранить шаблоны в chatfilter.txt")) then
-                  if not input.readonly then
-                     local file = io.open(filedata.filepath, "w")
-                     file:write(textbuffer.chatfilters.v)
-                     file:close()
-                     sampAddChatMessage("Сохранено в файл: /moonloader/resource/mappingtoolkit/chatfilter.txt", -1)
-                  else
-                     sampAddChatMessage("Недоступно в режмие для чтения. Снимте режим RO (Readonly)", -1)
-                  end
-               end
-               imgui.SameLine()
-               if imgui.TooltipButton(u8"Помощь", imgui.ImVec2(80, 25), u8:encode("Гайд по паттернам (Онлайн)")) then
-                  os.execute('explorer https://www.blast.hk/threads/62661/')
-               end
-               imgui.SameLine()
-               if imgui.TooltipButton(u8"Отключить", imgui.ImVec2(80, 25), u8"Отключить расширенные фильтры для чата") then
-                  ini.settings.chatfilter = false
-                  inicfg.save(ini, configIni)
-               end
-               
-               imgui.PushFont(fonts.multilinetextfont)
-               if input.readonly then
-                  imgui.InputTextMultiline('##chatfilters', textbuffer.chatfilters, imgui.ImVec2(450, 145),
-                  imgui.InputTextFlags.EnterReturnsTrue + imgui.InputTextFlags.AllowTabInput + imgui.InputTextFlags.ReadOnly)
-               else 
-                  imgui.InputTextMultiline('##chatfilters', textbuffer.chatfilters, imgui.ImVec2(450, 145),
-                  imgui.InputTextFlags.EnterReturnsTrue + imgui.InputTextFlags.AllowTabInput)
-               end
-               imgui.PopFont()
-               
-               imgui.Text("lines: "..filedata.lines.." symbols: "..filedata.symbols)
-               imgui.SameLine()
-               imgui.Text("                                      ")
-               imgui.SameLine()
-               if imgui.Selectable(input.readonly and "RO" or "W", false, 0, imgui.ImVec2(25, 15)) then
-                  input.readonly = not input.readonly
-               end
-               imgui.SameLine()
-               if imgui.Selectable("Unlock IO", false, 0, imgui.ImVec2(50, 15)) then
-                  imgui.resetIO()
-               end
-               imgui.SameLine()
-               imgui.TextQuestion("( ? )", u8"RO - Включить режим ReadOnly\nUnlock IO - разблокировать инпут если курсор забагался")
-            else
-               if imgui.TooltipButton(u8"Включить расширенные фильтры", imgui.ImVec2(220, 25), u8"Активирует расширенные фильтры для чата") then
-                  ini.settings.chatfilter = true
-                  inicfg.save(ini, configIni)
-               end
-            end
-            imgui.Spacing()
          end
-         
-         imgui.Spacing()
-         imgui.Spacing()
-         
-         if isTrainingSanbox then
-            if imgui.TooltipButton(u8"mute", imgui.ImVec2(60, 25), u8"Настройки чата, позволяет заглушить указанный тип сообщений /mute") then
-               if dialog.main.v then dialog.main.v = false end
-               sampSendChat("/mute")
-            end
-            imgui.SameLine()
-         end
-         
-         imgui.PushItemWidth(175)
-         if imgui.Combo(u8'Чат по-умолчанию##cahtprefixcombo', combobox.chatprefix, chatPrefixNames) then
-            ini.settings.chatprefix = combobox.chatprefix.v
-            inicfg.save(ini, configIni)
-         end
-         imgui.PopItemWidth()
-         
-         if imgui.ToggleButton(u8"Останавливать чат при открытии поля ввода", checkbox.freezechat) then
-            if checkbox.freezechat.v then 
-               playerdata.isChatFreezed = true 
-            else
-               playerdata.isChatFreezed = false
-            end
-            ini.settings.freezechat = checkbox.freezechat.v
-            inicfg.save(ini, configIni)
-         end
-         
-         if imgui.ToggleButton(u8"Отключить весь чат", checkbox.allchatoff) then
-            ini.settings.allchatoff = checkbox.allchatoff.v
-            inicfg.save(ini, configIni)
-            if checkbox.allchatoff.v then
-               sampAddChatMessage("[SCRIPT]: {FFFFFF}Все сообщения в чат будут игнорироваться", 0x0FF6600)
-            end
-         end     
-         
-         if imgui.ToggleButton(u8(checkbox.hidechat.v and 'Показать панель с чатотм' or 'Скрыть панель с чатом'), checkbox.hidechat) then
-            memory.fill(getModuleHandle("samp.dll") + 0x63DA0, checkbox.hidechat.v and 0x90909090 or 0x0A000000, 4, true)
-            sampSetChatInputEnabled(checkbox.hidechat.v)
-         end
-         
-         if imgui.ToggleButton(u8"Очищать строку ввода после закрытия", checkbox.chatinputdrop) then
-            ini.settings.chatinputdrop = checkbox.chatinputdrop.v
-            inicfg.save(ini, configIni)
-         end
-         
-         if imgui.ToggleButton(u8"Копировать ник кликнутого игрока в TAB", checkbox.tabclickcopy) then
-            ini.settings.tabclickcopy = checkbox.tabclickcopy.v
-            inicfg.save(ini, configIni)
-            if ini.settings.tabclickcopy then
-               sampAddChatMessage("[SCRIPT]: {FFFFFF}Кликните на игрока чтобы скопировать его никнейм", 0x0FF6600)
-            end
-         end
-         
-         if imgui.ToggleButton(u8"Сохранять историю персональных сообщений /pmh", checkbox.savepmmessages) then
-            ini.settings.savepmmessages = checkbox.savepmmessages.v
-            inicfg.save(ini, configIni)
-            if ini.settings.savepmmessages then
-               sampAddChatMessage("[SCRIPT]: {FFFFFF}История персональных сообщений доступна через команду /pmh", 0x0FF6600)
-            end
-         end
-         
-         -- imgui.Spacing()
-         -- if imgui.Button(u8"Получить id и ники игроков рядом", imgui.ImVec2(300, 25)) then
-            -- copyNearestPlayersToClipboard()
-         -- end
-         
       elseif tabmenu.settings == 9 then
          
          local id = getLocalPlayerId()
@@ -7921,7 +8024,6 @@ function imgui.OnDrawFrame()
             imgui.Text(isPlayerControlLocked(playerPed) and u8('Управление: Заблокированно') or u8('Управление: Доступно'))
             imgui.Text(sampIsLocalPlayerSpawned() and u8('Заспавнен: Да') or u8('Заспавнен: Нет'))
             imgui.Text(string.format(u8"Курсор: %s", cursormodesList[cursormode+1]))
-            
             imgui.Spacing()
             
             imgui.TextColoredRGB("{FF0000}Эти функции могут триггерить античит! Будьте разумны в использовании")
@@ -13537,6 +13639,14 @@ function sampev.onSendCommand(command)
    end
    
    if isTrainingSanbox and command:find("^/loadvw") then
+      lua_thread.create(function()
+         wait(1500)
+         if not sampIsDialogActive() then
+            sampAddChatMessage("[SYNTAX]: {FFFFFF}/loadvw доступен только в своем мире", 0x09A9999)
+            wait(250)
+            sampSendChat("/world")
+         end
+      end)
       if command:find('(/%a+) (.+)') then
          local cmd, arg = command:match('(/%a+) (.+)')
          local id = tonumber(arg)
@@ -13687,8 +13797,7 @@ function sampev.onSendCommand(command)
    end
    
    if ini.settings.devmode and command:find("^/test") then   
-      imgui.closeDialogs()
-      -- allowPauseInWidescreen(true)
+      --imgui.closeDialogs()
       -- sampAddChatMessage("Test", -1)
       -- local rotationX, rotationY, rotationZ = 0.0
       -- local rotationX, rotationY, rotationZ = getObjectRotationVelocity(LastObject.handle)
@@ -14377,12 +14486,18 @@ function sampev.onTogglePlayerControllable(controllable)
 end
 
 function sampev.onSetCameraLookAt(lookAtPosition, cutType)
+   -- cutType:
+   -- 1 CAMERA_MOVE	The camera position and/or target will move to its new value over time.
+   -- 2 CAMERA_CUT	The camera position and/or target will move to its new value instantly.
+   playerdata.isCameraLookAt = true
+   playerdata.cameraLookAtCutType = cutType
    if checkbox.logcamset.v then
       print(("Set camera look at: %.2f, %.2f, %.2f cutType: %i"):format(lookAtPosition.x, lookAtPosition.y, lookAtPosition.z, cutType))
    end
    if checkbox.lockcamchange.v then
       return false
    end
+   
 end
 
 function sampev.onSetCameraPosition(position)
@@ -14395,6 +14510,9 @@ function sampev.onSetCameraPosition(position)
 end
 
 function sampev.onSetCameraBehind()
+   playerdata.isCameraLookAt = false
+   playerdata.isCameraInterpolate = false
+   
    if checkbox.logcamset.v then
       print("Server set camera behind player")
    end
@@ -14404,10 +14522,14 @@ function sampev.onSetCameraBehind()
 end
 
 function sampev.onInterpolateCamera(setPos, fromPos, destPos, time, mode)
+   playerdata.isCameraInterpolate = true
+   playerdata.cameraInterpolateMode = mode
+   
    if checkbox.logcamset.v then
       print(("InterpolateCamera from: %.2f, %.2f, %.2f dest: %.2f, %.2f, %.2f time:%i mode:%i"
       ):format(fromPos.x, fromPos.y, fromPos.z, destPos.x, destPos.y, destPos.z, time, mode))
    end
+   
    if checkbox.lockcamchange.v then
       return false
    end
@@ -15158,7 +15280,7 @@ function direction()
          elseif (angle >= 259 and angle <= 329) then
             return u8"Северо-восток"
          else
-            return angle
+            return u8"Неизвестно"
          end
       else
          return u8"Неизвестно"
