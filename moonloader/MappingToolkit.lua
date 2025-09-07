@@ -1949,7 +1949,7 @@ function main()
          end
          if ini.settings.bigoffsetwarning then
             if math.abs(offset.x) ~= math.abs(LastObject.position.x) then
-               if math.abs(offset.x) < maxOffsetDistance * 2 then -- ignore false positives
+               if math.abs(offset.x) < const.maxOffsetDistance * 2 then -- ignore false positives
                   if math.abs(offset.x) > const.maxOffsetDistance - 25 then
                      printStyledString('~y~ WARNING ~w~to much offset ~n~distance: ~y~'..math.abs(math.floor(offset.x)), 2000, 4)
                   elseif math.abs(offset.y) > const.maxOffsetDistance - 25 then
@@ -9434,17 +9434,17 @@ function imgui.OnDrawFrame()
                --if checkbox.hidestaticobjects and objectid ~= -1 then
                objectsInTable = objectsInTable + 1
                imgui.Columns(4)
-               imgui.SetColumnWidth(-1, 80)
+               imgui.SetColumnWidth(-1, 60)
                imgui.Text(" "..objectid)
                imgui.NextColumn()
-               imgui.SetColumnWidth(-1, 80)
+               imgui.SetColumnWidth(-1, 60)
                imgui.TextColoredRGB("{3f70d6}"..model)
                if imgui.IsItemClicked() then
                   setClipboardText(model)
                   sampAddChatMessage("Модель id: {696969}"..model.." {FFFFFF}скопирована в буффер обмена", -1)
                end
                imgui.NextColumn()
-               imgui.SetColumnWidth(-1, 350)
+               imgui.SetColumnWidth(-1, 355)
                if objectid ~= -1 then
                   if imgui.Selectable(" "..modelName) then
                      dialog.objectinfo.v = true
@@ -11393,6 +11393,11 @@ function sampev.onShowDialog(dialogId, style, title, button1, button2, text)
                         wait(200)
                         sampSetCurrentDialogEditboxText(worldname)
                      end)
+                     -- if LastData.lastDialogText then
+                        -- if not LastData.lastDialogText:find(tostring(worldname)) then
+                           -- printStyledString('~r~ WARNING ~w~Attempt to save an another world ~r~', 7000, 4)         
+                        -- end
+                     -- end
                   end
                   dialoghook.saveworldname = false
                end
