@@ -3,7 +3,7 @@ script_description("Assistant for mappers")
 script_dependencies('imgui', 'lib.samp.events')
 script_properties("work-in-pause")
 script_url("https://github.com/ins1x/MappingToolkit")
-script_version("4.18") -- pre-release 7
+script_version("4.18") -- release
 -- support sa-mp versions depends on SAMPFUNCS (0.3.7-R1, 0.3.7-R3-1, 0.3.7-R5, 0.3.DL)
 -- script_moonloader(16) moonloader v.0.26 
 -- editor options: tabsize 3, Unix (LF), encoding Windows-1251
@@ -8689,12 +8689,21 @@ function imgui.OnDrawFrame()
             if imgui.Button(u8"Все разрушаемые объекты",imgui.ImVec2(220, 25)) then
                os.execute('explorer "https://dev.prineside.com/ru/gtasa_samp_model_id/customsearch/?c%5B%5D=1&s=id-asc&bc=-1&bb=1&bt=-1&ba=-1"')
             end
+            
             if imgui.Button(u8"Все отображаемые по времени",imgui.ImVec2(220, 25)) then
                os.execute('explorer "https://dev.prineside.com/ru/gtasa_samp_model_id/customsearch/?c%5B%5D=1&s=id-asc&bc=-1&bb=-1&bt=1&ba=-1"')
             end
             imgui.SameLine()
             if imgui.Button(u8"Все объекты с анимацией",imgui.ImVec2(220, 25)) then
                os.execute('explorer "https://dev.prineside.com/ru/gtasa_samp_model_id/customsearch/?c%5B%5D=1&s=id-asc&bc=-1&bb=-1&bt=-1&ba=1"')
+            end
+            
+            if imgui.Button(u8"Детали конструкций",imgui.ImVec2(220, 25)) then
+               os.execute('explorer "https://dev.prineside.com/ru/gtasa_samp_model_id/category/construction/"')
+            end
+            imgui.SameLine()
+            if imgui.Button(u8"Частицы (Партиклы)",imgui.ImVec2(220, 25)) then
+               os.execute('explorer "https://dev.prineside.com/ru/gtasa_samp_model_id/category/samp-particles/"')
             end
             
             imgui.Spacing()
@@ -9444,7 +9453,7 @@ function imgui.OnDrawFrame()
                   sampAddChatMessage("Модель id: {696969}"..model.." {FFFFFF}скопирована в буффер обмена", -1)
                end
                imgui.NextColumn()
-               imgui.SetColumnWidth(-1, 355)
+               imgui.SetColumnWidth(-1, 350)
                if objectid ~= -1 then
                   if imgui.Selectable(" "..modelName) then
                      dialog.objectinfo.v = true
@@ -9454,6 +9463,7 @@ function imgui.OnDrawFrame()
                   imgui.TextColoredRGB("{696969}"..modelName)
                end
                imgui.NextColumn()
+               imgui.SetColumnWidth(-1, 90)
                imgui.Text(" "..distance)
                imgui.NextColumn()
                imgui.Columns(1)
@@ -15044,6 +15054,9 @@ end
 function DecToARGB(color)
    -- format color to readable format
    -- color = color or "none"
+   if not color then
+      return "none"
+   end
    local clr
    if tonumber(color) ~= -1 then
       clr = string.format("%X", color)
