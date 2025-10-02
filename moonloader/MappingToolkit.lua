@@ -3,7 +3,7 @@ script_description("Assistant for mappers")
 script_dependencies('imgui', 'lib.samp.events')
 script_properties("work-in-pause")
 script_url("https://github.com/ins1x/MappingToolkit")
-script_version("4.18") -- release
+script_version("4.19") -- beta 1
 -- support sa-mp versions depends on SAMPFUNCS (0.3.7-R1, 0.3.7-R3-1, 0.3.7-R5, 0.3.DL)
 -- script_moonloader(16) moonloader v.0.26 
 -- editor options: tabsize 3, Unix (LF), encoding Windows-1251
@@ -489,6 +489,7 @@ local checkbox = {
    searchaslower = imgui.ImBool(true),
    searchwithoutformat = imgui.ImBool(false),
    searchregexp = imgui.ImBool(false),
+   searchtxdignoredups = imgui.ImBool(false),
    lockcamchange = imgui.ImBool(false),
    pickupinfo = imgui.ImBool(false),
    lockcambehind = imgui.ImBool(false),
@@ -565,6 +566,7 @@ local slider = {
 local tabmenu = {
    main = 1,
    objects = 1,
+   objoptions = 1,
    settings = 9,
    chat = 1,
    coords = 1,
@@ -2975,6 +2977,11 @@ function imgui.OnDrawFrame()
                end
                imgui.SameLine()
             end
+            if imgui.TooltipButton(u8" ? ", imgui.ImVec2(35, 25), u8:encode("Поиск объектов")) then
+               imgui.selectTabMenu(3)
+               tabmenu.info = 2
+            end
+            imgui.SameLine()
             imgui.Text(u8"Последний modelid объекта: не выбран")
             -- if isTrainingSanbox then
                -- if imgui.IsItemClicked() then
@@ -3007,7 +3014,10 @@ function imgui.OnDrawFrame()
                   dialog.main.v = not dialog.main.v
                end
             end
-            
+            if imgui.TooltipButton(u8" ? ", imgui.ImVec2(35, 25), u8:encode("Поиск объектов")) then
+               imgui.selectTabMenu(3)
+               tabmenu.info = 2
+            end
             if LastObject.handle and isTrainingSanbox
             and LastObject.txdid ~= nil then
                local txdtable = sampTextureList[LastObject.txdid+1]
@@ -3075,7 +3085,7 @@ function imgui.OnDrawFrame()
                imgui.TextColoredRGB(string.format('{696969}Объект находится на расстоянии %.2f метров от вас', distance))
             end  
          end
-         
+               
          if isTrainingSanbox then
             if LastObject.modelid then
                if imgui.TooltipButton(u8"Редактировать", imgui.ImVec2(95, 25), u8:encode("Редактировать текущий объект (/oe)")) then
@@ -8584,10 +8594,10 @@ function imgui.OnDrawFrame()
             imgui.TextQuestion("( ? )", u8"Все запросы перенаправляет в ваш браузер")
             imgui.Spacing()
          elseif tabmenu.onlinesearch == 2 then
-            imgui.Text(u8"В этом разделе вы можете найти текстуры через сайт")
+            imgui.Text(u8"В этом разделе вы можете найти текстуры (онлайн)")
             imgui.SameLine()
-            imgui.Link("https://textures.xyin.ws/?page=textures&limit=100", "textures.xyin.ws")
-            imgui.SameLine()
+            -- imgui.Link("https://textures.xyin.ws/?page=textures&limit=100", "textures.xyin.ws")
+            -- imgui.SameLine()
             imgui.TextQuestion("( ? )", u8"Все запросы перенаправляет в ваш браузер")
             imgui.Spacing()
          end
@@ -8730,11 +8740,35 @@ function imgui.OnDrawFrame()
             if imgui.InputText("##CheckObject", textbuffer.objectid) then
             end
             imgui.PopItemWidth()
-            
             imgui.SameLine()
-            if imgui.Button(u8"Найти",imgui.ImVec2(65, 25)) then
+            imgui.Checkbox(u8"Скрывать дубликаты", checkbox.searchtxdignoredups)
+            
+            if imgui.Button(u8"Искать на textures.xyin.ws",imgui.ImVec2(195, 25)) then
                if string.len(textbuffer.objectid.v) > 3 then
-                  local link = 'explorer "https://textures.xyin.ws/?page=textures&limit=100&search='.. u8:decode(textbuffer.objectid.v)..'"'
+                  local link
+                  if checkbox.searchtxdignoredups.v then
+                     link = 'explorer "https://textures.xyin.ws/?page=textures&limit=100&nodups=1&search='.. u8:decode(textbuffer.objectid.v)..'"'
+                  else
+                     link = 'explorer "https://textures.xyin.ws/?page=textures&limit=100&search='.. u8:decode(textbuffer.objectid.v)..'"'
+                  end
+                  os.execute(link)
+                  if string.len(textbuffer.objectid.v) <= 24 then
+                     ini.tmp.osearch = textbuffer.objectid.v
+                     inicfg.save(ini, configIni)
+                  end
+               else
+                  sampAddChatMessage("[SCRIPT]: {FFFFFF}Введите больше 3-х символов для поиска",0x0FF6600)
+               end
+            end
+            imgui.SameLine()            
+            if imgui.Button(u8"Искать на gtxd.net",imgui.ImVec2(165, 25)) then
+               if string.len(textbuffer.objectid.v) > 3 then
+                  local link
+                  if checkbox.searchtxdignoredups.v then
+                     link = 'explorer "https://gtxd.net/?search='.. u8:decode(textbuffer.objectid.v)..'&page=1&show=100&noDuplicates=1"'
+                  else
+                     link = 'explorer "https://gtxd.net/?search='.. u8:decode(textbuffer.objectid.v)..'&page=1&show=100"'
+                  end
                   os.execute(link)
                   if string.len(textbuffer.objectid.v) <= 24 then
                      ini.tmp.osearch = textbuffer.objectid.v
@@ -8802,6 +8836,11 @@ function imgui.OnDrawFrame()
                textbuffer.objectid.v = rawstring
             end
             imgui.PopItemWidth()
+            
+            imgui.Spacing()
+            imgui.TextColoredRGB("Список текстур TXD по категориям на")
+            imgui.SameLine()
+            imgui.Link("https://dev.prineside.com/ru/gtasa_samp_game_texture/view/", "dev.prineside.com")
             imgui.Spacing()
             
             if isTrainingSanbox then
