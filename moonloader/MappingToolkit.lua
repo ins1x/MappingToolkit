@@ -3,7 +3,7 @@ script_description("Assistant for mappers")
 script_dependencies('imgui', 'lib.samp.events')
 script_properties("work-in-pause")
 script_url("https://github.com/ins1x/MappingToolkit")
-script_version("4.19") -- beta 1
+script_version("4.19") -- beta 2
 -- support sa-mp versions depends on SAMPFUNCS (0.3.7-R1, 0.3.7-R3-1, 0.3.7-R5, 0.3.DL)
 -- script_moonloader(16) moonloader v.0.26 
 -- editor options: tabsize 3, Unix (LF), encoding Windows-1251
@@ -165,6 +165,7 @@ local ini = inicfg.load({
       showstreamedvehs = false,
       showlastobject = true,
       showlasttxd = true,
+      showlastcb = true,
       showcursorpos = true,
    },
    ui = { -- imgui sets
@@ -400,6 +401,7 @@ local checkbox = {
    panelshowstreamedplayers = imgui.ImBool(ini.panel.showstreamedplayers),
    panelshowcursorpos = imgui.ImBool(ini.panel.showcursorpos),
    panelshoweditdata = imgui.ImBool(ini.panel.showlastobject),
+   panelshowlastcb = imgui.ImBool(ini.panel.showlastcb),
    
    usecolor = imgui.ImBool(ini.mentions.usecolor),
    usesound = imgui.ImBool(ini.mentions.usesound),
@@ -627,7 +629,8 @@ local textbuffer = {
    cmdlist = imgui.ImBuffer(65536),
    animlist = imgui.ImBuffer(65536),
    cordlist = imgui.ImBuffer(65536),
-   cblist = imgui.ImBuffer(65536)
+   callbacks = imgui.ImBuffer(65536),
+   textfunctions = imgui.ImBuffer(65536)
 }
 
 local nops = {
@@ -1087,16 +1090,29 @@ function main()
          file:close()
       end
       
-      if doesFileExist(getGameDirectory()..'\\moonloader\\resource\\mappingtoolkit\\cblist.txt') then
+      if doesFileExist(getGameDirectory()..'\\moonloader\\resource\\mappingtoolkit\\callbacks.txt') then
          local file = io.open(getGameDirectory()..
-         "//moonloader//resource//mappingtoolkit//cblist.txt", "r")
-         textbuffer.cblist.v = file:read('*a')
+         "//moonloader//resource//mappingtoolkit//callbacks.txt", "r")
+         textbuffer.callbacks.v = file:read('*a')
          file:close()
       else
-         local file = io.open("moonloader/resource/mappingtoolkit/cblist.txt", "w")
+         local file = io.open("moonloader/resource/mappingtoolkit/callbacks.txt", "w")
          file:write(u8"Файл поврежден либо не найден\n")
          file:write(u8"Скачать стандартный можно по ссылке:\n")
-         file:write("https://github.com/ins1x/MappingToolkit/blob/main/moonloader/resource/mappingtoolkit/cblist.txt")
+         file:write("https://github.com/ins1x/MappingToolkit/blob/main/moonloader/resource/mappingtoolkit/callbacks.txt")
+         file:close()
+      end
+      
+      if doesFileExist(getGameDirectory()..'\\moonloader\\resource\\mappingtoolkit\\textfunctions.txt') then
+         local file = io.open(getGameDirectory()..
+         "//moonloader//resource//mappingtoolkit//textfunctions.txt", "r")
+         textbuffer.textfunctions.v = file:read('*a')
+         file:close()
+      else
+         local file = io.open("moonloader/resource/mappingtoolkit/textfunctions.txt", "w")
+         file:write(u8"Файл поврежден либо не найден\n")
+         file:write(u8"Скачать стандартный можно по ссылке:\n")
+         file:write("https://github.com/ins1x/MappingToolkit/blob/main/moonloader/resource/mappingtoolkit/textfunctions.txt")
          file:close()
       end
       
@@ -1926,6 +1942,12 @@ function main()
          if ini.panel.showlasttxd then
             if LastObject.txdid then
                rendertext = rendertext.." | {0080BC}txdid: "..LastObject.txdid.."{FFFFFF}"
+            end
+         end
+         
+         if ini.panel.showlastcb then
+            if LastData.lastCb then
+               rendertext = rendertext.." | {0080BC}cbid: "..LastData.lastCb.."{FFFFFF}"
             end
          end
          renderFontDrawText(fonts.backgroundfont, rendertext, 15, y-15, 0xFFFFFFFF)
@@ -2977,6 +2999,7 @@ function imgui.OnDrawFrame()
                end
                imgui.SameLine()
             end
+            imgui.SameLine()
             if imgui.TooltipButton(u8" ? ", imgui.ImVec2(35, 25), u8:encode("Поиск объектов")) then
                imgui.selectTabMenu(3)
                tabmenu.info = 2
@@ -3014,6 +3037,7 @@ function imgui.OnDrawFrame()
                   dialog.main.v = not dialog.main.v
                end
             end
+            imgui.SameLine()
             if imgui.TooltipButton(u8" ? ", imgui.ImVec2(35, 25), u8:encode("Поиск объектов")) then
                imgui.selectTabMenu(3)
                tabmenu.info = 2
@@ -5406,7 +5430,7 @@ function imgui.OnDrawFrame()
                      exportText = string.format("%s %s", exportText, textbuffer.txdsprite.v)
                   end
                else
-                  exportText = string.format("%i %.2f %.2f %.2f %.2f %i %.2f %.2f 0x%s 0x%s %i %i %i %i %i", 
+                  exportText = string.format("%i %.2f %.2f %.2f %.2f %i %.2f %.2f 0x%s 0x%s %i %i %i %i %i %s", 
                   id, posX, posY, boxSizeX, boxSizeY, style, letSizeX, letSizeY, letColorArgb, outlineColorArgb, 
                   outline, shadow, reversedAlign, clickable, showtime, text)
                end
@@ -6633,6 +6657,12 @@ function imgui.OnDrawFrame()
                ini.panel.showlastobject = checkbox.panelshoweditdata.v
                inicfg.save(ini, configIni)
             end
+            
+            if imgui.Checkbox(u8'Показывать информацию о последнем КБ', checkbox.panelshowlastcb) then
+               ini.panel.showlastcb = checkbox.panelshowlastcb.v
+               inicfg.save(ini, configIni)
+            end
+            
             imgui.Text(u8"Прочее:")
             if imgui.Checkbox(u8'Показывать ID над HUD', checkbox.showidonhud) then
                ini.settings.showidonhud = checkbox.showidonhud.v
@@ -8855,85 +8885,167 @@ function imgui.OnDrawFrame()
          end
          
       elseif tabmenu.info == 7 then
-         local filepath = getGameDirectory().."//moonloader//resource//mappingtoolkit//cblist.txt"
-         
          -- if imgui.TooltipButton(u8"Unlock IO", imgui.ImVec2(80, 25), u8:encode("разблокировать инпут если курсор забагался")) then
             -- imgui.resetIO()
          -- end
          --imgui.SameLine()
-
-         imgui.PushFont(fonts.multilinetextfont)
-         imgui.InputTextMultiline('##cblist', textbuffer.cblist, imgui.ImVec2(490, 350),
-         imgui.InputTextFlags.EnterReturnsTrue + imgui.InputTextFlags.AllowTabInput + imgui.InputTextFlags.ReadOnly)
-         imgui.PopFont()
-         
-         
-         if imgui.TooltipButton("/cblist", imgui.ImVec2(75, 25), u8"Список комадных блоков") then
-            sampSendChat("/cblist")
-            dialog.main.v = false
+         imgui.PushStyleVar(imgui.StyleVar.ItemSpacing, imgui.ImVec2(2, 0))
+         if tabmenu.cb == 1 then
+            imgui.PushStyleColor(imgui.Col.Button, imgui.GetStyle().Colors[imgui.Col.ButtonHovered])
+            if imgui.Button(u8"Командные блоки", imgui.ImVec2(135, 25)) then tabmenu.cb = 1 end
+            imgui.PopStyleColor()
+         else
+            if imgui.Button(u8"Командные блоки", imgui.ImVec2(135, 25)) then tabmenu.cb = 1 end
          end
          imgui.SameLine()
-         if imgui.TooltipButton("/tb", imgui.ImVec2(75, 25), u8"Список триггер-блоков в мире") then
-            sampSendChat("/tb")
-            dialog.main.v = false
+         if tabmenu.cb == 2 then
+            imgui.PushStyleColor(imgui.Col.Button, imgui.GetStyle().Colors[imgui.Col.ButtonHovered])
+            if imgui.Button(u8"Текстовые команды", imgui.ImVec2(135, 25)) then tabmenu.cb = 2 end
+            imgui.PopStyleColor()
+         else
+            if imgui.Button(u8"Текстовые команды", imgui.ImVec2(135, 25)) then tabmenu.cb = 2 end
          end
          imgui.SameLine()
-         if imgui.TooltipButton("/timers", imgui.ImVec2(75, 25), u8"Список таймеров мира") then
-            sampSendChat("/timers")
-            dialog.main.v = false
-         end
-         imgui.SameLine()
-         if imgui.TooltipButton("/server", imgui.ImVec2(75, 25), u8"Список серверных массивов мира") then
-            sampSendChat("/server")
-            dialog.main.v = false
-         end
-         imgui.SameLine()
-         if imgui.TooltipButton("/varlist", imgui.ImVec2(75, 25), u8"Список серверных переменных мира") then
-            sampSendChat("/varlist")
-            dialog.main.v = false
-         end
-         imgui.SameLine()
-         if imgui.TooltipButton("/pvarlist", imgui.ImVec2(75, 25), u8"Список пользовательских переменных мира") then
-            sampSendChat("/pvarlist")
-            dialog.main.v = false
-         end
-         
-         imgui.Text(u8"Найти по описанию")
-         imgui.SameLine()
-         imgui.PushStyleVar(imgui.StyleVar.ItemSpacing, imgui.ImVec2(4, 4))
-         imgui.PushItemWidth(200)
-         imgui.InputText("##search", textbuffer.searchbar)
-         imgui.PopItemWidth()
-         imgui.SameLine()
-         if imgui.TooltipButton(u8"Поиск##Search", imgui.ImVec2(60, 25), u8:encode("Поиск по тексту (Регистрозависим)")) then
-            local results = 0
-            local resultline = 0
-            if string.len(textbuffer.searchbar.v) > 0 then
-               for line in io.lines(filepath) do
-                  resultline = resultline + 1
-                  if line:find(textbuffer.searchbar.v, 1, true) then
-                     results = results + 1
-                     sampAddChatMessage("Строка "..resultline.." : "..u8:decode(line), -1)
-                  end
-               end
-            end
-            if not results then
-               sampAddChatMessage("Результат поиска: Не найдено", -1)
-            end
-         end
-         imgui.SameLine()
-         if imgui.Selectable("Unlock IO", false, 0, imgui.ImVec2(55, 15)) then
-            imgui.resetIO()
-         end
-         if imgui.IsItemHovered() then
-            imgui.BeginTooltip()
-            imgui.PushTextWrapPos(600)
-            imgui.TextUnformatted(u8"Unlock IO - разблокировать инпут если курсор забагался")
-            imgui.PopTextWrapPos()
-            imgui.EndTooltip()
+         if tabmenu.cb == 3 then
+            imgui.PushStyleColor(imgui.Col.Button, imgui.GetStyle().Colors[imgui.Col.ButtonHovered])
+            if imgui.Button(u8"Коллбэки", imgui.ImVec2(135, 25)) then tabmenu.cb = 3 end
+            imgui.PopStyleColor()
+         else
+            if imgui.Button(u8"Коллбэки", imgui.ImVec2(135, 25)) then tabmenu.cb = 3 end
          end
          imgui.PopStyleVar()
-      end -- end tabmenu.info
+         
+         if tabmenu.cb == 1 then
+            imgui.Spacing()
+            local cmbtext = [[
+            Командные блоки(КБ) - это логические блоки позволяющие игрокам создавать
+            уникальный функционал для миров. Вы можете задавать последовательности 
+            различных действий и обработку условий по множеству параметров.
+            ]]
+            
+            local cmbcmds = [[
+            Команды для взаимодействия с КБ:
+            {FF6600}/cb{FFFFFF} - создать командный блокам
+            {FF6600}/cbdell{FFFFFF} - удалить блок
+            {FF6600}/cbtp{FFFFFF} - телепортрт к блоку
+            {FF6600}/cbedit{FFFFFF} - открыть меню блока
+            {FF6600}/cbed{FFFFFF} - редактировать последний блок
+            {FF6600}/data{FFFFFF} - информация об игроке и данных в его массиве.
+            {FF6600}/timers{FFFFFF} - список таймеров мира
+            {FF6600}/oldcb{FFFFFF} - включить устарелые текстовые команды
+            {FF6600}/cmb | //<text>{FFFFFF} - активировать КБ аллиас
+            {FF6600}/cblist{FFFFFF} - список всех командных блоков в мире
+            {FF6600}/tb{FFFFFF} - список триггер блоков в мире
+            {FF6600}/shopmenu{FFFFFF} - управление магазинами мира для КБ
+            ]]
+            
+            imgui.PushStyleVar(imgui.StyleVar.ItemSpacing, imgui.ImVec2(1, 0.5))
+            imgui.TextColoredRGB(string.gsub(cmbtext, "   ", ""))
+            imgui.PopStyleVar()
+            
+            imgui.Spacing()
+            
+            imgui.PushStyleVar(imgui.StyleVar.ItemSpacing, imgui.ImVec2(1, 0.5))
+            imgui.TextColoredRGB(string.gsub(cmbcmds, "   ", ""))
+            imgui.PopStyleVar()
+            
+            imgui.Spacing()
+            imgui.PushStyleVar(imgui.StyleVar.ItemSpacing, imgui.ImVec2(1, 1))
+            imgui.TextColoredRGB("Подробнее:")
+            imgui.Link("https://forum.training-server.com/d/6166-kollbeki-wiki", u8"Коллбэки - Вики с TRAINING-FORUM")
+            imgui.Link("https://forum.training-server.com/d/19980-spisok-tekstovyh-funktsiy-wiki/21", u8"Текстовые функции - Вики с TRAINING-FORUM")
+            imgui.PopStyleVar()
+            
+            imgui.Spacing()
+            imgui.Spacing()
+            
+            if imgui.TooltipButton("/cblist", imgui.ImVec2(75, 25), u8"Список комадных блоков") then
+               sampSendChat("/cblist")
+               dialog.main.v = false
+            end
+            imgui.SameLine()
+            if imgui.TooltipButton("/tb", imgui.ImVec2(75, 25), u8"Список триггер-блоков в мире") then
+               sampSendChat("/tb")
+               dialog.main.v = false
+            end
+            imgui.SameLine()
+            if imgui.TooltipButton("/timers", imgui.ImVec2(75, 25), u8"Список таймеров мира") then
+               sampSendChat("/timers")
+               dialog.main.v = false
+            end
+            imgui.SameLine()
+            if imgui.TooltipButton("/server", imgui.ImVec2(75, 25), u8"Список серверных массивов мира") then
+               sampSendChat("/server")
+               dialog.main.v = false
+            end
+            imgui.SameLine()
+            if imgui.TooltipButton("/varlist", imgui.ImVec2(75, 25), u8"Список серверных переменных мира") then
+               sampSendChat("/varlist")
+               dialog.main.v = false
+            end
+            imgui.SameLine()
+            if imgui.TooltipButton("/pvarlist", imgui.ImVec2(75, 25), u8"Список пользовательских переменных мира") then
+               sampSendChat("/pvarlist")
+               dialog.main.v = false
+            end
+         
+         elseif tabmenu.cb == 2 then
+            imgui.PushFont(fonts.multilinetextfont)
+            imgui.InputTextMultiline('##textfunctions', textbuffer.textfunctions, imgui.ImVec2(490, 330),
+            imgui.InputTextFlags.EnterReturnsTrue + imgui.InputTextFlags.AllowTabInput + imgui.InputTextFlags.ReadOnly)
+            imgui.PopFont()
+         elseif tabmenu.cb == 3 then
+            imgui.PushFont(fonts.multilinetextfont)
+            imgui.InputTextMultiline('##callbacks', textbuffer.callbacks, imgui.ImVec2(490, 330),
+            imgui.InputTextFlags.EnterReturnsTrue + imgui.InputTextFlags.AllowTabInput + imgui.InputTextFlags.ReadOnly)
+            imgui.PopFont()
+         end
+         
+         if tabmenu.cb > 1 then
+            local filepath
+            if tabmenu.cb == 2 then
+               filepath = getGameDirectory().."//moonloader//resource//mappingtoolkit//textfunctions.txt"
+            elseif tabmenu.cb == 3 then   
+               filepath = getGameDirectory().."//moonloader//resource//mappingtoolkit//callbacks.txt"
+            end
+            imgui.Text(u8"Найти по описанию")
+            imgui.SameLine()
+            imgui.PushStyleVar(imgui.StyleVar.ItemSpacing, imgui.ImVec2(4, 4))
+            imgui.PushItemWidth(200)
+            imgui.InputText("##search", textbuffer.searchbar)
+            imgui.PopItemWidth()
+            imgui.SameLine()
+            if imgui.TooltipButton(u8"Поиск##Search", imgui.ImVec2(60, 25), u8:encode("Поиск по тексту (Регистрозависим)")) then
+               local results = 0
+               local resultline = 0
+               if string.len(textbuffer.searchbar.v) > 0 then
+                  for line in io.lines(filepath) do
+                     resultline = resultline + 1
+                     if line:find(textbuffer.searchbar.v, 1, true) then
+                        results = results + 1
+                        --sampAddChatMessage("Строка "..resultline.." : "..u8:decode(line), -1)
+                        sampAddChatMessage(u8:decode(line), -1)
+                     end
+                  end
+               end
+               if results < 1 then
+                  sampAddChatMessage("Результат поиска: Совпадений не найдено", -1)
+               end
+            end
+            imgui.SameLine()
+            if imgui.Selectable("Unlock IO", false, 0, imgui.ImVec2(55, 15)) then
+               imgui.resetIO()
+            end
+            if imgui.IsItemHovered() then
+               imgui.BeginTooltip()
+               imgui.PushTextWrapPos(600)
+               imgui.TextUnformatted(u8"Unlock IO - разблокировать инпут если курсор забагался")
+               imgui.PopTextWrapPos()
+               imgui.EndTooltip()
+            end
+            imgui.PopStyleVar()
+         end
+      end 
          
       imgui.NextColumn()
       
@@ -10762,7 +10874,12 @@ function sampev.onSendDialogResponse(dialogId, button, listboxId, input)
                sampSendChat("/stream")
             end)
          end
-         
+         if input:find("Установить игроку границу мира") then
+            lua_thread.create(function()
+               wait(500)
+               sampSetCurrentDialogEditboxText(tostring("20000 -20000 20000 -20000"))
+            end)
+         end
          if input:find("Сделать мир статичным") then
             sampAddChatMessage("[SCRIPT]: {FFFFFF}Перед тем как сделать мир статичным, установите желаемое описание и название мира!", 0x0FF6600)
             sampAddChatMessage("[SCRIPT]: {FFFFFF}Вы сможете менять эти параметры позже, но они будут возвращаться на текущие после рестарта сервера.", 0x0FF6600)
@@ -11197,11 +11314,11 @@ function sampev.onShowDialog(dialogId, style, title, button1, button2, text)
       end
       
       if ini.settings.extendedmenues then
-         if title:find('Поиск') then
-            local newtext = text ..
-            "\nИскать можно так же через /cbsearch <text>\n"
-            return {dialogId, style, title, button1, button2, newtext}
-         end
+         -- if title:find('Поиск') then
+            -- local newtext = text ..
+            -- "\nИскать можно так же через /cbsearch <text>\n"
+            -- return {dialogId, style, title, button1, button2, newtext}
+         -- end
          
          if title:find('Редактирование') then
             if text:find("скина, который будет использован") then
@@ -13515,37 +13632,6 @@ function sampev.onSendCommand(command)
       end
    end
    
-   if command:find("^/cbsearch") and isTrainingSanbox then
-      if command:find('(/%a+) (.+)') then
-         local cmd, arg = command:match('(/%a+) (.+)')
-         local searchtext = tostring(arg)
-         if string.len(searchtext) < 2 then
-            sampAddChatMessage("Минимальное кол-во символов для поиска = 2", -1)
-            return false
-         end
-         local filepath = getGameDirectory().."//moonloader//resource//mappingtoolkit//cblist.txt"
-         local results = 0
-         local resultline = 0
-         if string.len(searchtext) > 0 then
-            for line in io.lines(filepath) do
-               resultline = resultline + 1
-               if line:find(searchtext, 1, true) then
-                  results = results + 1
-                  sampAddChatMessage(""..u8:decode(line), -1)
-               end
-            end
-         end
-         if results == 0 then
-            sampAddChatMessage("Результат поиска: Совпадений для "..tostring(arg).." не найдено", -1)
-         end
-         return false
-      else 
-         sampAddChatMessage("[SCRIPT]: Введите информацию для поиска", 0x0FF6600)
-         sampAddChatMessage("[SYNTAX]: {FFFFFF}/cbsearch tick", 0x09A9999)
-         return false
-      end
-   end
-   
    if command:find("^/osearch") and not isTrainingSanbox then
       if command:find('(/%a+) (.+)') then
          local cmd, arg = command:match('(/%a+) (.+)')
@@ -13588,6 +13674,15 @@ function sampev.onSendCommand(command)
             sampSendChat("/pm "..id.." "..message)
          end
       end
+   end
+   
+   if isTrainingSanbox and command:find("^/cbed") then
+      if LastData.lastCb then
+         sampSendChat("/cbedit "..LastData.lastCb)
+      else
+         sampSendChat("/cblist")
+      end
+      return false
    end
    
    if command:find("^/last") then
