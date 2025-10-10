@@ -196,7 +196,7 @@ inicfg.save(ini, configIni)
 local sizeX, sizeY = getScreenResolution()
 local v = nil
 
-local isTrainingSanbox = false
+local isTrainingSandbox = false
 
 local searchresults = {}
 local playerAtachedObjects = {}
@@ -1274,7 +1274,7 @@ function main()
       local servername = sampGetCurrentServerName()
       
       if servername:find("TRAINING") or ini.settings.forcerun then
-         isTrainingSanbox = true
+         isTrainingSandbox = true
       end
       
       -- Unload script if not localhost server and not is TRAINING-SANDBOX
@@ -1296,7 +1296,7 @@ function main()
       imgui.Process = dialog.main.v
       
       -- chatfix
-      if isTrainingSanbox then
+      if isTrainingSandbox then
          if isKeyJustPressed(0x54) 
          and not sampIsScoreboardOpen() 
          and not isSampfuncsConsoleActive() then
@@ -1403,7 +1403,7 @@ function main()
          end
       end
          
-      if isTrainingSanbox then
+      if isTrainingSandbox then
          -- CTRL + SHIFT + V
          if isKeyDown(0x11) and isKeyDown(0x10) and isKeyDown(0x56) 
          and not sampIsChatInputActive() and not isPauseMenuActive()
@@ -1435,6 +1435,7 @@ function main()
             
             if LastData.lastTextBuffer then
                if LastData.lastTextBuffer:len() > 1 then
+                  wait(50)
                   sampSetCurrentDialogEditboxText(LastData.lastTextBuffer)
                end
             end
@@ -1527,7 +1528,7 @@ function main()
             end 	
          end
          
-         if isTrainingSanbox and ini.settings.remapnum then
+         if isTrainingSandbox and ini.settings.remapnum then
             -- PageUP <-- Num4 (and edit.mode == 4)
             if isKeyDown(0x21) and not sampIsChatInputActive() 
             and not sampIsDialogActive() and not isPauseMenuActive() 
@@ -1577,7 +1578,7 @@ function main()
             -- end
          -- end
          
-         if isTrainingSanbox then
+         if isTrainingSandbox then
             -- Backspace reset texturelist to 0 page
             if edit.mode == 4 and dialoghook.textureslist then
                if isKeyJustPressed(0x08) and not sampIsChatInputActive() 
@@ -1590,7 +1591,7 @@ function main()
             end
          end
          
-         if isTrainingSanbox and isCharInAnyCar(playerPed) then
+         if isTrainingSandbox and isCharInAnyCar(playerPed) then
             -- Fix exit from RC toys on F key
             if isKeyJustPressed(0x46) and not sampIsChatInputActive() 
             and not sampIsDialogActive() and not isPauseMenuActive() 
@@ -1622,7 +1623,7 @@ function main()
             checkbox.showobjectsmodel.v = not checkbox.showobjectsmodel.v
          end
          
-         if isTrainingSanbox and dialoghook.previewdialog then
+         if isTrainingSandbox and dialoghook.previewdialog then
             -- Switching textdraws with arrow buttons, mouse buttons, pgup-pgdown keys
             if isKeyJustPressed(0x25) or isKeyJustPressed(0x05) 
             or isKeyJustPressed(0x21) and sampIsCursorActive() 
@@ -1639,7 +1640,7 @@ function main()
             end
          end
          
-         if isTrainingSanbox then
+         if isTrainingSandbox then
             -- M key menu /vw and /world 
             if isKeyJustPressed(0x4D) and not sampIsChatInputActive() and not sampIsDialogActive()
             and not isPauseMenuActive() and not isSampfuncsConsoleActive() then 
@@ -2206,14 +2207,14 @@ function imgui.OnDrawFrame()
       end
       imgui.SameLine()
       if imgui.TooltipButton(u8"Меню игрока", imgui.ImVec2(100, 25), u8"Открыть серверное меню взаимодействия с игроком") then
-         if isTrainingSanbox then
+         if isTrainingSandbox then
             sampSendChat("/data " .. chosen.player)
          end
          dialog.main.v = false
       end
 
       if imgui.TooltipButton(u8"Наблюдать", imgui.ImVec2(100, 25), u8"Наблюдать за игроком") then      
-         if isTrainingSanbox then
+         if isTrainingSandbox then
             sampSendChat("/sp " .. chosen.player)
          else
             sampSendChat("/spec " .. chosen.player)
@@ -2226,7 +2227,7 @@ function imgui.OnDrawFrame()
             if res then
                if id == chosen.player then
                   local pposX, pposY, pposZ = getCharCoordinates(v)
-                  if isTrainingSanbox then
+                  if isTrainingSandbox then
                      sampSendChat(string.format("/xyz %f %f %f",
                      pposX+0.5, pposY+0.5, pposZ), -1)
                   else
@@ -2239,7 +2240,7 @@ function imgui.OnDrawFrame()
           end
        end
        
-       if isTrainingSanbox then
+       if isTrainingSandbox then
           if imgui.TooltipButton(u8"Пробить игрока", imgui.ImVec2(205, 25), u8"Проверка игрока на TRAINING-Checker (online)") then
              local link = 'explorer "https://trainingchecker.vercel.app/player?nickname='..nickname..'"'
              os.execute(link)
@@ -2421,7 +2422,7 @@ function imgui.OnDrawFrame()
                sampAddChatMessage("Координаты скопированы в буффер обмена", -1)
                local posA = getCharHeading(playerPed)
                sampAddChatMessage(string.format("Ваши координаты: {696969}%.2f %.2f %.2f {FFFFFF}Угол поворота: {696969}%.2f", tpcpos.x, tpcpos.y, tpcpos.z, posA), -1)
-               if isTrainingSanbox and playerdata.isWorldHoster then
+               if isTrainingSandbox and playerdata.isWorldHoster then
                   sampAddChatMessage(string.format("Используйте: /xyz {696969}%.2f %.2f %.2f", tpcpos.x, tpcpos.y, tpcpos.z), -1)
                end
             end
@@ -2458,7 +2459,7 @@ function imgui.OnDrawFrame()
                local result, x, y, z = getNearestRoadCoordinates()
                if result then
                   local dist = getDistanceBetweenCoords3d(x, y, z, getCharCoordinates(playerPed))
-                  if not isTrainingSanbox then
+                  if not isTrainingSandbox then
                      if dist < 10.0 then 
                         setCharCoordinates(playerPed, x, y, z + 3.0)
                         sampAddChatMessage("[SCRIPT]: {FFFFFF}Вы телепортированы на ближайшую поверхность", 0x0FF6600)
@@ -2528,7 +2529,7 @@ function imgui.OnDrawFrame()
             if imgui.TooltipButton(u8"Запросить спавн", imgui.ImVec2(130, 25), u8"Отправить SendRequestSpawn серверу") then
                sampSendRequestSpawn()
             end
-            if isTrainingSanbox then
+            if isTrainingSandbox then
                if imgui.TooltipButton(u8"Слапнуть себя", imgui.ImVec2(200, 25), u8"Подбросить себя /slapme") then
                   sampSendChat("/slapme")
                end
@@ -2537,7 +2538,7 @@ function imgui.OnDrawFrame()
                   sampSendChat("/spawnme")
                end
             end
-            if isTrainingSanbox then
+            if isTrainingSandbox then
                if imgui.TooltipButton(u8"Выбрать интерьер", imgui.ImVec2(200, 25), u8"Выбрать интерьер для мира /int") then
                   sampSendChat("/int")
                   dialog.main.v = false
@@ -2664,7 +2665,7 @@ function imgui.OnDrawFrame()
             if imgui.Button(u8"По координатам (системно)", imgui.ImVec2(200, 25)) then
                freezeCharPosition(playerPed, false)
                if textbuffer.tpcx.v then
-                  if isTrainingSanbox then
+                  if isTrainingSandbox then
                      sampSendChat(string.format("/xyz %f %f %f", textbuffer.tpcx.v, textbuffer.tpcy.v, textbuffer.tpcz.v), -1)
                      sampAddChatMessage(string.format("[SCRIPT]: {FFFFFF}Телепорт на координаты: %.1f %.1f %.1f",
                      textbuffer.tpcx.v, textbuffer.tpcy.v, textbuffer.tpcz.v), 0x0FF6600)
@@ -2685,7 +2686,7 @@ function imgui.OnDrawFrame()
                   freezeCharPosition(playerPed, false)
                
                   if textbuffer.tpcx.v then
-                     if isTrainingSanbox then
+                     if isTrainingSandbox then
                         sampSendChat(string.format("/xyz %f %f %f", textbuffer.tpcx.v, textbuffer.tpcy.v, textbuffer.tpcz.v), -1)
                         sampAddChatMessage(string.format("[SCRIPT]: {FFFFFF}Телепорт на метку: %.1f %.1f %.1f",
                         textbuffer.tpcx.v, textbuffer.tpcy.v, textbuffer.tpcz.v), 0x0FF6600)
@@ -2721,7 +2722,7 @@ function imgui.OnDrawFrame()
                   freezeCharPosition(playerPed, false)
                
                   if textbuffer.tpcx.v then
-                     if isTrainingSanbox then
+                     if isTrainingSandbox then
                         setCharCoordinates(playerPed, textbuffer.tpcx.v, textbuffer.tpcy.v, textbuffer.tpcz.v)
                         sampAddChatMessage(string.format("[SCRIPT]: {FFFFFF}Телепорт на метку: %.1f %.1f %.1f",
                         textbuffer.tpcx.v, textbuffer.tpcy.v, textbuffer.tpcz.v), 0x0FF6600)
@@ -2992,7 +2993,7 @@ function imgui.OnDrawFrame()
                sampAddChatMessage("[SCRIPT]: {FFFFFF}modelid скопирован в буффер обмена", 0x0FF6600)
             end
          else
-            if isTrainingSanbox then
+            if isTrainingSandbox then
                if imgui.TooltipButton(u8"/olist", imgui.ImVec2(65, 25), u8:encode("Список всех созданнных вами в мире объектов")) then
                   sampSendChat("/olist")
                   dialog.main.v = not dialog.main.v
@@ -3006,7 +3007,7 @@ function imgui.OnDrawFrame()
             end
             imgui.SameLine()
             imgui.Text(u8"Последний modelid объекта: не выбран")
-            -- if isTrainingSanbox then
+            -- if isTrainingSandbox then
                -- if imgui.IsItemClicked() then
                   -- sampSendChat("/olist")
                   -- dialog.main.v = not dialog.main.v
@@ -3019,7 +3020,7 @@ function imgui.OnDrawFrame()
             local modelid = getObjectModel(LastObject.handle)
             local objectid = sampGetObjectSampIdByHandle(LastObject.handle)
       
-            if isTrainingSanbox then
+            if isTrainingSandbox then
                if LastObject.localid then
                   imgui.SameLine()
                   imgui.TextColoredRGB("localid: {007DFF}"..LastObject.localid)
@@ -3030,7 +3031,7 @@ function imgui.OnDrawFrame()
                local link = 'explorer "https://dev.prineside.com/ru/gtasa_samp_model_id/search/?q='..modelid..'"'
                os.execute(link)
             end
-            if isTrainingSanbox then
+            if isTrainingSandbox then
                imgui.SameLine()
                if imgui.TooltipButton(u8"/olist", imgui.ImVec2(65, 25), u8:encode("Список всех созданнных вами в мире объектов")) then
                   sampSendChat("/olist")
@@ -3042,7 +3043,7 @@ function imgui.OnDrawFrame()
                imgui.selectTabMenu(3)
                tabmenu.info = 2
             end
-            if LastObject.handle and isTrainingSanbox
+            if LastObject.handle and isTrainingSandbox
             and LastObject.txdid ~= nil then
                local txdtable = sampTextureList[LastObject.txdid+1]
                local txdname = tostring(txdtable[3])
@@ -3110,7 +3111,7 @@ function imgui.OnDrawFrame()
             end  
          end
                
-         if isTrainingSanbox then
+         if isTrainingSandbox then
             if LastObject.modelid then
                if imgui.TooltipButton(u8"Редактировать", imgui.ImVec2(95, 25), u8:encode("Редактировать текущий объект (/oe)")) then
                   sampSendChat("/oe")
@@ -3680,7 +3681,7 @@ function imgui.OnDrawFrame()
          end
          
          if imgui.CollapsingHeader(u8"Аттачи") then
-            -- if isTrainingSanbox then
+            -- if isTrainingSandbox then
                -- if imgui.Button(u8"Список кодов аттачей") then
                   -- sampSendChat("/attlist")
                -- end
@@ -3711,7 +3712,7 @@ function imgui.OnDrawFrame()
             18	Jaw\
             ")
             
-            if isTrainingSanbox then
+            if isTrainingSandbox then
               if imgui.TooltipButton(u8"Наборы аттачей", imgui.ImVec2(200, 25),
               u8"Открыть ваши наборы аттачей") then
                   sampSendChat("/mn")
@@ -4294,7 +4295,7 @@ function imgui.OnDrawFrame()
                memory.setint8(0xBA676C, 2)
             end
          end
-         if isTrainingSanbox then
+         if isTrainingSandbox then
             imgui.SameLine()
             if imgui.TooltipButton(u8"Перейти в интерьер для съемок", imgui.ImVec2(230, 25), u8"Телепортирует в интерьер с хромакеем") then
                if playerdata.isWorldHoster then
@@ -4411,7 +4412,7 @@ function imgui.OnDrawFrame()
          imgui.TextQuestion("( ? )", u8"Скрывает 3d тексты из стрима (для скринов)")
          
          if imgui.ToggleButton(u8"Скрыть NameTags", checkbox.nametagoff) then 
-            if isTrainingSanbox then
+            if isTrainingSandbox then
                if checkbox.nametagoff.v then
                   sampSendChat("/nameoff")
                else
@@ -4505,7 +4506,7 @@ function imgui.OnDrawFrame()
          
          if imgui.TooltipButton(u8"Updstream", imgui.ImVec2(95, 25),
             u8:encode("Подгрузить параметры дальности прорисовки для объектов")) then
-            if isTrainingSanbox then
+            if isTrainingSandbox then
                sampSendChat("/updstream")
             else
                -- force clean stream memory (cause crashes)
@@ -4986,7 +4987,7 @@ function imgui.OnDrawFrame()
                imgui.SameLine()
                if imgui.Checkbox(u8"##txdsetselectable", checkbox.txdsetselectable) then
                end
-               if isTrainingSanbox then
+               if isTrainingSandbox then
                   imgui.SameLine()
                   imgui.Text(u8"Время:")
                   imgui.SameLine()
@@ -5998,7 +5999,7 @@ function imgui.OnDrawFrame()
             if imgui.TooltipButton(u8"timestamp", imgui.ImVec2(90, 25), u8"Отображать время в чате") then
                sampProcessChatInput("/timestamp")
             end
-            if isTrainingSanbox then
+            if isTrainingSandbox then
                imgui.SameLine()
                if ini.settings.savepmmessages then
                   --imgui.PushStyleColor(imgui.Col.Button, imgui.ImVec4(1.0, 1.0, 0.0, 1.0))
@@ -6017,7 +6018,7 @@ function imgui.OnDrawFrame()
             imgui.Spacing()
             imgui.Spacing()
             
-            if isTrainingSanbox then
+            if isTrainingSandbox then
                if imgui.TooltipButton(u8"mute", imgui.ImVec2(60, 25), u8"Настройки чата, позволяет заглушить указанный тип сообщений /mute") then
                   if dialog.main.v then dialog.main.v = false end
                   sampSendChat("/mute")
@@ -6088,7 +6089,7 @@ function imgui.OnDrawFrame()
             end
             
             -- Outdate. Hamster deactivated on server
-            -- if isTrainingSanbox then
+            -- if isTrainingSandbox then
                -- if imgui.ToggleButton(u8"Заткнуть хомяка (Бот Hamster)", checkbox.blockhamster) then
                   -- ini.settings.blockhamster = checkbox.blockhamster.v
                   -- inicfg.save(ini, configIni)
@@ -6103,7 +6104,7 @@ function imgui.OnDrawFrame()
             if imgui.ToggleButton(u8"Скрывать сообщения от ботов", checkbox.antichatbot) then
                if checkbox.antichatbot.v then
                   sampAddChatMessage("[SCRIPT]: {FFFFFF}Если не все сообщения ботов заблокировались воспользуйтесь расширенными чат-фильтрами", 0x0FF6600)
-                  if isTrainingSanbox then
+                  if isTrainingSandbox then
                      sampAddChatMessage("[SCRIPT]: {FFFFFF}Так же можно заблокировать сообщения от бота командой /ignore <id>", 0x0FF6600)
                   end
                end
@@ -6121,7 +6122,7 @@ function imgui.OnDrawFrame()
                inicfg.save(ini, configIni)
             end
             
-            if isTrainingSanbox then
+            if isTrainingSandbox then
                if imgui.ToggleButton(u8"Скрывать приставку [CB] в чате", checkbox.chathidecb) then
                   ini.settings.chathidecb = checkbox.chathidecb.v
                   inicfg.save(ini, configIni)
@@ -6674,7 +6675,7 @@ function imgui.OnDrawFrame()
             imgui.SameLine()
             imgui.TextQuestion("( ? )", u8"Отображать ваш ID над худом (вверху экрана с правой стороны)")
             
-            if isTrainingSanbox then
+            if isTrainingSandbox then
                if imgui.Checkbox(u8'Восстановить стандартный цвет 3D текста с инф-цией о объекте', checkbox.fixobjinfotext) then
                   ini.settings.fixobjinfotext = checkbox.fixobjinfotext.v
                   inicfg.save(ini, configIni)
@@ -6762,7 +6763,7 @@ function imgui.OnDrawFrame()
          
          if imgui.CollapsingHeader(u8"Вход в мир:") then
             imgui.resetIO()
-            if isTrainingSanbox then
+            if isTrainingSandbox then
                if imgui.Checkbox(u8'Включать режим разработчика при входе в мир', checkbox.autodevmode) then
                   ini.settings.autodevmode = checkbox.autodevmode.v
                   inicfg.save(ini, configIni)
@@ -6790,7 +6791,7 @@ function imgui.OnDrawFrame()
             imgui.SameLine()
             imgui.TextQuestion("( ? )", u8"Отключает аудиострим (убирает музыку в мирах)")
             
-            if isTrainingSanbox then
+            if isTrainingSandbox then
                if imgui.Checkbox(u8'Включать бессмертие в мире', checkbox.setgm) then
                   sampSendChat("/gm")
                   ini.settings.setgm = checkbox.setgm.v
@@ -6807,7 +6808,7 @@ function imgui.OnDrawFrame()
             imgui.SameLine()
             imgui.TextQuestion("( ? )", u8"Устанавливать свою погоду и время при входе в мир")
             
-            if isTrainingSanbox then
+            if isTrainingSandbox then
                if imgui.Checkbox(u8'Заспавниться после загрузки мира', checkbox.spawnafterloadvw) then
                   ini.settings.spawnafterloadvw = checkbox.spawnafterloadvw.v
                   inicfg.save(ini, configIni)
@@ -6875,7 +6876,7 @@ function imgui.OnDrawFrame()
             end
          end
          
-         if isTrainingSanbox then
+         if isTrainingSandbox then
             if imgui.CollapsingHeader(u8"Автодополнение:") then
                
                if imgui.Checkbox(u8'Автодополнение имени мира (при сохранении)', checkbox.saveworldname) then
@@ -6934,7 +6935,7 @@ function imgui.OnDrawFrame()
          end
          if imgui.CollapsingHeader(u8"Подключение:") then
            
-            if isTrainingSanbox then   
+            if isTrainingSandbox then   
                if imgui.Checkbox(u8'Пропускать диалог с правилами при входе на сервер', checkbox.skiprules) then
                   ini.settings.skiprules = checkbox.skiprules.v
                   inicfg.save(ini, configIni)
@@ -6951,7 +6952,7 @@ function imgui.OnDrawFrame()
             imgui.TextQuestion("( ? )", u8"Автоматически переподключит вас к серверу при потере соединения\
             (Исправляет так же сообщение You are bannded on this server)")
             
-            if isTrainingSanbox then
+            if isTrainingSandbox then
                if imgui.Checkbox(u8'Возвращаться обратно в свой мир при вылете', checkbox.backtoworld) then
                   ini.settings.backtoworld = checkbox.backtoworld.v
                   inicfg.save(ini, configIni)
@@ -7509,7 +7510,7 @@ function imgui.OnDrawFrame()
       elseif tabmenu.info == 3 then
          
          imgui.PushStyleVar(imgui.StyleVar.ItemSpacing, imgui.ImVec2(2, 2))
-         if isTrainingSanbox then
+         if isTrainingSandbox then
             imgui.TextNotify("На TRAINING используется ARGB формат цвета 0xAARRGGBB", 
             u8"Текст чата или цвет игрока выглядит следующим образом: 0xRRGGBBAA.\nFF - цвет будет отображаться без прозрачности, если используется 00 он будет невидимым")
          else
@@ -8569,7 +8570,7 @@ function imgui.OnDrawFrame()
                imgui.SameLine()
                imgui.Link("https://wiki.blast.hk/sampfuncs/console", "https://wiki.blast.hk/sampfuncs/console")
                
-               if isTrainingSanbox then
+               if isTrainingSandbox then
                   imgui.TextColoredRGB("Команды сервера TRAINING-SANDBOX")
                   imgui.SameLine()
                   imgui.Link("https://forum.training-server.com/d/3679-vse-komandy-servera", "forum.training-server.com")
@@ -8579,13 +8580,13 @@ function imgui.OnDrawFrame()
                   imgui.Link("https://forum.training-server.com/d/427", "forum.training-server.com")            
                end
                
-               if not isTrainingSanbox then
+               if not isTrainingSandbox then
                   imgui.TextColoredRGB("Команды RCON")
                   imgui.SameLine()
                   imgui.Link("https://www.open.mp/docs/server/ControllingServer", "https://www.open.mp/docs/")
                end
                
-               if not isTrainingSanbox then
+               if not isTrainingSandbox then
                   imgui.TextColoredRGB("Texture Studio Commands")
                   imgui.SameLine()
                   imgui.Link("https://github.com/ins1x/mtools/wiki/Texture-Studio-Commands", "Git wiki")
@@ -8672,7 +8673,7 @@ function imgui.OnDrawFrame()
                   sampAddChatMessage("[SCRIPT]: {FFFFFF}Введите больше 3-х символов для поиска",0x0FF6600)
                end
             end
-            if isTrainingSanbox then       
+            if isTrainingSandbox then       
                imgui.SameLine()
                if imgui.Button(u8"/osearch",imgui.ImVec2(72, 25)) then
                   if string.len(textbuffer.objectid.v) > 3 then
@@ -8715,7 +8716,7 @@ function imgui.OnDrawFrame()
                end
             end
             
-            if isTrainingSanbox then
+            if isTrainingSandbox then
                imgui.TextColoredRGB("Найти объект можно командой: {696969}/osearch <text>")
                imgui.TextColoredRGB("Просмотреть список использованных объектов: {696969}/olist")
             end
@@ -8808,7 +8809,7 @@ function imgui.OnDrawFrame()
                   sampAddChatMessage("[SCRIPT]: {FFFFFF}Введите больше 3-х символов для поиска",0x0FF6600)
                end
             end 
-            if isTrainingSanbox then
+            if isTrainingSandbox then
                imgui.SameLine()
                if imgui.Button(u8"/tsearch",imgui.ImVec2(72, 25)) then
                   if LastObject.txdid ~= nil and LastObject.txdslot ~= nil then
@@ -8873,7 +8874,7 @@ function imgui.OnDrawFrame()
             imgui.Link("https://dev.prineside.com/ru/gtasa_samp_game_texture/view/", "dev.prineside.com")
             imgui.Spacing()
             
-            if isTrainingSanbox then
+            if isTrainingSandbox then
                imgui.TextColoredRGB("Найти нужную текстуру можно командой: {696969}/tsearch <objectid> <slot> <name>")
             else
                imgui.TextColoredRGB("Найти нужную текстуру можно командой: {696969}/tsearch <text>")
@@ -9082,7 +9083,7 @@ function imgui.OnDrawFrame()
          if imgui.Button(u8"Команды", imgui.ImVec2(105, 30)) then tabmenu.info = 6 end
       end
       
-      if isTrainingSanbox then
+      if isTrainingSandbox then
          if tabmenu.info == 7 then
             imgui.PushStyleColor(imgui.Col.Button, imgui.GetStyle().Colors[imgui.Col.ButtonHovered])
             if imgui.Button(u8"КБ", imgui.ImVec2(105, 30)) then tabmenu.info = 7 end
@@ -9630,7 +9631,7 @@ function imgui.OnDrawFrame()
          imgui.TextQuestion("TxdId", u8"ID текстуры (/tsearch)")
          imgui.SetColumnWidth(-1, 50)
          imgui.NextColumn()
-         if isTrainingSanbox then 
+         if isTrainingSandbox then 
             imgui.Text("Slot")
          else
             imgui.Text("MaterialId")
@@ -9971,7 +9972,7 @@ function imgui.OnDrawFrame()
          imgui.Text(string.format(u8"Покраска: %i/%i", paintjob, availablePaintjobs))
          
          if imgui.Button(u8"Меню транспорта", imgui.ImVec2(250, 25)) then         
-            if isTrainingSanbox then
+            if isTrainingSandbox then
                dialog.main.v = not dialog.main.v
                sampSendChat("/vmenu "..id)
             else
@@ -10162,7 +10163,7 @@ function imgui.OnDrawFrame()
          imgui.Begin(u8"Информация о объекте", dialog.objectinfo)
       end
       
-      if isTrainingSanbox and chosen.object == LastObject.handle then
+      if isTrainingSandbox and chosen.object == LastObject.handle then
          if LastObject.localid then
             imgui.TextColoredRGB("localid: {007DFF}"..LastObject.localid)
          end
@@ -10218,7 +10219,7 @@ function imgui.OnDrawFrame()
       end
       imgui.TextColoredRGB(string.format("angle: {007DFF}%.1f", getObjectHeading(chosen.object)))
       
-      if chosen.object == LastObject.handle and isTrainingSanbox
+      if chosen.object == LastObject.handle and isTrainingSandbox
       and LastObject.txdid ~= nil then
          local txdtable = sampTextureList[LastObject.txdid+1]
          local txdname = tostring(txdtable[3])
@@ -10265,7 +10266,7 @@ function imgui.OnDrawFrame()
          os.execute(link)
       end
       
-      if isTrainingSanbox then
+      if isTrainingSandbox then
          imgui.SameLine()
          if imgui.TooltipButton(u8"Инфо (/oinfo)", imgui.ImVec2(120, 25), u8"Посмотреть подробную информацию по объекту (серверной командой)") then            
             if LastObject.localid then
@@ -10323,7 +10324,7 @@ function imgui.OnDrawFrame()
          end
          
          if result and x ~= 0 and doesObjectExist(chosen.object) then
-            if isTrainingSanbox then
+            if isTrainingSandbox then
                sampSendChat(string.format("/xyz %f %f %f", x, y, z), 0x0FFFFFF)
                sampAddChatMessage("Вы телепортировались на координаты к объекту {696969}"..objectid.." ("..modelid..")", -1)
             else
@@ -10331,7 +10332,7 @@ function imgui.OnDrawFrame()
                sampAddChatMessage("Недоступно для этого сервера!", -1)
             end  
          else
-            if isTrainingSanbox then
+            if isTrainingSandbox then
                sampSendChat("/tpo")
             else
                sampAddChatMessage("Не найден объект", -1)
@@ -10508,7 +10509,7 @@ function sampev.onSendDialogResponse(dialogId, button, listboxId, input)
    end
    
    -- TIP: All Training dialogId has id 32700
-   if isTrainingSanbox and dialogId == 32700 then
+   if isTrainingSandbox and dialogId == 32700 then
       
       if button == 0 then 
          dialoghook.editdialog = false
@@ -10996,7 +10997,7 @@ function sampev.onShowDialog(dialogId, style, title, button1, button2, text)
       LastData.lastDialogText = u8:encode(text)
    end
    
-   if isTrainingSanbox and dialogId == 32700 then
+   if isTrainingSandbox and dialogId == 32700 then
       -- TRAINING Skip cmdbinds dialog
       if ini.settings.skiprules then
          if text:find('1. Общие правила') and style == 0 and button1 == "Принимаю" then
@@ -11712,7 +11713,7 @@ function sampev.onShowDialog(dialogId, style, title, button1, button2, text)
    end
       
    -- Skip olist when exit from /omenu
-   if isTrainingSanbox and dialogId == 65535 and ini.settings.skipomenu then      
+   if isTrainingSandbox and dialogId == 65535 and ini.settings.skipomenu then      
       if LastData.lastDialogInput then
          if not LastData.lastDialogInput:find("Слот") -- /att fix
          and not LastData.lastDialogInput:find("Скин по умолчанию") -- team skin fix
@@ -11776,7 +11777,7 @@ function sampev.onServerMessage(color, text)
       -- end
       
       -- -- local hexcolor = chatmessage:find("{FFA500}.*")
-      -- -- if isTrainingSanbox and hexcolor then
+      -- -- if isTrainingSandbox and hexcolor then
          -- -- chatmessage = string.sub(chatmessage, hexcolor+8, chatmessage:len())
          -- -- print(chatmessage, hexcolor)
       -- -- end
@@ -11807,7 +11808,7 @@ function sampev.onServerMessage(color, text)
    -- if text:find("Официальный сайт сервера training") then
    -- end
    
-   if isTrainingSanbox then
+   if isTrainingSandbox then
       if text:find("Хочешь смешную шутку? А она тебя нет. Куда ты возращаться собрался ты и так тут") then
          playerdata.isWorldHoster = true
          ini.tmp.worldhoster = true
@@ -11861,7 +11862,7 @@ function sampev.onServerMessage(color, text)
          chatlog:close()
          return false
       end
-      if isTrainingSanbox then
+      if isTrainingSandbox then
          if text:match(".+CZ00.*") or text:match(".+czo.*") then
             chatlog = io.open(getFolderPath(5).."\\GTA San Andreas User Files\\SAMP\\chatlog.txt", "a")
             chatlog:write(os.date("[%H:%M:%S] [ADBlock] ")..text.."\r\n")
@@ -11878,7 +11879,7 @@ function sampev.onServerMessage(color, text)
    end
    
    if ini.settings.chatonlysystem then
-      if isTrainingSanbox then
+      if isTrainingSandbox then
          local tag = string.match(text, "%[.*%]")
          if not tag then
             return false
@@ -11886,7 +11887,7 @@ function sampev.onServerMessage(color, text)
       end
    end
    
-   if isTrainingSanbox then
+   if isTrainingSandbox then
    
       if text:find("SERVER: Unknown command") then
          sampAddChatMessage("[ERROR]: {FFFFFF}Команда не найдена. Просмотреть список доступных команд {696969}/cmdlist", 0x0CC0000)
@@ -12114,7 +12115,7 @@ function sampev.onServerMessage(color, text)
       -- end
    end
    
-   if ini.settings.blockhamster and isTrainingSanbox then
+   if ini.settings.blockhamster and isTrainingSandbox then
       if text:find("Hamster:") then
          input.isbot = true
          chatlog = io.open(getFolderPath(5).."\\GTA San Andreas User Files\\SAMP\\chatlog.txt", "a")
@@ -12200,7 +12201,7 @@ function sampev.onServerMessage(color, text)
    local newtext = text
    
    if checkbox.anticaps.v then
-      if isTrainingSanbox then
+      if isTrainingSandbox then
          local globalmessage = text:match(":{FFA500}.+")
          local nearmessage = text:match(":%s.+")
          local worldmessage = text:match(":{91FF00}.+")
@@ -12250,11 +12251,11 @@ function sampev.onSendCommand(command)
    LastData.lastCommand = command
    
    -- ignore triggering on world custom commands like //menu
-   if isTrainingSanbox and command:find("//") then
+   if isTrainingSandbox and command:find("//") then
       return {command}
    end
    
-   if isTrainingSanbox then
+   if isTrainingSandbox then
       -- Automatic substitution of the last object ID for some commands
       if not command:find('(/%a+) (.+)') then
          if LastObject.localid then            
@@ -12289,7 +12290,7 @@ function sampev.onSendCommand(command)
    end
    
    -- minigames
-   if isTrainingSanbox then
+   if isTrainingSandbox then
       if command:find("^/dm") then
          LastData.lastMinigame = 1
       elseif command:find("^/gungame") or command:find("^/gg") then
@@ -12305,7 +12306,7 @@ function sampev.onSendCommand(command)
       end
    end
    
-   if not isTrainingSanbox then
+   if not isTrainingSandbox then
       if command:find("^/setweather") then
          if command:find('(/%a+) (.+)') then
             local cmd, arg = command:match('(/%a+) (.+)')
@@ -12345,7 +12346,7 @@ function sampev.onSendCommand(command)
       end
    end
    
-   if isTrainingSanbox then
+   if isTrainingSandbox then
       if command:find("^/jp$") then
          sampSendChat("/jetpack")
       end
@@ -12365,7 +12366,7 @@ function sampev.onSendCommand(command)
       -- end
    end
    
-   if isTrainingSanbox then
+   if isTrainingSandbox then
       if command:find("^/spec$") then
          if getClosestPlayerId() ~= -1 then
             if sampIsPlayerConnected(getClosestPlayerId()) then
@@ -12445,7 +12446,7 @@ function sampev.onSendCommand(command)
       local posX, posY, posZ = getCharCoordinates(playerPed)
       local posA = getCharHeading(playerPed)
       sampAddChatMessage(string.format("Ваши координаты: {696969}%.2f %.2f %.2f {FFFFFF}Угол поворота: {696969}%.2f", posX, posY, posZ, posA), -1)
-      if isTrainingSanbox and playerdata.isWorldHoster then
+      if isTrainingSandbox and playerdata.isWorldHoster then
          sampAddChatMessage(string.format("Используйте: /xyz {696969}%.2f %.2f %.2f", posX, posY, posZ), -1)
       end
       return false
@@ -12461,13 +12462,13 @@ function sampev.onSendCommand(command)
                   while time ~= 0 do
                      time = time - 1
                      if time > 0 then
-                        if isTrainingSanbox then
+                        if isTrainingSandbox then
                            sampSendChat("/s "..time)
                         else
                            sampSendChat(""..time)
                         end
                      else
-                        if isTrainingSanbox then
+                        if isTrainingSandbox then
                            sampSendChat("/s GO!")
                         else
                            sampSendChat("GO!")
@@ -12500,7 +12501,7 @@ function sampev.onSendCommand(command)
       worldspawnpos.y = 0
       worldspawnpos.z = 0
       -- fix audiostream 
-      if isTrainingSanbox then
+      if isTrainingSandbox then
          -- send StopAudioStream()
          local bs = raknetNewBitStream()
          raknetEmulRpcReceiveBitStream(42,bs)         
@@ -12509,7 +12510,7 @@ function sampev.onSendCommand(command)
       
    end
    
-   if command:find("^/time$") and isTrainingSanbox then
+   if command:find("^/time$") and isTrainingSandbox then
       if not command:find('(/%a+) (.+)') then
          sampAddChatMessage("Сегодня "..os.date("%x %X"), -1)
       end
@@ -12521,14 +12522,14 @@ function sampev.onSendCommand(command)
          setClipboardText(string.format("%.2f %.2f %.2f", tpcpos.x, tpcpos.y, tpcpos.z))
          sampAddChatMessage("[SCRIPT]: {FFFFFF}Позиция скопирована в буффер обмена", 0x0FF6600)
       end
-      if not isTrainingSanbox then
+      if not isTrainingSandbox then
          return false
       end
    end
    
    if command:find("^/actor$") then
       -- fix stuck on actor
-      if isTrainingSanbox and not command:find('(/%a+) (.+)') then
+      if isTrainingSandbox and not command:find('(/%a+) (.+)') then
          if sampIsLocalPlayerSpawned() then
             local x, y, z = getCharCoordinates(playerPed)   
             setCharCoordinates(playerPed, x + 0.2, y, z)
@@ -12539,7 +12540,7 @@ function sampev.onSendCommand(command)
    if command:find("^/gopos") then
       if sampIsLocalPlayerSpawned() then
          if tpcpos.x and tpcpos.x ~= 0 then
-            if isTrainingSanbox then
+            if isTrainingSandbox then
                sampSendChat(string.format("/xyz %f %f %f",
                tpcpos.x, tpcpos.y, tpcpos.z), 0x0FFFFFF)
                sampAddChatMessage(string.format("[SCRIPT]: {FFFFFF}Вы телепортировались на координаты: %.2f %.2f %.2f",
@@ -12577,9 +12578,9 @@ function sampev.onSendCommand(command)
       end
    end
    
-   if isTrainingSanbox then 
+   if isTrainingSandbox then 
       if command:find("^/flymode") then
-         if isTrainingSanbox then
+         if isTrainingSandbox then
             if not playerdata.isWorldHoster then
                sampAddChatMessage("[SCRIPT]: {FFFFFF}Вы не хостер в мире!", 0x0FF6600)
                return false
@@ -12604,7 +12605,7 @@ function sampev.onSendCommand(command)
       end
    end
    
-   if command:find("^/slapme") and not isTrainingSanbox then
+   if command:find("^/slapme") and not isTrainingSandbox then
       if sampIsLocalPlayerSpawned() then
          local posX, posY, posZ = getCharCoordinates(playerPed)
          setCharCoordinates(playerPed, posX, posY, posZ+1.0)
@@ -12612,7 +12613,7 @@ function sampev.onSendCommand(command)
       return false
    end
    
-   if command:find("^/spawnme") and not isTrainingSanbox  then
+   if command:find("^/spawnme") and not isTrainingSandbox  then
       local posX, posY, posZ = getCharCoordinates(playerPed)
       setCharCoordinates(playerPed, posX, posY, posZ+0.2)
       freezeCharPosition(playerPed, false)
@@ -12623,13 +12624,13 @@ function sampev.onSendCommand(command)
    end
    
    -- editmodes hook
-   if command:find("^/csel") or command:find("^/editobject") and not isTrainingSanbox then
+   if command:find("^/csel") or command:find("^/editobject") and not isTrainingSandbox then
       sampAddChatMessage("Включен режим редактирования объекта", 0x000FF00)
       enterEditObject()
       return false
    end
 
-   if isTrainingSanbox and command:find("^/otext") then
+   if isTrainingSandbox and command:find("^/otext") then
       if command:find('(/%a+) (.+)') then
          local cmd, arg = command:match('(/%a+) (.+)')
          local id = tonumber(arg)
@@ -12639,7 +12640,7 @@ function sampev.onSendCommand(command)
       end
    end
    
-   if isTrainingSanbox and command:find("^/action") then
+   if isTrainingSandbox and command:find("^/action") then
       -- sampAddChatMessage("[SCRIPT]: {FFFFFF}Рекомендуется использовать /otext вместо /action", 0x0FF6600)
       dialoghook.action = true
       
@@ -12648,7 +12649,7 @@ function sampev.onSendCommand(command)
       end
    end
    
-   if isTrainingSanbox 
+   if isTrainingSandbox 
    and command:find("^/pickuplist$") 
    or command:find("^/passlist$") then
       local pickupcounter = 0
@@ -12676,7 +12677,7 @@ function sampev.onSendCommand(command)
        return false
     end
    
-   if isTrainingSanbox and command:find("^/editpass") then
+   if isTrainingSandbox and command:find("^/editpass") then
       if command:find('(/%a+) (.+)') then
          local cmd, arg = command:match('(/%a+) (.+)')
          local id = tonumber(arg)
@@ -12689,7 +12690,7 @@ function sampev.onSendCommand(command)
       end
    end
    
-   if isTrainingSanbox and command:find("^/vmenu") then
+   if isTrainingSandbox and command:find("^/vmenu") then
       if command:find('(/%a+) (.+)') then
          local cmd, arg = command:match('(/%a+) (.+)')
          local id = tonumber(arg)
@@ -12704,7 +12705,7 @@ function sampev.onSendCommand(command)
       end
    end
    
-   if isTrainingSanbox then
+   if isTrainingSandbox then
       if command:find("^/actionlist") or command:find("^/alist$") then
          sampAddChatMessage("[SCRIPT]: {FFFFFF} Обратите внимание что internalid не совпадает с id сервера!", 0x0FF6600)
          sampAddChatMessage("Список 3d текстов (/action):", -1)
@@ -12723,7 +12724,7 @@ function sampev.onSendCommand(command)
       end
    end
    
-   if isTrainingSanbox then
+   if isTrainingSandbox then
       if command:find("^/actorlist") or command:find("^/actors") then
          sampAddChatMessage("Список актеров:", -1)
          local actorsCount = 0
@@ -12747,7 +12748,7 @@ function sampev.onSendCommand(command)
       end
    end
    
-   if isTrainingSanbox and command:find("^/rdell") then
+   if isTrainingSandbox and command:find("^/rdell") then
       if command:find('(/%a+) (.+)') then
          local cmd, arg = command:match('(/%a+) (.+)')
          local radius = tonumber(arg)
@@ -12791,7 +12792,7 @@ function sampev.onSendCommand(command)
       return false
    end
    
-   if isTrainingSanbox then
+   if isTrainingSandbox then
       if command:find("^/oc$") or command:find("^/copy$") then
          sampSendChat("/clone")
          edit.mode = 2
@@ -12811,7 +12812,7 @@ function sampev.onSendCommand(command)
       end
    end
    
-   if isTrainingSanbox and command:find("^/clone") then
+   if isTrainingSandbox and command:find("^/clone") then
       if command:find('(/%a+) (.+)') then
          --local cmd, arg = command:match('(/%a+) (%d+)')
          --local id = tonumber(arg)
@@ -12820,17 +12821,17 @@ function sampev.onSendCommand(command)
       end
    end
       
-   if isTrainingSanbox and command:find("^/tblist") then
+   if isTrainingSandbox and command:find("^/tblist") then
       sampSendChat("/tb")
       return false
    end
    
-   if isTrainingSanbox and command:find("^/mn") then
+   if isTrainingSandbox and command:find("^/mn") then
       sampSendChat("/menu")
       return false
    end
    
-   -- if isTrainingSanbox and command:find("^/accept") then
+   -- if isTrainingSandbox and command:find("^/accept") then
       -- if not command:find('(/%a+) (.+)') then
          -- if LastData.lastAccept then
             -- lua_thread.create(function()
@@ -12841,7 +12842,7 @@ function sampev.onSendCommand(command)
       -- end
    -- end
    
-   if isTrainingSanbox and command:find("^/gotocar") then
+   if isTrainingSandbox and command:find("^/gotocar") then
       if command:find('(/%a+) (.+)') then
          local cmd, arg = command:match('(/%a+) (.+)')
          local id = tonumber(arg)
@@ -12862,7 +12863,7 @@ function sampev.onSendCommand(command)
       return false
    end
    
-   if isTrainingSanbox and command:match("^/cb$") then
+   if isTrainingSandbox and command:match("^/cb$") then
       if ini.settings.cbnewactivation then
          dialoghook.suspendcbactivation = false
       end
@@ -12874,7 +12875,7 @@ function sampev.onSendCommand(command)
       end
    end
    
-   if isTrainingSanbox and command:match("^/cbedit") then
+   if isTrainingSandbox and command:match("^/cbedit") then
       if command:find('(/%a+) (.+)') then
          local cmd, arg = command:match('(/%a+) (.+)')
          local id = tonumber(arg)
@@ -12889,11 +12890,11 @@ function sampev.onSendCommand(command)
       end
    end
    
-   if isTrainingSanbox and command:find("^/olist") then
+   if isTrainingSandbox and command:find("^/olist") then
       dialoghook.olist = true
    end
    
-   if isTrainingSanbox and command:find("^/omenu") then
+   if isTrainingSandbox and command:find("^/omenu") then
       if command:find('(/%a+) (.+)') then
          local cmd, arg = command:match('(/%a+) (.+)')
          local id = tonumber(arg)
@@ -12911,7 +12912,7 @@ function sampev.onSendCommand(command)
       end
    end
    
-   if isTrainingSanbox and command:find("^/odell") then
+   if isTrainingSandbox and command:find("^/odell") then
       if command:find('(/%a+) (.+)') then
          local cmd, arg = command:match('(/%a+) (.+)')
          local id = tonumber(arg)
@@ -12954,11 +12955,11 @@ function sampev.onSendCommand(command)
       return true
    end
    
-   if isTrainingSanbox and command:find("^/od$") then
+   if isTrainingSandbox and command:find("^/od$") then
       edit.mode = 3
    end
    
-   if isTrainingSanbox and command:find("^/ao") then -- /ao to /oa
+   if isTrainingSandbox and command:find("^/ao") then -- /ao to /oa
       if command:find('(/%a+) (.+)') then
          local cmd, arg = command:match('(/%a+) (.+)')
          local id = tonumber(arg)
@@ -12973,7 +12974,7 @@ function sampev.onSendCommand(command)
       end
    end
    
-   if isTrainingSanbox and command:find("^/oa") then -- /oadd
+   if isTrainingSandbox and command:find("^/oa") then -- /oadd
       if command:find('(/%a+) (.+)') then
          local cmd, arg = command:match('(/%a+) (.+)')
          local id = tonumber(arg)
@@ -13002,7 +13003,7 @@ function sampev.onSendCommand(command)
       end
    end
    
-   if isTrainingSanbox and command:find("^/oswap") then
+   if isTrainingSandbox and command:find("^/oswap") then
       if command:find('(/%a+) (.+) (.+)') then
          local cmd, localid, modelid = command:match('(/%a+) (.+) (.+)')
          local id = tonumber(localid)
@@ -13018,12 +13019,12 @@ function sampev.onSendCommand(command)
       end
    end
    
-   if isTrainingSanbox and command:find("^/mtexture") then
+   if isTrainingSandbox and command:find("^/mtexture") then
       sampAddChatMessage("[SYNTAX]: {FFFFFF}/texture <object> <slot> <page*>", 0x09A9999)
       return false
    end
    
-   if isTrainingSanbox and command:find("^/texture") then
+   if isTrainingSandbox and command:find("^/texture") then
       -- if command:find('(/%a+) (.+) (.+) (.+)') then
          -- local cmd, id, slot, page = command:match('(/%a+) (.+) (.+) (.+)')
          -- local id = tonumber(id)
@@ -13069,7 +13070,7 @@ function sampev.onSendCommand(command)
       end
    end
       
-   if isTrainingSanbox and command:find("^/stexture") then
+   if isTrainingSandbox and command:find("^/stexture") then
       if command:find('(/%a+) (.+) (.+) (.+)') then
          local cmd, objectid, slot, texture = command:match('(/%a+) (.+) (.+) (.+)')
          if ini.settings.cberrorwarnings then
@@ -13100,7 +13101,7 @@ function sampev.onSendCommand(command)
       end
    end
    
-   if isTrainingSanbox and command:find("^/stextureall") then
+   if isTrainingSandbox and command:find("^/stextureall") then
       if command:find('(/%a+) (.+) (.+)') then
          local cmd, objectid, texture = command:match('(/%a+) (.+) (.+)')
          local objectid = tonumber(objectid)
@@ -13219,12 +13220,12 @@ function sampev.onSendCommand(command)
       return false
    end
    
-   if isTrainingSanbox and command:find("^/tcopy") then
+   if isTrainingSandbox and command:find("^/tcopy") then
       sampAddChatMessage("[SYNTAX]: {FFFFFF}Используйте /texture чтобы установить текстуру, а затем /tpaste <id> чтобы применить на выбранный объект", 0x09A9999)
       return false
    end
    
-   if isTrainingSanbox and command:find("^/tpaste") then
+   if isTrainingSandbox and command:find("^/tpaste") then
       if not LastObject.txdid or not LastObject.txdslot then
          sampAddChatMessage("[SCRIPT]: {FFFFFF}Нет последней использованной текстуры. Сперва наложите текстуру через /texture", 0x0FF6600)
          return false
@@ -13246,7 +13247,7 @@ function sampev.onSendCommand(command)
    
    if command:find("^/undo") then
       if LastRemovedObject.modelid then
-         if isTrainingSanbox then
+         if isTrainingSandbox then
             if LastRemovedObject.position.x ~= 0 then
                sampSendChat(("/oadd %i %.3f %.3f %.3f"):format(
                LastRemovedObject.modelid, LastRemovedObject.position.x, LastRemovedObject.position.y, LastRemovedObject.position.z))
@@ -13263,12 +13264,12 @@ function sampev.onSendCommand(command)
       return false
    end
    
-   if isTrainingSanbox and command:find("^/oedit") then
+   if isTrainingSandbox and command:find("^/oedit") then
       edit.mode = 1
       return true
    end
    
-   if isTrainingSanbox and command:find("^/spint") then
+   if isTrainingSandbox and command:find("^/spint") then
       if playerdata.isWorldHoster then
          sampSendChat("/int")
          return false
@@ -13285,7 +13286,7 @@ function sampev.onSendCommand(command)
       return false
    end
    
-   if isTrainingSanbox and command:find("^/rot") then      
+   if isTrainingSandbox and command:find("^/rot") then      
       if command:find('(/%a+) (.+)') then
          local cmd, arg = command:match('(/%a+) (.+)')
          local degreees = tonumber(arg)
@@ -13311,7 +13312,7 @@ function sampev.onSendCommand(command)
       return false
    end
    
-   if isTrainingSanbox and command:find("^/healme") then
+   if isTrainingSandbox and command:find("^/healme") then
       sampSendChat("/health 100")
       if getCharHealth(playerPed) > 90.0 then
          sampAddChatMessage("[SCRIPT]: {FFFFFF}Вы вылечили себя", 0x0FF6600)
@@ -13363,7 +13364,7 @@ function sampev.onSendCommand(command)
    end
    
    if command:find("^/rindex") then
-      if isTrainingSanbox then
+      if isTrainingSandbox then
          sampSendChat("/untexture")
          return false
       end
@@ -13426,7 +13427,7 @@ function sampev.onSendCommand(command)
       return false
    end
    
-   if command:find("^/ocolor") and not isTrainingSanbox then
+   if command:find("^/ocolor") and not isTrainingSandbox then
       if command:find('(/%a+) (.+)') then
          local cmd, arg = command:match('(/%a+) (.+)')
          local ocolor = tostring(arg)
@@ -13449,7 +13450,7 @@ function sampev.onSendCommand(command)
       return false
    end
    
-   if command:find("^/ocolor") and isTrainingSanbox then
+   if command:find("^/ocolor") and isTrainingSandbox then
       if command:find('(/%a+) (.+) (.+) (.+)') then
          local cmd, object, slot, ocolor = command:match('(/%a+) (.+) (.+) (.+)')
          local object = tonumber(object)
@@ -13497,7 +13498,7 @@ function sampev.onSendCommand(command)
    
    if command:find("^/ogoto") then
       if LastObject.handle and doesObjectExist(LastObject.handle) then
-         if isTrainingSanbox then
+         if isTrainingSandbox then
             sampSendChat(string.format("/xyz %f %f %f",
             LastObject.position.x, LastObject.position.y, LastObject.position.z), 0x0FFFFFF)   
          else
@@ -13505,7 +13506,7 @@ function sampev.onSendCommand(command)
          end
          sampAddChatMessage("Вы телепортировались на координаты к послед.объекту "..LastObject.modelid, 0x000FF00)
       else
-         if isTrainingSanbox then
+         if isTrainingSandbox then
             sampAddChatMessage("[SYNTAX]: {FFFFFF}Используйте /tpo <id>", 0x09A9999)
          else
             sampAddChatMessage("Последний созданный объект не найден", -1)
@@ -13539,7 +13540,7 @@ function sampev.onSendCommand(command)
    end
    
    if command:find("^/cmdsearch") or command:find("^/findcmd") 
-   or command:find("^/cmdfind") and isTrainingSanbox then
+   or command:find("^/cmdfind") and isTrainingSandbox then
       if command:find('(/%a+) (.+)') then
          local cmd, arg = command:match('(/%a+) (.+)')
          local searchcmd = tostring(arg)
@@ -13566,7 +13567,7 @@ function sampev.onSendCommand(command)
    end
    
    if command:find("^/animsearch") or command:find("^/findanim") 
-   and isTrainingSanbox then
+   and isTrainingSandbox then
       if command:find('(/%a+) (.+)') then
          local cmd, arg = command:match('(/%a+) (.+)')
          local searchcmd = tostring(arg)
@@ -13592,7 +13593,7 @@ function sampev.onSendCommand(command)
       return false
    end
    
-   if command:find("^/tsearch") and isTrainingSanbox then
+   if command:find("^/tsearch") and isTrainingSandbox then
       if LastObject.txdid ~= nil then
          sampAddChatMessage("[SCRIPT]: {FFFFFF}Последняя использованная текстура: " .. LastObject.txdid, 0x0FF6600)
       end
@@ -13632,7 +13633,7 @@ function sampev.onSendCommand(command)
       end
    end
    
-   if command:find("^/osearch") and not isTrainingSanbox then
+   if command:find("^/osearch") and not isTrainingSandbox then
       if command:find('(/%a+) (.+)') then
          local cmd, arg = command:match('(/%a+) (.+)')
          local searchobj = tostring(arg)
@@ -13667,7 +13668,7 @@ function sampev.onSendCommand(command)
       end
    end
    
-   if isTrainingSanbox and command:find("^/лс") then
+   if isTrainingSandbox and command:find("^/лс") then
       if command:find('(/%a+) (.+) (.+)') then
          local cmd, id, message = command:match('(/%a+) (.+) (.+)')
          if message then
@@ -13676,7 +13677,7 @@ function sampev.onSendCommand(command)
       end
    end
    
-   if isTrainingSanbox and command:find("^/cbed") then
+   if isTrainingSandbox and command:find("^/cbed") then
       if LastData.lastCb then
          sampSendChat("/cbedit "..LastData.lastCb)
       else
@@ -13686,16 +13687,16 @@ function sampev.onSendCommand(command)
    end
    
    if command:find("^/last") then
-      if isTrainingSanbox and LastObject.localid then
+      if isTrainingSandbox and LastObject.localid then
          sampAddChatMessage("Последний локальный ид объекта: {696969}"..LastObject.localid, -1)
       end
-      if isTrainingSanbox and LastData.lastCb then
+      if isTrainingSandbox and LastData.lastCb then
          sampAddChatMessage("Последний командный блок: {696969}"..LastData.lastCb, -1)
       end
-      if isTrainingSanbox and LastData.lastActor then
+      if isTrainingSandbox and LastData.lastActor then
          sampAddChatMessage("Последний актер: {696969}"..LastData.lastActor, -1)
       end
-      if isTrainingSanbox and LastData.lastPass then
+      if isTrainingSandbox and LastData.lastPass then
          sampAddChatMessage("Последний проход: {696969}"..LastData.lastPass, -1)
       end
       if LastObject.modelid then
@@ -13737,7 +13738,7 @@ function sampev.onSendCommand(command)
       return false
    end 
    
-   if isTrainingSanbox and command:find("^/afkkick") then
+   if isTrainingSandbox and command:find("^/afkkick") then
       local counter = 0
       if next(playersTable) == nil then 
          sampAddChatMessage("[SCRIPT]: {FFFFFF}Сперва обнови список игроков!", 0x0FF6600) 
@@ -13787,7 +13788,7 @@ function sampev.onSendCommand(command)
       return false
    end
    
-   if isTrainingSanbox and command:find("^/loadvw") then
+   if isTrainingSandbox and command:find("^/loadvw") then
       lua_thread.create(function()
          wait(1500)
          if not sampIsDialogActive() then
@@ -13806,12 +13807,12 @@ function sampev.onSendCommand(command)
       end
    end
    
-   if isTrainingSanbox and command:find("^/loadworld") or command:find("^/worldload") then
+   if isTrainingSandbox and command:find("^/loadworld") or command:find("^/worldload") then
       sampSendChat("/loadvw")
       return false
    end
    
-   if isTrainingSanbox and command:find("^/saveworld") or command:find("^/worldsave") then
+   if isTrainingSandbox and command:find("^/saveworld") or command:find("^/worldsave") then
       dialoghook.saveworld = true
       dialoghook.saveworldname = true
       sampSendChat("/vw")
@@ -13819,7 +13820,7 @@ function sampev.onSendCommand(command)
    end
    
    -- hook world name
-   if isTrainingSanbox and command:find("^/savevw")then
+   if isTrainingSandbox and command:find("^/savevw")then
       dialoghook.saveworldname = true
       if checkbox.worldsavereminder.v then
          threads.savereminder:terminate()
@@ -13842,7 +13843,7 @@ function sampev.onSendCommand(command)
       end
    end
    
-   if isTrainingSanbox then 
+   if isTrainingSandbox then 
       if command:find("^/attinfo") or command:find("^/attachinfo") then
          if command:find('(/%a+) (.+)') then
             local cmd, arg = command:match('(/%a+) (.+)')
@@ -13855,37 +13856,37 @@ function sampev.onSendCommand(command)
       end
    end
    
-   if isTrainingSanbox and command:find("^/spcar") then
+   if isTrainingSandbox and command:find("^/spcar") then
       dialoghook.spcars = true
       sampSendChat("/vw")
       return false
    end
    
-   if isTrainingSanbox and command:find("^/resetgun") then
+   if isTrainingSandbox and command:find("^/resetgun") then
       dialoghook.resetguns = true
       sampSendChat("/vw")
       return false
    end
    
-   if isTrainingSanbox and command:find("^/resetveh") then
+   if isTrainingSandbox and command:find("^/resetveh") then
       dialoghook.resetvehs = true
       sampSendChat("/vw")
       return false
    end
    
-   if isTrainingSanbox and command:find("^/vkickall$") then
+   if isTrainingSandbox and command:find("^/vkickall$") then
       dialoghook.vkickall = true
       sampSendChat("/vw")
       return false
    end
    
-   if isTrainingSanbox and command:find("^/cc$") then
+   if isTrainingSandbox and command:find("^/cc$") then
       ClearChat()
       sampAddChatMessage("[SCRIPT]: {FFFFFF}Чат был очищен!", 0x0FF6600)
       return false
    end
    
-   if isTrainingSanbox and command:find("^/tpp") then
+   if isTrainingSandbox and command:find("^/tpp") then
       if not command:find('(/%a+) (.+)') then
          if LastData.lastPass then
             sampSendChat("/tpp "..LastData.lastPass)
@@ -13990,7 +13991,7 @@ function sampev.onSendChat(message)
       end
       
       local hexcolor = chatmessage:find("{FFA500}.*")
-      if isTrainingSanbox and hexcolor then
+      if isTrainingSandbox and hexcolor then
          chatmessage = string.sub(chatmessage, hexcolor+8, chatmessage:len())
       end
       
@@ -14277,7 +14278,7 @@ function sampev.onApplyPlayerAnimation(playerId, animLib, animName, frameDelta, 
       return false
    end
    -- Fixes knocking down the jetpack by calling animation
-   if isTrainingSanbox then   
+   if isTrainingSandbox then   
       local res, id = sampGetPlayerIdByCharHandle(playerPed)
       if res and sampGetPlayerSpecialAction(id) == 2 then
          return false
@@ -14420,7 +14421,7 @@ function sampev.onSendEditObject(playerObject, objectId, response, position, rot
    end
    
    -- Auto open /omenu on save object 
-   -- if isTrainingSanbox and response == 1 then
+   -- if isTrainingSandbox and response == 1 then
       -- if LastObject.localid then
          -- sampSendChat("/omenu "..LastObject.localid)
       -- end
@@ -14431,7 +14432,7 @@ function sampev.onSendEditObject(playerObject, objectId, response, position, rot
    edit.response = response
    
    if ini.settings.restoreobjectpos and not playerdata.isPlayerEditAttachedObject then
-      if isTrainingSanbox and response == 0 then
+      if isTrainingSandbox and response == 0 then
          if LastObject.startpos.x ~= 0 and LastObject.startpos.y ~= 0 then
             return {playerObject, objectId, response,  LastObject.startpos, rotation}
          end
@@ -14488,7 +14489,7 @@ function sampev.onSendEnterEditObject(type, objectId, model, position)
       LastRemovedObject.modelid = model
    end
       
-   if not isTrainingSanbox then
+   if not isTrainingSandbox then
       --checkBuggedObject(model)
       local result, errorString = checkBuggedObject(model)
       if result then
@@ -14560,7 +14561,7 @@ attachedPlayerId, attachedVehicleId, text)
       attachedPlayerId, attachedVehicleId, text)
    end
    
-   if isTrainingSanbox then
+   if isTrainingSandbox then
       if not text:find("obj:") then -- ignore system 3d text
          table.insert(streamed3dTexts, {
          id = id, color = color, position = position, distance = distance, 
@@ -14577,7 +14578,7 @@ attachedPlayerId, attachedVehicleId, text)
    end
       
    -- Get local id from textdraw info
-   if isTrainingSanbox then
+   if isTrainingSandbox then
       --if color == 8436991 or color == 16211740 then
       if text:find("obj:") then
          -- Bugged instruction, remove later
@@ -14734,13 +14735,13 @@ function sampev.onShowTextDraw(id, data)
       sampAddChatMessage("                 ", -1)
    end
    
-   if isTrainingSanbox then
+   if isTrainingSandbox then
       if id == 2070 then
          dialoghook.previewdialog = true
       end
    end
    
-   if isTrainingSanbox and ini.settings.skipvehnotify then
+   if isTrainingSandbox and ini.settings.skipvehnotify then
       if id == 2125 then
          return false
       end
@@ -14752,7 +14753,7 @@ function sampev.onShowTextDraw(id, data)
 end
 
 function sampev.onTextDrawSetString(id, text)
-   if isTrainingSanbox then
+   if isTrainingSandbox then
       if id == 2055 then
          LastData.lastTextureListIndex = text:match('Index: (%d+)')
          LastData.lastTextureListPage = text:match('Page: (%d+)')
@@ -14921,7 +14922,7 @@ function sampev.onSendSpawn()
    if playerdata.firstSpawn and ini.settings.allchatoff then
       sampAddChatMessage("[SCRIPT]: {FFFFFF}Глобальный чат отключен!", 0x0FF6600)
    end
-   if playerdata.firstSpawn and isTrainingSanbox then 
+   if playerdata.firstSpawn and isTrainingSandbox then 
       playerdata.firstSpawn = false
       if sampIsLocalPlayerSpawned() then 
          if ini.settings.saveskin and isValidSkin(ini.settings.skinid) then
@@ -14943,7 +14944,7 @@ function sampev.onSendSpawn()
    end
    
    local pid = getLocalPlayerId()
-   if isTrainingSanbox and pid == 0 then
+   if isTrainingSandbox and pid == 0 then
       sampAddChatMessage("[SCRIPT]: {FFFFFF}У вас багнутый ID перезайдите на сервер!", 0x0FF6600)
       sampAddChatMessage("[SCRIPT]: {FFFFFF}Если не перезайти вас будут кикать с большинства миров!", 0x0FF6600)
    end
@@ -15019,7 +15020,7 @@ function onScriptTerminate(script, quit)
       inicfg.save(ini, configIni)
       
       toggleFlyMode(false)
-      if isTrainingSanbox then
+      if isTrainingSandbox then
          sampTextdrawDelete(const.txdmodelinfoid)
       end
    end
@@ -15700,21 +15701,21 @@ function Restream()
    lua_thread.create(function()
    lockPlayerControl(true)
 
-   if isTrainingSanbox then
+   if isTrainingSandbox then
       sampAddChatMessage("[SCRIPT]: {FFFFFF}Начинается процесс рестрима. Ожидайте несколько секунд", 0x0FF6600)
    else
       sampAddChatMessage("[SCRIPT]: {FFFFFF}Начинается процесс рестрима. Ожидайте чуть более 5 секунд", 0x0FF6600)
    end
    
    tpcpos.x, tpcpos.y, tpcpos.z = getCharCoordinates(playerPed)
-   if isTrainingSanbox then
+   if isTrainingSandbox then
       sampSendChat(string.format("/xyz %f %f %f",
       tpcpos.x, tpcpos.y, tpcpos.z+10000.0), 0x0FFFFFF)
    else
       setCharCoordinates(playerPed, tpcpos.x, tpcpos.y, tpcpos.z+10000.0)
    end
    
-   if isTrainingSanbox then
+   if isTrainingSandbox then
       wait(750)
       sampSendChat(string.format("/xyz %f %f %f",
       tpcpos.x, tpcpos.y, tpcpos.z), 0x0FFFFFF)
@@ -15729,7 +15730,7 @@ function Restream()
    
    wait(750)
    if dialoghook.error then
-      if isTrainingSanbox then
+      if isTrainingSandbox then
          setCharCoordinates(playerPed, tpcpos.x, tpcpos.y, tpcpos.z+10000.0)
          wait(750)
          setCharCoordinates(playerPed, tpcpos.x, tpcpos.y, tpcpos.z+0.5)
