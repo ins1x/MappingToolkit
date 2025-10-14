@@ -3,7 +3,7 @@ script_description("Assistant for mappers")
 script_dependencies('imgui', 'lib.samp.events')
 script_properties("work-in-pause")
 script_url("https://github.com/ins1x/MappingToolkit")
-script_version("4.19") -- beta 2
+script_version("4.19") -- beta 3
 -- support sa-mp versions depends on SAMPFUNCS (0.3.7-R1, 0.3.7-R3-1, 0.3.7-R5, 0.3.DL)
 -- script_moonloader(16) moonloader v.0.26 
 -- editor options: tabsize 3, Unix (LF), encoding Windows-1251
@@ -331,13 +331,16 @@ local dialoghook = {
    tbvalue = false,
    olist = false,
    otext = false,
+   osearch = false,
    previewdialog = false,
    spcars = false,
    resetguns = false,
    resetvehs = false,
    vkickall = false,
    error = false,
-   devmenutoggle = false
+   devmenutoggle = false,
+   prevdialog = false,
+   nextdialog = false,
 }
 
 local checkbox = {
@@ -1639,6 +1642,28 @@ function main()
                sampSendClickTextdraw(2094)
             end
          end
+         
+         -- if isTrainingSandbox and dialoghook.nextdialog then
+            -- if isKeyJustPressed(0x27) and sampIsCursorActive()
+            -- and not sampIsChatInputActive() and sampIsDialogActive()
+            -- and not isPauseMenuActive() and not isSampfuncsConsoleActive() then 
+               -- lua_thread.create(function()
+                  -- wait(250)
+                  -- sampSendDialogResponse(32700, 1, 18, " <<<след. страница<<< ")
+               -- end)
+            -- end
+         -- end
+         
+         -- if isTrainingSandbox and dialoghook.prevdialog then
+            -- if isKeyJustPressed(0x25) and sampIsCursorActive()
+            -- and not sampIsChatInputActive() and sampIsDialogActive()
+            -- and not isPauseMenuActive() and not isSampfuncsConsoleActive() then 
+               -- lua_thread.create(function()
+                  -- wait(250)
+                  -- sampSendDialogResponse(32700, 1, 0, " <<<пред. страница<<< ")
+               -- end)
+            -- end
+         -- end
          
          if isTrainingSandbox then
             -- M key menu /vw and /world 
@@ -10517,6 +10542,8 @@ function sampev.onSendDialogResponse(dialogId, button, listboxId, input)
          dialoghook.setsadstext = false
          dialoghook.setworldname = false
          dialoghook.setworlddescription = false
+         dialoghook.nextdialog = false
+         dialoghook.prevdialog = false
       end
       
       if button == 1 and dialoghook.action then
@@ -11006,6 +11033,20 @@ function sampev.onShowDialog(dialogId, style, title, button1, button2, text)
          end
       end
       
+      -- Switching cb with arrow buttons
+      if title:find('Страница') and style == 2 then
+         if text:find('пред. страница') then
+            dialoghook.prevdialog = true
+         else
+            dialoghook.prevdialog = false
+         end
+         if text:find('след. страница') then
+            dialoghook.nextdialog = true
+         else
+            dialoghook.nextdialog = false
+         end
+      end
+      
       if title:find('Изменить 3D текст') then
          if ini.settings.cbvalautocomplete then
             local result = text:match('[:].*')
@@ -11178,6 +11219,9 @@ function sampev.onShowDialog(dialogId, style, title, button1, button2, text)
             "\n{696969}Нажмите CTRL + SHIFT + L чтобы открыть ссылку в браузере\n"
             return {dialogId, style, title, button1, button2, newtext}
          end
+         
+         -- if text:find('Отправить сообщение игроку') then
+         -- end
          
          if text:find('Показать гангзону игроку') then
             LastData.lastLink = 'https://dev.prineside.com/gtasa_gangzone_editor/'
@@ -13668,6 +13712,16 @@ function sampev.onSendCommand(command)
       end
    end
    
+   if isTrainingSandbox and command:find("^/osearch") then
+      local cmd, arg = command:match('(/%a+) (.+)')
+      if arg then
+         local searchobj = tostring(arg)
+         if string.len(searchobj) <= 1 then
+            dialoghook.osearch = true
+         end
+      end
+   end
+   
    if isTrainingSandbox and command:find("^/лс") then
       if command:find('(/%a+) (.+) (.+)') then
          local cmd, id, message = command:match('(/%a+) (.+) (.+)')
@@ -14817,6 +14871,17 @@ function sampev.onSendClickTextDraw(textdrawId)
          print(("Click Textdraw ID: %s, Model: %s, x : %.2f, y: %.2f"):format(textdrawId, sampTextdrawGetModelRotationZoomVehColor(textdrawId), posX, posY))
          sampAddChatMessage("Click Textdraw ID: "..textdrawId, -1)
       end
+   end
+   
+   if dialoghook.osearch then
+      local text = sampTextdrawGetString(textdrawId+26)
+      if text then
+         local modelid = text:match("%d+")
+         if modelid then
+            LastData.lastModel = tonumber(modelid)
+         end
+      end
+      dialoghook.osearch = false
    end
    
    if checkbox.txdparamsonclick.v then
