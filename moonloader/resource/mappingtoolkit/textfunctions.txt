@@ -77,20 +77,6 @@
 #gunModel(gunid)#/#weaponModel(gunid)# - возвращает ID объекта оружия.
   (на несуществующее такое как 20, 21 вернет -1)
 
-Данные мира:
-#array(slot, *playerid)# - вернуть массив (СЛОТ: 0-26) игрока.
-#server(slot)# - вернуть массив сервера (СЛОТ: 0-49)
-#var(name)# - вернуть переменную мира, из /varlist
-#pvar(name, *playerid)# - вернуть переменную игрока, из /pvarlist
-#online# - вернуть онлайн мира
-#isWorld(playerid)#isWorld(playerid)# - Вернёт 1 если игрок в мире.
-#time# - вернуть время мира
-#weather# - вернуть погоду мира
-#worldName# - вернет название мира
-#worldDesc# - вернет описание мира
-#vdata(vehicleid num)# - Массив транспорта.
-#oArray(objectid slot)# - значение массива slot объекта objectid (0-10)
-
 Списки игроков:
 #playerCount(category value)#
   Вернёт количество игроков у которых совпадет category с value.
@@ -112,7 +98,14 @@
 #randomPlayer(*category)# - Вернёт рандомного игрока по category.
   list: team <id>, skin <id>, veh <id>, data <slot> <value>, 
   wanted <value>, action <id>, dead, alive
-  
+#randomPlayer(team 1)# - вернуть случайного игрока из 1 команды.
+#randomPlayer(skin 228)# - вернуть случайного игрока с скином 228.
+#randomPlayer(veh 411)# - вернуть случайного игрока в транспорте модель 411.
+#randomPlayer(wanted 6)# - вернуть случайного игрока у которого 6 звезд розыска.
+#randomPlayer(action 3)# - вернуть случайного игрока у которого специальное дейсвтие равно 3. Таблица специальных действий: https://open.mp/docs/scripting/resources/specialactions
+#randomPlayer(dead)# - вернуть случайного игрока в состоянии смерти.
+#randomPlayer(alive)# - вернуть случайного живого игрока.
+
 Команды:
 #team(*playerid)# - вернуть ID команды (/team) игрока
 #teamName(*playerid)# - название команды игрока
@@ -176,15 +169,33 @@
 #oState(objectid)# - вернет статус отображения объекта
 #objectCount# - вернет кол-во объектов в мире
 #maxObjectCount# - вернет макс. возможное кол-во объектов в мире
+
+3d тексты:
 #getDistAction(actionid)# - вернет дистанцию к /action
 #actionXYZ(actionid)# - вернет координаты /action
 #actionX(actionid)# #actionY(actionid)# #actionZ(actionid)# 
 #actionText(actionid)# - вернет текст акшиона
 
-КБ:
+Данные мира:
+#online# - вернуть онлайн мира
+#isWorld(playerid)#isWorld(playerid)# - Вернёт 1 если игрок в мире.
+#time# - вернуть время мира
+#weather# - вернуть погоду мира
+#worldName# - вернет название мира
+#worldDesc# - вернет описание мира
+
+Блоки, переменные и массивы:
 #ext(blockid value)# - вернет строку значения командного блока
 #retval(id, *playerid)# - Числовые значения.
 #retstr(*id, **playerid)# - Текстовые значения.
+#var(HelloMessage)# - вернет значение переменной HelloMessage.
+#pvar(varname, id)# - Возвращает данные переменной игрока.
+ id игрока - не является обязательным параметром. 
+#random(0, 100)# - вернет случайное число от 0 до 100.
+#vdata(vehicleid num)# - Массив транспорта.
+#oArray(objectid slot)# - значение массива slot объекта objectid (0-10)
+#array(slot, *playerid)# - вернуть массив (СЛОТ: 0-26) игрока.
+#server(slot)# - вернуть массив сервера (СЛОТ: 0-49)
 #tick# - возвращает количество тиков с начала работы сервера, 1 тик - 1 мс.
 #timestamp# - секунды
 
