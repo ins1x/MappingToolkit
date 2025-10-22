@@ -3,7 +3,7 @@ script_description("Assistant for mappers")
 script_dependencies('imgui', 'lib.samp.events')
 script_properties("work-in-pause")
 script_url("https://github.com/ins1x/MappingToolkit")
-script_version("4.19") -- beta 3
+script_version("4.19") -- beta 4
 -- support sa-mp versions depends on SAMPFUNCS (0.3.7-R1, 0.3.7-R3-1, 0.3.7-R5, 0.3.DL)
 -- script_moonloader(16) moonloader v.0.26 
 -- editor options: tabsize 3, Unix (LF), encoding Windows-1251
@@ -766,6 +766,7 @@ local LastData = {
    lastVehinfoModelid = 0,
    lastCbvaluebuffer = nil,
    lastTbvaluebuffer = nil,
+   lastCbMessage = nil,
    lastMinigame = nil,
    lastModelinfo = 0,
    lastAttEditSlot = nil,
@@ -1416,7 +1417,7 @@ function main()
                   wait(50)
                   sampSetCurrentDialogEditboxText(tostring(LastData.lastCbvaluebuffer))
                end)
-               LastData.lastTextBuffer = ""
+               LastData.lastTextBuffer = nil
             end
             
             if ini.settings.cbvalautocomplete and LastData.lastTbvaluebuffer then
@@ -1424,7 +1425,7 @@ function main()
                   wait(50)
                   sampSetCurrentDialogEditboxText(tostring(LastData.lastTbvaluebuffer))
                end)
-               LastData.lastTextBuffer = ""
+               LastData.lastTextBuffer = nil
             end
             
             if LastData.lastOtext and dialoghook.otext then
@@ -1433,6 +1434,7 @@ function main()
                      wait(50)
                      sampSetCurrentDialogEditboxText(tostring(LastData.lastOtext))
                   end)
+                  LastData.lastTextBuffer = nil
                end
             end
             
@@ -10902,11 +10904,21 @@ function sampev.onSendDialogResponse(dialogId, button, listboxId, input)
                sampSendChat("/stream")
             end)
          end
-         if input:find("Установить игроку границу мира") then
-            lua_thread.create(function()
-               wait(500)
-               sampSetCurrentDialogEditboxText(tostring("20000 -20000 20000 -20000"))
-            end)
+         if ini.settings.dialogautocomplete then
+            if input:find("Установить игроку границу мира") then
+               lua_thread.create(function()
+                  wait(500)
+                  sampSetCurrentDialogEditboxText(tostring("20000 -20000 20000 -20000"))
+               end)
+            end
+            -- if input:find("Отправить сообщение") then
+               -- if LastData.lastCbMessage then
+                  -- lua_thread.create(function()
+                     -- wait(500)
+                     -- sampSetCurrentDialogEditboxText(tostring(LastData.lastCbMessage))
+                  -- end)
+               -- end
+            -- end
          end
          if input:find("Сделать мир статичным") then
             sampAddChatMessage("[SCRIPT]: {FFFFFF}Перед тем как сделать мир статичным, установите желаемое описание и название мира!", 0x0FF6600)
@@ -11238,6 +11250,15 @@ function sampev.onShowDialog(dialogId, style, title, button1, button2, text)
                return {dialogId, style, title, button1, button2, newtext}
             end
          end
+         
+         -- if text:find("Отправить игроку сообщение") then
+            -- if LastData.lastCbMessage then
+               -- lua_thread.create(function()
+                  -- wait(500)
+                  -- sampSetCurrentDialogEditboxText(tostring(LastData.lastCbMessage))
+               -- end)
+            -- end
+         -- end
          
          if text:find('Укажите два цвета для двух слотов в формате AARRGGBB') then
             local newtext = text ..
@@ -13734,6 +13755,26 @@ function sampev.onSendCommand(command)
    if isTrainingSandbox and command:find("^/cbed") then
       if LastData.lastCb then
          sampSendChat("/cbedit "..LastData.lastCb)
+      else
+         sampSendChat("/cblist")
+      end
+      return false
+   end
+
+   if isTrainingSandbox and command:find("^/cbnext") then
+      if LastData.lastCb then
+         sampSendChat("/cbedit "..LastData.lastCb+1)
+         LastData.lastCb = LastData.lastCb+1
+      else
+         sampSendChat("/cblist")
+      end
+      return false
+   end
+
+   if isTrainingSandbox and command:find("^/cbprev") then
+      if LastData.lastCb then
+         sampSendChat("/cbedit "..LastData.lastCb-1)
+         LastData.lastCb = LastData.lastCb-1
       else
          sampSendChat("/cblist")
       end
