@@ -3,7 +3,7 @@ script_description("Assistant for mappers")
 script_dependencies('imgui', 'lib.samp.events')
 script_properties("work-in-pause")
 script_url("https://github.com/ins1x/MappingToolkit")
-script_version("4.19") -- beta 4
+script_version("4.19") -- release
 -- support sa-mp versions depends on SAMPFUNCS (0.3.7-R1, 0.3.7-R3-1, 0.3.7-R5, 0.3.DL)
 -- script_moonloader(16) moonloader v.0.26 
 -- editor options: tabsize 3, Unix (LF), encoding Windows-1251
@@ -10605,7 +10605,7 @@ function sampev.onSendDialogResponse(dialogId, button, listboxId, input)
             LastData.lastAttEditSlot = listboxId + 1
          end
       end
-      
+         
       if button == 0 and ini.settings.skipomenu then
          local caption = sampGetDialogCaption()
          if LastData.lastDialogTitle then
@@ -13752,7 +13752,11 @@ function sampev.onSendCommand(command)
       end
    end
    
-   if isTrainingSandbox and command:find("^/cbed") then
+   if isTrainingSandbox and command:find("^/cblist") then
+      LastData.lastTbvaluebuffer = nil
+   end
+   
+   if isTrainingSandbox and command:find("^/cbed$") then
       if LastData.lastCb then
          sampSendChat("/cbedit "..LastData.lastCb)
       else
@@ -13761,7 +13765,7 @@ function sampev.onSendCommand(command)
       return false
    end
 
-   if isTrainingSandbox and command:find("^/cbnext") then
+   if isTrainingSandbox and command:find("^/cbnext$") then
       if LastData.lastCb then
          sampSendChat("/cbedit "..LastData.lastCb+1)
          LastData.lastCb = LastData.lastCb+1
@@ -13771,7 +13775,7 @@ function sampev.onSendCommand(command)
       return false
    end
 
-   if isTrainingSandbox and command:find("^/cbprev") then
+   if isTrainingSandbox and command:find("^/cbprev$") then
       if LastData.lastCb then
          sampSendChat("/cbedit "..LastData.lastCb-1)
          LastData.lastCb = LastData.lastCb-1

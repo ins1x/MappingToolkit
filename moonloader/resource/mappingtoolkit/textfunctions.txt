@@ -46,14 +46,13 @@
 #getZ(x y)# - Вернёт коорднату Z по X Y.
 #camxyz(*playerid)#  - вернуть позицию камеры игрока
 #camx(*playerid)# #camy(*playerid)# #camz(*playerid)# - позиция камеры
-#camVecXYZ# or #camVecX/Y/Z# - вернет текущее направление движения игрока в трехмерном пространстве (3D).
 #cameraMode(*playerid)# - Вернёт состояние камеры.
 #customRaycast(x y z angle dist 0/1 x/y/z/xyz)#
   Рэйкст по позиции только со своими координатами.
 #camVecXYZ# и #camVecX/Y/Z# - направление движения игрока в 3D пространстве
 #front(dist <x/y>, *playerid)# - вернёт координате x/y на растоянии dist от игрока.
 #raycast(cam/pos dist col coord)# - возврат коллизии
-#getAngle(x1 y1 ×2 y2)# - Вернёт FA от x1 y1 до x2 y2.
+#getAngle(x1 y1 x2 y2)# - Вернёт FA от x1 y1 до x2 y2.
 #GetDistPlayer(targetid, *playerid)# - вернет дистанцию к targetid
 #GetDistPos(x y z *playerid)# - вернет дистанцию к позиции x y z
 #GetDist(x1 y1 z1 ×2 y2 z2)# 
@@ -121,7 +120,7 @@
 #vehColor(*playerid)# - цвет автомобиля в HEX формате
 #vehColor1(*playerid)# - цвет автомобиля 1
 #vehColor2(*playerid)# - цвет автомобиля 2
-#vehModel(*playerid)## - вернет модель ТС игрока по playerid
+#vehModel(*playerid)# - вернет модель ТС игрока по playerid
 #GetVehModel(vehid)# - вернет модель ТС по vehid
 #vehHealth(*playerid)# - вернуть уровень здоровья ТС
 #gearState(vehid)# - возвращает положение шасси в самолетах.
