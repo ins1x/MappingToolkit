@@ -262,14 +262,14 @@
 Актеры:
 #arActor(dist, skinid)# - вернет ближ. актера в радиусе radius. 
   Необязательный параметр: модель скина.
-#torXYZ(actorid)# #actorX(actorid)# #actorY(actorid)# #actorZ(actorid)#
-#tDistActor(actorid, *playerid)# - вернет координаты актера
-#torState(actorid)# or #actorStatus(actorid)# - вернет статус актера
-#torAnim(actorid)# - вернет анимацию актера из списка
-#torAltAnim(actorid)# - вернет альтернативную анимацию актера из списка
-#torSkin(actorid)# - вернет модель скина актера
-#torHealth(actorid)# - вернет уровень здоровья актера
-#torInvulnerable(actorid)# or #actorGM(actorid)# - вернет статус GM’a у актера
+#actorXYZ(actorid)# #actorX(actorid)# #actorY(actorid)# #actorZ(actorid)#
+#actDistActor(actorid, *playerid)# - вернет координаты актера
+#actorState(actorid)# or #actorStatus(actorid)# - вернет статус актера
+#actorAnim(actorid)# - вернет анимацию актера из списка
+#actorAltAnim(actorid)# - вернет альтернативную анимацию актера из списка
+#actorSkin(actorid)# - вернет модель скина актера
+#actorHealth(actorid)# - вернет уровень здоровья актера
+#actorInvulnerable(actorid)# or #actorGM(actorid)# - вернет статус GM’a у актера
 #lastActor(*playerid)# - Последний редактируемый игроком актер.
 #targetActor#
 
