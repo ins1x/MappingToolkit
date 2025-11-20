@@ -3,7 +3,7 @@ script_description("Assistant for mappers")
 script_dependencies('imgui', 'lib.samp.events')
 script_properties("work-in-pause")
 script_url("https://github.com/ins1x/MappingToolkit")
-script_version("4.19") -- release
+script_version("4.19") -- release 1
 -- support sa-mp versions depends on SAMPFUNCS (0.3.7-R1, 0.3.7-R3-1, 0.3.7-R5, 0.3.DL)
 -- script_moonloader(16) moonloader v.0.26 
 -- editor options: tabsize 3, Unix (LF), encoding Windows-1251
@@ -10817,34 +10817,36 @@ function sampev.onSendDialogResponse(dialogId, button, listboxId, input)
             end)
          end
          
-         -- Extend main /menu
-         if input:find("Взять Jetpack") then
-            sampSendChat("/jetpack")
+         local title = sampGetDialogCaption()
+         if title:find("Меню") then
+            -- Extend main /menu
+            if input:find("Взять Jetpack") then
+               sampSendChat("/jetpack")
+            end
+            if input:find("Взять оружие") then
+               sampSendChat("/weapon")
+            end
+            if input:find("Сменить скин") then
+               sampSendChat("/skin")
+            end
+            if input:find("Очистить чат") then
+               ClearChat()
+               sampAddChatMessage("[SCRIPT]: {FFFFFF}Чат был очищен!", 0x0FF6600)
+               --sampAddChatMessage("[SCRIPT]: {FFFFFF}Чат был очищен!", 0x0FF6600)
+            end
+            if input:find("Заспавнить себя") then
+               sampSendChat("/spawnme")
+            end
+            if input:find("Слапнуть себя") then
+               sampSendChat("/slapme")
+            end
+            if input:find("Список друзей") then
+               sampSendChat("/flist")
+            end
+            if input:find("Ачивки") then
+               sampSendChat("/ach")
+            end
          end
-         if input:find("Взять оружие") then
-            sampSendChat("/weapon")
-         end
-         if input:find("Сменить скин") then
-            sampSendChat("/skin")
-         end
-         if input:find("Очистить чат") then
-            ClearChat()
-            sampAddChatMessage("[SCRIPT]: {FFFFFF}Чат был очищен!", 0x0FF6600)
-            --sampAddChatMessage("[SCRIPT]: {FFFFFF}Чат был очищен!", 0x0FF6600)
-         end
-         if input:find("Заспавнить себя") then
-            sampSendChat("/spawnme")
-         end
-         if input:find("Слапнуть себя") then
-            sampSendChat("/slapme")
-         end
-         if input:find("Список друзей") then
-            sampSendChat("/flist")
-         end
-         if input:find("Ачивки") then
-            sampSendChat("/ach")
-         end
-         
          -- Extend main /vw menu
          if input:find("Настройки для команд") then
             lua_thread.create(function()
