@@ -3,7 +3,7 @@ script_description("Assistant for mappers")
 script_dependencies('imgui', 'lib.samp.events')
 script_properties("work-in-pause")
 script_url("https://github.com/ins1x/MappingToolkit")
-script_version("4.19") -- release 1
+script_version("4.19") -- release 2
 -- support sa-mp versions depends on SAMPFUNCS (0.3.7-R1, 0.3.7-R3-1, 0.3.7-R5, 0.3.DL)
 -- script_moonloader(16) moonloader v.0.26 
 -- editor options: tabsize 3, Unix (LF), encoding Windows-1251
@@ -2717,7 +2717,7 @@ function imgui.OnDrawFrame()
                         sampSendChat(string.format("/xyz %f %f %f", textbuffer.tpcx.v, textbuffer.tpcy.v, textbuffer.tpcz.v), -1)
                         sampAddChatMessage(string.format("[SCRIPT]: {FFFFFF}Телепорт на метку: %.1f %.1f %.1f",
                         textbuffer.tpcx.v, textbuffer.tpcy.v, textbuffer.tpcz.v), 0x0FF6600)
-                     else 
+                     else
                         sampAddChatMessage("[SCRIPT]: {FFFFFF}Недоступно для вашего сервера", 0x0FF6600)
                      end
                   else
@@ -3758,30 +3758,12 @@ function imgui.OnDrawFrame()
             end
 
             if imgui.Button(u8"Скрыть аттачи (Визуально)",imgui.ImVec2(200, 25)) then
-               for i, objid in pairs(getAllObjects()) do
-                  pX, pY, pZ = getCharCoordinates(playerPed)
-                  _, objX, objY, objZ = getObjectCoordinates(objid)
-                  local ddist = getDistanceBetweenCoords3d(pX, pY, pZ, objX, objY, objZ)
-                  if ddist < 1 and playerAtachedObjects[objid] ~= false then
-                     setObjectVisible(objid, false)
-                     playerAtachedObjects[objid] = false
-                  end
-               end
+               hideAttaches(true)
                sampAddChatMessage("[SCRIPT]: {FFFFFF}Вы скрыли все аттачи (Визуально для себя)", 0x0FF6600)
             end
             imgui.SameLine()
             if imgui.Button(u8"Показать аттачи (Визуально)",imgui.ImVec2(200, 25)) then
-               for i, objid in pairs(getAllObjects()) do
-                  if playerAtachedObjects[objid] == false then
-                     pX, pY, pZ = getCharCoordinates(playerPed)
-                     _, objX, objY, objZ = getObjectCoordinates(objid)
-                     local ddist = getDistanceBetweenCoords3d(pX, pY, pZ, objX, objY, objZ)
-                     if playerAtachedObjects[objid] == false then
-                        setObjectVisible(objid, true)
-                        playerAtachedObjects[objid] = true
-                     end
-                  end
-               end
+               hideAttaches(false)
                sampAddChatMessage("[SCRIPT]: {FFFFFF}Вы показали скрытые аттачи", 0x0FF6600)
             end
             
@@ -4349,12 +4331,14 @@ function imgui.OnDrawFrame()
          if imgui.Checkbox(u8("Визуально скрыть персонажа"), checkbox.hideped) then 
             if checkbox.hideped.v then
                hidePED(true)
+               hideAttaches(true)
             else
                hidePED(false)
+               hideAttaches(false)
             end
          end 
          imgui.SameLine()
-         imgui.TextQuestion("( ? )", u8"Визуально для вас скроет скин и аттачи")
+         imgui.TextQuestion("( ? )", u8"Визуально для вас скроет персонажа и аттачи (невидимка")
 	     
          if imgui.Checkbox(u8("Пьяная камера"), checkbox.drunkcam) then 
             if not checkbox.drunkcam.v then
@@ -12200,17 +12184,39 @@ function sampev.onServerMessage(color, text)
    end
    
    if checkbox.chatmentions.v then
+      -- add words to ignore mentions here
+      local ignorewords = {"ADS", "мин", "часов", "сек", "место", "дней"}
+      
+      local searchresult = 0
+      for i, word in ipairs(ignorewords) do
+         if text:find(word) then
+            searchresult = searchresult + 1
+         end
+      end
+      
       -- ignore system messages by color
       if color ~= -10092289 --orange color training
       and color ~= 993737727 --black system color
       --and color ~= -1 then
       then
          -- mentions by nickname
-         if text:find(nickname) then
-            if text:find(":") then
-               local pointpos = text:find(":")
-               local cleartext = text:sub(pointpos, string.len(text))
-               if cleartext:find(nickname) then
+         if searchresult == 0 then
+            if text:find(nickname) then
+               if text:find(":") then
+                  local pointpos = text:find(":")
+                  local cleartext = text:sub(pointpos, string.len(text))
+                  if cleartext:find(nickname) then
+                     if ini.mentions.usegametext then
+                        printStyledString('You were mentioned in the chat', 2000, 4)
+                     end
+                     if ini.mentions.usesound then
+                        addOneOffSound(0.0, 0.0, 0.0, ini.mentions.sound) -- CHECKPOINT_GREEN
+                     end
+                     if ini.mentions.usecolor then
+                        return {color, "{"..ini.mentions.color.."}"..text}
+                     end
+                  end
+               else
                   if ini.mentions.usegametext then
                      printStyledString('You were mentioned in the chat', 2000, 4)
                   end
@@ -12221,21 +12227,9 @@ function sampev.onServerMessage(color, text)
                      return {color, "{"..ini.mentions.color.."}"..text}
                   end
                end
-            else
-               if ini.mentions.usegametext then
-                  printStyledString('You were mentioned in the chat', 2000, 4)
-               end
-               if ini.mentions.usesound then
-                  addOneOffSound(0.0, 0.0, 0.0, ini.mentions.sound) -- CHECKPOINT_GREEN
-               end
-               if ini.mentions.usecolor then
-                  return {color, "{"..ini.mentions.color.."}"..text}
-               end
             end
-         end
          
-         -- mentions by id
-         if not text:find("ADS") and not text:find("мин") then
+            -- mentions by id
             if text:match("[^/:]".."%s"..id.."%s(.+)") -- id text mention
             or text:match("@"..id.."%s") then -- @id mention
             --or text:match("(%s"..id.."%s)") then
@@ -12249,7 +12243,8 @@ function sampev.onServerMessage(color, text)
                   return {color, "{"..ini.mentions.color.."}"..text}
                end
             end
-         end
+         end      
+
       end
    end
    
@@ -13568,18 +13563,15 @@ function sampev.onSendCommand(command)
          if isTrainingSandbox then
             sampSendChat(string.format("/xyz %f %f %f",
             LastObject.position.x, LastObject.position.y, LastObject.position.z), 0x0FFFFFF)   
-         else
-            setCharCoordinates(playerPed, LastObject.position.x, LastObject.position.x, LastObject.position.z+0.2)
+            sampAddChatMessage("Вы телепортировались на координаты к послед.объекту "..LastObject.modelid, 0x000FF00)
+            return false
          end
-         sampAddChatMessage("Вы телепортировались на координаты к послед.объекту "..LastObject.modelid, 0x000FF00)
       else
          if isTrainingSandbox then
             sampAddChatMessage("[SYNTAX]: {FFFFFF}Используйте /tpo <id>", 0x09A9999)
-         else
-            sampAddChatMessage("Последний созданный объект не найден", -1)
+            return false
          end
       end
-      return false
    end
    
    if command:find("^/searchveh") or command:find("^/findveh") then
@@ -13924,7 +13916,9 @@ function sampev.onSendCommand(command)
    if isTrainingSandbox and command:find("^/savevw")then
       dialoghook.saveworldname = true
       if checkbox.worldsavereminder.v then
-         threads.savereminder:terminate()
+         if threads.savereminder then
+            threads.savereminder:terminate()
+         end
          threads.savereminder = nil
          SaveReminder()
       end
@@ -15743,15 +15737,17 @@ function timelap(delay)
 end
 
 function SaveReminder()
-   threads.savereminder = lua_thread.create(function()
-      while checkbox.worldsavereminder.v do
-         local delay = tonumber(ini.settings.reminderdelay)
-         wait(1000*60*delay)
-         if playerdata.isWorldHoster then
-            sampAddChatMessage("[SCRIPT]: {FFFFFF}Вы давно не сохраняли мир. Сохраните его во избежание потери прогресса. ( /savevw )", 0x0FF6600)
+   if isTrainingSandbox then
+      threads.savereminder = lua_thread.create(function()
+         while checkbox.worldsavereminder.v do
+            local delay = tonumber(ini.settings.reminderdelay)
+            wait(1000*60*delay)
+            if playerdata.isWorldHoster then
+               sampAddChatMessage("[SCRIPT]: {FFFFFF}Вы давно не сохраняли мир. Сохраните его во избежание потери прогресса. ( /savevw )", 0x0FF6600)
+            end
          end
-      end
-   end)
+      end)
+   end
 end
 
 function WorldJoinInit()
@@ -15941,6 +15937,33 @@ function hidePED(state)
       memory.setuint8(address + 0x474, 2, true)
    else
       memory.setuint8(address + 0x474, 1, true)
+   end
+end
+
+function hideAttaches(state)
+-- if state true hide palyer attaches, if false show all attaches
+   if state then 
+      for i, objid in pairs(getAllObjects()) do
+         pX, pY, pZ = getCharCoordinates(playerPed)
+         _, objX, objY, objZ = getObjectCoordinates(objid)
+         local ddist = getDistanceBetweenCoords3d(pX, pY, pZ, objX, objY, objZ)
+         if ddist < 1 and playerAtachedObjects[objid] ~= false then
+            setObjectVisible(objid, false)
+            playerAtachedObjects[objid] = false
+         end
+      end
+   else
+      for i, objid in pairs(getAllObjects()) do
+         if playerAtachedObjects[objid] == false then
+            pX, pY, pZ = getCharCoordinates(playerPed)
+            _, objX, objY, objZ = getObjectCoordinates(objid)
+            local ddist = getDistanceBetweenCoords3d(pX, pY, pZ, objX, objY, objZ)
+            if playerAtachedObjects[objid] == false then
+               setObjectVisible(objid, true)
+               playerAtachedObjects[objid] = true
+            end
+         end
+      end
    end
 end
 
