@@ -3,7 +3,7 @@ script_description("Assistant for mappers")
 script_dependencies('imgui', 'lib.samp.events')
 script_properties("work-in-pause")
 script_url("https://github.com/ins1x/MappingToolkit")
-script_version("4.19") -- release 2
+script_version("4.19") -- release 3
 -- support sa-mp versions depends on SAMPFUNCS (0.3.7-R1, 0.3.7-R3-1, 0.3.7-R5, 0.3.DL)
 -- script_moonloader(16) moonloader v.0.26 
 -- editor options: tabsize 3, Unix (LF), encoding Windows-1251
@@ -83,6 +83,7 @@ local ini = inicfg.load({
       noaltenter = false,
       nointeriorradar = false,
       nopagekeys = false,
+      nokillchat = false,
       novehiclevisualdamage = false,
       oinfotxd = true,
       pauseinwidescreen = false,
@@ -384,6 +385,7 @@ local checkbox = {
    novehiclevisualdamage = imgui.ImBool(ini.settings.novehiclevisualdamage),
    noaltenter = imgui.ImBool(ini.settings.noaltenter),
    nopagekeys = imgui.ImBool(ini.settings.nopagekeys),
+   nokillchat = imgui.ImBool(ini.settings.nokillchat),
    nointeriorradar = imgui.ImBool(ini.settings.nointeriorradar),
    weatherinformer = imgui.ImBool(ini.settings.weatherinformer),
    saveworldname = imgui.ImBool(ini.settings.saveworldname),
@@ -4304,6 +4306,19 @@ function imgui.OnDrawFrame()
                memory.setint8(0xBA676C, 2)
             end
          end
+         imgui.SameLine()
+         if imgui.Button(u8(ini.settings.nokillchat and 'Показать' or 'Скрыть')..u8" Killchat", imgui.ImVec2(125, 25)) then
+            ini.settings.nokillchat = not ini.settings.nokillchat
+            print(ini.settings.nokillchat)
+            inicfg.save(ini, configIni)
+            lua_thread.create(function()
+               wait(100)
+               setVirtualKeyDown(0x78, true) -- F9
+               wait(100)
+               setVirtualKeyDown(0x78, false)
+            end)
+         end
+         
          if isTrainingSandbox then
             imgui.SameLine()
             if imgui.TooltipButton(u8"Перейти в интерьер для съемок", imgui.ImVec2(230, 25), u8"Телепортирует в интерьер с хромакеем") then
@@ -6555,6 +6570,42 @@ function imgui.OnDrawFrame()
                slider.weather.v = 12
                ini.settings.weather = slider.weather.v
                setWeather(slider.weather.v)            
+            end
+            
+            if imgui.Button(u8"Фиолетовая", imgui.ImVec2(110,25)) then
+               slider.weather.v = 40
+               slider.time.v = 20
+               setWeather(slider.weather.v)
+               setTime(slider.time.v)
+               ini.settings.weather = slider.weather.v
+               ini.settings.time = slider.time.v
+            end
+            imgui.SameLine()
+            if imgui.Button(u8"Красная", imgui.ImVec2(110,25)) then
+               slider.weather.v = 33
+               slider.time.v = 21
+               setTime(slider.time.v)
+               setWeather(slider.weather.v)
+               ini.settings.weather = slider.weather.v
+               ini.settings.time = slider.time.v
+            end
+            imgui.SameLine()
+            if imgui.Button(u8"Светлая", imgui.ImVec2(110,25)) then
+               slider.weather.v = 4
+               slider.time.v = 10
+               setWeather(slider.weather.v)
+               setTime(slider.time.v)
+               ini.settings.weather = slider.weather.v
+               ini.settings.time = slider.time.v
+            end
+            imgui.SameLine()
+            if imgui.Button(u8"Ночная", imgui.ImVec2(110,25)) then
+               slider.weather.v = 7
+               slider.time.v = 24
+               setWeather(slider.weather.v)      
+               setTime(slider.time.v)
+               ini.settings.weather = slider.weather.v
+               ini.settings.time = slider.time.v               
             end
             
             if imgui.Button(u8"Монохромная", imgui.ImVec2(110,25)) then
@@ -14730,6 +14781,18 @@ function sampev.onTogglePlayerControllable(controllable)
    playerdata.isLockPlayerControl = controllable
 end
 
+function sampev.onSendDeathNotification(reason, killerId)
+   if ini.settings.nokillchat then
+      return false
+   end
+end
+
+function sampev.onSendDeathNotification(killerId, killedId, reason)
+   if ini.settings.nokillchat then
+      return false
+   end
+end
+
 function sampev.onSetCameraLookAt(lookAtPosition, cutType)
    -- cutType:
    -- 1 CAMERA_MOVE	The camera position and/or target will move to its new value over time.
@@ -14910,7 +14973,12 @@ function sampev.onSendClickTextDraw(textdrawId)
          sampAddChatMessage("Close Textdraws", -1)
       else
          print(("Click Textdraw ID: %s, Model: %s, x : %.2f, y: %.2f"):format(textdrawId, sampTextdrawGetModelRotationZoomVehColor(textdrawId), posX, posY))
-         sampAddChatMessage("Click Textdraw ID: "..textdrawId, -1)
+         local text = sampTextdrawGetString(textdrawId)
+         if text then
+            sampAddChatMessage("Click Textdraw ID: "..textdrawId.." TXT: "..text, -1)
+         else
+            sampAddChatMessage("Click Textdraw ID: "..textdrawId, -1)
+         end
       end
    end
    
@@ -15001,6 +15069,15 @@ function sampev.onInitGame(playerId, hostName, settings, vehicleModels)
    inicfg.save(ini, configIni)
    if hostName:find("TRAINING") then
       dialoghook.backtoworld = true
+   end
+   
+   if ini.settings.nokillchat then
+      lua_thread.create(function()
+         wait(100)
+         setVirtualKeyDown(0x78, true) -- F9
+         wait(100)
+         setVirtualKeyDown(0x78, false)
+      end)
    end
 end
 
