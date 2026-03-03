@@ -3,7 +3,7 @@ script_description("Assistant for mappers")
 script_dependencies('imgui', 'lib.samp.events')
 script_properties("work-in-pause")
 script_url("https://github.com/ins1x/MappingToolkit")
-script_version("4.19") -- release 3
+script_version("4.19") -- release 4
 -- support sa-mp versions depends on SAMPFUNCS (0.3.7-R1, 0.3.7-R3-1, 0.3.7-R5, 0.3.DL)
 -- script_moonloader(16) moonloader v.0.26 
 -- editor options: tabsize 3, Unix (LF), encoding Windows-1251
@@ -3363,6 +3363,10 @@ function imgui.OnDrawFrame()
                imgui.TextQuestion("( ? )", u8"Введите modelid от 615-18300 [GTASA], 18632-19521 [SAMP]")
             end
             
+            imgui.Checkbox(u8'Игнорировать наложение текстур', nops.setobjectmaterial)
+            imgui.SameLine()
+            imgui.TextQuestion("( ? )", u8"Игнорирует наложение текстур на объекты (Действует при обновлении зоны стрима)")
+            
             imgui.Text(u8"Коллизия:")
             if imgui.Checkbox(u8("Отключить коллизию у всех объектов"), checkbox.objectcollision) then 
                if checkbox.objectcollision.v then
@@ -3769,6 +3773,14 @@ function imgui.OnDrawFrame()
                sampAddChatMessage("[SCRIPT]: {FFFFFF}Вы показали скрытые аттачи", 0x0FF6600)
             end
             
+            imgui.Text(u8"Объекты для аттачей:")
+            if imgui.Button(u8"Которые можно держать",imgui.ImVec2(200, 25)) then
+               os.execute('explorer "https://dev.prineside.com/ru/gtasa_samp_model_id/tag/240-holding-objects/"')
+            end
+            imgui.SameLine()
+            if imgui.Button(u8"SA-MP объекты",imgui.ImVec2(200, 25)) then
+               os.execute('explorer "https://dev.prineside.com/ru/gtasa_samp_model_id/tag/2-sa-mp/"')
+            end
             imgui.Spacing()
             
             imgui.Checkbox(u8("Отслеживать установку аттачей"), checkbox.hooksetattachedobject) 
