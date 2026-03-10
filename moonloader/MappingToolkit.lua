@@ -3,7 +3,7 @@ script_description("Assistant for mappers")
 script_dependencies('imgui', 'lib.samp.events')
 script_properties("work-in-pause")
 script_url("https://github.com/ins1x/MappingToolkit")
-script_version("4.19") -- release 4
+script_version("4.19") -- release 5
 -- support sa-mp versions depends on SAMPFUNCS (0.3.7-R1, 0.3.7-R3-1, 0.3.7-R5, 0.3.DL)
 -- script_moonloader(16) moonloader v.0.26 
 -- editor options: tabsize 3, Unix (LF), encoding Windows-1251
@@ -86,6 +86,7 @@ local ini = inicfg.load({
       nokillchat = false,
       novehiclevisualdamage = false,
       oinfotxd = true,
+      oldlistdialog = false,
       pauseinwidescreen = false,
       recontime = 15500,
       renderfont = "Arial",
@@ -396,6 +397,7 @@ local checkbox = {
    deleteprotect = imgui.ImBool(ini.settings.deleteprotect),
    spawnafterloadvw = imgui.ImBool(ini.settings.spawnafterloadvw),
    loadworldname = imgui.ImBool(ini.settings.loadworldname),
+   oldlistdialog = imgui.ImBool(ini.settings.oldlistdialog),
    
    showpanel = imgui.ImBool(ini.panel.showpanel),
    panelbackground = imgui.ImBool(ini.panel.background),
@@ -6897,6 +6899,13 @@ function imgui.OnDrawFrame()
                imgui.SameLine()
                imgui.TextQuestion("( ? )", u8"Автоматически заполнит название мира из диалога /loadvw сразу при загрузке")
                
+               if imgui.Checkbox(u8'Старый вид диалога /list', checkbox.oldlistdialog) then
+                  ini.settings.oldlistdialog = checkbox.oldlistdialog.v
+                  inicfg.save(ini, configIni)
+               end
+               imgui.SameLine()
+               imgui.TextQuestion("( ? )", u8"Скрывает мини-игры из диалога /list")
+               
                if imgui.Checkbox(u8'Устанавливать свой скин в мире', checkbox.saveskin) then 
                   if checkbox.saveskin.v then
                      ini.settings.saveskin = true
@@ -11092,6 +11101,10 @@ function sampev.onShowDialog(dialogId, style, title, button1, button2, text)
             sampSendDialogResponse(32700, 1, nil)
             sampCloseCurrentDialogWithButton(1)
          end
+         if text:find('1. Main') and style == 0 and button1 == "Принимаю" then
+            sampSendDialogResponse(32700, 1, nil)
+            sampCloseCurrentDialogWithButton(1)
+         end
       end
       
       -- Switching cb with arrow buttons
@@ -11331,6 +11344,31 @@ function sampev.onShowDialog(dialogId, style, title, button1, button2, text)
                   LastData.lastModelinfo, -10.0, 0, 45.0, 1.25, -1, -1)
                   sampTextdrawSetShadow(const.txdmodelinfoid, 0, 1)
                end
+            end
+         end
+      end
+      
+      if style == 5 then -- TABLIST_HEADERS
+         if ini.settings.oldlistdialog then
+            if text:find("Название мира") then
+               local lines = {}
+               for line in string.gmatch(text, "([^\n]*)") do
+                  if line:len() > 2 then
+                     if not line:find('.M.') then
+                        table.insert(lines, line)
+                     end
+                  end
+               end
+               
+               if next(lines) ~= nil then
+                  local newtext = ""
+                  for index, value in ipairs(lines) do
+                     newtext = newtext..value.."\n"
+                  end
+                  
+                  return {dialogId, style, title, button1, button2, newtext}
+               end
+            
             end
          end
       end
