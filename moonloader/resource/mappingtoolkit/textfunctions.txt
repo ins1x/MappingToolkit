@@ -61,6 +61,7 @@
 #getzone(x, y)# - названия района по x, y
 #getzoneid(x, y)# - id района по x, y (исп. в проверке на район в КБ)  
 #waterlvl(*playerid)# - вернуть уровень нахождения игрока в море
+#pcia(x y z *dist *int)# количество игроков в далеке от точки
 
 Оружие:
 #gun(*playerid)# or #weapon(*playerid)# - ID оружия игрока

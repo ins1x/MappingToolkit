@@ -3,7 +3,7 @@ script_description("Assistant for mappers")
 script_dependencies('imgui', 'lib.samp.events')
 script_properties("work-in-pause")
 script_url("https://github.com/ins1x/MappingToolkit")
-script_version("4.19") -- release 5
+script_version("4.20") -- Release
 -- support sa-mp versions depends on SAMPFUNCS (0.3.7-R1, 0.3.7-R3-1, 0.3.7-R5, 0.3.DL)
 -- script_moonloader(16) moonloader v.0.26 
 -- editor options: tabsize 3, Unix (LF), encoding Windows-1251
@@ -15,11 +15,9 @@ script_version("4.19") -- release 5
 -- The toolkit provides additional functions for working with textures and objects,
 -- fixes some game bugs, supplements server commands and dialogs.
 
--- The functionality is quite extensive and is regularly updated. 
 -- More information on the toolkit's capabilities is on the wiki. 
 -- Designed for TRAINING-SANDBOX. It can work on other projects, 
 -- but most of the features will be unavailable.
--- THANKS blast.hk and all GTA 3D Era community!
 
 local sampev = require 'lib.samp.events'
 local imgui = require 'imgui'
@@ -10755,7 +10753,8 @@ function sampev.onSendDialogResponse(dialogId, button, listboxId, input)
       
       if button == 1 then -- if dialog response
          -- Corrects spawn item on /world menu
-         if listboxId == 3 and input:find("Вернуться в свой мир") then
+         if listboxId == 3 and input:find("Вернуться в свой мир") 
+         or input:find("Return to my world") then 
             if not playerdata.isWorldJoinUnavailable then
                if worldspawnpos.x and worldspawnpos.x ~= 0 then
                   sampSendChat(string.format("/xyz %f %f %f",
@@ -10766,7 +10765,8 @@ function sampev.onSendDialogResponse(dialogId, button, listboxId, input)
             end
          end
          
-         if listboxId == 3 and input:find("Вернуться в свой статичный мир") then
+         if listboxId == 3 and input:find("Вернуться в свой статичный мир") 
+         or input:find("Return to my static world") then
             if not playerdata.isWorldJoinUnavailable then
                if worldspawnpos.x and worldspawnpos.x ~= 0 then
                   sampSendChat(string.format("/xyz %f %f %f",
@@ -10783,7 +10783,8 @@ function sampev.onSendDialogResponse(dialogId, button, listboxId, input)
          -- end
          -- if listboxId == 3 and input:find("Создать пробный VIP мир") then
          -- end
-         if listboxId == 4 and input:find("Отправиться на спаун") then
+         if listboxId == 4 and input:find("Отправиться на спаун") 
+         or input:find("Go to lobby") then
             edit.mode = 0
             if not playerdata.isWorldHoster and ini.settings.saveskin then
                restorePlayerSkin()
@@ -10904,13 +10905,15 @@ function sampev.onSendDialogResponse(dialogId, button, listboxId, input)
             end
          end
          -- Extend main /vw menu
-         if input:find("Настройки для команд") then
+         if input:find("Настройки для команд") 
+         or input:find("Teams settings") then
             lua_thread.create(function()
                wait(200)
                sampSendChat("/team")
             end)
          end
-         if input:find("Интерьеры") then
+         if input:find("Интерьеры") 
+         or input:find("Interiors") then
             sampSendChat("/int")
          end
          -- Extend world manage menu
@@ -11398,6 +11401,7 @@ function sampev.onShowDialog(dialogId, style, title, button1, button2, text)
             LastData.lastCbvaluebuffer = nil
          end
       end
+      
       -- TODO optimise and split blocks later
       if ini.settings.cbvalautocomplete and dialoghook.tbvalue then
          if not text:find("N/A") then
@@ -11430,14 +11434,21 @@ function sampev.onShowDialog(dialogId, style, title, button1, button2, text)
             sampSendDialogResponse(32700, 1, 3, "Вернуться в свой мир")
             dialoghook.backtoworld = false
          end
+         if text:find('Return to my world.* sec') then
+            sampSendDialogResponse(32700, 1, 3, "Return to my world")
+            dialoghook.backtoworld = false
+         end
       end
 
       if title:find("Покинуть данный мир") then
          dialoghook.backtoworld = false
       end
 
-      if text:find("Создать игровой мир") then
-         if text:find("сек") then
+      if text:find("Создать игровой мир") 
+      or text:find("Create new world")
+      then
+         if text:find("сек") 
+         or text:find("sec") then
             playerdata.isWorldJoinUnavailable = true
          else
             playerdata.isWorldJoinUnavailable = false
@@ -11616,91 +11627,98 @@ function sampev.onShowDialog(dialogId, style, title, button1, button2, text)
          end
          
          -- Extend main /vw menu
-         if text:find("Название мира") and style == 4 then
-            if dialoghook.devmenutoggle then
-               lua_thread.create(function()
-                  wait(200)
-                  sampSendDialogResponse(32700, 1, 11, "- Режим разработки")
-                  sampCloseCurrentDialogWithButton(0)
-                  dialoghook.devmenutoggle = false
-               end)
+         if style == 4 then 
+            if text:find("Название мира") or text:find("World name") then
+               if dialoghook.devmenutoggle then
+                  lua_thread.create(function()
+                     wait(200)
+                     --sampSendDialogResponse(32700, 1, 11, "- Режим разработки")
+                     sampSendDialogResponse(32700, 1, 11, "- Development Mode")
+                     sampCloseCurrentDialogWithButton(0)
+                     dialoghook.devmenutoggle = false
+                  end)
+               end
+               
+               if dialoghook.logstoggle then
+                  lua_thread.create(function()
+                     wait(200)
+                     --sampSendDialogResponse(32700, 1, 7, "- Логи")
+                     sampSendDialogResponse(32700, 1, 7, "- Logs")
+                     sampCloseCurrentDialogWithButton(0)
+                     dialoghook.logstoggle = false
+                  end)
+               end
+               
+               if dialoghook.saveworld then
+                  lua_thread.create(function()
+                     wait(50)
+                     sampSendDialogResponse(32700, 1, 15, "- Управление игровым миром")
+                     wait(50)
+                     sampSendDialogResponse(32700, 1, 8, "- Сохранить виртуальный мир")
+                     dialoghook.saveworld = false
+                  end)
+               end
+               
+               if dialoghook.spcars then
+                  lua_thread.create(function()
+                     wait(5)
+                     sampSendDialogResponse(32700, 1, 15, "- Управление игровым миром")
+                     wait(5)
+                     sampSendDialogResponse(32700, 1, 11, "- Респаун свободного транспорта")
+                     dialoghook.spcars = false
+                     wait(5)
+                     sampCloseCurrentDialogWithButton(0)
+                     sampAddChatMessage("[SCRIPT]: {FFFFFF}Весь незанятый транспорт был отправлен на спавн!", 0x0FF6600)
+                  end)
+               end
+               
+               if dialoghook.resetguns then
+                  lua_thread.create(function()
+                     wait(5)
+                     sampSendDialogResponse(32700, 1, 15, "- Управление игровым миром")
+                     wait(5)
+                     sampSendDialogResponse(32700, 1, 0, "- Обнулить все оружие")
+                     dialoghook.resetguns = false
+                     wait(5)
+                     sampCloseCurrentDialogWithButton(0)
+                     sampAddChatMessage("[SCRIPT]: {FFFFFF}Все оружие у игроков было сброшено!", 0x0FF6600)
+                  end)
+               end
+               
+               if dialoghook.resetvehs then
+                  lua_thread.create(function()
+                     wait(5)
+                     sampSendDialogResponse(32700, 1, 15, "- Управление игровым миром")
+                     wait(5)
+                     sampSendDialogResponse(32700, 1, 10, "- Обнулить свободный транспорт")
+                     dialoghook.resetvehs = false
+                     wait(5)
+                     sampCloseCurrentDialogWithButton(0)
+                     sampAddChatMessage("[SCRIPT]: {FFFFFF}Весь незанятый транспорт был обнулен!", 0x0FF6600)
+                  end)
+               end
+               
+               if dialoghook.vkickall then
+                  lua_thread.create(function()
+                     wait(5)
+                     sampSendDialogResponse(32700, 1, 15, "- Управление игровым миром")
+                     wait(5)
+                     sampSendDialogResponse(32700, 1, 7, "- Выкинуть всех игроков")
+                     dialoghook.vkickall = false
+                     wait(5)
+                     sampCloseCurrentDialogWithButton(0)
+                     sampAddChatMessage("[SCRIPT]: {FFFFFF}Все игроки были кикнуты из мира!", 0x0FF6600)
+                  end)
+               end
+               
+               -- local newitems = 
+               -- " - Настройки для команд\n"..
+               -- " - Интерьеры\n"
+               local newitems = 
+               "- Teams settings\n"..
+               "- Interiors\n"
+               return {dialogId, style, title, button1, button2, text..newitems}
             end
-            
-            if dialoghook.logstoggle then
-               lua_thread.create(function()
-                  wait(200)
-                  sampSendDialogResponse(32700, 1, 7, "- Логи")
-                  sampCloseCurrentDialogWithButton(0)
-                  dialoghook.logstoggle = false
-               end)
-            end
-            
-            if dialoghook.saveworld then
-               lua_thread.create(function()
-                  wait(50)
-                  sampSendDialogResponse(32700, 1, 15, "- Управление игровым миром")
-                  wait(50)
-                  sampSendDialogResponse(32700, 1, 8, "- Сохранить виртуальный мир")
-                  dialoghook.saveworld = false
-               end)
-            end
-            
-            if dialoghook.spcars then
-               lua_thread.create(function()
-                  wait(5)
-                  sampSendDialogResponse(32700, 1, 15, "- Управление игровым миром")
-                  wait(5)
-                  sampSendDialogResponse(32700, 1, 11, "- Респаун свободного транспорта")
-                  dialoghook.spcars = false
-                  wait(5)
-                  sampCloseCurrentDialogWithButton(0)
-                  sampAddChatMessage("[SCRIPT]: {FFFFFF}Весь незанятый транспорт был отправлен на спавн!", 0x0FF6600)
-               end)
-            end
-            
-            if dialoghook.resetguns then
-               lua_thread.create(function()
-                  wait(5)
-                  sampSendDialogResponse(32700, 1, 15, "- Управление игровым миром")
-                  wait(5)
-                  sampSendDialogResponse(32700, 1, 0, "- Обнулить все оружие")
-                  dialoghook.resetguns = false
-                  wait(5)
-                  sampCloseCurrentDialogWithButton(0)
-                  sampAddChatMessage("[SCRIPT]: {FFFFFF}Все оружие у игроков было сброшено!", 0x0FF6600)
-               end)
-            end
-            
-            if dialoghook.resetvehs then
-               lua_thread.create(function()
-                  wait(5)
-                  sampSendDialogResponse(32700, 1, 15, "- Управление игровым миром")
-                  wait(5)
-                  sampSendDialogResponse(32700, 1, 10, "- Обнулить свободный транспорт")
-                  dialoghook.resetvehs = false
-                  wait(5)
-                  sampCloseCurrentDialogWithButton(0)
-                  sampAddChatMessage("[SCRIPT]: {FFFFFF}Весь незанятый транспорт был обнулен!", 0x0FF6600)
-               end)
-            end
-            
-            if dialoghook.vkickall then
-               lua_thread.create(function()
-                  wait(5)
-                  sampSendDialogResponse(32700, 1, 15, "- Управление игровым миром")
-                  wait(5)
-                  sampSendDialogResponse(32700, 1, 7, "- Выкинуть всех игроков")
-                  dialoghook.vkickall = false
-                  wait(5)
-                  sampCloseCurrentDialogWithButton(0)
-                  sampAddChatMessage("[SCRIPT]: {FFFFFF}Все игроки были кикнуты из мира!", 0x0FF6600)
-               end)
-            end
-            
-            local newitems = 
-            " - Настройки для команд\n"..
-            " - Интерьеры\n"
-            return {dialogId, style, title, button1, button2, text..newitems}
          end
          
          if dialoghook.saveworldname then
@@ -11808,7 +11826,6 @@ function sampev.onShowDialog(dialogId, style, title, button1, button2, text)
                end
             end
          end
-         
          
          if title:find("ADS текст") then
             dialoghook.setsadstext = true
@@ -12649,6 +12666,11 @@ function sampev.onSendCommand(command)
             return false
          end
       end
+      return false
+   end
+   
+   if command:find("^/wordl$") then
+      sampSendChat("/world")
       return false
    end
    
@@ -14196,6 +14218,11 @@ function sampev.onSendChat(message)
             return false
          end
       end
+   end
+   
+   if message:find("^.учше$")then
+      sampSendChat("/exit")
+      return false
    end
    
    if ini.settings.txtmacros then
