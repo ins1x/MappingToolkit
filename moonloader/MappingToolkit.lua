@@ -3,7 +3,7 @@ script_description("Assistant for mappers")
 script_dependencies('imgui', 'lib.samp.events')
 script_properties("work-in-pause")
 script_url("https://github.com/ins1x/MappingToolkit")
-script_version("4.20") -- Release
+script_version("4.21") -- Alpha 1
 -- support sa-mp versions depends on SAMPFUNCS (0.3.7-R1, 0.3.7-R3-1, 0.3.7-R5, 0.3.DL)
 -- script_moonloader(16) moonloader v.0.26 
 -- editor options: tabsize 3, Unix (LF), encoding Windows-1251
@@ -108,6 +108,7 @@ local ini = inicfg.load({
       skipomenu = false,
       skipvehnotify = false,
       skiprules = false,
+      skiplang = false,
       spawnafterloadvw = false,
       streammemmax = 0,
       tabclickcopy = false,
@@ -381,6 +382,7 @@ local checkbox = {
    trailerspawnfix = imgui.ImBool(ini.settings.trailerspawnfix),
    skipvehnotify = imgui.ImBool(ini.settings.skipvehnotify),
    skiprules = imgui.ImBool(ini.settings.skiprules),
+   skiplang = imgui.ImBool(ini.settings.skiplang),
    novehiclevisualdamage = imgui.ImBool(ini.settings.novehiclevisualdamage),
    noaltenter = imgui.ImBool(ini.settings.noaltenter),
    nopagekeys = imgui.ImBool(ini.settings.nopagekeys),
@@ -1000,7 +1002,9 @@ function main()
       if doesFileExist('moonloader/training-autologin.lua')
       or doesFileExist('moonloader/training-autologin.luac') then
          ini.settings.skiprules = false 
+         ini.settings.skiplang = false 
          checkbox.skiprules.v = false
+         checkbox.skiplang.v = false
       end
       
       -- dialogs.asi cause crashes
@@ -7023,6 +7027,13 @@ function imgui.OnDrawFrame()
                end
                imgui.SameLine()
                imgui.TextQuestion("( ? )", u8"Автоматически пропускает диалог с правилами при входе на сервер")
+               
+               if imgui.Checkbox(u8'Пропускать диалог с выбором языка при входе на сервер', checkbox.skiplang) then
+                  ini.settings.skiplang = checkbox.skiplang.v
+                  inicfg.save(ini, configIni)
+               end
+               imgui.SameLine()
+               imgui.TextQuestion("( ? )", u8"Автоматически пропускает диалог с выбором языка при входе на сервер")
             end
             
             if imgui.Checkbox(u8'Использовать автореконнект при потере соединения', checkbox.autoreconnect) then
@@ -10905,13 +10916,6 @@ function sampev.onSendDialogResponse(dialogId, button, listboxId, input)
             end
          end
          -- Extend main /vw menu
-         if input:find("Настройки для команд") 
-         or input:find("Teams settings") then
-            lua_thread.create(function()
-               wait(200)
-               sampSendChat("/team")
-            end)
-         end
          if input:find("Интерьеры") 
          or input:find("Interiors") then
             sampSendChat("/int")
@@ -11107,6 +11111,18 @@ function sampev.onShowDialog(dialogId, style, title, button1, button2, text)
          if text:find('1. Main') and style == 0 and button1 == "Принимаю" then
             sampSendDialogResponse(32700, 1, nil)
             sampCloseCurrentDialogWithButton(1)
+         end
+      end
+      
+      -- TRAINING Auto select Language
+      if ini.settings.skiplang then
+         if title:find('Select Language') then
+            if defaultlangrus then
+               sampSendDialogResponse(32700, 1, 1, "Russian")
+            else
+               sampSendDialogResponse(32700, 1, 0, "English")
+            end
+            sampCloseCurrentDialogWithButton(0)
          end
       end
       
@@ -11353,7 +11369,7 @@ function sampev.onShowDialog(dialogId, style, title, button1, button2, text)
       
       if style == 5 then -- TABLIST_HEADERS
          if ini.settings.oldlistdialog then
-            if text:find("Название мира") then
+            if text:find("Название мира") or text:find("World name") then
                local lines = {}
                for line in string.gmatch(text, "([^\n]*)") do
                   if line:len() > 2 then
@@ -11715,7 +11731,6 @@ function sampev.onShowDialog(dialogId, style, title, button1, button2, text)
                -- " - Настройки для команд\n"..
                -- " - Интерьеры\n"
                local newitems = 
-               "- Teams settings\n"..
                "- Interiors\n"
                return {dialogId, style, title, button1, button2, text..newitems}
             end
@@ -11815,7 +11830,7 @@ function sampev.onShowDialog(dialogId, style, title, button1, button2, text)
             end)
          end
          
-         if text:find("Укажите желаемое название мира") then
+         if text:find("Укажите желаемое название мира") or text:find("Change world name") then
             dialoghook.setworldname = true
             if ini.tmp.worldname then
                if ini.tmp.worldname:len() > 1 then
@@ -15203,11 +15218,12 @@ function sampev.onSendSpawn()
       end
    end
    
-   local pid = getLocalPlayerId()
-   if isTrainingSandbox and pid == 0 then
-      sampAddChatMessage("[SCRIPT]: {FFFFFF}У вас багнутый ID перезайдите на сервер!", 0x0FF6600)
-      sampAddChatMessage("[SCRIPT]: {FFFFFF}Если не перезайти вас будут кикать с большинства миров!", 0x0FF6600)
-   end
+   -- Fixed on server side 4/03/2026
+   -- local pid = getLocalPlayerId()
+   -- if isTrainingSandbox and pid == 0 then
+      -- sampAddChatMessage("[SCRIPT]: {FFFFFF}У вас багнутый ID перезайдите на сервер!", 0x0FF6600)
+      -- sampAddChatMessage("[SCRIPT]: {FFFFFF}Если не перезайти вас будут кикать с большинства миров!", 0x0FF6600)
+   -- end
    
    toggleFlyMode(false)
 end
