@@ -3,7 +3,7 @@ script_description("Assistant for mappers")
 script_dependencies('imgui', 'lib.samp.events')
 script_properties("work-in-pause")
 script_url("https://github.com/ins1x/MappingToolkit")
-script_version("4.21") -- Alpha 1
+script_version("4.21") -- Alpha 2
 -- support sa-mp versions depends on SAMPFUNCS (0.3.7-R1, 0.3.7-R3-1, 0.3.7-R5, 0.3.DL)
 -- script_moonloader(16) moonloader v.0.26 
 -- editor options: tabsize 3, Unix (LF), encoding Windows-1251
@@ -1069,7 +1069,7 @@ function main()
          textbuffer.favtxt.v = file:read('*a')
          file:close()
       else
-         local file = io.open(getGameDirectory().."/moonloader/resource/mappingtoolkit/favorites/textsurfaces.txt", "r")
+         local file = io.open(getGameDirectory().."/moonloader/resource/mappingtoolkit/favorites/textsurfaces.txt", "w")
          file:write(u8"Файл поврежден либо не найден")
          file:close()
       end
@@ -4336,7 +4336,6 @@ function imgui.OnDrawFrame()
          end
          
          if isTrainingSandbox then
-            imgui.SameLine()
             if imgui.TooltipButton(u8"Перейти в интерьер для съемок", imgui.ImVec2(230, 25), u8"Телепортирует в интерьер с хромакеем") then
                if playerdata.isWorldHoster then
                   sampSendChat("/int 1 1")
@@ -11854,9 +11853,11 @@ function sampev.onShowDialog(dialogId, style, title, button1, button2, text)
             end
          end
          
-         if text:find("Укажите желаемое описание мира") then
+         if text:find("Укажите желаемое описание мира") 
+         or text:find("desired world description") then
             dialoghook.setworlddescription = true
-            if text:find("Текущее описание") then
+            if text:find("Текущее описание") 
+            or text:find("Current description") then
                lua_thread.create(function()
                   for line in string.gmatch(text, "([^\n]*)") do
                      if line:len() > 1 then
@@ -12142,7 +12143,9 @@ function sampev.onServerMessage(color, text)
          LastData.lastLoadedWorldNumber = nil
       end
       
-      if text:find("Хост "..nickname..".+"..id..".+ вернулся в мир") then
+      if text:find("Хост "..nickname..".+"..id..".+ вернулся в мир") 
+      or text:find("Host "..nickname..".+"..id..".+ has returned to the world") 
+      then
          dialoghook.backtoworld = false
          WorldJoinInit()
       end
