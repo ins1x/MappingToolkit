@@ -3,7 +3,7 @@ script_description("Assistant for mappers")
 script_dependencies('imgui', 'lib.samp.events')
 script_properties("work-in-pause")
 script_url("https://github.com/ins1x/MappingToolkit")
-script_version("4.21") -- Alpha 2
+script_version("4.21") -- Alpha 3
 -- support sa-mp versions depends on SAMPFUNCS (0.3.7-R1, 0.3.7-R3-1, 0.3.7-R5, 0.3.DL)
 -- script_moonloader(16) moonloader v.0.26 
 -- editor options: tabsize 3, Unix (LF), encoding Windows-1251
@@ -11736,19 +11736,26 @@ function sampev.onShowDialog(dialogId, style, title, button1, button2, text)
          end
          
          if dialoghook.saveworldname then
-           if title:find("Сохранения шаг 2") then
+           if title:find("Сохранения шаг 2") or title:find("Save World step 2") then
                for line in string.gmatch(text, "([^\n]*)") do
-                  local worldname = string.match(line, "сохранения: {FFFFFF}(.+)")
-                  if worldname then
+                  local worldname_ru = string.match(line, "сохранения: {FFFFFF}(.+)")
+                  local worldname_en = string.match(line, "save slot{FFFFFF}: {FFFFFF}(.+)")
+                  if worldname_ru then
                      lua_thread.create(function()
                         wait(200)
-                        sampSetCurrentDialogEditboxText(worldname)
+                        sampSetCurrentDialogEditboxText(worldname_ru)
                      end)
                      -- if LastData.lastDialogText then
                         -- if not LastData.lastDialogText:find(tostring(worldname)) then
                            -- printStyledString('~r~ WARNING ~w~Attempt to save an another world ~r~', 7000, 4)         
                         -- end
                      -- end
+                  end
+                  if worldname_en then
+                     lua_thread.create(function()
+                        wait(200)
+                        sampSetCurrentDialogEditboxText(worldname_en)
+                     end)
                   end
                   dialoghook.saveworldname = false
                end
