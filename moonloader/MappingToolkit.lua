@@ -3,7 +3,7 @@ script_description("Assistant for mappers")
 script_dependencies('imgui', 'lib.samp.events')
 script_properties("work-in-pause")
 script_url("https://github.com/ins1x/MappingToolkit")
-script_version("4.21") -- Alpha 3
+script_version("4.21") -- RC 4
 -- support sa-mp versions depends on SAMPFUNCS (0.3.7-R1, 0.3.7-R3-1, 0.3.7-R5, 0.3.DL)
 -- script_moonloader(16) moonloader v.0.26 
 -- editor options: tabsize 3, Unix (LF), encoding Windows-1251
@@ -966,9 +966,9 @@ function main()
       while not isSampAvailable() do wait(100) end
       
       if not ini.settings.menukeychanged then
-         sampAddChatMessage("{696969}Mapping Toolkit  {FFFFFF}Открыть меню: {CDCDCD}ALT + X", 0xFFFFFF)
+         sampAddChatMessage("{FF6600}Mapping Toolkit  {FFFFFF}Открыть меню: {CDCDCD}ALT + X", 0xFFFFFF)
       else
-         sampAddChatMessage("{696969}Mapping Toolkit  {FFFFFF}Открыть меню: {CDCDCD}/toolkit", 0xFFFFFF)
+         sampAddChatMessage("{FF6600}Mapping Toolkit  {FFFFFF}Открыть меню: {CDCDCD}/toolkit", 0xFFFFFF)
       end
       
       if not doesDirectoryExist("moonloader/resource/mappingtoolkit") then 
@@ -6795,13 +6795,15 @@ function imgui.OnDrawFrame()
                imgui.Text(u8" минут")
             end
             
-            if imgui.Checkbox(u8("Уведомлять о ошибках КБ в мире"), checkbox.cberrorwarnings) then
-               if checkbox.cberrorwarnings.v then
-                  sampAddChatMessage("[SCRIPT]: {FFFFFF}Включены уведомления о ошибках КБ в мире", 0x0FF6600)
-                  sampAddChatMessage("[WARNING]: {FFFFFF}Будет выводить предупреждения с тегом {FF6600}[WARNING]", 0x0FF6600)
+            if isTrainingSandbox then
+               if imgui.Checkbox(u8("Уведомлять о ошибках КБ в мире"), checkbox.cberrorwarnings) then
+                  if checkbox.cberrorwarnings.v then
+                     sampAddChatMessage("[SCRIPT]: {FFFFFF}Включены уведомления о ошибках КБ в мире", 0x0FF6600)
+                     sampAddChatMessage("[WARNING]: {FFFFFF}Будет выводить предупреждения с тегом {FF6600}[WARNING]", 0x0FF6600)
+                  end
+                  ini.settings.cberrorwarnings = checkbox.cberrorwarnings.v
+                  inicfg.save(ini, configIni)
                end
-               ini.settings.cberrorwarnings = checkbox.cberrorwarnings.v
-               inicfg.save(ini, configIni)
             end
             imgui.SameLine()
             imgui.TextQuestion("( ? )", u8"Будет уведомлять о недопустимых параметрах КБ в мире (Используйте для тестов мира)")
@@ -6828,9 +6830,11 @@ function imgui.OnDrawFrame()
                   inicfg.save(ini, configIni)
                end
                
-               if imgui.Checkbox(u8'Скрывать всплывающие подсказки о системах транспорта', checkbox.skipvehnotify) then
-                  ini.settings.skipvehnotify = checkbox.skipvehnotify.v
-                  inicfg.save(ini, configIni)
+               if isTrainingSandbox then
+                  if imgui.Checkbox(u8'Скрывать всплывающие подсказки о системах транспорта', checkbox.skipvehnotify) then
+                     ini.settings.skipvehnotify = checkbox.skipvehnotify.v
+                     inicfg.save(ini, configIni)
+                  end
                end
                imgui.SameLine()
                imgui.TextQuestion("( ? )", u8"Скрывает всплывающие подсказки внизу экрана при переключении опций транспорта")
@@ -7454,25 +7458,24 @@ function imgui.OnDrawFrame()
       imgui.SetColumnWidth(-1, 510)
       
       if tabmenu.info == 1 then
-         local text = [[Ассистент дает вам больше возможностей для маппинга и разработки.
-         Предоставляет дополнительные функции для работы с текстурами и объектами,
-         исправляет некоторые баги игры, дополняет серверные команды и диалоги.
-         
-         Функционал достаточно обширен, и регулярно обновляется.  
-         Может работать и на других проектах, но многие функции будут недоступны.
-         Распостраняется только с открытым исходным кодом!
+         local text = [[
+         Mapping Toolkit - это мультитул для мапперов, который дает больше 
+         возможностей для маппинга и разработки ваших собственных проектов. 
+         Проедоставляет множество дополнительных функции для взаимодействия 
+         с игровыми объектами и текстурами, управления камерой и эффектами, 
+         а так же содержит подсказки и справочные материалы. 
          ]]
 
          text = string.gsub(text, "   ", "")
          imgui.Text(u8(text))
          imgui.Spacing()
-            imgui.Text(u8"Обсуждение Mapping Toolkit на форуме:")
+            imgui.Text(u8"Обсуждение и предложения по улучшению на форуме:")
             imgui.SameLine()
-            imgui.Link("https://forum.training-server.com/d/19708-luamappingtoolkit/", "Mapping Toolkit")
+            imgui.Link("https://forum.training-server.com/d/19708-luamappingtoolkit/", "TRAINING-SANDBOX")
             
             imgui.Text(u8"Скачать тулкит с GitHub:")
             imgui.SameLine()
-            imgui.Link("https://github.com/ins1x/MappingToolkit", "ins1x/MappingToolkit")
+            imgui.Link("https://github.com/ins1x/MappingToolkit", "MappingToolkit")
             imgui.SameLine()
             imgui.Text(u8"или с GoogleDrive:")
             imgui.SameLine()
@@ -7508,19 +7511,16 @@ function imgui.OnDrawFrame()
          if tabmenu.credits == 1 then
             imgui.Spacing()
             local text = [[
-            Форумчанам с {696969}BLASTHACK{CDCDCD} за полезные примеры и сниппеты по Lua
+            Порталам {696969}BLASTHACK{CDCDCD}, {90ee90}p{dc143c}r{CDCDCD}ineside{CDCDCD}, {1e90ff}pawnokit{CDCDCD} за публично доступные каталоги ресурсов 
             Разработчику {FF6600}FYP{CDCDCD} создавшему moonloader, lib.samp.events
             Форумчанам с TRAINING-SANDBOX {FF6600}Кокеточка, Cheater_80_LVL, LINCOLN, qxlies{CDCDCD}
-            за помощь в тестировании, и предложениям по улучшению
+            за помощь в обнаружении ошибок, и предложениям по улучшению
             ]]
             text = string.gsub(text, "   ", "")
             imgui.TextColoredRGB(text)
             
          elseif tabmenu.credits == 2 then
             imgui.Spacing()
-            imgui.TextColoredRGB("TRAINING-{dc143c}CHECKER:")
-            imgui.SameLine()
-            imgui.Link("https://trainingchecker.vercel.app/", "trainingchecker.vercel.app")
             
             imgui.TextColoredRGB("{90ee90}I{dc143c}D{CDCDCD} моделей объектов в SA-MP и GTA San Andreas:")
             imgui.SameLine()
@@ -7534,6 +7534,15 @@ function imgui.OnDrawFrame()
             imgui.SameLine()
             imgui.Link("https://encycolorpedia.ru/", "encycolorpedia.ru")            
             
+            imgui.TextColoredRGB("{f56a6a}1NSANE MAPPING{CDCDCD} домашняя страница маппера:")
+            imgui.SameLine()
+            imgui.Link("https://ins1x.github.io/insanemapping/resources.html", "ins1x.github.io/insanemapping")
+            
+            if isTrainingSandbox then
+               imgui.TextColoredRGB("TRAINING-{dc143c}CHECKER:")
+               imgui.SameLine()
+               imgui.Link("https://trainingchecker.vercel.app/", "trainingchecker.vercel.app")
+            end            
             
          elseif tabmenu.credits == 3 then
             imgui.Spacing()
@@ -7548,32 +7557,11 @@ function imgui.OnDrawFrame()
             ]] 
             text = string.gsub(text, "   ", "")
             imgui.Text(u8(text))
-
-            
-            imgui.Text(u8"Контакты для связи со мной")
-            imgui.SameLine()
-            imgui.TextColoredRGB("{6e2aad}Discord:")
-            imgui.SameLine()
-            imgui.Link("https://discordapp.com/users/625192705772748821", "1NS")
-            imgui.SameLine()
-            imgui.TextColoredRGB("{1e90ff}Telegram:")
-            imgui.SameLine()
-            imgui.Link("https://t.me/ins1x", "ins1x")
             
             if imgui.TooltipButton(u8"Сообщить на форуме TRAINING", imgui.ImVec2(200, 25), u8"Нашли баг? сообщите на форуме") then
                sampAddChatMessage("Сейчас вас перенаправит на форум TRAINING SANDBOX", -1)
                os.execute('explorer "https://forum.training-server.com/d/19708-luamappingtoolkit/"')
             end
-            imgui.SameLine()
-            if imgui.TooltipButton(u8"Сообщить на форуме Blast.hk", imgui.ImVec2(200, 25), u8"Нашли баг? сообщите на форуме") then
-               sampAddChatMessage("Сейчас вас перенаправит на форум blast.hk", -1)
-               os.execute('explorer "https://www.blast.hk/threads/220636/#post-1540364"')
-            end
-            -- imgui.Text(u8"Showroom маппинга на")
-            -- imgui.SameLine()
-            -- imgui.TextColoredRGB("{FFFFFF}You{FF0000}Tube:")
-            -- imgui.SameLine()
-            -- imgui.Link("https://www.youtube.com/@1nsanemapping/featured", "1nsanemapping")
          end
          imgui.Spacing()
          imgui.Spacing()
@@ -7582,7 +7570,7 @@ function imgui.OnDrawFrame()
          end
          if imgui.TooltipButton(u8"Проверить обновления", imgui.ImVec2(180, 25), u8"Проверить наличие обновлений") then
             if not checkScriptUpdates() then
-               sampAddChatMessage("{696969}Mapping Toolkit  {FFFFFF}Установлена актуальная версия {696969}"..thisScript().version, -1)
+               sampAddChatMessage("{FF6600}Mapping Toolkit  {FFFFFF}Установлена актуальная версия {696969}"..thisScript().version, -1)
                --os.execute('explorer https://github.com/ins1x/MappingToolkit/releases')
             else
                sampAddChatMessage("[SCRIPT]: {FFFFFF}Скачать последню версию можно", 0x0FF6600)
@@ -7674,7 +7662,7 @@ function imgui.OnDrawFrame()
             if imgui.Selectable(string.upper(hexcolor), false, 0, imgui.ImVec2(110, 15)) then
                setClipboardText(string.upper(hexcolor))
                textbuffer.colorsearch.v = string.upper(hexcolor)
-               sampAddChatMessage("Цвет скопирован в буффер обмена", -1)
+               sampAddChatMessage("[SCRIPT]: {FFFFFF}Цвет скопирован в буффер обмена", 0x0FF6600)
             end
          end
          if tabmenu.colorformat == 2 then
@@ -7685,7 +7673,7 @@ function imgui.OnDrawFrame()
             if imgui.Selectable(string.upper(color), false, 0, imgui.ImVec2(100, 15)) then
                setClipboardText(string.upper(color))
                textbuffer.colorsearch.v = string.upper(color)
-               sampAddChatMessage("Цвет скопирован в буффер обмена", -1)
+               sampAddChatMessage("[SCRIPT]: {FFFFFF}Цвет скопирован в буффер обмена", 0x0FF6600)
             end
          end
          if tabmenu.colorformat == 3 then
@@ -7696,7 +7684,7 @@ function imgui.OnDrawFrame()
             if imgui.Selectable(string.upper(color), false, 0, imgui.ImVec2(100, 15)) then
                setClipboardText(string.upper(color))
                textbuffer.colorsearch.v = string.upper(color)
-               sampAddChatMessage("Цвет скопирован в буффер обмена", -1)
+               sampAddChatMessage("[SCRIPT]: {FFFFFF}Цвет скопирован в буффер обмена", 0x0FF6600)
             end
          end
          if tabmenu.colorformat == 4 then
@@ -7708,7 +7696,7 @@ function imgui.OnDrawFrame()
             if imgui.Selectable(tostring(color), false, 0, imgui.ImVec2(110, 15)) then
                setClipboardText(string.upper(color))
                textbuffer.colorsearch.v = string.upper(color)
-               sampAddChatMessage("Цвет скопирован в буффер обмена", -1)
+               sampAddChatMessage("[SCRIPT]: {FFFFFF}Цвет скопирован в буффер обмена", 0x0FF6600)
             end
          end
          if tabmenu.colorformat == 5 then
@@ -7719,7 +7707,7 @@ function imgui.OnDrawFrame()
             if imgui.Selectable(string.upper(color), false, 0, imgui.ImVec2(100, 15)) then
                setClipboardText(string.upper(color))
                textbuffer.colorsearch.v = string.upper(color)
-               sampAddChatMessage("Цвет скопирован в буффер обмена", -1)
+               sampAddChatMessage("[SCRIPT]: {FFFFFF}Цвет скопирован в буффер обмена", 0x0FF6600)
             end
          end
          if tabmenu.colorformat == 6 then
@@ -7731,7 +7719,7 @@ function imgui.OnDrawFrame()
             if imgui.Selectable(tostring(color), false, 0, imgui.ImVec2(100, 15)) then
                setClipboardText(tostring(color))
                textbuffer.colorsearch.v = string.upper(color)
-               sampAddChatMessage("Цвет скопирован в буффер обмена", -1)
+               sampAddChatMessage("[SCRIPT]: {FFFFFF}Цвет скопирован в буффер обмена", 0x0FF6600)
             end
          end
          imgui.SameLine()
@@ -7820,7 +7808,7 @@ function imgui.OnDrawFrame()
             local hexcolor = tostring(intToHexRgb(join_argb(input.colorpicker.v[4] * 255,
             input.colorpicker.v[1] * 255, input.colorpicker.v[2] * 255, input.colorpicker.v[3] * 255)))
             textbuffer.colorsearch.v = string.upper(hexcolor)
-            sampAddChatMessage("Цвет скопирован в буффер обмена", -1)
+            sampAddChatMessage("[SCRIPT]: {FFFFFF}Цвет скопирован в буффер обмена", 0x0FF6600)
          end
          imgui.SameLine()
          if imgui.TooltipButton(u8"Инфо", imgui.ImVec2(55, 25), 
@@ -9166,15 +9154,15 @@ function imgui.OnDrawFrame()
          if imgui.Button(u8"Палитра", imgui.ImVec2(105, 30)) then tabmenu.info = 3 end
       end  
       
-      if tabmenu.info == 6 then
-         imgui.PushStyleColor(imgui.Col.Button, imgui.GetStyle().Colors[imgui.Col.ButtonHovered])
-         if imgui.Button(u8"Команды", imgui.ImVec2(105, 30)) then tabmenu.info = 6 end
-         imgui.PopStyleColor()
-      else
-         if imgui.Button(u8"Команды", imgui.ImVec2(105, 30)) then tabmenu.info = 6 end
-      end
-      
       if isTrainingSandbox then
+         if tabmenu.info == 6 then
+            imgui.PushStyleColor(imgui.Col.Button, imgui.GetStyle().Colors[imgui.Col.ButtonHovered])
+            if imgui.Button(u8"Команды", imgui.ImVec2(105, 30)) then tabmenu.info = 6 end
+            imgui.PopStyleColor()
+         else
+            if imgui.Button(u8"Команды", imgui.ImVec2(105, 30)) then tabmenu.info = 6 end
+         end
+      
          if tabmenu.info == 7 then
             imgui.PushStyleColor(imgui.Col.Button, imgui.GetStyle().Colors[imgui.Col.ButtonHovered])
             if imgui.Button(u8"КБ", imgui.ImVec2(105, 30)) then tabmenu.info = 7 end
@@ -10138,13 +10126,13 @@ function imgui.OnDrawFrame()
       imgui.Begin(u8"Управление", dialog.toolkitmanage)
       
       if imgui.Button(u8"Перегрузить тулкит",imgui.ImVec2(150, 25)) then
-         sampAddChatMessage("{696969}Mapping Toolkit{FFFFFF}  перезагружается.", -1)
+         sampAddChatMessage("{FF6600}Mapping Toolkit{FFFFFF}  перезагружается.", -1)
          --sampAddChatMessage("Для перезапуска можно использовтаь комбинацию клавиш {696969}CTRL + R.", -1)
          thisScript():reload()
       end
       
       if imgui.Button(u8"Выгрузить тулкит",imgui.ImVec2(150, 25)) then
-         sampAddChatMessage("{696969}Mapping Toolkit{FFFFFF}  успешно выгружен.", -1)
+         sampAddChatMessage("{FF6600}Mapping Toolkit{FFFFFF}  успешно выгружен.", -1)
          sampAddChatMessage("Для повторного запуска используйте комбинацию клавиш {696969}CTRL + R.", -1)
          thisScript():unload()
       end
@@ -10155,7 +10143,7 @@ function imgui.OnDrawFrame()
             thisScript():resume()
             dialog.main.v = true
             dialog.general.v = true
-            sampAddChatMessage("{696969}Mapping Toolkit{FFFFFF}  поставлен на паузу.", -1)
+            sampAddChatMessage("{FF6600}Mapping Toolkit{FFFFFF}  поставлен на паузу.", -1)
          end
       else
          if imgui.Button(u8"Поставить на паузу",imgui.ImVec2(150, 25)) then
@@ -10163,7 +10151,7 @@ function imgui.OnDrawFrame()
             dialog.info.v = false
             dialog.streameditems.v = false
             thisScript():pause()
-            sampAddChatMessage("{696969}Mapping Toolkit{FFFFFF}  снят с паузы.", -1)
+            sampAddChatMessage("{FF6600}Mapping Toolkit{FFFFFF}  снят с паузы.", -1)
          end
       end
       
@@ -10181,12 +10169,12 @@ function imgui.OnDrawFrame()
       
       if imgui.TooltipButton(u8"Обновление", imgui.ImVec2(150, 25), u8"Проверить наличие обновлений") then
          if not checkScriptUpdates() then
-            sampAddChatMessage("{696969}Mapping Toolkit  {FFFFFF}Установлена актуальная версия {696969}"..thisScript().version, -1)
-            --os.execute('explorer https://github.com/ins1x/MappingToolkit/releases')
+            sampAddChatMessage("{FF6600}Mapping Toolkit  {FFFFFF}Установлена актуальная версия {696969}"..thisScript().version, -1)
          else
             sampAddChatMessage("[SCRIPT]: {FFFFFF}Скачать последню версию можно", 0x0FF6600)
             sampAddChatMessage("[SCRIPT]: {FFFFFF}GitHub: https://github.com/ins1x/MappingToolkit/releases", 0x0FF6600)
             sampAddChatMessage("[SCRIPT]: {FFFFFF}GoogleDrive: https://drive.google.com/drive/folders/1v-LmqAgKGpYYeA1C7aT-rlODTa2OfulT", 0x0FF6600)
+            os.execute('explorer https://github.com/ins1x/MappingToolkit/releases')
          end
       end
       if imgui.TooltipButton(u8"Отладка", imgui.ImVec2(150, 25), u8"Открыть инструменты для отлдаки") then
