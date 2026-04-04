@@ -3,7 +3,7 @@ script_description("Assistant for mappers")
 script_dependencies('imgui', 'lib.samp.events')
 script_properties("work-in-pause")
 script_url("https://github.com/ins1x/MappingToolkit")
-script_version("4.21") -- RC 4
+script_version("4.21") -- Release
 -- support sa-mp versions depends on SAMPFUNCS (0.3.7-R1, 0.3.7-R3-1, 0.3.7-R5, 0.3.DL)
 -- script_moonloader(16) moonloader v.0.26 
 -- editor options: tabsize 3, Unix (LF), encoding Windows-1251
@@ -507,6 +507,7 @@ local checkbox = {
    drunkcam = imgui.ImBool(false),
    cordlinedatetime = imgui.ImBool(false),
    cordlineseparator = imgui.ImBool(false),
+   charanimspeed = imgui.ImBool(false),
    test = imgui.ImBool(false)
 }
 
@@ -517,6 +518,7 @@ local input = {
    txdselected = false,
    camdelay = imgui.ImInt(5000),
    camshake = imgui.ImInt(500),
+   charanimspeed = imgui.ImInt(5),
    gametexttime = imgui.ImInt(5000),
    hideobjectid = imgui.ImInt(615),
    mdomodel = imgui.ImInt(0),
@@ -1250,8 +1252,21 @@ function main()
       while true do
       wait(0)
       
-      -- Speed x10 (Do not use on public, trigger anticheat)
-      -- setCharAnimSpeed(PLAYER_PED, 'RUN_OLD', 10)
+      -- Speed up player run
+      if checkbox.charanimspeed.v then
+         setCharAnimSpeed(PLAYER_PED, 'RUN_ARMED', input.charanimspeed.v)
+         setCharAnimSpeed(PLAYER_PED, 'RUN_OLD', input.charanimspeed.v)
+         setCharAnimSpeed(PLAYER_PED, 'RUN_CIVI', input.charanimspeed.v)
+         setCharAnimSpeed(PLAYER_PED, 'RUN_FAT', input.charanimspeed.v)
+         setCharAnimSpeed(PLAYER_PED, 'RUN_FATOLD', input.charanimspeed.v)
+         setCharAnimSpeed(PLAYER_PED, 'RUN_PLAYER', input.charanimspeed.v)
+         setCharAnimSpeed(PLAYER_PED, 'RUN_GANG1', input.charanimspeed.v)
+         setCharAnimSpeed(PLAYER_PED, 'woman_run', input.charanimspeed.v)
+         setCharAnimSpeed(PLAYER_PED, 'woman_runsexy', input.charanimspeed.v)
+         setCharAnimSpeed(PLAYER_PED, 'WOMAN_runbusy', input.charanimspeed.v)
+         setCharAnimSpeed(PLAYER_PED, 'WOMAN_runpanic', input.charanimspeed.v)
+         setCharAnimSpeed(PLAYER_PED, 'WOMAN_runfatold', input.charanimspeed.v)
+      end
       
       -- Autoreconnect
       -- Required use reset_remove.asi fix
@@ -2640,6 +2655,39 @@ function imgui.OnDrawFrame()
                getDistanceBetweenCoords3d(positionX, positionY, positionZ, bX, bY, bZ)))
                imgui.Spacing()
             end 
+            
+            imgui.Text(u8"Ускорение пешком: ")
+            
+            if imgui.Button(u8(checkbox.charanimspeed.v and 'Отключить' or 'Включить')..u8" char anim speed", imgui.ImVec2(200, 25)) then
+               checkbox.charanimspeed.v = not checkbox.charanimspeed.v
+               if not isTrainingSandbox then
+                  sampAddChatMessage("[SCRIPT]: {FFFFFF}НЕ используйте на публичных серверах! Триггерит Античит!!", 0x0FF6600)
+               end
+               if not checkbox.charanimspeed.v then
+                  setCharAnimSpeed(PLAYER_PED, 'RUN_ARMED', 1)
+                  setCharAnimSpeed(PLAYER_PED, 'RUN_OLD', 1)
+                  setCharAnimSpeed(PLAYER_PED, 'RUN_CIVI', 1)
+                  setCharAnimSpeed(PLAYER_PED, 'RUN_FAT', 1)
+                  setCharAnimSpeed(PLAYER_PED, 'RUN_FATOLD', 1)
+                  setCharAnimSpeed(PLAYER_PED, 'RUN_PLAYER', 1)
+                  setCharAnimSpeed(PLAYER_PED, 'RUN_GANG1', 1)
+                  setCharAnimSpeed(PLAYER_PED, 'woman_run', 1)
+                  setCharAnimSpeed(PLAYER_PED, 'woman_runsexy', 1)
+                  setCharAnimSpeed(PLAYER_PED, 'WOMAN_runbusy', 1)
+                  setCharAnimSpeed(PLAYER_PED, 'WOMAN_runpanic', 1)
+                  setCharAnimSpeed(PLAYER_PED, 'WOMAN_runfatold', 1)
+               end
+            end
+            
+            imgui.SameLine()
+            imgui.Text(u8"x")
+            imgui.SameLine()
+            imgui.PushItemWidth(100)
+            if imgui.InputInt(u8'##INPUT_charanimspeed', input.charanimspeed, 1, 100) then
+               if input.charanimspeed.v < 1 then
+                  input.charanimspeed.v = 1
+               end                  
+            end
             
             imgui.Text(u8"Телепорт по координатам:")
             if imgui.TooltipButton(u8"Обновить", imgui.ImVec2(70, 25), u8"Обновит значения на вашу текущую позицию") then
@@ -7081,26 +7129,6 @@ function imgui.OnDrawFrame()
             if imgui.Button(u8'Сменить') then
                sampSetGamestate(combobox.gamestate.v)
             end
-            
-            -- if fileschecker.isAutologinExist then
-               -- imgui.TextColoredRGB("Авто-логин: {00FF00}Установлен")
-               -- imgui.SameLine()
-               -- imgui.TextQuestion("( ? )", u8"У вас уже установлен training-autologin.lua")
-               -- -- if imgui.TooltipButton(u8'Сбросить конфиг', imgui.ImVec2(250, 25), u8"Сбросит файл с ключами") then
-                  -- -- os.rename(getGameDirectory().."//moonloader//config//training-autologin.ini", getGameDirectory().."//moonloader//config//backup_training-autologin.ini")
-                  -- -- sampAddChatMessage("[SCRIPT]: {FFFFFF}Настройки авто-логина были сброшены на стандартные.",0x0FF6600)
-                  -- -- sampAddChatMessage("[SCRIPT]: {FFFFFF}Резервную копию ваших предыдущих настроек можно найти в {696969}moonloader/config.",0x0FF6600)
-               -- -- end
-            -- else
-               -- if imgui.TooltipButton(u8'Установить авто-логин', imgui.ImVec2(250, 25), u8"Отправит вас на страницу скачивания тулкита авто-логина") then
-                  -- os.execute('explorer "https://github.com/ins1x/moonloader-scripts/raw/refs/heads/main/training-sandbox/training-autologin/training-autologin.lua"')
-                  -- sampAddChatMessage("[SCRIPT]: {FFFFFF}После загрузки файла скопируйте training-autologin.lua в папку moonloader", 0x0FF6600)
-                  -- sampAddChatMessage("[SCRIPT]: {FFFFFF}При первом входе после установки авто-логин автоматически сохранит пароль (Только для TRAINING-SANDBOX)", 0x0FF6600)
-               -- end
-               -- imgui.SameLine()
-               -- imgui.TextQuestion("( ? )", u8"После загрузки файла скопируйте training-autologin.lua в папку moonloader")
-            -- end
-            
          end
          if imgui.CollapsingHeader(u8"Горячие клавиши:") then
             if imgui.Checkbox(u8'Включить горячие клавиши', checkbox.hotkeys) then
@@ -7511,7 +7539,7 @@ function imgui.OnDrawFrame()
          if tabmenu.credits == 1 then
             imgui.Spacing()
             local text = [[
-            Порталам {696969}BLASTHACK{CDCDCD}, {90ee90}p{dc143c}r{CDCDCD}ineside{CDCDCD}, {1e90ff}pawnokit{CDCDCD} за публично доступные каталоги ресурсов 
+            Порталам {696969}BLASTHACK{CDCDCD}, {90ee90}P{dc143c}r{CDCDCD}ineside{CDCDCD}, {1e90ff}Pawnokit{CDCDCD}
             Разработчику {FF6600}FYP{CDCDCD} создавшему moonloader, lib.samp.events
             Форумчанам с TRAINING-SANDBOX {FF6600}Кокеточка, Cheater_80_LVL, LINCOLN, qxlies{CDCDCD}
             за помощь в обнаружении ошибок, и предложениям по улучшению
@@ -8710,6 +8738,11 @@ function imgui.OnDrawFrame()
             -- imgui.SameLine()
             imgui.TextQuestion("( ? )", u8"Все запросы перенаправляет в ваш браузер")
             imgui.Spacing()
+         elseif tabmenu.onlinesearch == 3 then
+            imgui.Text(u8"Раздел для разработчиков. Поиск референсов по функциям (онлайн)")
+            imgui.SameLine()
+            imgui.TextQuestion("( ? )", u8"Все запросы перенаправляет в ваш браузер")
+            imgui.Spacing()
          end
          
          if tabmenu.onlinesearch == 1 then
@@ -8727,7 +8760,14 @@ function imgui.OnDrawFrame()
          else
             if imgui.Button(u8"Текстуры", imgui.ImVec2(125, 25)) then tabmenu.onlinesearch = 2 end
          end
-         
+         imgui.SameLine()
+         if tabmenu.onlinesearch == 3 then
+            imgui.PushStyleColor(imgui.Col.Button, imgui.GetStyle().Colors[imgui.Col.ButtonHovered])
+            if imgui.Button(u8"Функции", imgui.ImVec2(125, 25)) then tabmenu.onlinesearch = 3 end
+            imgui.PopStyleColor()
+         else
+            if imgui.Button(u8"Функции", imgui.ImVec2(125, 25)) then tabmenu.onlinesearch = 3 end
+         end
          imgui.Spacing()
          imgui.Spacing()
             
@@ -8962,6 +9002,75 @@ function imgui.OnDrawFrame()
             imgui.TextColoredRGB("Покрасить каждый слой объекта отдельным цветом: {696969}/cindex")
             imgui.TextColoredRGB("Показать использованные за сеанс текстуры: {696969}/tlist")
             imgui.Spacing()
+         elseif tabmenu.onlinesearch == 3 then
+            imgui.Text(u8"Введите ключевое слово, или название функции:")
+            imgui.PushItemWidth(220)
+            if imgui.InputText("##CheckObject", textbuffer.objectid) then
+            end
+            imgui.PopItemWidth()
+            
+            if imgui.Button(u8"Найти на open.mp",imgui.ImVec2(120, 25)) then
+               if string.len(textbuffer.objectid.v) > 3 then
+                  local link = 'explorer "https://open.mp/search?q='.. u8:decode(textbuffer.objectid.v)..'"'
+                  os.execute(link)
+                  if string.len(textbuffer.objectid.v) <= 24 then
+                     ini.tmp.osearch = textbuffer.objectid.v
+                     inicfg.save(ini, configIni)
+                  end
+               else
+                  sampAddChatMessage("[SCRIPT]: {FFFFFF}Введите больше 3-х символов для поиска",0x0FF6600)
+               end
+            end
+            imgui.SameLine()
+            if imgui.Button(u8"Найти на blast.hk(docuwiki)",imgui.ImVec2(175, 25)) then
+               if string.len(textbuffer.objectid.v) > 2 then
+                  local link = 'explorer "https://blast.hk/dokuwiki/start?q='.. u8:decode(textbuffer.objectid.v)..'&do=search"'
+                  os.execute(link)
+                  if string.len(textbuffer.objectid.v) <= 24 then
+                     ini.tmp.osearch = textbuffer.objectid.v
+                     inicfg.save(ini, configIni)
+                  end
+               else
+                  sampAddChatMessage("[SCRIPT]: {FFFFFF}Введите больше 2-х символов для поиска",0x0FF6600)
+               end
+            end
+            if isTrainingSandbox then
+               if imgui.TooltipButton(u8"Поиск по текстовым командам КБ", imgui.ImVec2(300, 25), u8:encode("поиск по комадным блокам")) then
+                  tabmenu.info = 7
+                  tabmenu.cb = 2
+               end
+            end
+            
+            imgui.Spacing()
+            
+            imgui.TextColoredRGB("Документация по SAMP/Open.mp")
+            imgui.SameLine()
+            imgui.Link("open.mp/docs", "open.mp")
+            
+            imgui.TextColoredRGB("Библиотека SAMP.lua")
+            imgui.SameLine()
+            imgui.Link("https://github.com/THE-FYP/SAMP.Lua/blob/master/samp/events.lua", "events.lua")
+
+            imgui.TextColoredRGB("Список RPC и Packet list")
+            imgui.SameLine()
+            imgui.Link("https://github.com/Brunoo16/samp-packet-list/wiki", "samp-packet-list")
+            
+            imgui.TextColoredRGB("Скриптовый API Lua")
+            imgui.SameLine()
+            imgui.Link("https://wiki.blast.hk/ru/moonloader/scripting-api", "scripting-api")
+            
+            imgui.TextColoredRGB("Функции Lua MoonLoader")
+            imgui.SameLine()
+            imgui.Link("https://blast.hk/dokuwiki/moonloader:functions", "moonloader")
+            
+            imgui.TextColoredRGB("Опкоды Sampfuncs")
+            imgui.SameLine()
+            imgui.Link("https://wiki.blast.hk/t/opcode/sampfuncs", "opcode")
+            
+            imgui.TextColoredRGB("Dear ImGui API")
+            imgui.SameLine()
+            imgui.Link("https://github.com/ocornut/imgui/blob/master/imgui.h", "imgui")
+            
          end
          
       elseif tabmenu.info == 7 then
@@ -9010,9 +9119,11 @@ function imgui.OnDrawFrame()
             {FF6600}/cbtp{FFFFFF} - телепортрт к блоку
             {FF6600}/cbedit{FFFFFF} - открыть меню блока
             {FF6600}/cbed{FFFFFF} - редактировать последний блок
+            {FF6600}/nearcb{FFFFFF} - список кб рядом (по радиусу)
             {FF6600}/data{FFFFFF} - информация об игроке и данных в его массиве.
             {FF6600}/timers{FFFFFF} - список таймеров мира
             {FF6600}/oldcb{FFFFFF} - включить устарелые текстовые команды
+            {FF6600}/tracecb{FFFFFF} - включить режим отладки вызовов КБ
             {FF6600}/cmb | //<text>{FFFFFF} - активировать КБ аллиас
             {FF6600}/cblist{FFFFFF} - список всех командных блоков в мире
             {FF6600}/tb{FFFFFF} - список триггер блоков в мире
@@ -9415,6 +9526,7 @@ function imgui.OnDrawFrame()
              sampAddChatMessage("[SCRIPT]: {FFFFFF}Список был сохранен в /moonloader/resource/mappingtoolkit/export/exportdata.pwn", 0x0FF6600)
           end
        end
+       
        if combobox.selecttable.v >= 3 then
           imgui.SameLine()
           if imgui.TooltipButton(u8"Очистить", imgui.ImVec2(70, 25), u8:encode("Очистить таблицу")) then
@@ -9436,7 +9548,50 @@ function imgui.OnDrawFrame()
              end
           end
        end
+
+       if combobox.selecttable.v == 0 then
+          imgui.SameLine()
+          if imgui.TooltipButton(u8" ? ", imgui.ImVec2(30, 25), u8:encode("Получить справку по функции AddPlayerClass")) then
+             os.execute('explorer "https://open.mp/docs/scripting/functions/AddPlayerClass"')
+          end       
+       elseif combobox.selecttable.v == 1 then
+          imgui.SameLine()
+          if imgui.TooltipButton(u8" ? ", imgui.ImVec2(30, 25), u8:encode("Получить справку по функции AddStaticVehicle")) then
+             os.execute('explorer "https://open.mp/docs/scripting/functions/AddStaticVehicle"')
+          end
+       elseif combobox.selecttable.v == 2 then
+          imgui.SameLine()
+          if imgui.TooltipButton(u8" ? ", imgui.ImVec2(30, 25), u8:encode("Получить справку по функции CreateObject")) then
+             os.execute('explorer "https://open.mp/docs/scripting/functions/CreateObject"')
+          end
+       elseif combobox.selecttable.v == 3 then
+          imgui.SameLine()
+          if imgui.TooltipButton(u8" ? ", imgui.ImVec2(30, 25), u8:encode("Получить справку по функции SetObjectMaterial")) then
+             os.execute('explorer "https://open.mp/docs/scripting/functions/SetObjectMaterial"')
+          end
+       elseif combobox.selecttable.v == 4 then
+          imgui.SameLine()
+          if imgui.TooltipButton(u8" ? ", imgui.ImVec2(30, 25), u8:encode("Получить справку по функции CreatePickup")) then
+             os.execute('explorer "https://open.mp/docs/scripting/functions/CreatePickup"')
+          end
+       elseif combobox.selecttable.v == 5 then
+          imgui.SameLine()
+          if imgui.TooltipButton(u8" ? ", imgui.ImVec2(30, 25), u8:encode("Получить справку по функции Create3DTextLabel")) then
+             os.execute('explorer "https://open.mp/docs/scripting/functions/Create3DTextLabel"')
+          end
+       elseif combobox.selecttable.v == 6 then
+          imgui.SameLine()
+          if imgui.TooltipButton(u8" ? ", imgui.ImVec2(30, 25), u8:encode("Получить справку по функции SetPlayerMapIcon")) then
+             os.execute('explorer "https://open.mp/docs/scripting/functions/SetPlayerMapIcon"')
+          end
+       elseif combobox.selecttable.v == 7 then
+          imgui.SameLine()
+          if imgui.TooltipButton(u8" ? ", imgui.ImVec2(30, 25), u8:encode("Получить справку по функции SetObjectMaterialText")) then
+             os.execute('explorer "https://open.mp/docs/scripting/functions/SetObjectMaterialText"')
+          end
+       end
        
+          
        if combobox.selecttable.v == 0 then          
           playersTable = {}       
           playersTotal = 0
@@ -10657,7 +10812,21 @@ function sampev.onSendDialogResponse(dialogId, button, listboxId, input)
             LastData.lastAttEditSlot = listboxId + 1
          end
       end
-         
+      
+      if button == 1 then
+         local caption = sampGetDialogCaption()
+         if caption:find("Edit Attach") then
+            if listboxId == 4 then
+               if LastData.lastAttEditSlot then
+                  lua_thread.create(function()
+                     wait(250)
+                     sampSendChat("/attinfo "..LastData.lastAttEditSlot)
+                  end)
+               end
+            end
+         end
+      end
+      
       if button == 0 and ini.settings.skipomenu then
          local caption = sampGetDialogCaption()
          if LastData.lastDialogTitle then
@@ -10686,16 +10855,22 @@ function sampev.onSendDialogResponse(dialogId, button, listboxId, input)
       if button == 1 then
          local caption = sampGetDialogCaption()
          if caption:find("Страница") then
-            local cblistitem = string.match(input, "%d.+NAME")
-            local cblistitemnew = string.match(input, "%d.+N.+A")
-            if cblistitem then
-               local cbid = cblistitem:gsub('NAME','')
-               LastData.lastCb = string.match(cbid, "(%d+)") 
+            if input:len() >= 1 then 
+               if input:match("(%d+)") then
+                  LastData.lastCb = tonumber(input)
+               end
             end
-            if cblistitemnew then
-               local cbid = cblistitemnew:gsub('N.+A','')
-               LastData.lastCb = string.match(cbid, "(%d+)")
-            end
+            -- OLD Cblist menu hook
+            -- local cblistitem = string.match(input, "%d.+NAME")
+            -- local cblistitemnew = string.match(input, "%d.+N.+A")
+            -- if cblistitem then
+               -- local cbid = cblistitem:gsub('NAME','')
+               -- LastData.lastCb = string.match(cbid, "(%d+)") 
+            -- end
+            -- if cblistitemnew then
+               -- local cbid = cblistitemnew:gsub('N.+A','')
+               -- LastData.lastCb = string.match(cbid, "(%d+)")
+            -- end
          end
       end
       
@@ -11125,6 +11300,11 @@ function sampev.onShowDialog(dialogId, style, title, button1, button2, text)
          else
             dialoghook.nextdialog = false
          end
+      end
+      
+      if title:find('Edit Attach') then
+         local newtext = text.."\nInfo"
+         return {dialogId, style, title, button1, button2, newtext}
       end
       
       if title:find('Изменить 3D текст') then
@@ -11824,7 +12004,7 @@ function sampev.onShowDialog(dialogId, style, title, button1, button2, text)
             end)
          end
          
-         if text:find("Укажите желаемое название мира") or text:find("Change world name") then
+         if text:find("Укажите желаемое название мира") or text:find("Change World Name") then
             dialoghook.setworldname = true
             if ini.tmp.worldname then
                if ini.tmp.worldname:len() > 1 then
@@ -13893,6 +14073,13 @@ function sampev.onSendCommand(command)
          sampSendChat("/cblist")
       end
       return false
+   end
+   
+   if isTrainingSandbox and command:find("^/cbtp$") then
+      if LastData.lastCb then
+         sampSendChat("/cbtp "..LastData.lastCb)
+         sampAddChatMessage("[SCRIPT]: {FFFFFF}Вас телепортировало на последний КБ", 0x0FF6600) 
+      end
    end
 
    if isTrainingSandbox and command:find("^/cbnext$") then
