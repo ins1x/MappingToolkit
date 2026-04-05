@@ -3,7 +3,7 @@ script_description("Assistant for mappers")
 script_dependencies('imgui', 'lib.samp.events')
 script_properties("work-in-pause")
 script_url("https://github.com/ins1x/MappingToolkit")
-script_version("4.21") -- Release
+script_version("4.22") -- RC 1
 -- support sa-mp versions depends on SAMPFUNCS (0.3.7-R1, 0.3.7-R3-1, 0.3.7-R5, 0.3.DL)
 -- script_moonloader(16) moonloader v.0.26 
 -- editor options: tabsize 3, Unix (LF), encoding Windows-1251
@@ -128,6 +128,7 @@ local ini = inicfg.load({
       keyK = "",
       keyL = "/lock",
       keyN = "",
+      keyM = "/wm",
       keyB = "",
       keyZ = "",
       keyI = "",
@@ -307,6 +308,7 @@ local dialog = {
    dialogtext = imgui.ImBool(false),
    txdlist = imgui.ImBool(false),
    toolkitmanage = imgui.ImBool(false), 
+   hotkeys = imgui.ImBool(false), 
 }
 
 local dialoghook = {
@@ -437,6 +439,7 @@ local checkbox = {
    loggametexts = imgui.ImBool(false),
    logtxd = imgui.ImBool(false),
    logcamset = imgui.ImBool(false),
+   logcommands = imgui.ImBool(false),
    logsetplayerpos = imgui.ImBool(false),
    logmessages = imgui.ImBool(false),
    logworlddouns = imgui.ImBool(false),
@@ -508,6 +511,7 @@ local checkbox = {
    cordlinedatetime = imgui.ImBool(false),
    cordlineseparator = imgui.ImBool(false),
    charanimspeed = imgui.ImBool(false),
+   unsafeteleport = imgui.ImBool(false),
    test = imgui.ImBool(false)
 }
 
@@ -684,6 +688,7 @@ local combobox = {
    hotkeyOaction = imgui.ImInt(0),
    hotkeyPaction = imgui.ImInt(0),
    hotkeyNaction = imgui.ImInt(0),
+   hotkeyMaction = imgui.ImInt(0),
    hotkeyBaction = imgui.ImInt(0),
    hotkeyZaction = imgui.ImInt(0),
    hotkeyUaction = imgui.ImInt(0),
@@ -713,6 +718,8 @@ local combobox = {
    txdtype = imgui.ImInt(0),
    exportformat = imgui.ImInt(0),
    uifontselect = imgui.ImInt(0),
+   tpdestination = imgui.ImInt(0),
+   developerdocs = imgui.ImInt(0),
    logs = imgui.ImInt(0)
 }
 
@@ -747,6 +754,7 @@ local LastData = {
    lastCommand = "",
    lastTextBuffer = "",
    lastClickedTextdrawId = 0,
+   lastCheckpointPos = nil,
    lastShowedTextdrawId = 0,
    lastDialogInput = nil,
    lastDialogText = nil,
@@ -820,14 +828,15 @@ local hotkeysActivationList = {
    u8"Откр/Закр транспорт", u8"Починить транспорт", u8"Открыть меню транспорта",
    u8"Сохранить мир", u8"Загрузить мир", u8"Список комадных блоков",
    u8"Повернуть объект на 90", u8"Повернуть объект на 45",
-   u8"Скрыть/Показать нижнюю панель", u8"Открыть список миров"
+   u8"Скрыть/Показать нижнюю панель", u8"Открыть список миров", 
+   u8"Открыть меню мира"
 }
 
 local hotkeysActivationCmds = {
    "", "/jump", "/spawnme", "/slapme", "/jetpack", "/veh 481", "/weapon",
    "/veh", "/flymode", "/spec", "/oedit", "/csel", "/omenu", "/oinfo",
    "/animlist", "/cb", "/lock", "/fix", "/vmenu", "/savevw", "/loadvw",
-   "/cblist", "/rot", "/rot 45", "/panel", "/list"
+   "/cblist", "/rot", "/rot 45", "/panel", "/list", "/wm"
 }
 
 local chatPrefixList = {
@@ -1506,6 +1515,9 @@ function main()
             if isKeyJustPressed(0x4E) and ini.hotkeyactions.keyN ~= nil and string.len(ini.hotkeyactions.keyN) > 1 then
                sampSendChat(tostring(ini.hotkeyactions.keyN))
             end
+            if isKeyJustPressed(0x4D) and ini.hotkeyactions.keyM ~= nil and string.len(ini.hotkeyactions.keyM) > 1 then
+               sampSendChat(tostring(ini.hotkeyactions.keyM))
+            end
             if isKeyJustPressed(0x42) and ini.hotkeyactions.keyB ~= nil and string.len(ini.hotkeyactions.keyB) > 1 then
                sampSendChat(tostring(ini.hotkeyactions.keyB))
             end
@@ -1688,17 +1700,6 @@ function main()
             -- end
          -- end
          
-         if isTrainingSandbox then
-            -- M key menu /vw and /world 
-            if isKeyJustPressed(0x4D) and not sampIsChatInputActive() and not sampIsDialogActive()
-            and not isPauseMenuActive() and not isSampfuncsConsoleActive() then 
-               if playerdata.isWorldHoster then 
-                  sampSendChat("/vw")
-               else 
-                  sampSendChat("/world")
-               end   
-            end
-         end
       end
       
       -- Objects render
@@ -2577,7 +2578,9 @@ function imgui.OnDrawFrame()
             if imgui.TooltipButton(u8"Запросить спавн", imgui.ImVec2(130, 25), u8"Отправить SendRequestSpawn серверу") then
                sampSendRequestSpawn()
             end
+            
             if isTrainingSandbox then
+               --imgui.PushStyleColor(imgui.Col.Button, imgui.ImVec4(0.0, 0.45, 0.0, 1.0))
                if imgui.TooltipButton(u8"Слапнуть себя", imgui.ImVec2(200, 25), u8"Подбросить себя /slapme") then
                   sampSendChat("/slapme")
                end
@@ -2585,6 +2588,7 @@ function imgui.OnDrawFrame()
                if imgui.TooltipButton(u8"Заспавнить себя", imgui.ImVec2(200, 25), u8"Заспавнить себя /spawnme") then
                   sampSendChat("/spawnme")
                end
+               --imgui.PopStyleColor()
             end
             if isTrainingSandbox then
                if imgui.TooltipButton(u8"Выбрать интерьер", imgui.ImVec2(200, 25), u8"Выбрать интерьер для мира /int") then
@@ -2690,7 +2694,74 @@ function imgui.OnDrawFrame()
             end
             
             imgui.Text(u8"Телепорт по координатам:")
-            if imgui.TooltipButton(u8"Обновить", imgui.ImVec2(70, 25), u8"Обновит значения на вашу текущую позицию") then
+            
+            local tpDestinationList = {
+               u8"По координатам",
+               u8"По метке",
+               u8"К чекпоинту",
+               u8"На сохраненную позицию",
+               u8"На спавн мира",
+               u8"К последнему объекту",
+            }
+            
+            imgui.PushItemWidth(200)
+            if imgui.Combo(u8'<- Выбрать точку телепорта##tpdestination', combobox.tpdestination, tpDestinationList) then
+               if combobox.tpdestination.v == 0 then
+                  textbuffer.tpcx.v = string.format("%.1f", positionX)
+                  textbuffer.tpcy.v = string.format("%.1f", positionY)
+                  textbuffer.tpcz.v = string.format("%.1f", positionZ)
+                  sampAddChatMessage("[SCRIPT]: {FFFFFF}Выставлены координаты на текущую позицию", 0x0FF6600)
+               elseif combobox.tpdestination.v == 1 then
+                  local bTargetResult, bX, bY, bZ = getTargetBlipCoordinates()
+                  if bTargetResult then
+                     textbuffer.tpcx.v = string.format("%.1f", bX)
+                     textbuffer.tpcy.v = string.format("%.1f", bY)
+                     textbuffer.tpcz.v = string.format("%.1f", bZ+2.0)
+                     sampAddChatMessage("[SCRIPT]: {FFFFFF}Выставлены координаты по метке на карте.", 0x0FF6600)
+                  else
+                     sampAddChatMessage("[SCRIPT]: {FFFFFF}Метка на карте не обнаружена. Координаты не были изменены.", 0x0FF6600)
+                  end
+               elseif combobox.tpdestination.v == 2 then
+                  if LastData.lastCheckpointPos then
+                     textbuffer.tpcx.v = string.format("%.1f", LastData.lastCheckpointPos.x-1)
+                     textbuffer.tpcy.v = string.format("%.1f", LastData.lastCheckpointPos.y-1)
+                     textbuffer.tpcz.v = string.format("%.1f", LastData.lastCheckpointPos.z)
+                     sampAddChatMessage("[SCRIPT]: {FFFFFF}Выставлены координаты к чекпоинту", 0x0FF6600)
+                  else
+                     sampAddChatMessage("[SCRIPT]: {FFFFFF}Чекпоинт на карте не обнаружен. Попробуйте ТП по метке", 0x0FF6600)
+                  end
+               elseif combobox.tpdestination.v == 3 then
+                  if tpcpos.x then
+                     textbuffer.tpcx.v = string.format("%.1f", tpcpos.x)
+                     textbuffer.tpcy.v = string.format("%.1f", tpcpos.y)
+                     textbuffer.tpcz.v = string.format("%.1f", tpcpos.z)
+                     sampAddChatMessage("[SCRIPT]: {FFFFFF}Выставлены координаты на сохраненную позицию", 0x0FF6600)
+                  else
+                     sampAddChatMessage("[SCRIPT]: {FFFFFF}Нет сохраненной позиции. Используйте {FF6600}/savepos", 0x0FF6600)
+                  end
+               elseif combobox.tpdestination.v == 4 then
+                  if worldspawnpos.x ~= 0.0 then
+                     textbuffer.tpcx.v = string.format("%.1f", worldspawnpos.x)
+                     textbuffer.tpcy.v = string.format("%.1f", worldspawnpos.y)
+                     textbuffer.tpcz.v = string.format("%.1f", worldspawnpos.z)
+                     sampAddChatMessage("[SCRIPT]: {FFFFFF}Выставлены координаты на позицию спавна в мире.", 0x0FF6600)
+                  else
+                     sampAddChatMessage("[SCRIPT]: {FFFFFF}Нет сохраненной позиции спавна в мире.", 0x0FF6600)
+                  end
+               elseif combobox.tpdestination.v == 5 then
+                  if LastObject.position.x ~= 0.0 then
+                     textbuffer.tpcx.v = string.format("%.1f", LastObject.position.x+1)
+                     textbuffer.tpcy.v = string.format("%.1f", LastObject.position.y+1)
+                     textbuffer.tpcz.v = string.format("%.1f", LastObject.position.z+1)
+                     sampAddChatMessage("[SCRIPT]: {FFFFFF}Выставлены координаты на позицию последнего объекта.", 0x0FF6600)
+                  else
+                     sampAddChatMessage("[SCRIPT]: {FFFFFF}Нет сохраненной позиции последнего объекта.", 0x0FF6600)
+                  end
+               end
+            end
+            imgui.PopItemWidth()
+            
+            if imgui.TooltipButton(u8"Обновить", imgui.ImVec2(105, 25), u8"Обновит значения на вашу текущую позицию") then
                tpcpos.x = positionX
                tpcpos.y = positionY
                tpcpos.z = positionZ
@@ -2698,6 +2769,7 @@ function imgui.OnDrawFrame()
                textbuffer.tpcy.v = string.format("%.1f", tpcpos.y)
                textbuffer.tpcz.v = string.format("%.1f", tpcpos.z)
             end
+            
             imgui.SameLine()
             imgui.TextColoredRGB("{007DFF}x:")
             imgui.SameLine()
@@ -2723,100 +2795,40 @@ function imgui.OnDrawFrame()
             end
             imgui.PopItemWidth()
             
-            imgui.SameLine()
-            imgui.TextQuestion("[=]", u8"Вставить послед. сохраненную позицию")
-            if imgui.IsItemClicked() then
-               if tpcpos.x then
-                  textbuffer.tpcx.v = string.format("%.1f", tpcpos.x)
-                  textbuffer.tpcy.v = string.format("%.1f", tpcpos.y)
-                  textbuffer.tpcz.v = string.format("%.1f", tpcpos.z)
-               end
-            end
-            imgui.SameLine()
-            imgui.TextQuestion("[o]", u8"Вставить координаты с метки на карте")
-            if imgui.IsItemClicked() then
-               local bTargetResult, bX, bY, bZ = getTargetBlipCoordinates()
-               if bTargetResult then
-                  textbuffer.tpcx.v = string.format("%.1f", bX)
-                  textbuffer.tpcy.v = string.format("%.1f", bY)
-                  textbuffer.tpcz.v = string.format("%.1f", bZ+2.0)
-               end
-            end
-            
-            if imgui.Button(u8"По координатам (системно)", imgui.ImVec2(200, 25)) then
+            imgui.PushStyleColor(imgui.Col.Button, imgui.ImVec4(0.0, 0.45, 0.0, 1.0))
+            if imgui.TooltipButton(u8"Телепортироваться", imgui.ImVec2(200, 25), u8"Телепортироваться по выставленным координатам") then               
                freezeCharPosition(playerPed, false)
-               if textbuffer.tpcx.v then
-                  if isTrainingSandbox then
-                     sampSendChat(string.format("/xyz %f %f %f", textbuffer.tpcx.v, textbuffer.tpcy.v, textbuffer.tpcz.v), -1)
+               if checkbox.unsafeteleport.v then
+                  if textbuffer.tpcx.v then
+                     setCharCoordinates(playerPed, textbuffer.tpcx.v, textbuffer.tpcy.v, textbuffer.tpcz.v)
                      sampAddChatMessage(string.format("[SCRIPT]: {FFFFFF}Телепорт на координаты: %.1f %.1f %.1f",
                      textbuffer.tpcx.v, textbuffer.tpcy.v, textbuffer.tpcz.v), 0x0FF6600)
-                  else 
-                     sampAddChatMessage("[SCRIPT]: {FFFFFF}Недоступно для вашего сервера", 0x0FF6600)
-                  end
-               else
-                  sampAddChatMessage("[SCRIPT]: {FFFFFF}Координаты не были сохранены", 0x0FF6600)
-               end  
-            end
-            imgui.SameLine()
-            if imgui.Button(u8"По метке (системно)", imgui.ImVec2(200, 25)) then
-               local bTargetResult, bX, bY, bZ = getTargetBlipCoordinates()
-               if bTargetResult then
-                  textbuffer.tpcx.v = string.format("%.1f", bX)
-                  textbuffer.tpcy.v = string.format("%.1f", bY)
-                  textbuffer.tpcz.v = string.format("%.1f", bZ+2.0)
-                  freezeCharPosition(playerPed, false)
-               
-                  if textbuffer.tpcx.v then
-                     if isTrainingSandbox then
-                        sampSendChat(string.format("/xyz %f %f %f", textbuffer.tpcx.v, textbuffer.tpcy.v, textbuffer.tpcz.v), -1)
-                        sampAddChatMessage(string.format("[SCRIPT]: {FFFFFF}Телепорт на метку: %.1f %.1f %.1f",
-                        textbuffer.tpcx.v, textbuffer.tpcy.v, textbuffer.tpcz.v), 0x0FF6600)
-                     else
-                        sampAddChatMessage("[SCRIPT]: {FFFFFF}Недоступно для вашего сервера", 0x0FF6600)
-                     end
                   else
-                     sampAddChatMessage("[SCRIPT]: {FFFFFF}Координаты не были сохранены", 0x0FF6600)
+                     sampAddChatMessage("[SCRIPT]: {FFFFFF}Координаты не выставлены", 0x0FF6600)
                   end  
                else
-                  sampAddChatMessage("[SCRIPT]: {FFFFFF}Метка на карте не обнаружена. Координаты не были изменены.", 0x0FF6600)
-               end
-            end
-            
-            if imgui.Button(u8"По координатам (hack)", imgui.ImVec2(200, 25)) then
-               freezeCharPosition(playerPed, false)
-               if textbuffer.tpcx.v then
-                  setCharCoordinates(playerPed, textbuffer.tpcx.v, textbuffer.tpcy.v, textbuffer.tpcz.v)
-                  sampAddChatMessage(string.format("[SCRIPT]: {FFFFFF}Телепорт на координаты: %.1f %.1f %.1f",
-                  textbuffer.tpcx.v, textbuffer.tpcy.v, textbuffer.tpcz.v), 0x0FF6600)
-               else
-                  sampAddChatMessage("[SCRIPT]: {FFFFFF}Координаты не были сохранены", 0x0FF6600)
-               end  
-            end
-            imgui.SameLine()
-            if imgui.Button(u8"По метке (hack)", imgui.ImVec2(200, 25)) then
-               local bTargetResult, bX, bY, bZ = getTargetBlipCoordinates()
-               if bTargetResult then
-                  textbuffer.tpcx.v = string.format("%.1f", bX)
-                  textbuffer.tpcy.v = string.format("%.1f", bY)
-                  textbuffer.tpcz.v = string.format("%.1f", bZ+2.0)
-                  
-                  freezeCharPosition(playerPed, false)
-               
-                  if textbuffer.tpcx.v then
-                     if isTrainingSandbox then
-                        setCharCoordinates(playerPed, textbuffer.tpcx.v, textbuffer.tpcy.v, textbuffer.tpcz.v)
-                        sampAddChatMessage(string.format("[SCRIPT]: {FFFFFF}Телепорт на метку: %.1f %.1f %.1f",
+                  if isTrainingSandbox then
+                     if textbuffer.tpcx.v then
+                        sampSendChat(string.format("/xyz %f %f %f", textbuffer.tpcx.v, textbuffer.tpcy.v, textbuffer.tpcz.v), -1)
+                        sampAddChatMessage(string.format("[SCRIPT]: {FFFFFF}Телепорт на координаты: %.1f %.1f %.1f",
                         textbuffer.tpcx.v, textbuffer.tpcy.v, textbuffer.tpcz.v), 0x0FF6600)
                      else 
                         sampAddChatMessage("[SCRIPT]: {FFFFFF}Недоступно для вашего сервера", 0x0FF6600)
                      end
                   else
                      sampAddChatMessage("[SCRIPT]: {FFFFFF}Координаты не были сохранены", 0x0FF6600)
-                  end                    
-               else
-                  sampAddChatMessage("[SCRIPT]: {FFFFFF}Метка на карте не обнаружена. Координаты не были изменены.", 0x0FF6600)
-               end 
+                  end  
+               end
             end
+            imgui.PopStyleColor()
+            
+            if imgui.Checkbox(u8"Снять ограничения (unsafe mode)", checkbox.unsafeteleport) then
+               if checkbox.unsafeteleport.v then
+                  sampAddChatMessage("[SCRIPT]: {FFFFFF}Сняты ограничения! Будьте осторожны, может триггерить античит!", 0x0800000)
+               end
+            end
+            imgui.SameLine()
+            imgui.TextQuestion("( ? )", u8"Снимает защиту, использует hack телепорт вместо системного (Может триггерить античит)")
             
             imgui.Spacing()
             imgui.Text(u8"Пошаговый телепорт:")
@@ -7166,219 +7178,13 @@ function imgui.OnDrawFrame()
             -- end
             -- imgui.SameLine()
             -- imgui.TextQuestion("( ? )", u8"Показывать подсказки по горячим клавишам (например при переходе в режим полета, ретекстура и.т.д)")
-            imgui.Spacing()
-            if tabmenu.hotkeys == 1 then
-               imgui.PushStyleColor(imgui.Col.Button, imgui.GetStyle().Colors[imgui.Col.ButtonHovered])
-               if imgui.Button(u8"Основные", imgui.ImVec2(125, 25)) then tabmenu.hotkeys = 1 end
-               imgui.PopStyleColor()
-            else
-               if imgui.Button(u8"Основные", imgui.ImVec2(125, 25)) then tabmenu.hotkeys = 1 end
+            
+            if imgui.TooltipButton(u8"Настроить действия на горячие клавиши",
+            imgui.ImVec2(275, 25), u8"Показать настройки горячих клавиш") then
+               dialog.hotkeys.v = not dialog.hotkeys.v
             end
             
-            imgui.SameLine()
-            if tabmenu.main == 2 then
-               imgui.PushStyleColor(imgui.Col.Button, imgui.GetStyle().Colors[imgui.Col.ButtonHovered])
-               if imgui.Button(u8"Функциональные (F2-F12)", imgui.ImVec2(185, 25)) then tabmenu.hotkeys = 2 end
-               imgui.PopStyleColor()
-            else
-               if imgui.Button(u8"Функциональные (F2-F12)", imgui.ImVec2(185, 25)) then tabmenu.hotkeys = 2 end
-            end
-      
-            imgui.PushItemWidth(270)
-            imgui.PushStyleVar(imgui.StyleVar.ItemSpacing, imgui.ImVec2(16, 4))
             
-            if tabmenu.hotkeys == 1 then
-               if imgui.Combo(u8'Клавиша J##ComboBoxhotkeyJaction', combobox.hotkeyJaction, 
-               hotkeysActivationList, #hotkeysActivationList) then
-                  ini.hotkeyactions.keyJ = tostring(hotkeysActivationCmds[combobox.hotkeyJaction.v+1])
-                  inicfg.save(ini, configIni)
-                  sampAddChatMessage("[SCRIPT]: {FFFFFF}Выбрано действие - "..
-                  u8:decode(tostring(hotkeysActivationList[combobox.hotkeyJaction.v+1])), 0x0FF6600)
-               end
-               
-               if imgui.Combo(u8'Клавиша I##ComboBoxhotkeyIaction', combobox.hotkeyIaction, 
-               hotkeysActivationList, #hotkeysActivationList) then
-                  ini.hotkeyactions.keyI = tostring(hotkeysActivationCmds[combobox.hotkeyIaction.v+1])
-                  inicfg.save(ini, configIni)
-                  sampAddChatMessage("[SCRIPT]: {FFFFFF}Выбрано действие - "..
-                  u8:decode(tostring(hotkeysActivationList[combobox.hotkeyIaction.v+1])), 0x0FF6600)
-               end
-               
-               if imgui.Combo(u8'Клавиша K##ComboBoxhotkeyKaction', combobox.hotkeyKaction, 
-               hotkeysActivationList, #hotkeysActivationList) then
-                  ini.hotkeyactions.keyK = tostring(hotkeysActivationCmds[combobox.hotkeyKaction.v+1])
-                  inicfg.save(ini, configIni)
-                  sampAddChatMessage("[SCRIPT]: {FFFFFF}Выбрано действие - "..
-                  u8:decode(tostring(hotkeysActivationList[combobox.hotkeyKaction.v+1])), 0x0FF6600)
-               end
-               
-               if imgui.Combo(u8'Клавиша L##ComboBoxhotkeyLaction', combobox.hotkeyLaction, 
-               hotkeysActivationList, #hotkeysActivationList) then
-                  ini.hotkeyactions.keyL = tostring(hotkeysActivationCmds[combobox.hotkeyLaction.v+1])
-                  inicfg.save(ini, configIni)
-                  sampAddChatMessage("[SCRIPT]: {FFFFFF}Выбрано действие - "..
-                  u8:decode(tostring(hotkeysActivationList[combobox.hotkeyLaction.v+1])), 0x0FF6600)
-               end
-               
-               if imgui.Combo(u8'Клавиша N##ComboBoxhotkeyNaction', combobox.hotkeyNaction, 
-               hotkeysActivationList, #hotkeysActivationList) then
-                  ini.hotkeyactions.keyN = tostring(hotkeysActivationCmds[combobox.hotkeyNaction.v+1])
-                  inicfg.save(ini, configIni)
-                  sampAddChatMessage("[SCRIPT]: {FFFFFF}Выбрано действие - "..
-                  u8:decode(tostring(hotkeysActivationList[combobox.hotkeyNaction.v+1])), 0x0FF6600)
-               end
-               
-               if imgui.Combo(u8'Клавиша B##ComboBoxhotkeyBaction', combobox.hotkeyBaction, 
-               hotkeysActivationList, #hotkeysActivationList) then
-                  ini.hotkeyactions.keyB = tostring(hotkeysActivationCmds[combobox.hotkeyBaction.v+1])
-                  inicfg.save(ini, configIni)
-                  sampAddChatMessage("[SCRIPT]: {FFFFFF}Выбрано действие - "..
-                  u8:decode(tostring(hotkeysActivationList[combobox.hotkeyBaction.v+1])), 0x0FF6600)
-               end
-               
-               if imgui.Combo(u8'Клавиша 0##ComboBoxhotkeyOaction', combobox.hotkeyOaction, 
-               hotkeysActivationList, #hotkeysActivationList) then
-                  ini.hotkeyactions.keyO = tostring(hotkeysActivationCmds[combobox.hotkeyOaction.v+1])
-                  inicfg.save(ini, configIni)
-                  sampAddChatMessage("[SCRIPT]: {FFFFFF}Выбрано действие - "..
-                  u8:decode(tostring(hotkeysActivationList[combobox.hotkeyOaction.v+1])), 0x0FF6600)
-               end
-               
-               if imgui.Combo(u8'Клавиша P##ComboBoxhotkeyPaction', combobox.hotkeyPaction, 
-               hotkeysActivationList, #hotkeysActivationList) then
-                  ini.hotkeyactions.keyP = tostring(hotkeysActivationCmds[combobox.hotkeyPaction.v+1])
-                  inicfg.save(ini, configIni)
-                  sampAddChatMessage("[SCRIPT]: {FFFFFF}Выбрано действие - "..
-                  u8:decode(tostring(hotkeysActivationList[combobox.hotkeyPaction.v+1])), 0x0FF6600)
-               end
-               
-               if imgui.Combo(u8'Клавиша R##ComboBoxhotkeyRaction', combobox.hotkeyRaction, 
-               hotkeysActivationList, #hotkeysActivationList) then
-                  ini.hotkeyactions.keyR = tostring(hotkeysActivationCmds[combobox.hotkeyRaction.v+1])
-                  inicfg.save(ini, configIni)
-                  sampAddChatMessage("[SCRIPT]: {FFFFFF}Выбрано действие - "..
-                  u8:decode(tostring(hotkeysActivationList[combobox.hotkeyRaction.v+1])), 0x0FF6600)
-               end
-
-               if imgui.Combo(u8'Клавиша Z##ComboBoxhotkeyZaction', combobox.hotkeyZaction, 
-               hotkeysActivationList, #hotkeysActivationList) then
-                  ini.hotkeyactions.keyZ = tostring(hotkeysActivationCmds[combobox.hotkeyZaction.v+1])
-                  inicfg.save(ini, configIni)
-                  sampAddChatMessage("[SCRIPT]: {FFFFFF}Выбрано действие - "..
-                  u8:decode(tostring(hotkeysActivationList[combobox.hotkeyZaction.v+1])), 0x0FF6600)
-               end
-               
-               if imgui.Combo(u8'Клавиша U##ComboBoxhotkeyUaction', combobox.hotkeyUaction, 
-               hotkeysActivationList, #hotkeysActivationList) then
-                  ini.hotkeyactions.keyU = tostring(hotkeysActivationCmds[combobox.hotkeyUaction.v+1])
-                  inicfg.save(ini, configIni)
-                  sampAddChatMessage("[SCRIPT]: {FFFFFF}Выбрано действие - "..
-                  u8:decode(tostring(hotkeysActivationList[combobox.hotkeyUaction.v+1])), 0x0FF6600)
-               end
-               
-            elseif tabmenu.hotkeys == 2 then
-               
-               if imgui.Combo(u8'Клавиша F2##ComboBoxhotkeyF2action', combobox.hotkeyF2action, 
-               hotkeysActivationList, #hotkeysActivationList) then
-                  ini.hotkeyactions.keyF2 = tostring(hotkeysActivationCmds[combobox.hotkeyF2action.v+1])
-                  inicfg.save(ini, configIni)
-                  sampAddChatMessage("[SCRIPT]: {FFFFFF}Выбрано действие - "..
-                  u8:decode(tostring(hotkeysActivationList[combobox.hotkeyF2action.v+1])), 0x0FF6600)
-               end
-               
-               if imgui.Combo(u8'Клавиша F3##ComboBoxhotkeyF3action', combobox.hotkeyF3action, 
-               hotkeysActivationList, #hotkeysActivationList) then
-                  ini.hotkeyactions.keyF3 = tostring(hotkeysActivationCmds[combobox.hotkeyF3action.v+1])
-                  inicfg.save(ini, configIni)
-                  sampAddChatMessage("[SCRIPT]: {FFFFFF}Выбрано действие - "..
-                  u8:decode(tostring(hotkeysActivationList[combobox.hotkeyF3action.v+1])), 0x0FF6600)
-               end
-               
-               if imgui.Combo(u8'Клавиша F4##ComboBoxhotkeyF4action', combobox.hotkeyF4action, 
-               hotkeysActivationList, #hotkeysActivationList) then
-                  ini.hotkeyactions.keyF4 = tostring(hotkeysActivationCmds[combobox.hotkeyF4action.v+1])
-                  inicfg.save(ini, configIni)
-                  sampAddChatMessage("[SCRIPT]: {FFFFFF}Выбрано действие - "..
-                  u8:decode(tostring(hotkeysActivationList[combobox.hotkeyF4action.v+1])), 0x0FF6600)
-               end
-               
-               if imgui.Combo(u8'Клавиша F5##ComboBoxhotkeyF5action', combobox.hotkeyF5action, 
-               hotkeysActivationList, #hotkeysActivationList) then
-                  ini.hotkeyactions.keyF5 = tostring(hotkeysActivationCmds[combobox.hotkeyF5action.v+1])
-                  inicfg.save(ini, configIni)
-                  sampAddChatMessage("[SCRIPT]: {FFFFFF}Выбрано действие - "..
-                  u8:decode(tostring(hotkeysActivationList[combobox.hotkeyF5action.v+1])), 0x0FF6600)
-               end
-               
-               if imgui.Combo(u8'Клавиша F7##ComboBoxhotkeyF7action', combobox.hotkeyF7action, 
-               hotkeysActivationList, #hotkeysActivationList) then
-                  ini.hotkeyactions.keyF7 = tostring(hotkeysActivationCmds[combobox.hotkeyF7action.v+1])
-                  inicfg.save(ini, configIni)
-                  sampAddChatMessage("[SCRIPT]: {FFFFFF}Выбрано действие - "..
-                  u8:decode(tostring(hotkeysActivationList[combobox.hotkeyF7action.v+1])), 0x0FF6600)
-               end
-               
-               if imgui.Combo(u8'Клавиша F9##ComboBoxhotkeyF9action', combobox.hotkeyF9action, 
-               hotkeysActivationList, #hotkeysActivationList) then
-                  ini.hotkeyactions.keyF9 = tostring(hotkeysActivationCmds[combobox.hotkeyF9action.v+1])
-                  inicfg.save(ini, configIni)
-                  sampAddChatMessage("[SCRIPT]: {FFFFFF}Выбрано действие - "..
-                  u8:decode(tostring(hotkeysActivationList[combobox.hotkeyF9action.v+1])), 0x0FF6600)
-               end
-               
-               if imgui.Combo(u8'Клавиша F10##ComboBoxhotkeyF10action', combobox.hotkeyF10action, 
-               hotkeysActivationList, #hotkeysActivationList) then
-                  ini.hotkeyactions.keyF10 = tostring(hotkeysActivationCmds[combobox.hotkeyF10action.v+1])
-                  inicfg.save(ini, configIni)
-                  sampAddChatMessage("[SCRIPT]: {FFFFFF}Выбрано действие - "..
-                  u8:decode(tostring(hotkeysActivationList[combobox.hotkeyF10action.v+1])), 0x0FF6600)
-               end
-               
-               if imgui.Combo(u8'Клавиша F11##ComboBoxhotkeyF11action', combobox.hotkeyF11action, 
-               hotkeysActivationList, #hotkeysActivationList) then
-                  ini.hotkeyactions.keyF11 = tostring(hotkeysActivationCmds[combobox.hotkeyF11action.v+1])
-                  inicfg.save(ini, configIni)
-                  sampAddChatMessage("[SCRIPT]: {FFFFFF}Выбрано действие - "..
-                  u8:decode(tostring(hotkeysActivationList[combobox.hotkeyF11action.v+1])), 0x0FF6600)
-               end
-               
-               if imgui.Combo(u8'Клавиша F12##ComboBoxhotkeyF12action', combobox.hotkeyF12action, 
-               hotkeysActivationList, #hotkeysActivationList) then
-                  ini.hotkeyactions.keyF12 = tostring(hotkeysActivationCmds[combobox.hotkeyF12action.v+1])
-                  inicfg.save(ini, configIni)
-                  sampAddChatMessage("[SCRIPT]: {FFFFFF}Выбрано действие - "..
-                  u8:decode(tostring(hotkeysActivationList[combobox.hotkeyF12action.v+1])), 0x0FF6600)
-               end
-            end
-            imgui.PopStyleVar()
-            imgui.PopItemWidth()
-            
-            if imgui.Button(u8"Вернуть на стандартные",imgui.ImVec2(200, 25)) then
-               ini.hotkeyactions.keyJ = "/flymode"
-               ini.hotkeyactions.keyI = ""
-               ini.hotkeyactions.keyK = ""
-               ini.hotkeyactions.keyL = "/lock"
-               ini.hotkeyactions.keyN = ""
-               ini.hotkeyactions.keyB = ""
-               ini.hotkeyactions.keyR = ""
-               ini.hotkeyactions.keyZ = ""
-               ini.hotkeyactions.keyU = "/animlist"
-               
-               ini.hotkeyactions.keyF2 = ""
-               ini.hotkeyactions.keyF3 = ""
-               ini.hotkeyactions.keyF4 = ""
-               ini.hotkeyactions.keyF5 = ""
-               ini.hotkeyactions.keyF7 = ""
-               ini.hotkeyactions.keyF9 = ""
-               ini.hotkeyactions.keyF10 = ""
-               ini.hotkeyactions.keyF11 = ""
-               ini.hotkeyactions.keyF12 = ""
-
-               inicfg.save(ini, configIni)
-               sampAddChatMessage("[SCRIPT]: {FFFFFF}Восстановлены стандартные значения", 0x0FF6600)
-            end
-            
-            imgui.TextColoredRGB("{696969}Нет нужной клавиши? Воспользуйтесь биндером")
          end
          -- if imgui.CollapsingHeader(u8"Прочее:") then
             
@@ -8263,6 +8069,7 @@ function imgui.OnDrawFrame()
             imgui.Checkbox(u8'Логгировать в консоли обработку текстдравов', checkbox.logtextdraws)
             imgui.Checkbox(u8'Логгировать в консоли поднятые пикапы', checkbox.pickeduppickups)
             imgui.Checkbox(u8'Логгировать в консоли ответы на диалоги', checkbox.logdialogresponse)
+            imgui.Checkbox(u8'Логгировать в консоли команды', checkbox.logcommands)
             imgui.Checkbox(u8'Логгировать в консоли выбранные объекты', checkbox.logobjects)
             imgui.Checkbox(u8'Логгировать в консоли 3d тексты', checkbox.log3dtexts)
             imgui.Checkbox(u8'Логгировать в консоли Gametexts', checkbox.loggametexts)
@@ -9043,34 +8850,37 @@ function imgui.OnDrawFrame()
             
             imgui.Spacing()
             
-            imgui.TextColoredRGB("Документация по SAMP/Open.mp")
-            imgui.SameLine()
-            imgui.Link("open.mp/docs", "open.mp")
+            local docDescriptionList = {
+               u8"Документация по SAMP/Open.mp",
+               u8"Библиотека SAMP.lua",
+               u8"Список RPC и Packet list",
+               u8"Скриптовый API Lua",
+               u8"Функции Lua MoonLoader",
+               u8"Опкоды Sampfuncs",
+               u8"Dear ImGui API",
+               u8"Key codes",
+            }
+            local docUrls = {
+               "https://open.mp/docs",
+               "https://github.com/THE-FYP/SAMP.Lua/blob/master/samp/events.lua",
+               "https://github.com/Brunoo16/samp-packet-list/wiki",
+               "https://wiki.blast.hk/ru/moonloader/scripting-api",
+               "https://blast.hk/dokuwiki/moonloader:functions",
+               "https://wiki.blast.hk/t/opcode/sampfuncs",
+               "https://github.com/ocornut/imgui/blob/master/imgui.h",
+               "https://learn.microsoft.com/en-us/windows/win32/inputdev/virtual-key-codes",
+            }
             
-            imgui.TextColoredRGB("Библиотека SAMP.lua")
+            imgui.Text(u8"Выберите справочный ресурс:")
+            imgui.TextNotify(" >> ", u8"Выберите ресурс")
             imgui.SameLine()
-            imgui.Link("https://github.com/THE-FYP/SAMP.Lua/blob/master/samp/events.lua", "events.lua")
-
-            imgui.TextColoredRGB("Список RPC и Packet list")
-            imgui.SameLine()
-            imgui.Link("https://github.com/Brunoo16/samp-packet-list/wiki", "samp-packet-list")
-            
-            imgui.TextColoredRGB("Скриптовый API Lua")
-            imgui.SameLine()
-            imgui.Link("https://wiki.blast.hk/ru/moonloader/scripting-api", "scripting-api")
-            
-            imgui.TextColoredRGB("Функции Lua MoonLoader")
-            imgui.SameLine()
-            imgui.Link("https://blast.hk/dokuwiki/moonloader:functions", "moonloader")
-            
-            imgui.TextColoredRGB("Опкоды Sampfuncs")
-            imgui.SameLine()
-            imgui.Link("https://wiki.blast.hk/t/opcode/sampfuncs", "opcode")
-            
-            imgui.TextColoredRGB("Dear ImGui API")
-            imgui.SameLine()
-            imgui.Link("https://github.com/ocornut/imgui/blob/master/imgui.h", "imgui")
-            
+            imgui.PushItemWidth(275)
+            imgui.Combo(u8'##developerdocs', combobox.developerdocs, 
+            docDescriptionList, #docDescriptionList)
+            imgui.PopItemWidth()
+            if imgui.TooltipButton(u8"Открыть справку", imgui.ImVec2(120, 25), u8"Открывает справочный ресурс в вашем браузере") then
+               os.execute('explorer "'..docUrls[combobox.developerdocs.v+1]..'"')
+            end
          end
          
       elseif tabmenu.info == 7 then
@@ -10350,6 +10160,240 @@ function imgui.OnDrawFrame()
       imgui.End()
    end
    
+   if dialog.hotkeys.v then
+      imgui.SetNextWindowPos(imgui.ImVec2(sizeX / 1.35, sizeY / 6),
+      imgui.Cond.FirstUseEver, imgui.ImVec2(0.5, 0.5))
+      imgui.Begin(u8"HotKeys", dialog.hotkeys)
+      
+      imgui.Spacing()
+      if tabmenu.hotkeys == 1 then
+         imgui.PushStyleColor(imgui.Col.Button, imgui.GetStyle().Colors[imgui.Col.ButtonHovered])
+         if imgui.Button(u8"Основные", imgui.ImVec2(125, 25)) then tabmenu.hotkeys = 1 end
+         imgui.PopStyleColor()
+      else
+         if imgui.Button(u8"Основные", imgui.ImVec2(125, 25)) then tabmenu.hotkeys = 1 end
+      end
+      
+      imgui.SameLine()
+      if tabmenu.main == 2 then
+         imgui.PushStyleColor(imgui.Col.Button, imgui.GetStyle().Colors[imgui.Col.ButtonHovered])
+         if imgui.Button(u8"Функциональные (F2-F12)", imgui.ImVec2(185, 25)) then tabmenu.hotkeys = 2 end
+         imgui.PopStyleColor()
+      else
+         if imgui.Button(u8"Функциональные (F2-F12)", imgui.ImVec2(185, 25)) then tabmenu.hotkeys = 2 end
+      end
+      
+      imgui.PushItemWidth(270)
+      imgui.PushStyleVar(imgui.StyleVar.ItemSpacing, imgui.ImVec2(16, 4))
+      
+      if tabmenu.hotkeys == 1 then
+         if imgui.Combo(u8'Key J##ComboBoxhotkeyJaction', combobox.hotkeyJaction, 
+         hotkeysActivationList, #hotkeysActivationList) then
+            ini.hotkeyactions.keyJ = tostring(hotkeysActivationCmds[combobox.hotkeyJaction.v+1])
+            inicfg.save(ini, configIni)
+            sampAddChatMessage("[SCRIPT]: {FFFFFF}Выбрано действие - "..
+            u8:decode(tostring(hotkeysActivationList[combobox.hotkeyJaction.v+1])), 0x0FF6600)
+         end
+         
+         if imgui.Combo(u8'Key I##ComboBoxhotkeyIaction', combobox.hotkeyIaction, 
+         hotkeysActivationList, #hotkeysActivationList) then
+            ini.hotkeyactions.keyI = tostring(hotkeysActivationCmds[combobox.hotkeyIaction.v+1])
+            inicfg.save(ini, configIni)
+            sampAddChatMessage("[SCRIPT]: {FFFFFF}Выбрано действие - "..
+            u8:decode(tostring(hotkeysActivationList[combobox.hotkeyIaction.v+1])), 0x0FF6600)
+         end
+         
+         if imgui.Combo(u8'Key K##ComboBoxhotkeyKaction', combobox.hotkeyKaction, 
+         hotkeysActivationList, #hotkeysActivationList) then
+            ini.hotkeyactions.keyK = tostring(hotkeysActivationCmds[combobox.hotkeyKaction.v+1])
+            inicfg.save(ini, configIni)
+            sampAddChatMessage("[SCRIPT]: {FFFFFF}Выбрано действие - "..
+            u8:decode(tostring(hotkeysActivationList[combobox.hotkeyKaction.v+1])), 0x0FF6600)
+         end
+         
+         if imgui.Combo(u8'Key L##ComboBoxhotkeyLaction', combobox.hotkeyLaction, 
+         hotkeysActivationList, #hotkeysActivationList) then
+            ini.hotkeyactions.keyL = tostring(hotkeysActivationCmds[combobox.hotkeyLaction.v+1])
+            inicfg.save(ini, configIni)
+            sampAddChatMessage("[SCRIPT]: {FFFFFF}Выбрано действие - "..
+            u8:decode(tostring(hotkeysActivationList[combobox.hotkeyLaction.v+1])), 0x0FF6600)
+         end
+         
+         if imgui.Combo(u8'Key N##ComboBoxhotkeyNaction', combobox.hotkeyNaction, 
+         hotkeysActivationList, #hotkeysActivationList) then
+            ini.hotkeyactions.keyN = tostring(hotkeysActivationCmds[combobox.hotkeyNaction.v+1])
+            inicfg.save(ini, configIni)
+            sampAddChatMessage("[SCRIPT]: {FFFFFF}Выбрано действие - "..
+            u8:decode(tostring(hotkeysActivationList[combobox.hotkeyNaction.v+1])), 0x0FF6600)
+         end
+         
+         if imgui.Combo(u8'Key M##ComboBoxhotkeyMaction', combobox.hotkeyMaction, 
+         hotkeysActivationList, #hotkeysActivationList) then
+            ini.hotkeyactions.keyM = tostring(hotkeysActivationCmds[combobox.hotkeyMaction.v+1])
+            inicfg.save(ini, configIni)
+            sampAddChatMessage("[SCRIPT]: {FFFFFF}Выбрано действие - "..
+            u8:decode(tostring(hotkeysActivationList[combobox.hotkeyMaction.v+1])), 0x0FF6600)
+         end
+         
+         if imgui.Combo(u8'Key B##ComboBoxhotkeyBaction', combobox.hotkeyBaction, 
+         hotkeysActivationList, #hotkeysActivationList) then
+            ini.hotkeyactions.keyB = tostring(hotkeysActivationCmds[combobox.hotkeyBaction.v+1])
+            inicfg.save(ini, configIni)
+            sampAddChatMessage("[SCRIPT]: {FFFFFF}Выбрано действие - "..
+            u8:decode(tostring(hotkeysActivationList[combobox.hotkeyBaction.v+1])), 0x0FF6600)
+         end
+         
+         if imgui.Combo(u8'Key 0##ComboBoxhotkeyOaction', combobox.hotkeyOaction, 
+         hotkeysActivationList, #hotkeysActivationList) then
+            ini.hotkeyactions.keyO = tostring(hotkeysActivationCmds[combobox.hotkeyOaction.v+1])
+            inicfg.save(ini, configIni)
+            sampAddChatMessage("[SCRIPT]: {FFFFFF}Выбрано действие - "..
+            u8:decode(tostring(hotkeysActivationList[combobox.hotkeyOaction.v+1])), 0x0FF6600)
+         end
+         
+         if imgui.Combo(u8'Key P##ComboBoxhotkeyPaction', combobox.hotkeyPaction, 
+         hotkeysActivationList, #hotkeysActivationList) then
+            ini.hotkeyactions.keyP = tostring(hotkeysActivationCmds[combobox.hotkeyPaction.v+1])
+            inicfg.save(ini, configIni)
+            sampAddChatMessage("[SCRIPT]: {FFFFFF}Выбрано действие - "..
+            u8:decode(tostring(hotkeysActivationList[combobox.hotkeyPaction.v+1])), 0x0FF6600)
+         end
+         
+         if imgui.Combo(u8'Key R##ComboBoxhotkeyRaction', combobox.hotkeyRaction, 
+         hotkeysActivationList, #hotkeysActivationList) then
+            ini.hotkeyactions.keyR = tostring(hotkeysActivationCmds[combobox.hotkeyRaction.v+1])
+            inicfg.save(ini, configIni)
+            sampAddChatMessage("[SCRIPT]: {FFFFFF}Выбрано действие - "..
+            u8:decode(tostring(hotkeysActivationList[combobox.hotkeyRaction.v+1])), 0x0FF6600)
+         end
+
+         if imgui.Combo(u8'Key Z##ComboBoxhotkeyZaction', combobox.hotkeyZaction, 
+         hotkeysActivationList, #hotkeysActivationList) then
+            ini.hotkeyactions.keyZ = tostring(hotkeysActivationCmds[combobox.hotkeyZaction.v+1])
+            inicfg.save(ini, configIni)
+            sampAddChatMessage("[SCRIPT]: {FFFFFF}Выбрано действие - "..
+            u8:decode(tostring(hotkeysActivationList[combobox.hotkeyZaction.v+1])), 0x0FF6600)
+         end
+         
+         if imgui.Combo(u8'Key U##ComboBoxhotkeyUaction', combobox.hotkeyUaction, 
+         hotkeysActivationList, #hotkeysActivationList) then
+            ini.hotkeyactions.keyU = tostring(hotkeysActivationCmds[combobox.hotkeyUaction.v+1])
+            inicfg.save(ini, configIni)
+            sampAddChatMessage("[SCRIPT]: {FFFFFF}Выбрано действие - "..
+            u8:decode(tostring(hotkeysActivationList[combobox.hotkeyUaction.v+1])), 0x0FF6600)
+         end
+         
+      elseif tabmenu.hotkeys == 2 then
+         
+         if imgui.Combo(u8'Key F2##ComboBoxhotkeyF2action', combobox.hotkeyF2action, 
+         hotkeysActivationList, #hotkeysActivationList) then
+            ini.hotkeyactions.keyF2 = tostring(hotkeysActivationCmds[combobox.hotkeyF2action.v+1])
+            inicfg.save(ini, configIni)
+            sampAddChatMessage("[SCRIPT]: {FFFFFF}Выбрано действие - "..
+            u8:decode(tostring(hotkeysActivationList[combobox.hotkeyF2action.v+1])), 0x0FF6600)
+         end
+         
+         if imgui.Combo(u8'Key F3##ComboBoxhotkeyF3action', combobox.hotkeyF3action, 
+         hotkeysActivationList, #hotkeysActivationList) then
+            ini.hotkeyactions.keyF3 = tostring(hotkeysActivationCmds[combobox.hotkeyF3action.v+1])
+            inicfg.save(ini, configIni)
+            sampAddChatMessage("[SCRIPT]: {FFFFFF}Выбрано действие - "..
+            u8:decode(tostring(hotkeysActivationList[combobox.hotkeyF3action.v+1])), 0x0FF6600)
+         end
+         
+         if imgui.Combo(u8'Key F4##ComboBoxhotkeyF4action', combobox.hotkeyF4action, 
+         hotkeysActivationList, #hotkeysActivationList) then
+            ini.hotkeyactions.keyF4 = tostring(hotkeysActivationCmds[combobox.hotkeyF4action.v+1])
+            inicfg.save(ini, configIni)
+            sampAddChatMessage("[SCRIPT]: {FFFFFF}Выбрано действие - "..
+            u8:decode(tostring(hotkeysActivationList[combobox.hotkeyF4action.v+1])), 0x0FF6600)
+         end
+         
+         if imgui.Combo(u8'Key F5##ComboBoxhotkeyF5action', combobox.hotkeyF5action, 
+         hotkeysActivationList, #hotkeysActivationList) then
+            ini.hotkeyactions.keyF5 = tostring(hotkeysActivationCmds[combobox.hotkeyF5action.v+1])
+            inicfg.save(ini, configIni)
+            sampAddChatMessage("[SCRIPT]: {FFFFFF}Выбрано действие - "..
+            u8:decode(tostring(hotkeysActivationList[combobox.hotkeyF5action.v+1])), 0x0FF6600)
+         end
+         
+         if imgui.Combo(u8'Key F7##ComboBoxhotkeyF7action', combobox.hotkeyF7action, 
+         hotkeysActivationList, #hotkeysActivationList) then
+            ini.hotkeyactions.keyF7 = tostring(hotkeysActivationCmds[combobox.hotkeyF7action.v+1])
+            inicfg.save(ini, configIni)
+            sampAddChatMessage("[SCRIPT]: {FFFFFF}Выбрано действие - "..
+            u8:decode(tostring(hotkeysActivationList[combobox.hotkeyF7action.v+1])), 0x0FF6600)
+         end
+         
+         if imgui.Combo(u8'Key F9##ComboBoxhotkeyF9action', combobox.hotkeyF9action, 
+         hotkeysActivationList, #hotkeysActivationList) then
+            ini.hotkeyactions.keyF9 = tostring(hotkeysActivationCmds[combobox.hotkeyF9action.v+1])
+            inicfg.save(ini, configIni)
+            sampAddChatMessage("[SCRIPT]: {FFFFFF}Выбрано действие - "..
+            u8:decode(tostring(hotkeysActivationList[combobox.hotkeyF9action.v+1])), 0x0FF6600)
+         end
+         
+         if imgui.Combo(u8'Key F10##ComboBoxhotkeyF10action', combobox.hotkeyF10action, 
+         hotkeysActivationList, #hotkeysActivationList) then
+            ini.hotkeyactions.keyF10 = tostring(hotkeysActivationCmds[combobox.hotkeyF10action.v+1])
+            inicfg.save(ini, configIni)
+            sampAddChatMessage("[SCRIPT]: {FFFFFF}Выбрано действие - "..
+            u8:decode(tostring(hotkeysActivationList[combobox.hotkeyF10action.v+1])), 0x0FF6600)
+         end
+         
+         if imgui.Combo(u8'Key F11##ComboBoxhotkeyF11action', combobox.hotkeyF11action, 
+         hotkeysActivationList, #hotkeysActivationList) then
+            ini.hotkeyactions.keyF11 = tostring(hotkeysActivationCmds[combobox.hotkeyF11action.v+1])
+            inicfg.save(ini, configIni)
+            sampAddChatMessage("[SCRIPT]: {FFFFFF}Выбрано действие - "..
+            u8:decode(tostring(hotkeysActivationList[combobox.hotkeyF11action.v+1])), 0x0FF6600)
+         end
+         
+         if imgui.Combo(u8'Key F12##ComboBoxhotkeyF12action', combobox.hotkeyF12action, 
+         hotkeysActivationList, #hotkeysActivationList) then
+            ini.hotkeyactions.keyF12 = tostring(hotkeysActivationCmds[combobox.hotkeyF12action.v+1])
+            inicfg.save(ini, configIni)
+            sampAddChatMessage("[SCRIPT]: {FFFFFF}Выбрано действие - "..
+            u8:decode(tostring(hotkeysActivationList[combobox.hotkeyF12action.v+1])), 0x0FF6600)
+         end
+      end
+      imgui.PopStyleVar()
+      imgui.PopItemWidth()
+      
+      if imgui.Button(u8"Вернуть на стандартные",imgui.ImVec2(200, 25)) then
+         ini.hotkeyactions.keyJ = "/flymode"
+         ini.hotkeyactions.keyI = ""
+         ini.hotkeyactions.keyK = ""
+         ini.hotkeyactions.keyM = "/wm"
+         ini.hotkeyactions.keyL = "/lock"
+         ini.hotkeyactions.keyN = ""
+         ini.hotkeyactions.keyB = ""
+         ini.hotkeyactions.keyR = ""
+         ini.hotkeyactions.keyZ = ""
+         ini.hotkeyactions.keyU = "/animlist"
+         
+         ini.hotkeyactions.keyF2 = ""
+         ini.hotkeyactions.keyF3 = ""
+         ini.hotkeyactions.keyF4 = ""
+         ini.hotkeyactions.keyF5 = ""
+         ini.hotkeyactions.keyF7 = ""
+         ini.hotkeyactions.keyF9 = ""
+         ini.hotkeyactions.keyF10 = ""
+         ini.hotkeyactions.keyF11 = ""
+         ini.hotkeyactions.keyF12 = ""
+
+         inicfg.save(ini, configIni)
+         sampAddChatMessage("[SCRIPT]: {FFFFFF}Восстановлены стандартные значения", 0x0FF6600)
+      end
+      imgui.SameLine()
+      if imgui.TooltipButton(" << ", imgui.ImVec2(65, 25), u8"Свернуть") then
+         dialog.hotkeys.v = false
+      end
+      imgui.TextColoredRGB("{696969}Нет нужной клавиши? Воспользуйтесь биндером")
+            
+      imgui.End()
+   end
+   
    if dialog.txdlist.v then
       imgui.SetNextWindowPos(imgui.ImVec2(sizeX / 7, sizeY / 3),
       imgui.Cond.FirstUseEver, imgui.ImVec2(0.5, 0.5))
@@ -10892,8 +10936,8 @@ function sampev.onSendDialogResponse(dialogId, button, listboxId, input)
          ini.tmp.worldhoster = false
          inicfg.save(ini, configIni)
          lua_thread.create(function()
-            wait(250)
-            sampSendChat("/clearzone")
+            -- wait(250)
+            -- sampSendChat("/clearzone")
             wait(1000)
             dialoghook.exitdialog = false
          end)
@@ -11816,7 +11860,7 @@ function sampev.onShowDialog(dialogId, style, title, button1, button2, text)
                   lua_thread.create(function()
                      wait(200)
                      --sampSendDialogResponse(32700, 1, 11, "- Режим разработки")
-                     sampSendDialogResponse(32700, 1, 11, "- Development Mode")
+                     sampSendDialogResponse(32700, 1, 11, LastData.lastDialogInput)
                      sampCloseCurrentDialogWithButton(0)
                      dialoghook.devmenutoggle = false
                   end)
@@ -11824,9 +11868,8 @@ function sampev.onShowDialog(dialogId, style, title, button1, button2, text)
                
                if dialoghook.logstoggle then
                   lua_thread.create(function()
-                     wait(200)
-                     --sampSendDialogResponse(32700, 1, 7, "- Логи")
-                     sampSendDialogResponse(32700, 1, 7, "- Logs")
+                     wait(500)
+                     sampSendDialogResponse(32700, 1, 7, LastData.lastDialogInput)
                      sampCloseCurrentDialogWithButton(0)
                      dialoghook.logstoggle = false
                   end)
@@ -12623,6 +12666,10 @@ end
 function sampev.onSendCommand(command)
    LastData.lastCommand = command
    
+   if checkbox.logcommands.v then
+      print(string.format("send command: %s", command))
+   end
+   
    -- ignore triggering on world custom commands like //menu
    if isTrainingSandbox and command:find("//") then
       return {command}
@@ -12722,6 +12769,20 @@ function sampev.onSendCommand(command)
    if isTrainingSandbox then
       if command:find("^/jp$") then
          sampSendChat("/jetpack")
+      end
+   end
+   
+   if isTrainingSandbox then
+      if command:find("^/wm$") then -- ex M key menu /vw and /world 
+         if not sampIsDialogActive() and not isPauseMenuActive() 
+         and not isSampfuncsConsoleActive() then 
+            if playerdata.isWorldHoster then 
+               sampSendChat("/vw")
+            else 
+               sampSendChat("/world")
+            end  
+         end
+         return false
       end
    end
    
@@ -13643,8 +13704,11 @@ function sampev.onSendCommand(command)
    end
    
    if isTrainingSandbox and command:find("^/oedit") then
-      edit.mode = 1
-      return true
+      if not isCharInAnyCar(playerPed) then
+         edit.mode = 1
+         return true
+      end
+      return false
    end
    
    if isTrainingSandbox and command:find("^/spint") then
@@ -15207,6 +15271,10 @@ function sampev.onTextDrawSetString(id, text)
    end
 end
 
+function sampev.onSetCheckpoint(position, radius)
+   LastData.lastCheckpointPos = position
+end
+
 function sampev.onSetMapIcon(iconId, position, type, color, style)
    
    table.insert(streamedMapIcons, {iconId = iconId, position = position, type = type, color = color, style = style})
@@ -15729,6 +15797,14 @@ function hotkeyActionInit()
       for index, value in pairs(hotkeysActivationCmds) do
          if value:find(tostring(ini.hotkeyactions.keyN)) then
             combobox.hotkeyNaction.v = index-1
+         end
+      end
+   end
+   
+   if ini.hotkeyactions.keyM ~= nil and string.len(ini.hotkeyactions.keyM) > 1 then
+      for index, value in pairs(hotkeysActivationCmds) do
+         if value:find(tostring(ini.hotkeyactions.keyM)) then
+            combobox.hotkeyMaction.v = index-1
          end
       end
    end
