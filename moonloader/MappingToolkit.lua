@@ -3,7 +3,7 @@ script_description("Assistant for mappers")
 script_dependencies('imgui', 'lib.samp.events')
 script_properties("work-in-pause")
 script_url("https://github.com/ins1x/MappingToolkit")
-script_version("4.22") -- RC 1
+script_version("4.22") -- RC 2
 -- support sa-mp versions depends on SAMPFUNCS (0.3.7-R1, 0.3.7-R3-1, 0.3.7-R5, 0.3.DL)
 -- script_moonloader(16) moonloader v.0.26 
 -- editor options: tabsize 3, Unix (LF), encoding Windows-1251
@@ -175,7 +175,7 @@ local ini = inicfg.load({
       imguifontsize = 14.0,
       imguitheme = 1,
       imguiwindowalign = 0,
-      imguiantialiasingstyle = 0,
+      imguiantialiasing = false,
       movetabwindow = true,
       multilinefont = "trebucbd",
       multilinefontsize = 13.0,
@@ -412,6 +412,9 @@ local checkbox = {
    panelshoweditdata = imgui.ImBool(ini.panel.showlastobject),
    panelshowlastcb = imgui.ImBool(ini.panel.showlastcb),
    
+   imguiantialiasing = imgui.ImBool(ini.ui.imguiantialiasing),
+   movetabwindow = imgui.ImBool(ini.ui.movetabwindow),
+   
    usecolor = imgui.ImBool(ini.mentions.usecolor),
    usesound = imgui.ImBool(ini.mentions.usesound),
    usegametext = imgui.ImBool(ini.mentions.usegametext),
@@ -512,6 +515,8 @@ local checkbox = {
    cordlineseparator = imgui.ImBool(false),
    charanimspeed = imgui.ImBool(false),
    unsafeteleport = imgui.ImBool(false),
+   showbottompanelsettings = imgui.ImBool(false),
+   showthemesettings = imgui.ImBool(false),
    test = imgui.ImBool(false)
 }
 
@@ -829,14 +834,16 @@ local hotkeysActivationList = {
    u8"Сохранить мир", u8"Загрузить мир", u8"Список комадных блоков",
    u8"Повернуть объект на 90", u8"Повернуть объект на 45",
    u8"Скрыть/Показать нижнюю панель", u8"Открыть список миров", 
-   u8"Открыть меню мира"
+   u8"Открыть меню мира", u8"Остановить анимацию", u8"Очистить анимации",
+   u8"Отменить редактирование"
 }
 
 local hotkeysActivationCmds = {
    "", "/jump", "/spawnme", "/slapme", "/jetpack", "/veh 481", "/weapon",
    "/veh", "/flymode", "/spec", "/oedit", "/csel", "/omenu", "/oinfo",
    "/animlist", "/cb", "/lock", "/fix", "/vmenu", "/savevw", "/loadvw",
-   "/cblist", "/rot", "/rot 45", "/panel", "/list", "/wm"
+   "/cblist", "/rot", "/rot 45", "/panel", "/list", "/wm", "/stopanim",
+   "/clearanims", "/canceledit"   
 }
 
 local chatPrefixList = {
@@ -4634,6 +4641,8 @@ function imgui.OnDrawFrame()
          
          if imgui.Checkbox(u8"Авто-очистка streaming memory", checkbox.streammemmax) then 
             if checkbox.streammemmax.v then
+               sampAddChatMessage("[SCRIPT]: {FFFFFF}Функция авто-очистки может давать различные коллиззии и баги отображения", 0x0FF6600)
+               sampAddChatMessage("[SCRIPT]: {FFFFFF}Рекомендуется не использовать на постоянной основе, а только в тестовых целях", 0x0FF6600)
                input.streammemmax.v = 400
             else
                input.streammemmax.v = 0
@@ -6722,9 +6731,13 @@ function imgui.OnDrawFrame()
          
          if imgui.CollapsingHeader(u8"Интерфейс:") then
             
-            imgui.Text(u8"Выбрана тема:")
+            if imgui.TooltipButton(u8" ? ", imgui.ImVec2(25, 25), u8:encode("Онлайн справка по настройкам интерфейса в конфиге")) then
+               os.execute('explorer "https://github.com/ins1x/MappingToolkit/wiki/%D0%9A%D0%BE%D0%BD%D1%84%D0%B8%D0%B3%D1%83%D1%80%D0%B0%D1%86%D0%B8%D1%8F#%D0%BD%D0%B0%D1%81%D1%82%D1%80%D0%BE%D0%B9%D0%BA%D0%B8-%D0%B8%D0%BD%D1%82%D0%B5%D1%80%D1%84%D0%B5%D0%B9%D1%81%D0%B0-imgui"')
+            end
             imgui.SameLine()
-            imgui.PushItemWidth(120)
+            imgui.Text(u8"Выбрана тема")
+            imgui.SameLine()
+            imgui.PushItemWidth(110)
             if imgui.Combo(u8'##imguitheme', combobox.imguitheme, imguiThemeNames) then
                ini.ui.imguitheme = combobox.imguitheme.v
                inicfg.save(ini, configIni)
@@ -6736,9 +6749,9 @@ function imgui.OnDrawFrame()
             imgui.SameLine()
             imgui.Text(u8"    ")
             imgui.SameLine()
-            imgui.Text(u8"Выбран шрифт:")
+            imgui.Text(u8"Выбран шрифт")
             imgui.SameLine()
-            imgui.PushItemWidth(120)
+            imgui.PushItemWidth(140)
             if imgui.Combo(u8'##uifontselect', combobox.uifontselect, uiFontsList) then
                ini.ui.imguifont = tostring(uiFontsFilenames[combobox.uifontselect.v + 1])
                inicfg.save(ini, configIni)
@@ -6746,6 +6759,44 @@ function imgui.OnDrawFrame()
                sampAddChatMessage("[SCRIPT]: {FFFFFF}Перезапустите тулкит чтобы увидеть изменения", 0x0FF6600)
             end
             imgui.PopItemWidth()
+            
+            if imgui.TooltipButton(u8(checkbox.showthemesettings.v and 'Скрыть' or 'Показать')..u8" все настройки темы", imgui.ImVec2(250, 25), u8"Отобразить все настройки нижней панели") then
+               checkbox.showthemesettings.v = not checkbox.showthemesettings.v 
+            end
+            imgui.SameLine()
+            imgui.PushStyleColor(imgui.Col.Button, imgui.ImVec4(0.2, 0.0, 0.0, 1.0))
+            if imgui.TooltipButton(u8"Сбросить все настройки темы", 
+            imgui.ImVec2(220, 25), u8"Сбросит все настройки темы на стандартные") then
+               ini.ui.imguifont = "trebucbd"
+               ini.ui.imguifontsize = 14.0
+               ini.ui.imguitheme = 0
+               ini.ui.imguiwindowalign = 0
+               ini.ui.imguiantialiasing = false
+               ini.ui.movetabwindow = true
+               ini.ui.multilinefont = "trebucbd"
+               ini.ui.multilinefontsize = 13.0
+               ini.ui.windowsizex = 640
+               ini.ui.windowsizey = 440
+               inicfg.save(ini, configIni)
+               apply_custom_style()
+               sampAddChatMessage("[SCRIPT]: {FFFFFF}Выбрана тема - "..tostring(imguiThemeNames[combobox.imguitheme.v+1]), 0x0FF6600)
+               sampAddChatMessage("[SCRIPT]: {FFFFFF}Выбрана шрифт - "..tostring(uiFontsList[combobox.uifontselect.v + 1]), 0x0FF6600)
+               sampAddChatMessage("[SCRIPT]: {FFFFFF}Тулкит перезапущен чтобы применить изменения", 0x0FF6600)
+               thisScript():reload()
+            end
+            imgui.PopStyleColor()
+            
+            if checkbox.showthemesettings.v then
+               if imgui.Checkbox(u8'Включить anti-aliasing', checkbox.imguiantialiasing) then
+                  ini.ui.imguiantialiasing = checkbox.imguiantialiasing.v
+                  inicfg.save(ini, configIni)
+               end
+            
+               if imgui.Checkbox(u8'Разрешить перемещать окна', checkbox.movetabwindow) then
+                  ini.ui.movetabwindow = checkbox.movetabwindow.v
+                  inicfg.save(ini, configIni)
+               end
+            end
             
             imgui.Text(u8"Нижняя панель:")
             if imgui.Checkbox(u8'Показывать дополнительную нижнюю панель', checkbox.showpanel) then
@@ -6755,52 +6806,57 @@ function imgui.OnDrawFrame()
             imgui.SameLine()
             imgui.TextQuestion("( ? )", u8"Отображать панель с различной информацие внизу экрана")
             
-            if imgui.Checkbox(u8'Показывать темный фон для нижней панели', checkbox.panelbackground) then
-               ini.panel.background = checkbox.panelbackground.v
-               inicfg.save(ini, configIni)
-            end
-            imgui.SameLine()
-            imgui.TextQuestion("( ? )", u8"Отображать темный фон на нижней панели")
-            
-            if imgui.Checkbox(u8'Показывать счетчик FPS на нижней панели', checkbox.panelshowfps) then
-               ini.panel.showfps = checkbox.panelshowfps.v
-               inicfg.save(ini, configIni)
-            end
-
-            if imgui.Checkbox(u8'Показывать счетчик объектов на нижней панели', checkbox.panelshowstreamedobj) then
-               ini.panel.showstreameddynobjects = checkbox.panelshowstreamedobj.v
-               inicfg.save(ini, configIni)
+            if imgui.TooltipButton(u8(checkbox.showbottompanelsettings.v and 'Скрыть' or 'Показать')..u8" настройки нижней панели", imgui.ImVec2(250, 25), u8"Отобразить все настройки нижней панели") then
+               checkbox.showbottompanelsettings.v = not checkbox.showbottompanelsettings.v 
             end
             
-            if imgui.Checkbox(u8'Показывать счетчик транспорта в стриме на нижней панели', checkbox.panelshowstreamedvehs) then
-               ini.panel.showstreamedvehs = checkbox.panelshowstreamedvehs.v
-               inicfg.save(ini, configIni)
-               if checkbox.panelshowstreamedvehs.v then
-                  sampAddChatMessage("[SCRIPT]: {FFFFFF}Данная опция может снижать FPS!", 0x0FF6600)
+            if checkbox.showbottompanelsettings.v then
+               if imgui.Checkbox(u8'Показывать темный фон для нижней панели', checkbox.panelbackground) then
+                  ini.panel.background = checkbox.panelbackground.v
+                  inicfg.save(ini, configIni)
+               end
+               imgui.SameLine()
+               imgui.TextQuestion("( ? )", u8"Отображать темный фон на нижней панели")
+               
+               if imgui.Checkbox(u8'Показывать счетчик FPS на нижней панели', checkbox.panelshowfps) then
+                  ini.panel.showfps = checkbox.panelshowfps.v
+                  inicfg.save(ini, configIni)
+               end
+               
+               if imgui.Checkbox(u8'Показывать счетчик объектов на нижней панели', checkbox.panelshowstreamedobj) then
+                  ini.panel.showstreameddynobjects = checkbox.panelshowstreamedobj.v
+                  inicfg.save(ini, configIni)
+               end
+               
+               if imgui.Checkbox(u8'Показывать счетчик транспорта в стриме на нижней панели', checkbox.panelshowstreamedvehs) then
+                  ini.panel.showstreamedvehs = checkbox.panelshowstreamedvehs.v
+                  inicfg.save(ini, configIni)
+                  if checkbox.panelshowstreamedvehs.v then
+                     sampAddChatMessage("[SCRIPT]: {FFFFFF}Данная опция может снижать FPS!", 0x0FF6600)
+                  end
+               end
+               
+               if imgui.Checkbox(u8'Показывать счетчик игроков в стриме на нижней панели', checkbox.panelshowstreamedplayers) then
+                  ini.panel.showstreamedplayers = checkbox.panelshowstreamedplayers.v
+                  inicfg.save(ini, configIni)
+               end
+               
+               if imgui.Checkbox(u8'Показывать XY координаты курсора на нижней панели', checkbox.panelshowcursorpos) then
+                  ini.panel.showcursorpos = checkbox.panelshowcursorpos.v
+                  inicfg.save(ini, configIni)
+               end
+               
+               if imgui.Checkbox(u8'Показывать информацию о текущем объекте (id, model, txd)', checkbox.panelshoweditdata) then
+                  ini.panel.showlasttxd = checkbox.panelshoweditdata.v
+                  ini.panel.showlastobject = checkbox.panelshoweditdata.v
+                  inicfg.save(ini, configIni)
+               end
+               
+               if imgui.Checkbox(u8'Показывать информацию о последнем КБ', checkbox.panelshowlastcb) then
+                  ini.panel.showlastcb = checkbox.panelshowlastcb.v
+                  inicfg.save(ini, configIni)
                end
             end
-            
-            if imgui.Checkbox(u8'Показывать счетчик игроков в стриме на нижней панели', checkbox.panelshowstreamedplayers) then
-               ini.panel.showstreamedplayers = checkbox.panelshowstreamedplayers.v
-               inicfg.save(ini, configIni)
-            end
-            
-            if imgui.Checkbox(u8'Показывать XY координаты курсора на нижней панели', checkbox.panelshowcursorpos) then
-               ini.panel.showcursorpos = checkbox.panelshowcursorpos.v
-               inicfg.save(ini, configIni)
-            end
-            
-            if imgui.Checkbox(u8'Показывать информацию о текущем объекте (id, model, txd)', checkbox.panelshoweditdata) then
-               ini.panel.showlasttxd = checkbox.panelshoweditdata.v
-               ini.panel.showlastobject = checkbox.panelshoweditdata.v
-               inicfg.save(ini, configIni)
-            end
-            
-            if imgui.Checkbox(u8'Показывать информацию о последнем КБ', checkbox.panelshowlastcb) then
-               ini.panel.showlastcb = checkbox.panelshowlastcb.v
-               inicfg.save(ini, configIni)
-            end
-            
             imgui.Text(u8"Прочее:")
             if imgui.Checkbox(u8'Показывать ID над HUD', checkbox.showidonhud) then
                ini.settings.showidonhud = checkbox.showidonhud.v
@@ -6868,6 +6924,15 @@ function imgui.OnDrawFrame()
             imgui.SameLine()
             imgui.TextQuestion("( ? )", u8"Будет уведомлять о недопустимых параметрах КБ в мире (Используйте для тестов мира)")
             
+            if isTrainingSandbox then
+               if imgui.Checkbox(u8'Скрывать всплывающие подсказки о системах транспорта', checkbox.skipvehnotify) then
+                  ini.settings.skipvehnotify = checkbox.skipvehnotify.v
+                  inicfg.save(ini, configIni)
+               end
+               imgui.SameLine()
+               imgui.TextQuestion("( ? )", u8"Скрывает всплывающие подсказки внизу экрана при переключении опций транспорта")
+            end
+               
             imgui.Spacing()
             imgui.Text(u8"Уведомления при упоминании вас в чате:")
             if imgui.Checkbox(u8("Уведомлять при упоминании по ID либо Никнейму в чате"), checkbox.chatmentions) then
@@ -6889,15 +6954,6 @@ function imgui.OnDrawFrame()
                   ini.mentions.usecolor = checkbox.usecolor.v
                   inicfg.save(ini, configIni)
                end
-               
-               if isTrainingSandbox then
-                  if imgui.Checkbox(u8'Скрывать всплывающие подсказки о системах транспорта', checkbox.skipvehnotify) then
-                     ini.settings.skipvehnotify = checkbox.skipvehnotify.v
-                     inicfg.save(ini, configIni)
-                  end
-               end
-               imgui.SameLine()
-               imgui.TextQuestion("( ? )", u8"Скрывает всплывающие подсказки внизу экрана при переключении опций транспорта")
             end
             imgui.Spacing()
          end
@@ -7132,6 +7188,18 @@ function imgui.OnDrawFrame()
             if imgui.Button(u8"Reconnect (15 сек)", imgui.ImVec2(200, 25)) then
                Recon(15500)
             end
+            
+            imgui.PushStyleColor(imgui.Col.Button, imgui.ImVec4(1.0, 0.0, 0.0, 1.0))
+            if imgui.Button(u8"Отключиться", imgui.ImVec2(200, 25)) then
+               sampDisconnectWithReason(1)
+            end
+            imgui.PopStyleColor()
+            imgui.SameLine()
+            imgui.PushStyleColor(imgui.Col.Button, imgui.ImVec4(0.0, 0.5, 0.0, 1.0))
+            if imgui.Button(u8"Подключиться", imgui.ImVec2(200, 25)) then
+               sampSetGamestate(1)
+            end
+            imgui.PopStyleColor()
             
             imgui.Text(u8'Текущий Gamestate: '..gamestates[sampGetGamestate() + 1])
             imgui.PushItemWidth(120)
@@ -11479,6 +11547,14 @@ function sampev.onShowDialog(dialogId, style, title, button1, button2, text)
             return {dialogId, style, title, button1, button2, newtext}
          end
          
+         if text:find('Аудиопоток:') then
+            LastData.lastLink = 'https://www.myinstants.com/ru/index/by/'
+            local newtext = "{FFFFFF}".. text .. 
+            "\nБиблиотека звуков: {007FFF}" .. LastData.lastLink ..
+            "\n{696969}Нажмите CTRL + SHIFT + L чтобы открыть ссылку в браузере\n"
+            return {dialogId, style, title, button1, button2, newtext}
+         end
+         
          if text:find('Создать взрыв:') then
             LastData.lastLink = 'https://pawnokit.ru/ru/explosions_id'
             local newtext = "{FFFFFF}".. text .. 
@@ -12774,8 +12850,8 @@ function sampev.onSendCommand(command)
    
    if isTrainingSandbox then
       if command:find("^/wm$") then -- ex M key menu /vw and /world 
-         if not sampIsDialogActive() and not isPauseMenuActive() 
-         and not isSampfuncsConsoleActive() then 
+         if not sampIsChatInputActive() and not sampIsDialogActive() 
+         and not isPauseMenuActive() and not isSampfuncsConsoleActive() then 
             if playerdata.isWorldHoster then 
                sampSendChat("/vw")
             else 
@@ -13068,7 +13144,12 @@ function sampev.onSendCommand(command)
       enterEditObject()
       return false
    end
-
+   
+   if command:find("^/canceledit$") then
+      cancelEdit()
+      return false
+   end
+   
    if isTrainingSandbox and command:find("^/otext") then
       if command:find('(/%a+) (.+)') then
          local cmd, arg = command:match('(/%a+) (.+)')
@@ -14375,6 +14456,14 @@ function sampev.onSendCommand(command)
             return false
          end
       end
+   end
+   
+   if command:find("^/clearanims") then
+      local x, y, z = getCharCoordinates(playerPed)
+      setCharCoordinates(playerPed, x, y, z - 1)
+      freezeCharPosition(PLAYER_PED, false)
+      lockPlayerControl(false)
+      return false
    end
    
    if command:find("^/picker") then
@@ -16693,6 +16782,7 @@ function imgui.closeDialogs()
    if dialog.dialogtext.v then dialog.dialogtext.v = false end
    if dialog.txdlist.v then dialog.txdlist.v = false end
    if dialog.toolkitmanage.v then dialog.toolkitmanage.v = false end
+   if dialog.hotkeys.v then dialog.hotkeys.v = false end
    
    -- if tabmenu.main == 2 then -- durtyfix tab unfolding
       -- tabmenu.main = 1
@@ -17413,7 +17503,7 @@ function apply_custom_style()
    style.GrabMinSize = 5.0 -- Minimum width/height of a grab box for slider/scrollbar.
    style.GrabRounding = 3.0 -- Radius of grabs corners rounding. Set to 0.0f to have rectangular slider grabs.
    
-   if not ini.ui.imguiantialiasingstyle then
+   if not ini.ui.imguiantialiasing then
       style.AntiAliasedLines = false -- Enable anti-aliasing on lines/borders. Disable if you are really tight on CPU/GPU.
       style.AntiAliasedShapes = false -- Enable anti-aliasing on filled shapes (rounded rectangles, circles, etc.)
    end
