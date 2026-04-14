@@ -3,7 +3,7 @@ script_description("Assistant for mappers")
 script_dependencies('imgui', 'lib.samp.events')
 script_properties("work-in-pause")
 script_url("https://github.com/ins1x/MappingToolkit")
-script_version("4.22") -- RC 3
+script_version("4.22") -- Release
 -- support sa-mp versions depends on SAMPFUNCS (0.3.7-R1, 0.3.7-R3-1, 0.3.7-R5, 0.3.DL)
 -- script_moonloader(16) moonloader v.0.26 
 -- editor options: tabsize 3, Unix (LF), encoding Windows-1251
@@ -157,6 +157,7 @@ local ini = inicfg.load({
       background = true,
       fontname = "Tahoma",
       fontsize = 7,
+      headingangle = false,
       showpanel = false,
       position = 0, -- position (0 = bottom pos, 1 = upper pos)
       showfps = true,
@@ -403,6 +404,7 @@ local checkbox = {
    oldlistdialog = imgui.ImBool(ini.settings.oldlistdialog),
    
    showpanel = imgui.ImBool(ini.panel.showpanel),
+   panelheadingangle = imgui.ImBool(ini.panel.headingangle),
    panelbackground = imgui.ImBool(ini.panel.background),
    panelshowfps = imgui.ImBool(ini.panel.showfps),
    panelshowstreamedobj = imgui.ImBool(ini.panel.showstreameddynobjects),
@@ -2012,6 +2014,10 @@ function main()
                local cursorPosX, cursorPosY = getCursorPos()
                rendertext = rendertext.." | {3f70d6}X: "..cursorPosX.." {e0364e}Y: "..cursorPosY.."{FFFFFF}"
             end
+         end
+         
+         if ini.panel.headingangle then
+            rendertext = rendertext.." | "..math.ceil(getCharHeading(playerPed)).."°"
          end
          
          if ini.panel.showmode then
@@ -4100,7 +4106,7 @@ function imgui.OnDrawFrame()
             sampAddChatMessage("[SCRIPT]: {FFFFFF}Позиция скопирована в буффер обмена", 0x0FF6600)
          end
          local rX, rY, rZ = getActiveCameraPointAt()
-         imgui.TextColoredRGB(string.format("Камера смотрит на точку {007DFF}rx: %.2f, {e0364e}ry: %.2f, {26b85d}rz: %.2f",
+         imgui.TextColoredRGB(string.format("Смотрит на точку {007DFF}rx: %.2f, {e0364e}ry: %.2f, {26b85d}rz: %.2f",
          rX, rY, rZ))
            if imgui.IsItemClicked() then
             setClipboardText(string.format(u8"%.4f, %.4f, %.4f", rX, rY, rZ))
@@ -4164,12 +4170,20 @@ function imgui.OnDrawFrame()
          imgui.PopStyleVar()
          imgui.Spacing()
          
-         if imgui.Button(u8">> Вернуть камеру <<", imgui.ImVec2(150, 25)) then
+         if imgui.TooltipButton(u8">> Вернуть камеру <<", imgui.ImVec2(150, 25), u8"Возвразает камеру на стандартные параметры") then
             if checkbox.fixcampos.v then checkbox.fixcampos.v = false end
-            sampAddChatMessage("[SCRIPT]: {FFFFFF}Камера возвращена на исходные", 0x0FF6600)
             restoreCamera()
             restoreCameraJumpcut()
             setCameraBehindPlayer()
+            sampAddChatMessage("[SCRIPT]: {FFFFFF}Камера возвращена на исходные", 0x0FF6600)
+         end
+         imgui.SameLine()
+         if imgui.TooltipButton(u8"Авто-поворот", imgui.ImVec2(150, 25), u8"Автоматически повернет игрока на ближайшее направление") then
+            local angle = math.ceil(getCharHeading(playerPed))
+            --local fixangle = 360/8 * math.floor(angle/45)
+            local fixangle = 360/4 * math.floor(angle/90)
+            setCharHeading(playerPed, fixangle)
+            sampAddChatMessage(string.format("[SCRIPT]: {FFFFFF}Направление скорректировано на {1e90ff}%s (%i° -> %i°)", u8:decode(direction()), angle, fixangle), 0x0FF6600)
          end
          
          if imgui.CollapsingHeader(u8"Зафиксированная камера") then
@@ -6939,6 +6953,11 @@ function imgui.OnDrawFrame()
                
                if imgui.Checkbox(u8'Показывать счетчик FPS на нижней панели', checkbox.panelshowfps) then
                   ini.panel.showfps = checkbox.panelshowfps.v
+                  inicfg.save(ini, configIni)
+               end
+               
+               if imgui.Checkbox(u8'Показывать угол поворота на нижней панели', checkbox.panelheadingangle) then
+                  ini.panel.headingangle = checkbox.panelheadingangle.v
                   inicfg.save(ini, configIni)
                end
                
