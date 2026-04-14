@@ -3,7 +3,7 @@ script_description("Assistant for mappers")
 script_dependencies('imgui', 'lib.samp.events')
 script_properties("work-in-pause")
 script_url("https://github.com/ins1x/MappingToolkit")
-script_version("4.22") -- RC 2
+script_version("4.22") -- RC 3
 -- support sa-mp versions depends on SAMPFUNCS (0.3.7-R1, 0.3.7-R3-1, 0.3.7-R5, 0.3.DL)
 -- script_moonloader(16) moonloader v.0.26 
 -- editor options: tabsize 3, Unix (LF), encoding Windows-1251
@@ -191,6 +191,7 @@ local ini = inicfg.load({
       sadstext = "",
       searchbar = "",
       disconnecttime = 0,
+      lastupdatecheck = nil
    }
 }, configIni)
 inicfg.save(ini, configIni)
@@ -514,9 +515,15 @@ local checkbox = {
    cordlinedatetime = imgui.ImBool(false),
    cordlineseparator = imgui.ImBool(false),
    charanimspeed = imgui.ImBool(false),
+   autowalk = imgui.ImBool(false), 
+   autowalkrun = imgui.ImBool(false),
    unsafeteleport = imgui.ImBool(false),
    showbottompanelsettings = imgui.ImBool(false),
    showthemesettings = imgui.ImBool(false),
+   orbitcam = imgui.ImBool(false),
+   sideborders = imgui.ImBool(false),
+   verticalborders = imgui.ImBool(false),
+   camparams = imgui.ImBool(false),
    test = imgui.ImBool(false)
 }
 
@@ -527,7 +534,7 @@ local input = {
    txdselected = false,
    camdelay = imgui.ImInt(5000),
    camshake = imgui.ImInt(500),
-   charanimspeed = imgui.ImInt(5),
+   charanimspeed = imgui.ImInt(2),
    gametexttime = imgui.ImInt(5000),
    hideobjectid = imgui.ImInt(615),
    mdomodel = imgui.ImInt(0),
@@ -557,6 +564,11 @@ local input = {
    txdobject = imgui.ImInt(0),
    pickupid = imgui.ImInt(0),
    streamdist = imgui.ImFloat(200.0),
+   orbitradius = imgui.ImFloat(5.0),
+   orbitheight = imgui.ImFloat(2.0),
+   orbitspeed = imgui.ImFloat(0.012),
+   orbitstartheading = imgui.ImFloat(0.0),
+   orbitangle = imgui.ImFloat(0.0),
    renderfontsize = imgui.ImInt(ini.settings.renderfontsize),
    reminderdelay = imgui.ImInt(ini.settings.reminderdelay),
    cbdefaultradius = imgui.ImFloat(ini.settings.cbdefaultradius),
@@ -1261,12 +1273,42 @@ function main()
       end
       
       if ini.settings.checkupdates then
-         checkScriptUpdates()
+         if ini.tmp.lastupdatecheck then
+            if os.time() > ini.tmp.lastupdatecheck + 86400 then
+               checkScriptUpdates()
+               ini.tmp.lastupdatecheck = os.time()
+            end
+         else
+            ini.tmp.lastupdatecheck = os.time()
+         end
       end
 
       --- END init
       while true do
       wait(0)
+      
+      if checkbox.autowalk.v then
+         if not sampIsChatInputActive() and not sampIsDialogActive()
+         and not isPauseMenuActive() and not isSampfuncsConsoleActive() then
+            setVirtualKeyDown(0x57, true) -- key W
+            if not checkbox.autowalkrun.v then
+               setVirtualKeyDown(0xA4, true) -- key LALT
+            end
+         else
+            checkbox.autowalk.v = false
+            checkbox.autowalkrun.v = false
+            setVirtualKeyDown(0x57, false) -- key W
+            setVirtualKeyDown(0xA4, false) -- key LALT
+         end
+         
+         -- shift or space or tab key
+         if isKeyJustPressed(0x10) or isKeyJustPressed(0x20) or isKeyJustPressed(0x09) then
+            checkbox.autowalk.v = false
+            checkbox.autowalkrun.v = false
+            setVirtualKeyDown(0x57, false) -- key W
+            setVirtualKeyDown(0xA4, false) -- key LALT
+         end
+      end
       
       -- Speed up player run
       if checkbox.charanimspeed.v then
@@ -1337,19 +1379,17 @@ function main()
       imgui.Process = dialog.main.v
       
       -- chatfix
-      if isTrainingSandbox then
-         if isKeyJustPressed(0x54) 
-         and not sampIsScoreboardOpen() 
-         and not isSampfuncsConsoleActive() then
-            if sampIsDialogActive() then
-               local dialogType = sampGetCurrentDialogType()
-               -- if not DIALOG_STYLE_INPUT and DIALOG_STYLE_PASSWORD
-               if dialogType ~= 1 and dialogType ~= 3 then
-                  sampSetChatInputEnabled(true)
-               end
-            else
+      if isKeyJustPressed(0x54) 
+      and not sampIsScoreboardOpen() 
+      and not isSampfuncsConsoleActive() then
+         if sampIsDialogActive() then
+            local dialogType = sampGetCurrentDialogType()
+            -- if not DIALOG_STYLE_INPUT and DIALOG_STYLE_PASSWORD
+            if dialogType ~= 1 and dialogType ~= 3 then
                sampSetChatInputEnabled(true)
             end
+         else
+            sampSetChatInputEnabled(true)
          end
       end
       
@@ -1828,6 +1868,38 @@ function main()
             cleanStreamMemory()
             sampAddChatMessage("[SCRIPT]: {FFFFFF}Low memory detected. Streaming memory cleaned", 0x0FF6600)
          end
+      end
+      
+      if checkbox.orbitcam.v and not playerdata.flymode and doesCharExist(playerPed) then
+         local px, py, pz = getCharCoordinates(playerPed)
+         local camX = px + input.orbitradius.v * math.cos(input.orbitangle.v)
+         local camY = py + input.orbitradius.v * math.sin(input.orbitangle.v)
+         local camZ = pz + input.orbitradius.v
+         setFixedCameraPosition(camX, camY, camZ, 0.0, 0.0, 0.0)
+         pointCameraAtPoint(px, py, pz + 0.8, 2)
+         input.orbitangle.v = input.orbitangle.v + input.orbitspeed.v
+         if input.orbitangle.v > math.pi * 2 then input.orbitangle.v = 0 end
+         setCharHeading(playerPed, input.orbitstartheading.v)
+      end
+      
+      if checkbox.sideborders.v then
+         local sw, sh = getScreenResolution()
+         local target_w = (sh * 9) / 16
+         -- local target_w = (sh * 4) / 3
+         local diff = sw - target_w
+         
+         if diff > 0 then
+            local bar_w = math.ceil(diff / 2) + 2
+            renderDrawBox(-5, -5, bar_w + 5, sh + 10, 0xFF000000)
+            renderDrawBox(sw - bar_w, -5, bar_w + 5, sh + 10, 0xFF000000)
+         end
+      end
+      
+      if checkbox.verticalborders.v then
+         local sw, sh = getScreenResolution()
+         local bordersize = sh/100 * 5.5
+         renderDrawBox(0, 0, sw, bordersize, 0xFF000000)
+         renderDrawBox(0, sh-bordersize, sw, bordersize, 0xFF000000)
       end
       
       if playerdata.flymode then
@@ -2693,11 +2765,39 @@ function imgui.OnDrawFrame()
             imgui.SameLine()
             imgui.Text(u8"x")
             imgui.SameLine()
-            imgui.PushItemWidth(100)
-            if imgui.InputInt(u8'##INPUT_charanimspeed', input.charanimspeed, 1, 100) then
+            imgui.PushItemWidth(90)
+            if imgui.InputInt(u8'##INPUT_charanimspeed', input.charanimspeed, 1, 50) then
                if input.charanimspeed.v < 1 then
                   input.charanimspeed.v = 1
                end                  
+            end
+            
+            if imgui.Checkbox(u8"AutoWalk", checkbox.autowalk) then
+               -- if checkbox.autowalk.v then
+                  -- sampAddChatMessage("[SCRIPT]: {FFFFFF}Чтобы выйти из режима авто-походки нажмите {FF6600}SHIFT{FFFFFF} либо {FF6600}SPACE", 0x0FF6600)
+               -- end
+               setVirtualKeyDown(0x57, false) -- key W
+               setVirtualKeyDown(0xA4, false) -- key LALT
+            end
+            imgui.SameLine()
+            imgui.TextQuestion("( ? )", u8"Включает режим авто-походки (ALT + W)")
+            imgui.SameLine()
+            if imgui.Checkbox(u8"AutoRun", checkbox.autowalkrun) then
+               if not checkbox.autowalk.v then checkbox.autowalk.v = true end
+               -- if checkbox.autowalk.v then
+                  -- sampAddChatMessage("[SCRIPT]: {FFFFFF}Чтобы выйти из режима авто-походки нажмите {FF6600}SHIFT{FFFFFF} либо {FF6600}SPACE", 0x0FF6600)
+               -- end
+               if not checkbox.autowalkrun.v then
+                  checkbox.autowalk.v = false
+               end
+               setVirtualKeyDown(0x57, false) -- key W
+               setVirtualKeyDown(0xA4, false) -- key LALT
+            end
+            imgui.SameLine()
+            imgui.TextQuestion("( ? )", u8"Включает режим авто-бега (залипание клавиши W)")
+            
+            if checkbox.autowalk.v or checkbox.autowalkrun.v then
+               imgui.TextColoredRGB("{696969}Чтобы выйти из режима авто-походки нажмите {FF6600}SHIFT{696969} либо {FF6600}SPACE")
             end
             
             imgui.Text(u8"Телепорт по координатам:")
@@ -3974,75 +4074,102 @@ function imgui.OnDrawFrame()
          end
         
       elseif tabmenu.settings == 3 then
-         --imgui.SetNextTreeNodeOpen(true)
-         if imgui.CollapsingHeader(u8"Параметры камеры") then
-            imgui.PushStyleVar(imgui.StyleVar.ItemSpacing, imgui.ImVec2(0.5, 2))
-            local angle = math.ceil(getCharHeading(playerPed))
-            local dir = direction()
-            if dir then 
-               if dir:find("Север") then
-                  imgui.TextColoredRGB(string.format("Направление: {1e90ff}%s  %i°", u8:decode(direction()), angle))
-               else
-                  imgui.TextColoredRGB(string.format("Направление: {b22222}%s  %i°", u8:decode(direction()), angle))
+         imgui.PushStyleVar(imgui.StyleVar.ItemSpacing, imgui.ImVec2(0.5, 2))
+         local angle = math.ceil(getCharHeading(playerPed))
+         local dir = direction()
+         if dir then 
+            if dir:find(u8"Север") then
+               imgui.TextColoredRGB(string.format("Направление: {1e90ff}%s  %i°", u8:decode(direction()), angle))
+               if imgui.IsItemClicked() then
+                  setClipboardText(string.format("%i", angle))
+                  sampAddChatMessage("[SCRIPT]: {FFFFFF}Угол поворота скопирован в буффер обмена", 0x0FF6600)
+               end
+            else
+               imgui.TextColoredRGB(string.format("Направление: {b22222}%s  %i°", u8:decode(direction()), angle))
+               if imgui.IsItemClicked() then
+                  setClipboardText(string.format("%i", angle))
+                  sampAddChatMessage("[SCRIPT]: {FFFFFF}Угол поворота скопирован в буффер обмена", 0x0FF6600)
                end
             end
-            local camX, camY, camZ = getActiveCameraCoordinates()
-            imgui.TextColoredRGB(string.format("Поизиция камеры {007DFF}x: %.1f, {e0364e}y: %.1f, {26b85d}z: %.1f",
-            camX, camY, camZ))
-            if imgui.IsItemClicked() then
-               setClipboardText(string.format(u8"%.1f, %.1f, %.1f", camX, camY, camZ))
-               sampAddChatMessage("[SCRIPT]: {FFFFFF}Позиция скопирована в буффер обмена", 0x0FF6600)
-            end
-            local rX, rY, rZ = getActiveCameraPointAt()
-            imgui.TextColoredRGB(string.format("Камера смотрит на точку {007DFF}rx: %.2f, {e0364e}ry: %.2f, {26b85d}rz: %.2f",
-            rX, rY, rZ))
-              if imgui.IsItemClicked() then
-               setClipboardText(string.format(u8"%.4f, %.4f, %.4f", rX, rY, rZ))
-               sampAddChatMessage("[SCRIPT]: {FFFFFF}Позиция скопирована в буффер обмена", 0x0FF6600)
-            end
-            local cameraCutTypes = {"NONE","CAMERA_MOVE","CAMERA_CUT"}
+         end
+         local camX, camY, camZ = getActiveCameraCoordinates()
+         imgui.TextColoredRGB(string.format("Поизиция камеры {007DFF}x: %.1f, {e0364e}y: %.1f, {26b85d}z: %.1f",
+         camX, camY, camZ))
+         if imgui.IsItemClicked() then
+            setClipboardText(string.format(u8"%.1f, %.1f, %.1f", camX, camY, camZ))
+            sampAddChatMessage("[SCRIPT]: {FFFFFF}Позиция скопирована в буффер обмена", 0x0FF6600)
+         end
+         local rX, rY, rZ = getActiveCameraPointAt()
+         imgui.TextColoredRGB(string.format("Камера смотрит на точку {007DFF}rx: %.2f, {e0364e}ry: %.2f, {26b85d}rz: %.2f",
+         rX, rY, rZ))
+           if imgui.IsItemClicked() then
+            setClipboardText(string.format(u8"%.4f, %.4f, %.4f", rX, rY, rZ))
+            sampAddChatMessage("[SCRIPT]: {FFFFFF}Позиция скопирована в буффер обмена", 0x0FF6600)
+         end
+            
+         local cameraCutTypes = {"NONE","CAMERA_MOVE","CAMERA_CUT"}
+         if playerdata.isCameraInterpolate then
             imgui.TextColoredRGB(playerdata.isCameraInterpolate and ('Интерполяция камеры:{FF6600} Да') or ('Интерполяция камеры:{696969} Нет'))
             if playerdata.isCameraInterpolate then
                imgui.SameLine()
                imgui.TextColoredRGB(("  Режим камеры: %s (%d)"):format(cameraCutTypes[playerdata.cameraInterpolateMode], playerdata.cameraInterpolateMode))
             end
+         end
+         
+         if playerdata.isCameraLookAt then
             imgui.TextColoredRGB(playerdata.isCameraLookAt and ('Камера изменена:{FF6600} Да') or ('Камера изменена:{696969} Нет'))
             if playerdata.isCameraLookAt then
                imgui.SameLine()
                imgui.TextColoredRGB(("  Режим камеры: %s (%d)"):format(cameraCutTypes[playerdata.cameraLookAtCutType], playerdata.cameraLookAtCutType))
             end
+         end
+         
+         if playerdata.isPlayerSpectating then
             imgui.TextColoredRGB(playerdata.isPlayerSpectating and ('В наблюдении:{FF6600} Да') or ('В наблюдении:{696969} Нет'))
+         end
+         
+         if playerdata.flymode then
+            imgui.TextColoredRGB(playerdata.flymode and ('В полете:{FF6600} Да') or ('В полете:{696969} Нет'))
+         end
+         
+         local vehCamModes = {
+            [0] = "NONE",
+            [1] = "UNKNOWN",
+            [2] = "MODE_VEH_BEHINDCAR",
+            [3] = "MODE_TRAIN_BEHINDCAR",
+            [4] = "MODE_FOLLOWPED",
+            [7] = "MODE_SNIPER",
+            [8] = "MODE_ROCKETLAUNCHER",
+            [15] = "MODE_FIXED",
+            [16] = "MODE_1STPERSON",
+            [18] = "MODE_CAM_ON_A_STRING",
+            [22] = "MODE_BEHINDBOAT",
+            [46] = "MODE_CAMERA",
+            [51] = "MODE_ROCKETLAUNCHER_HS",
+            [53] = "MODE_AIMWEAPON",
+            [55] = "MODE_AIMWEAPON_FROMCAR",
+            [56] = "MODE_DW_HELI_CHASE",
+            [57] = "MODE_DW_CAM_MAN",
+            [58] = "MODE_DW_BIRDY",
+            [59] = "MODE_DW_PLANE_SPOTTER",
+            [62] = "MODE_DW_PLANECAM1",
+            [63] = "MODE_DW_PLANECAM2",
+            [64] = "MODE_DW_PLANECAM3",
+         }
+         if isCharInAnyCar(playerPed) then 
+            imgui.TextColoredRGB(string.format("Режим камеры в транспорте:{696969} %s (%d)", 
+            vehCamModes[getPlayerInCarCameraMode()], getPlayerInCarCameraMode()))
+         end
             
-            local vehCamModes = {
-               [0] = "NONE",
-               [1] = "UNKNOWN",
-               [2] = "MODE_VEH_BEHINDCAR",
-               [3] = "MODE_TRAIN_BEHINDCAR",
-               [4] = "MODE_FOLLOWPED",
-               [7] = "MODE_SNIPER",
-               [8] = "MODE_ROCKETLAUNCHER",
-               [15] = "MODE_FIXED",
-               [16] = "MODE_1STPERSON",
-               [18] = "MODE_CAM_ON_A_STRING",
-               [22] = "MODE_BEHINDBOAT",
-               [46] = "MODE_CAMERA",
-               [51] = "MODE_ROCKETLAUNCHER_HS",
-               [53] = "MODE_AIMWEAPON",
-               [55] = "MODE_AIMWEAPON_FROMCAR",
-               [56] = "MODE_DW_HELI_CHASE",
-               [57] = "MODE_DW_CAM_MAN",
-               [58] = "MODE_DW_BIRDY",
-               [59] = "MODE_DW_PLANE_SPOTTER",
-               [62] = "MODE_DW_PLANECAM1",
-               [63] = "MODE_DW_PLANECAM2",
-               [64] = "MODE_DW_PLANECAM3",
-            }
-            if isCharInAnyCar(playerPed) then 
-               imgui.TextColoredRGB(string.format("Режим камеры в транспорте:{696969} %s (%d)", 
-               vehCamModes[getPlayerInCarCameraMode()], getPlayerInCarCameraMode()))
-            end
-            imgui.PopStyleVar()
-            imgui.Spacing()
+         imgui.PopStyleVar()
+         imgui.Spacing()
+         
+         if imgui.Button(u8">> Вернуть камеру <<", imgui.ImVec2(150, 25)) then
+            if checkbox.fixcampos.v then checkbox.fixcampos.v = false end
+            sampAddChatMessage("[SCRIPT]: {FFFFFF}Камера возвращена на исходные", 0x0FF6600)
+            restoreCamera()
+            restoreCameraJumpcut()
+            setCameraBehindPlayer()
          end
          
          if imgui.CollapsingHeader(u8"Зафиксированная камера") then
@@ -4254,11 +4381,31 @@ function imgui.OnDrawFrame()
             imgui.TextQuestion("( ? )", u8"Устанвливает плавное движение камеры при перемещении")
             
             if imgui.Button(u8"Переместить камеру", imgui.ImVec2(150, 25)) then
-               cameraSetVectorMove(cam.x, cam.y, cam.z, fixcam.x, fixcam.y, fixcam.z, input.camdelay.v, checkbox.smoothcam.v)
+               cameraSetVectorMove(cam.x, cam.y, cam.z, fixcam.x, fixcam.y, fixcam.z, 
+               input.camdelay.v, checkbox.smoothcam.v)
             end
             imgui.SameLine()
             if imgui.Button(u8"Векторное перемещение камеры", imgui.ImVec2(220, 25)) then
                cameraSetVectorTrack(cam.x, cam.y, cam.z, fixcam.x, fixcam.y, fixcam.z, input.camdelay.v, checkbox.smoothcam.v)
+               sampAddChatMessage("[SCRIPT]: {FFFFFF}Укажите конечную позицию!", 0x0FF6600)
+            end
+         end
+         
+         if imgui.CollapsingHeader(u8"Орбитальная камера") then
+            imgui.TextColoredRGB("{696969}Камера будет медленно вращаться вокруг вашего персонажа")
+            imgui.SliderFloat(u8'Радиус орбиты (m)', input.orbitradius, 2.0, 20.0, "%.1f m")
+            imgui.SliderFloat(u8'Высота камеры (m)', input.orbitheight, -2.0, 8.0, "%.1f m")
+            imgui.SliderFloat(u8'Скорость вращения', input.orbitspeed, 0.002, 0.05, "%.3f")
+                
+            if imgui.Button(checkbox.orbitcam.v and u8"Отключить орбитальную камеру" or u8"Включить орбитальную камеру", imgui.ImVec2(225, 25)) then
+               checkbox.orbitcam.v = not checkbox.orbitcam.v
+               if checkbox.orbitcam.v then 
+                  input.orbitstartheading.v = getCharHeading(playerPed)
+               else
+                  restoreCamera()
+                  restoreCameraJumpcut()
+                  setCameraBehindPlayer()
+               end
             end
          end
          
@@ -4278,20 +4425,19 @@ function imgui.OnDrawFrame()
             imgui.TextQuestion("( ? )", u8"Разблокирует изменение положения камеры на произвольные значеня")
             
             if ini.settings.usecustomcamdist then
-               imgui.TextColoredRGB("Дистанция камеры игрока")
-               imgui.SameLine()
-               imgui.TextQuestion(u8"(по-умолчанию 1)", u8"Вернуть на значение по-умолчанию")
-               if imgui.IsItemClicked() then
-                  slider.camdist.v = 1
-                  ini.settings.camdist = slider.camdist.v
-                  inicfg.save(ini, configIni)
-               end
-               if imgui.SliderInt(u8"##camdist", slider.camdist, -100, 250) then
+               if imgui.SliderInt(u8"Дистанция (m)##camdist", slider.camdist, -100, 250) then
                   ini.settings.camdist = slider.camdist.v
                   setCameraDistanceActivated(1)       
                   setCameraDistance(ini.settings.camdist)
                   inicfg.save(ini, configIni)
                   memory.setfloat(13210352, ini.settings.camdist, true)
+               end
+               
+               imgui.TextQuestion(u8"Сбросить по-умолчанию (1)", u8"Вернуть на значение по-умолчанию")
+               if imgui.IsItemClicked() then
+                  slider.camdist.v = 1
+                  ini.settings.camdist = slider.camdist.v
+                  inicfg.save(ini, configIni)
                end
             end
             
@@ -4303,19 +4449,79 @@ function imgui.OnDrawFrame()
             imgui.TextQuestion("( ? )", u8"Разблокирует изменения значение поля зрения (FOV).")
             
             if checkbox.changefov.v then
-               imgui.TextColoredRGB("FOV")
-               imgui.SameLine()
-               imgui.TextQuestion(u8"(по-умолчанию 70)", u8"Вернуть на значение по-умолчанию")
+               if imgui.SliderInt(u8"FOV##fovslider", slider.fov, 1, 179) then
+                  cameraSetLerpFov(slider.fov.v, slider.fov.v, 1000, true)
+                  ini.settings.fov = slider.fov.v
+                  inicfg.save(ini, configIni)
+               end
+               
+               imgui.TextQuestion(u8"Сбросить по-умолчанию (70)", u8"Вернуть на значение по-умолчанию")
                if imgui.IsItemClicked() then
                   slider.fov.v = 70
                   cameraSetLerpFov(slider.fov.v, slider.fov.v, 1000, true)
                   ini.settings.fov = slider.fov.v
                   inicfg.save(ini, configIni)
                end
-               if imgui.SliderInt(u8"##fovslider", slider.fov, 1, 179) then
-                  cameraSetLerpFov(slider.fov.v, slider.fov.v, 1000, true)
-                  ini.settings.fov = slider.fov.v
-                  inicfg.save(ini, configIni)
+            end
+         end
+         if imgui.CollapsingHeader(u8"Эффекты камеры") then
+            
+            if imgui.Checkbox(u8("Пьяная камера"), checkbox.drunkcam) then 
+               if not checkbox.drunkcam.v then
+                  local bs = raknetNewBitStream()
+                  raknetBitStreamWriteInt32(bs, 0)
+                  raknetEmulRpcReceiveBitStream(35, bs)
+                  raknetDeleteBitStream(bs)
+               end
+            end 
+            imgui.SameLine()
+            imgui.TextQuestion("( ? )", u8"Эффект пьяной камеры (локально только для вас)")
+            
+            imgui.Checkbox(u8'Боковые рамки', checkbox.sideborders)
+            imgui.SameLine()
+            imgui.TextQuestion("( ? )", u8"Отображает боковые TikTok-рамки (Разметка 9:16)")
+            imgui.SameLine()
+            imgui.Checkbox(u8'Вертикальные рамки', checkbox.verticalborders)
+            imgui.SameLine()
+            imgui.TextQuestion("( ? )", u8"Отображает вертикальные рамки (Как в кинофильмах)")
+            
+            if imgui.Checkbox(u8("Визуально скрыть персонажа"), checkbox.hideped) then 
+               if checkbox.hideped.v then
+                  hidePED(true)
+                  hideAttaches(true)
+               else
+                  hidePED(false)
+                  hideAttaches(false)
+               end
+            end 
+            imgui.SameLine()
+            imgui.TextQuestion("( ? )", u8"Визуально для вас скроет персонажа и аттачи (невидимка)")
+         
+            --imgui.Text(u8"Время:")
+            --imgui.SameLine()
+            imgui.PushItemWidth(50)
+            imgui.InputInt('##CamShake', input.camshake, 0)
+            imgui.PopItemWidth()
+            imgui.SameLine()
+            if imgui.Button(u8"Тряска камеры", imgui.ImVec2(150, 25)) then
+               shakeCam(input.camshake.v)
+            end
+            imgui.SameLine()
+            imgui.TextQuestion("( ? )", u8"Создаёт эффект тряски камеры")
+            
+                     
+            if isTrainingSandbox then
+               if imgui.TooltipButton(u8"Перейти в интерьер для съемок", imgui.ImVec2(230, 25), u8"Телепортирует в интерьер с хромакеем") then
+                  if playerdata.isWorldHoster then
+                     sampSendChat("/int 1 1")
+                     sampAddChatMessage("[SCRIPT]: {FFFFFF}Вернуться обратно можно командой /spawnme", 0x0FF6600)
+                  else
+                     sampAddChatMessage("[SCRIPT]: {FFFFFF}Вы не хостер в мире!", 0x0FF6600)
+                  end
+               end
+               imgui.SameLine()
+               if imgui.TooltipButton(u8"Черный экран", imgui.ImVec2(130, 25), u8"Включает режим черного экрана /blind") then
+                  sampSendChat("/blind")
                end
             end
          end
@@ -4324,7 +4530,7 @@ function imgui.OnDrawFrame()
             
             imgui.TextColoredRGB("Скорость перемещения в режиме полета")
             imgui.PushItemWidth(95)
-            if imgui.InputFloat('Default##defspeed', input.flymodespeed, 0.01, 10.0) then
+            if imgui.InputFloat('Default##defspeed', input.flymodespeed, 0.01, 10.0, "%.1f") then
                if input.flymodespeed.v < 0.01 or input.flymodespeed.v > 10.0 then
                   input.flymodespeed.v = 0.30
                end
@@ -4337,10 +4543,11 @@ function imgui.OnDrawFrame()
             imgui.SameLine()
             
             imgui.PushItemWidth(95)
-            if imgui.InputFloat('MAX##maxspeed', input.flymodemaxspeed, 1.0, 100.0) then
+            if imgui.InputFloat('MAX##maxspeed', input.flymodemaxspeed, 1.0, 100.0, "%.1f") then
                if input.flymodemaxspeed.v < 1.0 or input.flymodemaxspeed.v > 100.0 then
                   input.flymodemaxspeed.v = 50.0
                end
+               --ini.settings.flymodemaxspeed = ("%.2f"):format(input.flymodemaxspeed.v)
                ini.settings.flymodemaxspeed = input.flymodemaxspeed.v
                inicfg.save(ini, configIni)
             end
@@ -4377,95 +4584,7 @@ function imgui.OnDrawFrame()
          end
          
          imgui.Spacing()
-         imgui.Spacing()
-         if imgui.Button(u8(ini.settings.showhud and 'Скрыть' or 'Показать')..u8" HUD", imgui.ImVec2(100, 25)) then
-            ini.settings.showhud = not ini.settings.showhud
-            inicfg.save(ini, configIni)
-            if ini.settings.showhud then
-               displayHud(true)
-               memory.setint8(0xBA676C, 0)
-            else
-               displayHud(false)
-               memory.setint8(0xBA676C, 2)
-            end
-         end
-         imgui.SameLine()
-         if imgui.Button(u8(ini.settings.nokillchat and 'Показать' or 'Скрыть')..u8" Killchat", imgui.ImVec2(125, 25)) then
-            ini.settings.nokillchat = not ini.settings.nokillchat
-            print(ini.settings.nokillchat)
-            inicfg.save(ini, configIni)
-            lua_thread.create(function()
-               wait(100)
-               setVirtualKeyDown(0x78, true) -- F9
-               wait(100)
-               setVirtualKeyDown(0x78, false)
-            end)
-         end
          
-         if isTrainingSandbox then
-            if imgui.TooltipButton(u8"Перейти в интерьер для съемок", imgui.ImVec2(230, 25), u8"Телепортирует в интерьер с хромакеем") then
-               if playerdata.isWorldHoster then
-                  sampSendChat("/int 1 1")
-                  sampAddChatMessage("[SCRIPT]: {FFFFFF}Вернуться обратно можно командой /spawnme", 0x0FF6600)
-               else
-                  sampAddChatMessage("[SCRIPT]: {FFFFFF}Вы не хостер в мире!", 0x0FF6600)
-               end
-            end
-            imgui.SameLine()
-            if imgui.TooltipButton(u8"Черный экран", imgui.ImVec2(130, 25), u8"Включает режим черного экрана /blind") then
-               sampSendChat("/blind")
-            end
-         end
-         
-         if imgui.Checkbox(u8'Отключать радар в интерьерах', checkbox.nointeriorradar) then
-            ini.settings.nointeriorradar = checkbox.nointeriorradar.v
-            inicfg.save(ini, configIni)
-         end
-         imgui.SameLine()
-         imgui.TextQuestion("( ? )", u8"Отключит радар при входе в интерьер")
-         
-         
-         if imgui.Checkbox(u8("Визуально скрыть персонажа"), checkbox.hideped) then 
-            if checkbox.hideped.v then
-               hidePED(true)
-               hideAttaches(true)
-            else
-               hidePED(false)
-               hideAttaches(false)
-            end
-         end 
-         imgui.SameLine()
-         imgui.TextQuestion("( ? )", u8"Визуально для вас скроет персонажа и аттачи (невидимка")
-	     
-         if imgui.Checkbox(u8("Пьяная камера"), checkbox.drunkcam) then 
-            if not checkbox.drunkcam.v then
-               local bs = raknetNewBitStream()
-               raknetBitStreamWriteInt32(bs, 0)
-               raknetEmulRpcReceiveBitStream(35, bs)
-               raknetDeleteBitStream(bs)
-            end
-         end 
-         
-         --imgui.Text(u8"Время:")
-         --imgui.SameLine()
-         imgui.PushItemWidth(50)
-         imgui.InputInt('##CamShake', input.camshake, 0)
-         imgui.PopItemWidth()
-         imgui.SameLine()
-         if imgui.Button(u8"Тряска камеры", imgui.ImVec2(150, 25)) then
-            shakeCam(input.camshake.v)
-         end
-         imgui.SameLine()
-         imgui.TextQuestion("( ? )", u8"Создаёт эффект тряски камеры")
-         
-         if imgui.Button(u8">> Вернуть камеру <<", imgui.ImVec2(250, 25)) then
-            if checkbox.fixcampos.v then checkbox.fixcampos.v = false end
-            sampAddChatMessage("[SCRIPT]: {FFFFFF}Камера возвращена на исходные", 0x0FF6600)
-            restoreCamera()
-            restoreCameraJumpcut()
-         end
-         
-         imgui.Spacing()
       elseif tabmenu.settings == 4 then
          
          imgui.TextColoredRGB("Дистанция прорисовки LOD")
@@ -6857,7 +6976,7 @@ function imgui.OnDrawFrame()
                   inicfg.save(ini, configIni)
                end
             end
-            imgui.Text(u8"Прочее:")
+            imgui.Text(u8"Радар:")
             if imgui.Checkbox(u8'Показывать ID над HUD', checkbox.showidonhud) then
                ini.settings.showidonhud = checkbox.showidonhud.v
                inicfg.save(ini, configIni)
@@ -6867,6 +6986,37 @@ function imgui.OnDrawFrame()
             end
             imgui.SameLine()
             imgui.TextQuestion("( ? )", u8"Отображать ваш ID над худом (вверху экрана с правой стороны)")
+            
+            if imgui.Button(u8(ini.settings.showhud and 'Скрыть' or 'Показать')..u8" HUD", imgui.ImVec2(100, 25)) then
+               ini.settings.showhud = not ini.settings.showhud
+               inicfg.save(ini, configIni)
+               if ini.settings.showhud then
+                  displayHud(true)
+                  memory.setint8(0xBA676C, 0)
+               else
+                  displayHud(false)
+                  memory.setint8(0xBA676C, 2)
+               end
+            end
+            imgui.SameLine()
+            if imgui.Button(u8(ini.settings.nokillchat and 'Показать' or 'Скрыть')..u8" Killchat", imgui.ImVec2(125, 25)) then
+               ini.settings.nokillchat = not ini.settings.nokillchat
+               print(ini.settings.nokillchat)
+               inicfg.save(ini, configIni)
+               lua_thread.create(function()
+                  wait(100)
+                  setVirtualKeyDown(0x78, true) -- F9
+                  wait(100)
+                  setVirtualKeyDown(0x78, false)
+               end)
+            end
+            
+            if imgui.Checkbox(u8'Отключать радар в интерьерах', checkbox.nointeriorradar) then
+               ini.settings.nointeriorradar = checkbox.nointeriorradar.v
+               inicfg.save(ini, configIni)
+            end
+            imgui.SameLine()
+            imgui.TextQuestion("( ? )", u8"Отключит радар при входе в интерьер")
             
             if isTrainingSandbox then
                if imgui.Checkbox(u8'Восстановить стандартный цвет 3D текста с инф-цией о объекте', checkbox.fixobjinfotext) then
@@ -12307,8 +12457,10 @@ function sampev.onServerMessage(color, text)
          playerdata.isWorldHoster = true
          ini.tmp.worldhoster = true
          inicfg.save(ini, configIni)
-         if ini.settings.hotkeys then
-            sampAddChatMessage("[SERVER]: {FFFFFF}Меню управления миром - /vw или клавиша - M", 0x0FF6600)
+         if ini.settings.hotkeys and ini.hotkeyactions.keyM then
+            if ini.hotkeyactions.keyM:find(".wm") then
+               sampAddChatMessage("[SERVER]: {FFFFFF}Меню управления миром - /vw или клавиша - M", 0x0FF6600)
+            end
          end
          return false
       end
@@ -15378,10 +15530,13 @@ function sampev.onSetMapIcon(iconId, position, type, color, style)
    -- Marker type 1,2,4,56 will cause your game to crash if you have map legends enabled while viewing the map. 
    if (type == 1 or type == 2 or type == 4 or type == 56) then
       if ini.settings.cberrorwarnings then
-         lua_thread.create(function()
-            sampAddChatMessage(("[WARNING]: {FFFFFF}Mapicon %i указан багнутый тип иконки %i, возможен краш клиента"):format(iconId, type), 0x0FF6600)
-            wait(1000*60*5)
-         end)
+         local isLegendMapEnabled = memory.read_int8(0xBA67A4)
+         if isLegendMapEnabled then
+            lua_thread.create(function()
+               sampAddChatMessage(("[WARNING]: {FFFFFF}Mapicon %i указан багнутый тип иконки %i, возможен краш клиента если включена легенда на карте"):format(iconId, type), 0x0FF6600)
+               wait(1000*60*5)
+            end)
+         end
       end
       return {iconId, position, 57, color, style}
    end
