@@ -82,6 +82,8 @@
 /sindex <objectid>  - перекрасить объект в зеленую текстуру и обозначить слоты 
 /tsearch <objectid> <slot> <name>  - наложение текстуры по поиску 
 /stexture <objectid> <slot> <index>  - наложить текстуру на объект по индексу 
+/settextureinfo <object> <slot> <model> <txdname> <texturename> <color> 
+- установит текстуру по названию текстуры и библиотеке без ограничений от сервера
 /untexture <objectid>  - обнулить наложенные текстуры (и /ocolor) 
 /otext  - наложение текста на слот объекта 
 /getstream <objectid>  - получить дальность прорисовки объекта 

@@ -17,5 +17,5 @@
 .+/soccer{FFFFFF} - .*
 .+/dm{FFFFFF} - .*
 .+List of donation services .*
-.+Official server website .*
+.+Official server website.*
 .+Enter {80BCFF}/help.*
