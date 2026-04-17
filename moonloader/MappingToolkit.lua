@@ -3,7 +3,7 @@ script_description("Assistant for mappers")
 script_dependencies('imgui', 'lib.samp.events')
 script_properties("work-in-pause")
 script_url("https://github.com/ins1x/MappingToolkit")
-script_version("4.22") -- Release
+script_version("4.23") -- RС 1
 -- support sa-mp versions depends on SAMPFUNCS (0.3.7-R1, 0.3.7-R3-1, 0.3.7-R5, 0.3.DL)
 -- script_moonloader(16) moonloader v.0.26 
 -- editor options: tabsize 3, Unix (LF), encoding Windows-1251
@@ -98,6 +98,7 @@ local ini = inicfg.load({
       saveweather = false,
       saveworldname = true,
       savepmmessages = true,
+      savepagecb = true,
       setgm = false,
       serverlock = true,
       showhud = true,
@@ -332,6 +333,8 @@ local dialoghook = {
    textureslist = false,
    sampobjectslist = false,
    exitdialog = false,
+   cblist = false,
+   tblist = false,
    cbvalue = false,
    tbvalue = false,
    olist = false,
@@ -395,7 +398,6 @@ local checkbox = {
    weatherinformer = imgui.ImBool(ini.settings.weatherinformer),
    saveworldname = imgui.ImBool(ini.settings.saveworldname),
    worldlogson = imgui.ImBool(ini.settings.worldlogson),
-   fixobjinfotext = imgui.ImBool(ini.settings.fixobjinfotext),
    serverlock = imgui.ImBool(ini.settings.serverlock),
    savepmmessages = imgui.ImBool(ini.settings.savepmmessages),
    deleteprotect = imgui.ImBool(ini.settings.deleteprotect),
@@ -525,6 +527,7 @@ local checkbox = {
    orbitcam = imgui.ImBool(false),
    sideborders = imgui.ImBool(false),
    verticalborders = imgui.ImBool(false),
+   savepagecb = imgui.ImBool(false),
    camparams = imgui.ImBool(false),
    test = imgui.ImBool(false)
 }
@@ -656,6 +659,7 @@ local textbuffer = {
    dialogtext = imgui.ImBuffer(2048),
    chatfilters = imgui.ImBuffer(4096),
    favobjects = imgui.ImBuffer(65536),
+   favcb = imgui.ImBuffer(65536),
    favtxd = imgui.ImBuffer(65536),
    favtxt = imgui.ImBuffer(65536),
    cmdlist = imgui.ImBuffer(65536),
@@ -803,6 +807,7 @@ local LastData = {
    lastMinigame = nil,
    lastModelinfo = 0,
    lastAttEditSlot = nil,
+   lastPageCb = 0,
    lastLoadedWorldName = nil,
    lastLoadedWorldNumber = nil
 }
@@ -1158,6 +1163,17 @@ function main()
          file:close()
       end
       
+      if doesFileExist(getGameDirectory()..'\\moonloader\\resource\\mappingtoolkit\\favorites\\favcb.txt') then
+         local file = io.open(getGameDirectory()..
+         "//moonloader//resource//mappingtoolkit//favorites//favcb.txt", "r")
+         textbuffer.favcb.v = file:read('*a')
+         file:close()
+      else
+         local file = io.open("moonloader/resource/mappingtoolkit/favorites/favcb.txt", "w")
+         --file:write(u8"Файл поврежден либо не найден\n")
+         file:close()
+      end
+      
       if doesFileExist(getGameDirectory()..'\\moonloader\\resource\\mappingtoolkit\\favorites\\cordlist.txt') then
          local file = io.open(getGameDirectory()..
          "//moonloader//resource//mappingtoolkit//favorites//cordlist.txt", "r")
@@ -1487,8 +1503,8 @@ function main()
       end
          
       if isTrainingSandbox then
-         -- CTRL + SHIFT + V
-         if isKeyDown(0x11) and isKeyDown(0x10) and isKeyDown(0x56) 
+         -- CTRL + SHIFT + V or RMB to paste
+         if isKeyDown(0x11) and isKeyDown(0x10) and isKeyDown(0x56) or isKeyDown(0x02)
          and not sampIsChatInputActive() and not isPauseMenuActive()
          and not isSampfuncsConsoleActive() then  
             if ini.settings.cbvalautocomplete and LastData.lastCbvaluebuffer then
@@ -1524,6 +1540,7 @@ function main()
                end
             end
          end
+         
          -- CTRL + SHIFT + L
          if isKeyDown(0x11) and isKeyDown(0x10) and isKeyDown(0x4C) 
          and not sampIsChatInputActive() and not isPauseMenuActive()
@@ -7037,15 +7054,6 @@ function imgui.OnDrawFrame()
             imgui.SameLine()
             imgui.TextQuestion("( ? )", u8"Отключит радар при входе в интерьер")
             
-            if isTrainingSandbox then
-               if imgui.Checkbox(u8'Восстановить стандартный цвет 3D текста с инф-цией о объекте', checkbox.fixobjinfotext) then
-                  ini.settings.fixobjinfotext = checkbox.fixobjinfotext.v
-                  inicfg.save(ini, configIni)
-               end
-               imgui.SameLine()
-               imgui.TextQuestion("( ? )", u8"Восстанавливает стандартный синий цвет для 3D текста с информацией о ид объекта (В режиме разработки)")
-            end
-            
          end
          
          if imgui.CollapsingHeader(u8"Уведомления:") then
@@ -7265,6 +7273,13 @@ function imgui.OnDrawFrame()
                end
                imgui.SameLine()
                imgui.TextQuestion("( ? )", u8"Использовать авто-дополнение текущих значений в /cblist (только для TRAINING)")
+               
+               if imgui.Checkbox(u8'Сохранять последнюю страницу КБ', checkbox.savepagecb) then
+                  ini.settings.savepagecb = checkbox.savepagecb.v
+                  inicfg.save(ini, configIni)
+               end
+               imgui.SameLine()
+               imgui.TextQuestion("( ? )", u8"Сохраняет последнюю просмотренную страницу при вызове /cblist (только для TRAINING)")
                
                if imgui.Checkbox(u8'Изменять способ активации при создании КБ', checkbox.cbnewactivation) then
                   ini.settings.cbnewactivation = checkbox.cbnewactivation.v
@@ -8455,6 +8470,12 @@ function imgui.OnDrawFrame()
             for s in string.gmatch(textbuffer.favtxt.v, "\n" ) do
                lines = lines + 1
             end
+         elseif tabmenu.favorites == 4 then
+            filepath = getGameDirectory().."//moonloader//resource//mappingtoolkit//favorites//favcb.txt"
+            symbols = string.len(textbuffer.favcb.v)/2
+            for s in string.gmatch(textbuffer.favcb.v, "\n" ) do
+               lines = lines + 1
+            end
          end
          
          imgui.Spacing()
@@ -8462,26 +8483,34 @@ function imgui.OnDrawFrame()
          imgui.PushStyleVar(imgui.StyleVar.ItemSpacing, imgui.ImVec2(2, 0))
          if tabmenu.favorites == 1 then
             imgui.PushStyleColor(imgui.Col.Button, imgui.GetStyle().Colors[imgui.Col.ButtonHovered])
-            if imgui.Button(u8"Объекты", imgui.ImVec2(120, 25)) then tabmenu.favorites = 1 end
+            if imgui.Button(u8"Объекты", imgui.ImVec2(100, 25)) then tabmenu.favorites = 1 end
             imgui.PopStyleColor()
          else
-            if imgui.Button(u8"Объекты", imgui.ImVec2(120, 25)) then tabmenu.favorites = 1 end
+            if imgui.Button(u8"Объекты", imgui.ImVec2(100, 25)) then tabmenu.favorites = 1 end
          end
          imgui.SameLine()
          if tabmenu.favorites == 2 then
             imgui.PushStyleColor(imgui.Col.Button, imgui.GetStyle().Colors[imgui.Col.ButtonHovered])
-            if imgui.Button(u8"Текстуры", imgui.ImVec2(120, 25)) then tabmenu.favorites = 2 end
+            if imgui.Button(u8"Текстуры", imgui.ImVec2(100, 25)) then tabmenu.favorites = 2 end
             imgui.PopStyleColor()
          else
-            if imgui.Button(u8"Текстуры", imgui.ImVec2(120, 25)) then tabmenu.favorites = 2 end
+            if imgui.Button(u8"Текстуры", imgui.ImVec2(100, 25)) then tabmenu.favorites = 2 end
          end
          imgui.SameLine()
          if tabmenu.favorites == 3 then
             imgui.PushStyleColor(imgui.Col.Button, imgui.GetStyle().Colors[imgui.Col.ButtonHovered])
-            if imgui.Button(u8"Поверхности", imgui.ImVec2(120, 25)) then tabmenu.favorites = 3 end
+            if imgui.Button(u8"Поверхности", imgui.ImVec2(100, 25)) then tabmenu.favorites = 3 end
             imgui.PopStyleColor()
          else
-            if imgui.Button(u8"Поверхности", imgui.ImVec2(120, 25)) then tabmenu.favorites = 3 end
+            if imgui.Button(u8"Поверхности", imgui.ImVec2(100, 25)) then tabmenu.favorites = 3 end
+         end
+         imgui.SameLine()
+         if tabmenu.favorites == 4 then
+            imgui.PushStyleColor(imgui.Col.Button, imgui.GetStyle().Colors[imgui.Col.ButtonHovered])
+            if imgui.Button(u8"Блоки", imgui.ImVec2(100, 25)) then tabmenu.favorites = 4 end
+            imgui.PopStyleColor()
+         else
+            if imgui.Button(u8"Блоки", imgui.ImVec2(100, 25)) then tabmenu.favorites = 4 end
          end
          imgui.PopStyleVar()
          
@@ -8551,6 +8580,16 @@ function imgui.OnDrawFrame()
             -- end
             -- imgui.SameLine()
             -- imgui.TextQuestion("( ? )", u8"RO - Включить режим ReadOnly\nUnlock IO - разблокировать инпут если курсор забагался")
+         elseif tabmenu.favorites == 4 then
+            imgui.PushFont(fonts.multilinetextfont)
+            if input.readonly then
+               imgui.InputTextMultiline('##favcb', textbuffer.favcb, imgui.ImVec2(490, 340),
+               imgui.InputTextFlags.EnterReturnsTrue + imgui.InputTextFlags.AllowTabInput + imgui.InputTextFlags.ReadOnly)
+            else 
+               imgui.InputTextMultiline('##favcb', textbuffer.favcb, imgui.ImVec2(490, 340),
+               imgui.InputTextFlags.EnterReturnsTrue + imgui.InputTextFlags.AllowTabInput)
+            end
+            imgui.PopFont()
          end
          
          if tabmenu.favorites == 1 then
@@ -8565,6 +8604,10 @@ function imgui.OnDrawFrame()
             imgui.TextColoredRGB("Список всех спецсимволов:")
             imgui.SameLine()
             imgui.Link("https://pawnokit.ru/ru/spec_symbols", "pawnokit.ru")
+         elseif tabmenu.favorites == 4 then
+            imgui.TextColoredRGB("Текстовые функции:")
+            imgui.SameLine()
+            imgui.Link("https://forum.training-server.com/d/19980-spisok-tekstovyh-funktsiy-wiki/21", u8"Вики с TRAINING-FORUM")
          end
          
          --if tabmenu.favorites ~= 3 then
@@ -8576,6 +8619,8 @@ function imgui.OnDrawFrame()
                textbuffer.favtxd.v = file:read('*a')
             elseif tabmenu.favorites == 3 then
                textbuffer.favtxt.v = file:read('*a')
+            elseif tabmenu.favorites == 4 then
+               textbuffer.favcb.v = file:read('*a')
             end
             file:close()
          end
@@ -8594,6 +8639,8 @@ function imgui.OnDrawFrame()
                   file:write(textbuffer.favtxd.v)
                elseif tabmenu.favorites == 3 then
                   file:write(textbuffer.favtxt.v)
+               elseif tabmenu.favorites == 4 then
+                  file:write(textbuffer.favcb.v)
                end
                file:close()
                sampAddChatMessage("[SCRIPT]: {FFFFFF}Сохранено в файл: {696969}"..filepath, 0x0FF6600)
@@ -9136,18 +9183,18 @@ function imgui.OnDrawFrame()
          imgui.SameLine()
          if tabmenu.cb == 2 then
             imgui.PushStyleColor(imgui.Col.Button, imgui.GetStyle().Colors[imgui.Col.ButtonHovered])
-            if imgui.Button(u8"Текстовые команды", imgui.ImVec2(135, 25)) then tabmenu.cb = 2 end
+            if imgui.Button(u8"Текстовые", imgui.ImVec2(105, 25)) then tabmenu.cb = 2 end
             imgui.PopStyleColor()
          else
-            if imgui.Button(u8"Текстовые команды", imgui.ImVec2(135, 25)) then tabmenu.cb = 2 end
+            if imgui.Button(u8"Текстовые", imgui.ImVec2(105, 25)) then tabmenu.cb = 2 end
          end
          imgui.SameLine()
          if tabmenu.cb == 3 then
             imgui.PushStyleColor(imgui.Col.Button, imgui.GetStyle().Colors[imgui.Col.ButtonHovered])
-            if imgui.Button(u8"Коллбэки", imgui.ImVec2(135, 25)) then tabmenu.cb = 3 end
+            if imgui.Button(u8"Коллбэки", imgui.ImVec2(105, 25)) then tabmenu.cb = 3 end
             imgui.PopStyleColor()
          else
-            if imgui.Button(u8"Коллбэки", imgui.ImVec2(135, 25)) then tabmenu.cb = 3 end
+            if imgui.Button(u8"Коллбэки", imgui.ImVec2(105, 25)) then tabmenu.cb = 3 end
          end
          imgui.PopStyleVar()
          
@@ -11034,6 +11081,8 @@ function sampev.onSendDialogResponse(dialogId, button, listboxId, input)
          dialoghook.setworlddescription = false
          dialoghook.nextdialog = false
          dialoghook.prevdialog = false
+         dialoghook.cblist = false
+         dialoghook.tblist = false
       end
       
       if button == 1 and dialoghook.action then
@@ -11569,6 +11618,14 @@ function sampev.onShowDialog(dialogId, style, title, button1, button2, text)
          end
       end
       
+      -- TRAINING save cblist page
+      if ini.settings.savepagecb then
+         if dialoghook.cblist and title:find('Страница') then
+            local page = title:match('Страница: (%d+)')
+            LastData.lastPageCb = tonumber(page) - 1
+         end
+      end
+      
       -- Switching cb with arrow buttons
       if title:find('Страница') and style == 2 then
          if text:find('пред. страница') then
@@ -11704,7 +11761,7 @@ function sampev.onShowDialog(dialogId, style, title, button1, button2, text)
             local px, py, pz = getCharCoordinates(playerPed)
             LastData.lastTextBuffer = ("%i %.3f %.3f %.3f %.3f"):format(getCharModel(playerPed), px, py, pz, getCharHeading(playerPed))
             local newtext = "{FFFFFF}".. text .. 
-            "\n{696969}Нажмите CTRL + SHIFT + V чтобы вставить текущие данные скина, позиции, и поворота\n"
+            "\n{696969}Нажмите CTRL + SHIFT + V или RMB чтобы вставить текущие данные скина, позиции, и поворота\n"
             return {dialogId, style, title, button1, button2, newtext}
          end
          
@@ -11739,7 +11796,7 @@ function sampev.onShowDialog(dialogId, style, title, button1, button2, text)
             local newtext = "{FFFFFF}".. text .. 
             "\n{007FFF}" .. LastData.lastLink ..
             "\n{696969}Нажмите CTRL + SHIFT + L чтобы открыть ссылку в браузере\n"..
-            "{696969}Нажмите CTRL + SHIFT + V чтобы вставить шаблон в поле\n"
+            "{696969}Нажмите CTRL + SHIFT + V или RMB чтобы вставить шаблон в поле\n"
             return {dialogId, style, title, button1, button2, newtext}
          end
          
@@ -11783,7 +11840,7 @@ function sampev.onShowDialog(dialogId, style, title, button1, button2, text)
          if text:find('Укажите текст') then
             if dialoghook.action then
                local newtext = text ..
-               "\n\n{696969}Нажмите CTRL + SHIFT + V чтобы вставить последнее значение\n"
+               "\n\n{696969}Нажмите CTRL + SHIFT + V или RMB чтобы вставить последнее значение\n"
                return {dialogId, style, title, button1, button2, newtext}
             end
          end
@@ -11865,7 +11922,7 @@ function sampev.onShowDialog(dialogId, style, title, button1, button2, text)
             
             if style == 0 or style == 1 then -- if MsgBox or Input Dialog
                local newtext = text ..
-               "\n{696969}Нажмите CTRL + SHIFT + V чтобы вставить текущее значение\n"
+               "\n{696969}Нажмите CTRL + SHIFT + V или RMB чтобы вставить текущее значение\n"
                return {dialogId, style, title, button1, button2, newtext}
             end
          else
@@ -11892,7 +11949,7 @@ function sampev.onShowDialog(dialogId, style, title, button1, button2, text)
             
             if style == 0 or style == 1 then -- if MsgBox or Input Dialog
                local newtext = text ..
-               "\n{696969}Нажмите CTRL + SHIFT + V чтобы вставить текущее значение\n"
+               "\n{696969}Нажмите CTRL + SHIFT + V или RMB чтобы вставить текущее значение\n"
                return {dialogId, style, title, button1, button2, newtext}
             end
          else
@@ -11924,6 +11981,9 @@ function sampev.onShowDialog(dialogId, style, title, button1, button2, text)
             playerdata.isWorldJoinUnavailable = true
          else
             playerdata.isWorldJoinUnavailable = false
+            if ini.settings.worldlogson then
+               dialoghook.logstoggle = true
+            end
          end
       end
       
@@ -12047,7 +12107,7 @@ function sampev.onShowDialog(dialogId, style, title, button1, button2, text)
 
                if string.len(LastData.lastOtext) > 1 then 
                   newtext = newtext.."\nПоследний текст: "..LastData.lastOtext.."\n"..
-                  "{696969}Нажмите CTRL + SHIFT + V чтобы вставить последний текст\n"
+                  "{696969}Нажмите CTRL + SHIFT + V или RMB чтобы вставить последний текст\n"
                end
                
                return {dialogId, style, title, button1, button2, newtext}
@@ -12111,13 +12171,15 @@ function sampev.onShowDialog(dialogId, style, title, button1, button2, text)
                   end)
                end
                
-               if dialoghook.logstoggle then
-                  lua_thread.create(function()
-                     wait(500)
-                     sampSendDialogResponse(32700, 1, 7, LastData.lastDialogInput)
-                     sampCloseCurrentDialogWithButton(0)
-                     dialoghook.logstoggle = false
-                  end)
+               if ini.settings.worldlogson then
+                  if dialoghook.logstoggle then
+                     lua_thread.create(function()
+                        wait(500)
+                        sampSendDialogResponse(32700, 1, 7, LastData.lastDialogInput)
+                        sampCloseCurrentDialogWithButton(0)
+                        dialoghook.logstoggle = false
+                     end)
+                  end
                end
                
                if dialoghook.saveworld then
@@ -12401,12 +12463,15 @@ function sampev.onServerMessage(color, text)
       print(string.format("%s, %s", color, text))
    end
    
-   if color == -65281 and text:find('PM от') or text:find('PM к') then -- -65281 Yellow color
-      if ini.settings.savepmmessages then
-         local file = io.open(getGameDirectory()..
-         "/moonloader/resource/mappingtoolkit/history/pmmessages.txt", "a")
-         file:write(("[%s] %s \n"):format(tostring(os.date("%d.%m.%Y %X")), text))
-         file:close()
+   if color == -65281 then -- -65281 Yellow color
+      if text:find('PM от') or text:find('PM к') 
+      or text:find('PM for') or text:find('PM from') then 
+         if ini.settings.savepmmessages then
+            local file = io.open(getGameDirectory()..
+            "/moonloader/resource/mappingtoolkit/history/pmmessages.txt", "a")
+            file:write(("[%s] %s \n"):format(tostring(os.date("%d.%m.%Y %X")), text))
+            file:close()
+         end
       end
    end
    -- Corrects erroneous recieving of empty chat messages
@@ -13511,8 +13576,9 @@ function sampev.onSendCommand(command)
          LastRemovedObject.modelid = nil
       end
    end
-      
+   
    if isTrainingSandbox and command:find("^/tblist") then
+      dialoghook.tblist = true
       sampSendChat("/tb")
       return false
    end
@@ -14380,6 +14446,10 @@ function sampev.onSendCommand(command)
    
    if isTrainingSandbox and command:find("^/cblist") then
       LastData.lastTbvaluebuffer = nil
+      dialoghook.cblist = true
+      if ini.settings.savepagecb then
+         sampSendChat("/cblist "..LastData.lastPageCb)
+      end
    end
    
    if isTrainingSandbox and command:find("^/cbed$") then
@@ -15549,8 +15619,8 @@ function sampev.onSetMapIcon(iconId, position, type, color, style)
    -- Marker type 1,2,4,56 will cause your game to crash if you have map legends enabled while viewing the map. 
    if (type == 1 or type == 2 or type == 4 or type == 56) then
       if ini.settings.cberrorwarnings then
-         local isLegendMapEnabled = memory.read_int8(0xBA67A4)
-         if isLegendMapEnabled then
+         local LegendMapEnabled = memory.getint8(0xBA67A4)
+         if LegendMapEnabled > 0 then
             lua_thread.create(function()
                sampAddChatMessage(("[WARNING]: {FFFFFF}Mapicon %i указан багнутый тип иконки %i, возможен краш клиента если включена легенда на карте"):format(iconId, type), 0x0FF6600)
                wait(1000*60*5)
@@ -16466,6 +16536,9 @@ function WorldJoinInit()
       if ini.settings.setgm then 
          sampSendChat("/gm")
          wait(500)
+      end
+      if ini.settings.worldlogson then
+         dialoghook.logstoggle = true
       end
       
       if sampIsLocalPlayerSpawned() then
