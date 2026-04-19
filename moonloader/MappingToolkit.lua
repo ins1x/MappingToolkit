@@ -3,7 +3,7 @@ script_description("Assistant for mappers")
 script_dependencies('imgui', 'lib.samp.events')
 script_properties("work-in-pause")
 script_url("https://github.com/ins1x/MappingToolkit")
-script_version("4.23") -- RС 3
+script_version("4.23") -- Release
 -- support sa-mp versions depends on SAMPFUNCS (0.3.7-R1, 0.3.7-R3-1, 0.3.7-R5, 0.3.DL)
 -- script_moonloader(16) moonloader v.0.26 
 -- editor options: tabsize 3, Unix (LF), encoding Windows-1251
@@ -12328,10 +12328,10 @@ function sampev.onShowDialog(dialogId, style, title, button1, button2, text)
                dialoghook.cbsearch = true
                if ini.tmp.cbsearch then
                   if ini.tmp.cbsearch:len() > 1 then
-                     lua_thread.create(function()
-                        wait(200)
-                        sampSetCurrentDialogEditboxText(ini.tmp.cbsearch)
-                     end)
+                     LastData.lastTextBuffer = ini.tmp.cbsearch
+                     local newtext = text .. "\nВ прошлый раз вы искали: {FF6600}"..ini.tmp.cbsearch..
+                     "\n{696969}Нажмите CTRL + SHIFT + V или RMB чтобы вставить последнее значение поиска\n"
+                     return {dialogId, style, title, button1, button2, newtext}
                   end
                end
             end
@@ -12784,6 +12784,10 @@ function sampev.onServerMessage(color, text)
       
       if text:find('Создан action: (%d+)') then
          LastData.lastAction = text:match('Создан action: (%d+)')
+      end
+      
+      if text:find("[SERVER].+Вы телепортированы к 3D тексту: (%d+)") then
+         LastData.lastAction = text:match('Вы телепортированы к 3D тексту: (%d+)')
       end
       
       if text:find('Блок: (%d+) был удален') then
@@ -13582,6 +13586,26 @@ function sampev.onSendCommand(command)
             LastData.lastOtextObjectId = id
          end
       end
+   end
+   
+   if isTrainingSandbox and command:find("^/tpnextaction") then
+      if LastData.lastAction then
+         sampSendChat("/tpaction "..LastData.lastAction+1)
+      else
+         sampAddChatMessage("[SCRIPT]: {FFFFFF}Не найден последний action (3D текст). Попробуйте /tpaction <id>", 0x0FF6600)
+      end
+      return false
+   end
+   
+   if isTrainingSandbox and command:find("^/tpprevaction") then
+      if LastData.lastAction then
+         if LastData.lastAction >= 0 then
+            sampSendChat("/tpaction "..LastData.lastAction-1)
+         end
+      else
+         sampAddChatMessage("[SCRIPT]: {FFFFFF}Не найден последний action (3D текст). Попробуйте /tpaction <id>", 0x0FF6600)
+      end
+      return false
    end
    
    if isTrainingSandbox and command:find("^/action") then
