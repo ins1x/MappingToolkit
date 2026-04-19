@@ -3,7 +3,7 @@ script_description("Assistant for mappers")
 script_dependencies('imgui', 'lib.samp.events')
 script_properties("work-in-pause")
 script_url("https://github.com/ins1x/MappingToolkit")
-script_version("4.23") -- RС 2
+script_version("4.23") -- RС 3
 -- support sa-mp versions depends on SAMPFUNCS (0.3.7-R1, 0.3.7-R3-1, 0.3.7-R5, 0.3.DL)
 -- script_moonloader(16) moonloader v.0.26 
 -- editor options: tabsize 3, Unix (LF), encoding Windows-1251
@@ -42,6 +42,7 @@ local ini = inicfg.load({
       blockhamster = false,
       bigoffsetwarning = true,
       camdist = "1",
+      cbarrkeyson = false,
       cberrorwarnings = true,
       cbvalautocomplete = true,
       cbdefaultradius = 0.1,
@@ -382,6 +383,7 @@ local checkbox = {
    anticaps = imgui.ImBool(ini.settings.anticaps),
    antichatbot = imgui.ImBool(ini.settings.antichatbot),
    remapnum = imgui.ImBool(ini.settings.remapnum),
+   cbarrkeyson = imgui.ImBool(ini.settings.cbarrkeyson), 
    skinid = imgui.ImInt(ini.settings.skinid),
    showidonhud = imgui.ImBool(ini.settings.showidonhud),
    skipomenu = imgui.ImBool(ini.settings.skipomenu),
@@ -810,6 +812,7 @@ local LastData = {
    lastModelinfo = 0,
    lastAttEditSlot = nil,
    lastPageCb = 0,
+   lastPageTb = 0,
    lastLoadedWorldName = nil,
    lastLoadedWorldNumber = nil
 }
@@ -1747,27 +1750,44 @@ function main()
             end
          end
          
-         -- if isTrainingSandbox and dialoghook.nextdialog then
-            -- if isKeyJustPressed(0x27) and sampIsCursorActive()
-            -- and not sampIsChatInputActive() and sampIsDialogActive()
-            -- and not isPauseMenuActive() and not isSampfuncsConsoleActive() then 
-               -- lua_thread.create(function()
-                  -- wait(250)
-                  -- sampSendDialogResponse(32700, 1, 18, " <<<след. страница<<< ")
-               -- end)
-            -- end
-         -- end
-         
-         -- if isTrainingSandbox and dialoghook.prevdialog then
-            -- if isKeyJustPressed(0x25) and sampIsCursorActive()
-            -- and not sampIsChatInputActive() and sampIsDialogActive()
-            -- and not isPauseMenuActive() and not isSampfuncsConsoleActive() then 
-               -- lua_thread.create(function()
-                  -- wait(250)
-                  -- sampSendDialogResponse(32700, 1, 0, " <<<пред. страница<<< ")
-               -- end)
-            -- end
-         -- end
+         if ini.settings.cbarrkeyson then
+            if isTrainingSandbox and dialoghook.nextdialog then
+               if isKeyJustPressed(0x27) and sampIsCursorActive()
+               and not sampIsChatInputActive() and sampIsDialogActive()
+               and not isPauseMenuActive() and not isSampfuncsConsoleActive() then 
+                  lua_thread.create(function()
+                     wait(250)
+                     if dialoghook.cblist then
+                        if LastData.lastPageCb + 1 > 1 then
+                           sampSendDialogResponse(32700, 1, 19, " >>>след. страница>>>")
+                        else
+                           sampSendDialogResponse(32700, 1, 18, " >>>след. страница>>>")
+                        end
+                     end
+                     
+                     -- if dialoghook.tblist then
+                        -- if LastData.lastPageTb + 1 > 1 then
+                           -- sampSendDialogResponse(32700, 1, 19, " >>>след. страница>>>")
+                        -- else
+                           -- sampSendDialogResponse(32700, 1, 18, " >>>след. страница>>>")
+                        -- end
+                     -- end
+                  end)
+               end
+            end
+            
+            if isTrainingSandbox and dialoghook.prevdialog then
+               if isKeyJustPressed(0x25) and sampIsCursorActive()
+               and not sampIsChatInputActive() and sampIsDialogActive()
+               and not isPauseMenuActive() and not isSampfuncsConsoleActive() then 
+                  lua_thread.create(function()
+                     wait(250)
+                     --sampSendDialogResponse(32700, 1, 0, " <<<пред. страница<<<")
+                     sampSendDialogResponse(32700, 1, 0, nil)
+                  end)
+               end
+            end
+         end
          
       end
       
@@ -7405,6 +7425,13 @@ function imgui.OnDrawFrame()
             imgui.SameLine()
             imgui.TextQuestion("( ? )", u8"Активировать дополнительные горячие клавиши")
             
+            if imgui.Checkbox(u8'Переключение страниц в меню КБ на стрелки', checkbox.cbarrkeyson) then
+               ini.settings.cbarrkeyson = checkbox.cbarrkeyson.v
+               inicfg.save(ini, configIni)
+            end
+            imgui.SameLine()
+            imgui.TextQuestion("( ? )", u8"Переключение страниц в меню КБ на стрелки (< влево и вправо >)")
+            
             if imgui.Checkbox(u8'Переключение текстур на PgUp и PgDown', checkbox.remapnum) then
                ini.settings.remapnum = checkbox.remapnum.v
                inicfg.save(ini, configIni)
@@ -11181,10 +11208,28 @@ function sampev.onSendDialogResponse(dialogId, button, listboxId, input)
       
       if button == 1 and ini.settings.loadworldname then
          if LastData.lastDialogTitle and LastData.lastDialogText then
-            if LastData.lastDialogTitle:find("Загрузка мира") then
+            if LastData.lastDialogTitle:find("Загрузка мира") 
+            or LastData.lastDialogTitle:find("Load World") then
                local result = LastData.lastDialogText:match(listboxId.."%s+.FFFFFF.[%a_-]+")
                if result then
                   LastData.lastLoadedWorldName = result:sub(2, result:len())
+                  
+                  if ini.settings.loadworldname and LastData.lastLoadedWorldName then
+                     lua_thread.create(function()
+                        wait(500)
+                        sampSendChat("/vw")
+                        wait(500)
+                        sampSendDialogResponse(32700, 1, nil)
+                        wait(500)
+                        sampSetCurrentDialogEditboxText(LastData.lastLoadedWorldName)
+                        wait(500)
+                        sampCloseCurrentDialogWithButton(1)
+                        wait(250)
+                        sampCloseCurrentDialogWithButton(0)
+                        wait(500)
+                        sampAddChatMessage("[SCRIPT]: {FFFFFF}Название мира было автоматически загружено.", 0x0FF6600)
+                     end)
+                  end
                end
             end
          end
@@ -11638,24 +11683,29 @@ function sampev.onShowDialog(dialogId, style, title, button1, button2, text)
       end
       
       -- TRAINING save cblist page
-      if ini.settings.savepagecb then
-         if dialoghook.cblist and title:find('Страница') then
-            local page = title:match('Страница: (%d+)')
+      if title:find('Страница') then
+         local page = title:match('Страница: (%d+)')
+         if dialoghook.cblist then
             LastData.lastPageCb = tonumber(page) - 1
+         end
+         if dialoghook.tblist then
+            LastData.lastPageTb = tonumber(page) - 1
          end
       end
       
       -- Switching cb with arrow buttons
-      if title:find('Страница') and style == 2 then
-         if text:find('пред. страница') then
-            dialoghook.prevdialog = true
-         else
-            dialoghook.prevdialog = false
-         end
-         if text:find('след. страница') then
-            dialoghook.nextdialog = true
-         else
-            dialoghook.nextdialog = false
+      if title:find('Страница') and style == 5 then
+         if dialoghook.cblist or dialoghook.tblist then
+            if text:find('пред. страница') then
+               dialoghook.prevdialog = true
+            else
+               dialoghook.prevdialog = false
+            end
+            if text:find('след. страница') then
+               dialoghook.nextdialog = true
+            else
+               dialoghook.nextdialog = false
+            end
          end
       end
       
@@ -12654,6 +12704,7 @@ function sampev.onServerMessage(color, text)
          input.error = true
       end
       
+      -- Outdate: Remove later
       if text:find("Мир успешно загружен") then
          dialoghook.loadworld = false
          LastData.lastLoadedWorldNumber = nil
