@@ -3,7 +3,7 @@ script_description("Assistant for mappers")
 script_dependencies('imgui', 'lib.samp.events')
 script_properties("work-in-pause")
 script_url("https://github.com/ins1x/MappingToolkit")
-script_version("4.23") -- RС 1
+script_version("4.23") -- RС 2
 -- support sa-mp versions depends on SAMPFUNCS (0.3.7-R1, 0.3.7-R3-1, 0.3.7-R5, 0.3.DL)
 -- script_moonloader(16) moonloader v.0.26 
 -- editor options: tabsize 3, Unix (LF), encoding Windows-1251
@@ -192,6 +192,7 @@ local ini = inicfg.load({
       worlddescription = "",
       sadstext = "",
       searchbar = "",
+      cbsearch = "",
       disconnecttime = 0,
       lastupdatecheck = nil
    }
@@ -337,6 +338,7 @@ local dialoghook = {
    tblist = false,
    cbvalue = false,
    tbvalue = false,
+   cbsearch = false,
    olist = false,
    otext = false,
    osearch = false,
@@ -854,7 +856,8 @@ local hotkeysActivationList = {
    u8"Повернуть объект на 90", u8"Повернуть объект на 45",
    u8"Скрыть/Показать нижнюю панель", u8"Открыть список миров", 
    u8"Открыть меню мира", u8"Остановить анимацию", u8"Очистить анимации",
-   u8"Отменить редактирование"
+   u8"Отменить редактирование", u8"Переключить режим разработчика",
+   u8"Переключить логи мира"
 }
 
 local hotkeysActivationCmds = {
@@ -862,7 +865,7 @@ local hotkeysActivationCmds = {
    "/veh", "/flymode", "/spec", "/oedit", "/csel", "/omenu", "/oinfo",
    "/animlist", "/cb", "/lock", "/fix", "/vmenu", "/savevw", "/loadvw",
    "/cblist", "/rot", "/rot 45", "/panel", "/list", "/wm", "/stopanim",
-   "/clearanims", "/canceledit"   
+   "/clearanims", "/canceledit", "/devtoggle", "/devtoggle logs"
 }
 
 local chatPrefixList = {
@@ -7137,23 +7140,23 @@ function imgui.OnDrawFrame()
          
          if imgui.CollapsingHeader(u8"Вход в мир:") then
             imgui.resetIO()
-            if isTrainingSandbox then
-               if imgui.Checkbox(u8'Включать режим разработчика при входе в мир', checkbox.autodevmode) then
-                  ini.settings.autodevmode = checkbox.autodevmode.v
-                  inicfg.save(ini, configIni)
-               end
-               imgui.SameLine()
-               imgui.TextQuestion("( ? )", u8"Будет выставлять автоматически режим разработчика в мире (необходимо для перехвата локальных ид объектов)")
+            -- if isTrainingSandbox then
+               -- if imgui.Checkbox(u8'Включать режим разработчика при входе в мир', checkbox.autodevmode) then
+                  -- ini.settings.autodevmode = checkbox.autodevmode.v
+                  -- inicfg.save(ini, configIni)
+               -- end
+               -- imgui.SameLine()
+               -- imgui.TextQuestion("( ? )", u8"Будет выставлять автоматически режим разработчика в мире (необходимо для перехвата локальных ид объектов)")
                
-               if imgui.Checkbox(u8("Включать логи мира при входе"), checkbox.worldlogson) then
-                  ini.settings.worldlogson = checkbox.worldlogson.v
-                  inicfg.save(ini, configIni)
-                  dialoghook.logstoggle = true
-                  sampSendChat("/vw")
-               end
-               imgui.SameLine()
-               imgui.TextQuestion("( ? )", u8"Включает текстдрав с логами мира")
-            end
+               -- if imgui.Checkbox(u8("Включать логи мира при входе"), checkbox.worldlogson) then
+                  -- ini.settings.worldlogson = checkbox.worldlogson.v
+                  -- inicfg.save(ini, configIni)
+                  -- dialoghook.logstoggle = true
+                  -- sampSendChat("/vw")
+               -- end
+               -- imgui.SameLine()
+               -- imgui.TextQuestion("( ? )", u8"Включает текстдрав с логами мира")
+            -- end
             
             if imgui.Checkbox(u8("Отключить audiostream"), nops.audiostream) then
                if nops.audiostream.v then
@@ -7571,7 +7574,7 @@ function imgui.OnDrawFrame()
             imgui.Text(u8"Больше информации по возможностям тулкита:")
             imgui.SameLine()
             imgui.Link("https://github.com/ins1x/MappingToolkit/wiki/FAQ-%D0%BF%D0%BE-MappingToolkit", u8"Github-Wiki")
-            
+            -- https://codeberg.org/ins1x
          imgui.Spacing()
          
          imgui.PushStyleVar(imgui.StyleVar.ItemSpacing, imgui.ImVec2(5, 2))
@@ -11106,6 +11109,12 @@ function sampev.onSendDialogResponse(dialogId, button, listboxId, input)
          end
       end
       
+      if button == 1 and dialoghook.cbsearch then
+         dialoghook.cbsearch = false
+         ini.tmp.cbsearch = tostring(input)
+         inicfg.save(ini, configIni)
+      end
+      
       if button == 1 and dialoghook.setworldname then
          dialoghook.setworldname = false
          ini.tmp.worldname = tostring(input)
@@ -11256,7 +11265,7 @@ function sampev.onSendDialogResponse(dialogId, button, listboxId, input)
       
       if button == 1 then -- if dialog response
          -- Corrects spawn item on /world menu
-         if listboxId == 3 and input:find("Вернуться в свой мир") 
+         if listboxId == 2 and input:find("Вернуться в свой мир") 
          or input:find("Return to my world") then 
             if not playerdata.isWorldJoinUnavailable then
                if worldspawnpos.x and worldspawnpos.x ~= 0 then
@@ -11268,7 +11277,7 @@ function sampev.onSendDialogResponse(dialogId, button, listboxId, input)
             end
          end
          
-         if listboxId == 3 and input:find("Вернуться в свой статичный мир") 
+         if listboxId == 2 and input:find("Вернуться в свой статичный мир") 
          or input:find("Return to my static world") then
             if not playerdata.isWorldJoinUnavailable then
                if worldspawnpos.x and worldspawnpos.x ~= 0 then
@@ -11286,7 +11295,7 @@ function sampev.onSendDialogResponse(dialogId, button, listboxId, input)
          -- end
          -- if listboxId == 3 and input:find("Создать пробный VIP мир") then
          -- end
-         if listboxId == 4 and input:find("Отправиться на спаун") 
+         if listboxId == 3 and input:find("Отправиться на спаун") 
          or input:find("Go to lobby") then
             edit.mode = 0
             if not playerdata.isWorldHoster and ini.settings.saveskin then
@@ -11408,6 +11417,16 @@ function sampev.onSendDialogResponse(dialogId, button, listboxId, input)
             end
          end
          -- Extend main /vw menu
+         -- if input:find("Display in .list") 
+         -- or input:find("Отображать в .list") then
+            -- sampAddChatMessage("[SCRIPT]: {FFFFFF}Вы переключили отображение мира для всех в /list", 0x0FF6600)
+         -- end
+         
+         -- if input:find("Database") 
+         -- or input:find("База данных") then
+            -- sampAddChatMessage("[SCRIPT]: {FFFFFF}База данных сохраняет данные в одну базу со всех слотов мира!", 0x0FF6600)
+         -- end
+         
          if input:find("Интерьеры") 
          or input:find("Interiors") then
             sampSendChat("/int")
@@ -11960,11 +11979,11 @@ function sampev.onShowDialog(dialogId, style, title, button1, button2, text)
       
       if ini.settings.backtoworld and dialoghook.backtoworld then
          if text:find('Вернуться в свой мир.* сек') then
-            sampSendDialogResponse(32700, 1, 3, "Вернуться в свой мир")
+            sampSendDialogResponse(32700, 1, 2, "Вернуться в свой мир")
             dialoghook.backtoworld = false
          end
          if text:find('Return to my world.* sec') then
-            sampSendDialogResponse(32700, 1, 3, "Return to my world")
+            sampSendDialogResponse(32700, 1, 2, "Return to my world")
             dialoghook.backtoworld = false
          end
       end
@@ -11981,9 +12000,9 @@ function sampev.onShowDialog(dialogId, style, title, button1, button2, text)
             playerdata.isWorldJoinUnavailable = true
          else
             playerdata.isWorldJoinUnavailable = false
-            if ini.settings.worldlogson then
-               dialoghook.logstoggle = true
-            end
+            -- if ini.settings.worldlogson then
+               -- dialoghook.logstoggle = true
+            -- end
          end
       end
       
@@ -12161,6 +12180,7 @@ function sampev.onShowDialog(dialogId, style, title, button1, button2, text)
          -- Extend main /vw menu
          if style == 4 then 
             if text:find("Название мира") or text:find("World name") then
+               playerdata.isWorldHoster = true
                if dialoghook.devmenutoggle then
                   lua_thread.create(function()
                      wait(200)
@@ -12171,16 +12191,16 @@ function sampev.onShowDialog(dialogId, style, title, button1, button2, text)
                   end)
                end
                
-               if ini.settings.worldlogson then
-                  if dialoghook.logstoggle then
-                     lua_thread.create(function()
-                        wait(500)
-                        sampSendDialogResponse(32700, 1, 7, LastData.lastDialogInput)
-                        sampCloseCurrentDialogWithButton(0)
-                        dialoghook.logstoggle = false
-                     end)
-                  end
-               end
+               -- if ini.settings.worldlogson then
+                  -- if dialoghook.logstoggle then
+                     -- lua_thread.create(function()
+                        -- wait(500)
+                        -- sampSendDialogResponse(32700, 1, 7, LastData.lastDialogInput)
+                        -- sampCloseCurrentDialogWithButton(0)
+                        -- dialoghook.logstoggle = false
+                     -- end)
+                  -- end
+               -- end
                
                if dialoghook.saveworld then
                   lua_thread.create(function()
@@ -12253,8 +12273,22 @@ function sampev.onShowDialog(dialogId, style, title, button1, button2, text)
             end
          end
          
+         if ini.settings.cbvalautocomplete then
+            if title:find("Поиск") and style == 1 then
+               dialoghook.cbsearch = true
+               if ini.tmp.cbsearch then
+                  if ini.tmp.cbsearch:len() > 1 then
+                     lua_thread.create(function()
+                        wait(200)
+                        sampSetCurrentDialogEditboxText(ini.tmp.cbsearch)
+                     end)
+                  end
+               end
+            end
+         end
+         
          if dialoghook.saveworldname then
-           if title:find("Сохранения шаг 2") or title:find("Save World step 2") then
+            if title:find("Сохранения шаг 2") or title:find("Save World step 2") then
                for line in string.gmatch(text, "([^\n]*)") do
                   local worldname_ru = string.match(line, "сохранения: {FFFFFF}(.+)")
                   local worldname_en = string.match(line, "save slot{FFFFFF}: {FFFFFF}(.+)")
@@ -12463,13 +12497,19 @@ function sampev.onServerMessage(color, text)
       print(string.format("%s, %s", color, text))
    end
    
-   if color == -65281 then -- -65281 Yellow color
-      if text:find('PM от') or text:find('PM к') 
-      or text:find('PM for') or text:find('PM from') then 
-         if ini.settings.savepmmessages then
+   if ini.settings.savepmmessages then
+      if color == -65281 then -- -65281 Yellow color
+         if text:find('PM от') or text:find('PM к') 
+         or text:find('PM for') or text:find('PM from') then 
             local file = io.open(getGameDirectory()..
             "/moonloader/resource/mappingtoolkit/history/pmmessages.txt", "a")
-            file:write(("[%s] %s \n"):format(tostring(os.date("%d.%m.%Y %X")), text))
+            if isTrainingSandbox then
+               if not text:match(".+PM .+ Guide.*") then
+                  file:write(("[%s] %s \n"):format(tostring(os.date("%d.%m.%Y %X")), text))
+               end
+            else
+               file:write(("[%s] %s \n"):format(tostring(os.date("%d.%m.%Y %X")), text))
+            end
             file:close()
          end
       end
@@ -12527,7 +12567,8 @@ function sampev.onServerMessage(color, text)
          ini.tmp.worldhoster = true
          inicfg.save(ini, configIni)
       end
-      if text:find("Невозможно создать новый мир, за вами уже есть закрепленный мир") then
+      if text:find("Невозможно создать новый мир, за вами уже есть закрепленный мир") 
+      or text:find("Unable to create a new world: you already have one") then
          -- "Создать игровой мир"
          if not playerdata.isWorldJoinUnavailable then
             playerdata.isWorldHoster = true
@@ -12651,7 +12692,8 @@ function sampev.onServerMessage(color, text)
       
       --if text:find("[SERVER].+Данный игрок ограничил круг лиц, которые могут подключаться") then
       
-      if text:find("[SERVER].+Ваш мир был обнулен") then
+      if text:find("[SERVER].+Ваш мир был обнулен") 
+      or text:find("[SERVER].+Your world has been reset") then
          playerdata.isWorldHoster = false
          ini.tmp.worldhoster = false
          inicfg.save(ini, configIni)
@@ -13086,14 +13128,30 @@ function sampev.onSendCommand(command)
    
    if isTrainingSandbox then
       if command:find("^/wm$") then -- ex M key menu /vw and /world 
-         if not sampIsChatInputActive() and not sampIsDialogActive() 
-         and not isPauseMenuActive() and not isSampfuncsConsoleActive() then 
+         if not sampIsDialogActive() and not isPauseMenuActive() 
+         and not isSampfuncsConsoleActive() then 
             if playerdata.isWorldHoster then 
-               sampSendChat("/vw")
+               lua_thread.create(function()
+                  wait(50)
+                  sampSendChat("/vw")
+               end)
             else 
-               sampSendChat("/world")
+               lua_thread.create(function()
+                  wait(50)
+                  sampSendChat("/world")
+               end)
             end  
          end
+         -- if missing dialog, retry open /world
+         lua_thread.create(function()
+            wait(250)
+            if not sampIsDialogActive() then
+               --sampAddChatMessage("[SYNTAX]: {FFFFFF}/vw доступен только в своем мире", 0x09A9999)
+               wait(250)
+               sampSendChat("/world")
+            end
+         end)
+         
          return false
       end
    end
@@ -13266,7 +13324,86 @@ function sampev.onSendCommand(command)
          sampAddChatMessage("Сегодня "..os.date("%x %X"), -1)
       end
    end
-            
+   
+   if isTrainingSandbox and command:find("^/devtoggle") then
+      if command:find('(/%a+) (.+)') then
+         local cmd, arg = command:match('(/%a+) (.+)')
+         local arg = tostring(arg)
+         if type(arg) == "string" then
+            if arg:find("all") then
+               sampAddChatMessage("[SCRIPT]: {FFFFFF}Запущено переключение в режим разработчика.", 0x0FF6600)
+               lua_thread.create(function()
+                  wait(250)
+                  sampSendChat("/vw")
+                  wait(500)
+                  sampSendDialogResponse(32700, 1, 10, nil)
+                  wait(500)
+                  sampSendDialogResponse(32700, 1, 0, nil)
+                  sampAddChatMessage("[SCRIPT]: {FFFFFF}Подождите 5 секунд и не нажимайте кнопки!!!", 0x0FF6600)
+                  wait(5000)
+                  sampSendDialogResponse(32700, 1, 1, nil)
+                  wait(250)
+                  sampCloseCurrentDialogWithButton(0)
+                  wait(250)
+                  sampCloseCurrentDialogWithButton(0)
+                  sampAddChatMessage("[SCRIPT]: {FFFFFF}Режим разработчика включен.", 0x0FF6600)
+               end)
+            elseif arg:find("cb") then
+               sampAddChatMessage("[SCRIPT]: {FFFFFF}Запущено переключение в режим разработчика только для CB", 0x0FF6600)
+               lua_thread.create(function()
+                  wait(250)
+                  sampSendChat("/vw")
+                  wait(500)
+                  sampSendDialogResponse(32700, 1, 10, nil)
+                  wait(500)
+                  sampSendDialogResponse(32700, 1, 1, nil)
+                  wait(250)
+                  sampCloseCurrentDialogWithButton(0)
+                  wait(250)
+                  sampCloseCurrentDialogWithButton(0)
+               end)
+            elseif arg:find("logs") or arg:find("log") then
+               sampAddChatMessage("[SCRIPT]: {FFFFFF}Запущено переключение в режим разработчика (Переключение логов)", 0x0FF6600)
+               lua_thread.create(function()
+                  wait(250)
+                  sampSendChat("/vw")
+                  wait(500)
+                  sampSendDialogResponse(32700, 1, 6, nil)
+                  wait(250)
+                  sampCloseCurrentDialogWithButton(0)
+               end)
+            else
+               lua_thread.create(function()
+                  wait(250)
+                  sampSendChat("/vw")
+                  wait(500)
+                  sampSendDialogResponse(32700, 1, 10, nil)
+                  wait(500)
+                  sampSendDialogResponse(32700, 1, 0, nil)
+                  wait(250)
+                  sampCloseCurrentDialogWithButton(0)
+                  wait(250)
+                  sampCloseCurrentDialogWithButton(0)
+               end)
+            end
+         end
+      else
+         lua_thread.create(function()
+            wait(250)
+            sampSendChat("/vw")
+            wait(500)
+            sampSendDialogResponse(32700, 1, 10, nil)
+            wait(500)
+            sampSendDialogResponse(32700, 1, 0, nil)
+            wait(250)
+            sampCloseCurrentDialogWithButton(0)
+            wait(250)
+            sampCloseCurrentDialogWithButton(0)
+         end)
+      end
+      return false
+   end
+   
    if command:find("^/savepos") then
       if sampIsLocalPlayerSpawned() then
          tpcpos.x, tpcpos.y, tpcpos.z = getCharCoordinates(playerPed)
@@ -14002,18 +14139,16 @@ function sampev.onSendCommand(command)
       return false
    end
    
-   if command:find("^/undo") then
+   if isTrainingSandbox and command:find("^/undo") then
       if LastRemovedObject.modelid then
-         if isTrainingSandbox then
-            if LastRemovedObject.position.x ~= 0 then
-               sampSendChat(("/oadd %i %.3f %.3f %.3f"):format(
-               LastRemovedObject.modelid, LastRemovedObject.position.x, LastRemovedObject.position.y, LastRemovedObject.position.z))
-               sampAddChatMessage(("[SCRIPT]: {FFFFFF}Восстановлен последний удаленный объект: %i на координатах: %.3f %.3f %.3f"):format(
-               LastRemovedObject.modelid, LastRemovedObject.position.x, LastRemovedObject.position.y, LastRemovedObject.position.z), 0x0FF6600)
-            else            
-               sampSendChat("/oadd ".. LastRemovedObject.modelid)
-               sampAddChatMessage("[SCRIPT]: {FFFFFF}Восстановлен последний удаленный объект: "..LastRemovedObject.modelid, 0x0FF6600)
-            end
+         if LastRemovedObject.position.x ~= 0 then
+            sampSendChat(("/oadd %i %.3f %.3f %.3f"):format(
+            LastRemovedObject.modelid, LastRemovedObject.position.x, LastRemovedObject.position.y, LastRemovedObject.position.z))
+            sampAddChatMessage(("[SCRIPT]: {FFFFFF}Восстановлен последний удаленный объект: %i на координатах: %.3f %.3f %.3f"):format(
+            LastRemovedObject.modelid, LastRemovedObject.position.x, LastRemovedObject.position.y, LastRemovedObject.position.z), 0x0FF6600)
+         else            
+            sampSendChat("/oadd ".. LastRemovedObject.modelid)
+            sampAddChatMessage("[SCRIPT]: {FFFFFF}Восстановлен последний удаленный объект: "..LastRemovedObject.modelid, 0x0FF6600)
          end
       else
          sampAddChatMessage("[SCRIPT]: {FFFFFF}Не найден последний удаленный объект", 0x0FF6600)
@@ -14447,8 +14582,12 @@ function sampev.onSendCommand(command)
    if isTrainingSandbox and command:find("^/cblist") then
       LastData.lastTbvaluebuffer = nil
       dialoghook.cblist = true
-      if ini.settings.savepagecb then
-         sampSendChat("/cblist "..LastData.lastPageCb)
+      local cmd, arg = command:match('(/%a+) (.+)')
+      if not arg then
+         local searchobj = tostring(arg)
+         if ini.settings.savepagecb then
+            sampSendChat("/cblist "..LastData.lastPageCb)
+         end
       end
    end
    
@@ -14814,9 +14953,43 @@ function sampev.onSendChat(message)
       end
    end
    
+   -- RU Alias for exit
    if message:find("^.учше$")then
       sampSendChat("/exit")
       return false
+   end
+   
+   -- RU Alias for main menus
+   if isTrainingSandbox then
+      if message:find("^.мц$")then
+         sampSendChat("/vw")
+         return false
+      end
+      
+      if message:find("^.ьт$")then
+         sampSendChat("/mn")
+         return false
+      end
+      
+      if message:find("^.цщкдв$")then
+         sampSendChat("/world")
+         return false
+      end
+      
+      if message:find("^.сидшые$")then
+         sampSendChat("/cblist")
+         return false
+      end
+      
+      if message:find("^.рудз$")then
+         sampSendChat("/help")
+         return false
+      end
+      
+      if message:find("^.дшые$")then
+         sampSendChat("/list")
+         return false
+      end
    end
    
    if ini.settings.txtmacros then
@@ -15796,10 +15969,16 @@ function sampev.onSendSpawn()
       local delta = tonumber(os.time()) - tonumber(ini.tmp.disconnecttime)
       if delta < 500 then
          lua_thread.create(function()
-            wait(1000)
+            wait(1500)
             sampSendChat("/world")
             -- wait(500)
-            -- sampAddChatMessage("[SCRIPT]: {FFFFFF}Нажмите на M или введите /world чтобы вернуться в мир!", 0x0FF6600)
+            -- if ini.settings.hotkeys and ini.hotkeyactions.keyM then
+               -- if ini.hotkeyactions.keyM:find(".wm") then
+                  -- sampAddChatMessage("[SCRIPT]: {FFFFFF}Нажмите на M или введите /world чтобы вернуться в мир!", 0x0FF6600)
+               -- end
+            -- else
+               -- sampAddChatMessage("[SCRIPT]: {FFFFFF}Ведите /world чтобы вернуться в мир!", 0x0FF6600)
+            -- end
          end)
       end
    end
@@ -16272,7 +16451,7 @@ function checkBuggedObject(model)
    end
    if model == 3426 then
       bugged = true
-      errorString = "Багнутый объект "..model.." неккоректно отображается под поверхностью, в воде, либо при повороте (баг SAMP)"
+      errorString = "Объект "..model.." может неккоректно отображаться под поверхностью, в воде, либо при повороте (баг SAMP)"
    end
    if model == 11694 or model == 11695 or model == 11696 then
       bugged = true
@@ -16528,18 +16707,18 @@ function WorldJoinInit()
          sampSendChat("/weather "..ini.settings.weather)
          wait(500)
       end
-      if ini.settings.autodevmode then
-         dialoghook.devmenutoggle = true
-         sampSendChat("/vw")
-         wait(500)
-      end
+      -- if ini.settings.autodevmode then
+         -- dialoghook.devmenutoggle = true
+         -- sampSendChat("/vw")
+         -- wait(500)
+      -- end
       if ini.settings.setgm then 
          sampSendChat("/gm")
          wait(500)
       end
-      if ini.settings.worldlogson then
-         dialoghook.logstoggle = true
-      end
+      -- if ini.settings.worldlogson then
+         -- dialoghook.logstoggle = true
+      -- end
       
       if sampIsLocalPlayerSpawned() then
          if ini.settings.saveskin and isValidSkin(ini.settings.skinid) then
