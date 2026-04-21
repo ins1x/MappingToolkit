@@ -3,7 +3,7 @@ script_description("Assistant for mappers")
 script_dependencies('imgui', 'lib.samp.events')
 script_properties("work-in-pause")
 script_url("https://github.com/ins1x/MappingToolkit")
-script_version("4.23") -- Release
+script_version("4.24") -- RC 1
 -- support sa-mp versions depends on SAMPFUNCS (0.3.7-R1, 0.3.7-R3-1, 0.3.7-R5, 0.3.DL)
 -- script_moonloader(16) moonloader v.0.26 
 -- editor options: tabsize 3, Unix (LF), encoding Windows-1251
@@ -11709,6 +11709,13 @@ function sampev.onShowDialog(dialogId, style, title, button1, button2, text)
          end
       end
       
+      -- Fix switching cb
+      if text:find('Действие') or text:find ('Значение') then
+         dialoghook.prevdialog = false
+         dialoghook.nextdialog = false
+         dialoghook.cblist = false
+      end
+      
       if title:find('Edit Attach') then
          local newtext = text.."\nInfo"
          return {dialogId, style, title, button1, button2, newtext}
@@ -13258,7 +13265,14 @@ function sampev.onSendCommand(command)
             end
          end
       else
-         sampAddChatMessage("[SCRIPT]: {FFFFFF}Используйте /hp <id> <кол-во>", 0x0FF6600)
+         sampSendChat("/health 100")
+         lua_thread.create(function()
+            wait(500)
+            if getCharHealth(playerPed) >= 99.0 then
+               sampAddChatMessage("[SCRIPT]: {FFFFFF}Вы вылечили себя", 0x0FF6600)
+            end
+         end)
+         sampAddChatMessage("[SCRIPT]: {FFFFFF}Используйте /hp <id> <кол-во> если хотите вылечить другого игрока", 0x0FF6600)
       end
       return false
    end
@@ -14284,9 +14298,12 @@ function sampev.onSendCommand(command)
    
    if isTrainingSandbox and command:find("^/healme") then
       sampSendChat("/health 100")
-      if getCharHealth(playerPed) > 90.0 then
-         sampAddChatMessage("[SCRIPT]: {FFFFFF}Вы вылечили себя", 0x0FF6600)
-      end
+      lua_thread.create(function()
+         wait(500)
+         if getCharHealth(playerPed) >= 99.0 then
+            sampAddChatMessage("[SCRIPT]: {FFFFFF}Вы вылечили себя", 0x0FF6600)
+         end
+      end)
       return false
    end
    
