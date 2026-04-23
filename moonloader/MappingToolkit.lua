@@ -3,7 +3,7 @@ script_description("Assistant for mappers")
 script_dependencies('imgui', 'lib.samp.events')
 script_properties("work-in-pause")
 script_url("https://github.com/ins1x/MappingToolkit")
-script_version("4.24") -- RC 1
+script_version("4.24") -- RC 2
 -- support sa-mp versions depends on SAMPFUNCS (0.3.7-R1, 0.3.7-R3-1, 0.3.7-R5, 0.3.DL)
 -- script_moonloader(16) moonloader v.0.26 
 -- editor options: tabsize 3, Unix (LF), encoding Windows-1251
@@ -39,7 +39,6 @@ local ini = inicfg.load({
       autoreconnect = true,
       autocleanlogs = true,
       backtoworld = true,
-      blockhamster = false,
       bigoffsetwarning = true,
       camdist = "1",
       cbarrkeyson = false,
@@ -358,7 +357,6 @@ local checkbox = {
    autoreconnect = imgui.ImBool(ini.settings.autoreconnect),
    showhud = imgui.ImBool(ini.settings.showhud),
    backtoworld = imgui.ImBool(ini.settings.backtoworld),
-   blockhamster = imgui.ImBool(ini.settings.blockhamster),
    bigoffsetwarning = imgui.ImBool(ini.settings.bigoffsetwarning),
    lockserverweather = imgui.ImBool(ini.settings.lockserverweather),
    usecustomcamdist = imgui.ImBool(ini.settings.usecustomcamdist),
@@ -541,6 +539,7 @@ local input = {
    isbot = false,
    error = false,
    txdselected = false,
+   cbid = imgui.ImInt(0),
    camdelay = imgui.ImInt(5000),
    camshake = imgui.ImInt(500),
    charanimspeed = imgui.ImInt(2),
@@ -6371,14 +6370,6 @@ function imgui.OnDrawFrame()
                inicfg.save(ini, configIni)
             end
             
-            -- Outdate. Hamster deactivated on server
-            -- if isTrainingSandbox then
-               -- if imgui.ToggleButton(u8"Заткнуть хомяка (Бот Hamster)", checkbox.blockhamster) then
-                  -- ini.settings.blockhamster = checkbox.blockhamster.v
-                  -- inicfg.save(ini, configIni)
-               -- end
-            -- end
-            
             if imgui.ToggleButton(u8"Скрывать все объявления и рекламу", checkbox.antiads) then
                ini.settings.antiads = checkbox.antiads.v
                inicfg.save(ini, configIni)
@@ -6406,7 +6397,7 @@ function imgui.OnDrawFrame()
             end
             
             if isTrainingSandbox then
-               if imgui.ToggleButton(u8"Скрывать приставку [CB] в чате", checkbox.chathidecb) then
+               if imgui.ToggleButton(u8"Скрывать приставку * для [CB] в чате", checkbox.chathidecb) then
                   ini.settings.chathidecb = checkbox.chathidecb.v
                   inicfg.save(ini, configIni)
                end
@@ -7241,8 +7232,6 @@ function imgui.OnDrawFrame()
                imgui.TextQuestion("( ? )", u8"Будет выставлять скин при спавне в мире")
                
                if checkbox.saveskin.v then
-                  -- imgui.Text("Skinid:")
-                  -- imgui.SameLine()
                   imgui.PushItemWidth(45)
                   imgui.InputText("ID##saveskin", textbuffer.saveskin, imgui.InputTextFlags.CharsDecimal)
                   imgui.PopItemWidth()
@@ -8836,7 +8825,11 @@ function imgui.OnDrawFrame()
             if imgui.CollapsingHeader(u8"Больше:") then
                imgui.TextColoredRGB("Список всех анимаций SA-MP")
                imgui.SameLine()
-               imgui.Link("https://www.open.mp/docs/scripting/resources/animations", "https://www.open.mp/docs/scripting/resources/animations")
+               imgui.Link("https://www.open.mp/docs/scripting/resources/animations", "https://www.open.mp/docs")
+               
+               imgui.TextColoredRGB("Анимации для командных блоков")
+               imgui.SameLine()
+               imgui.Link("https://forum.training-server.com/d/4727", "https://forum.training-server.com/")
             end
          end
          
@@ -9230,65 +9223,37 @@ function imgui.OnDrawFrame()
          
          if tabmenu.cb == 1 then
             imgui.Spacing()
-            local cmbtext = [[
-            Командные блоки(КБ) - это логические блоки позволяющие игрокам создавать
-            уникальный функционал для миров. Вы можете задавать последовательности 
-            различных действий и обработку условий по множеству параметров.
-            ]]
-            
-            local cmbcmds = [[
-            Команды для взаимодействия с КБ:
-            {FF6600}/cb{FFFFFF} - создать командный блокам
-            {FF6600}/cbdell{FFFFFF} - удалить блок
-            {FF6600}/cbtp{FFFFFF} - телепортрт к блоку
-            {FF6600}/cbedit{FFFFFF} - открыть меню блока
-            {FF6600}/cbed{FFFFFF} - редактировать последний блок
-            {FF6600}/nearcb{FFFFFF} - список кб рядом (по радиусу)
-            {FF6600}/data{FFFFFF} - информация об игроке и данных в его массиве.
-            {FF6600}/timers{FFFFFF} - список таймеров мира
-            {FF6600}/oldcb{FFFFFF} - включить устарелые текстовые команды
-            {FF6600}/tracecb{FFFFFF} - включить режим отладки вызовов КБ
-            {FF6600}/cmb | //<text>{FFFFFF} - активировать КБ аллиас
-            {FF6600}/cblist{FFFFFF} - список всех командных блоков в мире
-            {FF6600}/tb{FFFFFF} - список триггер блоков в мире
-            {FF6600}/shopmenu{FFFFFF} - управление магазинами мира для КБ
-            ]]
-            
+            --imgui.Text(u8"Переменные и массивы:")
             imgui.PushStyleVar(imgui.StyleVar.ItemSpacing, imgui.ImVec2(1, 0.5))
-            imgui.TextColoredRGB(string.gsub(cmbtext, "   ", ""))
-            imgui.PopStyleVar()
-            
-            imgui.Spacing()
-            
-            imgui.PushStyleVar(imgui.StyleVar.ItemSpacing, imgui.ImVec2(1, 0.5))
-            imgui.TextColoredRGB(string.gsub(cmbcmds, "   ", ""))
-            imgui.PopStyleVar()
-            
-            imgui.Spacing()
-            imgui.PushStyleVar(imgui.StyleVar.ItemSpacing, imgui.ImVec2(1, 1))
-            imgui.TextColoredRGB("Подробнее:")
-            imgui.Link("https://forum.training-server.com/d/6166-kollbeki-wiki", u8"Коллбэки - Вики с TRAINING-FORUM")
-            imgui.Link("https://forum.training-server.com/d/19980-spisok-tekstovyh-funktsiy-wiki/21", u8"Текстовые функции - Вики с TRAINING-FORUM")
-            imgui.PopStyleVar()
-            
-            imgui.Spacing()
-            imgui.Spacing()
-            
-            if imgui.TooltipButton("/cblist", imgui.ImVec2(75, 25), u8"Список комадных блоков") then
-               sampSendChat("/cblist")
-               dialog.main.v = false
+            if LastData.lastCb then
+               imgui.TextColoredRGB("Последний ID КБ: {FF6600}"..LastData.lastCb)
+               if imgui.IsItemClicked() then
+                  setClipboardText(tonumber(LastData.lastCb))
+                  sampAddChatMessage("[SCRIPT]: {FFFFFF}Значение скопировано в буффер обмена", 0x0FF6600)
+               end
             end
-            imgui.SameLine()
-            if imgui.TooltipButton("/tb", imgui.ImVec2(75, 25), u8"Список триггер-блоков в мире") then
-               sampSendChat("/tb")
-               dialog.main.v = false
+            if LastData.lastPageCb then
+               imgui.TextColoredRGB("Последняя страница КБ: {FF6600}"..LastData.lastPageCb)
+               if imgui.IsItemClicked() then
+                  setClipboardText(tonumber(LastData.lastPageCb))
+                  sampAddChatMessage("[SCRIPT]: {FFFFFF}Значение скопировано в буффер обмена", 0x0FF6600)
+               end
             end
-            imgui.SameLine()
-            if imgui.TooltipButton("/timers", imgui.ImVec2(75, 25), u8"Список таймеров мира") then
-               sampSendChat("/timers")
-               dialog.main.v = false
+            if LastData.lastCbvaluebuffer then
+               imgui.TextColoredRGB("Последнее значение КБ: {FF6600}"..LastData.lastCbvaluebuffer)
+               if imgui.IsItemClicked() then
+                  setClipboardText(LastData.lastCbvaluebuffer)
+                  sampAddChatMessage("[SCRIPT]: {FFFFFF}Значение скопировано в буффер обмена", 0x0FF6600)
+               end
             end
-            imgui.SameLine()
+            if LastData.lastTbvaluebuffer then
+               imgui.TextColoredRGB("Последнее значение ТБ: {FF6600}"..LastData.lastTbvaluebuffer)
+               if imgui.IsItemClicked() then
+                  setClipboardText(LastData.lastTbvaluebuffer)
+                  sampAddChatMessage("[SCRIPT]: {FFFFFF}Значение скопировано в буффер обмена", 0x0FF6600)
+               end
+            end
+            imgui.PopStyleVar()
             if imgui.TooltipButton("/server", imgui.ImVec2(75, 25), u8"Список серверных массивов мира") then
                sampSendChat("/server")
                dialog.main.v = false
@@ -9303,7 +9268,147 @@ function imgui.OnDrawFrame()
                sampSendChat("/pvarlist")
                dialog.main.v = false
             end
-         
+            imgui.SameLine()
+            if imgui.TooltipButton("/data", imgui.ImVec2(75, 25), u8"Данные игрока (/data <id>)") then
+               local res, pid = sampGetPlayerIdByCharHandle(ped)
+               if res then
+                  sampSendChat("/data ".. pid)
+                  dialog.main.v = false
+               end
+            end
+            
+            imgui.Spacing()
+            imgui.Spacing()
+            
+            -- imgui.SetCursorPosX((imgui.GetWindowWidth() - imgui.CalcTextSize(u8"Настройки КБ").x) / 2.0)
+            -- if imgui.TooltipButton(u8"Авто-дополнение КБ", imgui.ImVec2(125, 25), u8"Открыть настройки атодополнения КБ в Тулките") then
+               -- imgui.selectTabMenu(1)
+               -- tabmenu.settings = 9
+            -- end
+            
+            imgui.Text(u8"Управление КБ:")
+            imgui.SameLine()
+            imgui.TextQuestion("( ? )", u8[[
+            Командные блоки(КБ) - это логические блоки позволяющие игрокам создавать
+            уникальный функционал для миров. Вы можете задавать последовательности 
+            различных действий и обработку условий по множеству параметров.
+            ]])
+            
+            imgui.PushItemWidth(100)
+            imgui.Text(u8"cbid:")
+            imgui.SameLine()
+            if imgui.InputInt('##CBid', input.cbid, 1, 999) then
+               if input.cbid.v < 0 then
+                  input.cbid.v = 0
+               end
+            end
+            imgui.PopItemWidth()
+            imgui.SameLine()
+            if imgui.TooltipButton(u8" <x] ", imgui.ImVec2(35, 25), u8"Очистить поле") then
+               input.cbid.v = 0
+               imgui.resetIO()
+            end
+            imgui.SameLine()
+            imgui.TextQuestion(" [v] ", u8"Вставить ID последнего КБ")
+            if imgui.IsItemClicked() then
+               if LastData.lastCb then
+                  input.cbid.v = tonumber(LastData.lastCb)
+               else
+                  input.cbid.v = 0
+               end
+            end
+            
+            if imgui.TooltipButton(u8"Редактировать", imgui.ImVec2(125, 25), u8"Редактировать блок (/cbedit <id>)") then
+               if input.cbid.v then
+                  sampSendChat("/cbedit "..input.cbid.v)
+                  dialog.main.v = false
+               end
+            end
+            imgui.SameLine()
+            imgui.PushStyleColor(imgui.Col.Button, imgui.ImVec4(0.0, 0.45, 0.0, 1.0))
+            if imgui.TooltipButton(u8"ТП к КБ", imgui.ImVec2(125, 25), u8"Телепортироваться к блоку (/cbtp <id>)") then
+               if input.cbid.v then
+                  sampSendChat("/cbtp "..input.cbid.v)
+               end
+            end
+            imgui.PopStyleColor()
+            imgui.SameLine()
+            imgui.PushStyleColor(imgui.Col.Button, imgui.ImVec4(0.2, 0.0, 0.0, 1.0))
+            if imgui.TooltipButton(u8"Удалить", imgui.ImVec2(125, 25), u8"Удалить блок (/cbdell <id>)") then
+               if input.cbid.v then
+                  sampSendChat("/cbdell "..input.cbid.v)
+               end
+            end
+            imgui.PopStyleColor()
+            
+            imgui.Text(u8"Списки блоков:")
+            if imgui.TooltipButton("/cblist", imgui.ImVec2(75, 25), u8"Список комадных блоков") then
+               sampSendChat("/cblist")
+               dialog.main.v = false
+            end
+            imgui.SameLine()
+            if imgui.TooltipButton("/tb", imgui.ImVec2(75, 25), u8"Список триггер-блоков в мире") then
+               sampSendChat("/tb")
+               dialog.main.v = false
+            end
+            imgui.SameLine()
+            if imgui.TooltipButton("/nearcb", imgui.ImVec2(75, 25), u8"Cписок кб рядом (по радиусу)") then
+               sampSendChat("/nearcb 100")
+               dialog.main.v = false
+            end
+            imgui.SameLine()
+            if imgui.TooltipButton("/shopmenu", imgui.ImVec2(75, 25), u8"Управление магазинами мира для КБ") then
+               sampSendChat("/shopmenu")
+               dialog.main.v = false
+            end
+            imgui.SameLine()
+            if imgui.TooltipButton("/timers", imgui.ImVec2(75, 25), u8"Список таймеров мира") then
+               sampSendChat("/timers")
+               dialog.main.v = false
+            end
+            
+            imgui.Text(u8"Продвинутые функции:")
+            if imgui.TooltipButton("/textengine", imgui.ImVec2(75, 25), u8"Переключение движков тектовых команд") then
+               sampSendChat("/textengine")
+               dialog.main.v = false
+            end
+            imgui.SameLine()
+            if imgui.TooltipButton("/newcb", imgui.ImVec2(75, 25), u8"Информация по обновлению текстовых команд") then
+               sampSendChat("/newcb")
+               dialog.main.v = false
+            end
+            imgui.SameLine()
+            if imgui.TooltipButton("/tracecb", imgui.ImVec2(75, 25), u8"Включить режим отладки вызовов КБ") then
+               sampSendChat("/tracecb")
+            end
+            
+            imgui.Spacing()
+            local docDescriptionList = {
+               u8"Коллбэки [WIKI]",
+               u8"Текстовые функции (новый движок)",
+               u8"Текстовые функции и коллбэки (классический)",
+               u8"Сравнение движков текстовых функций",
+               u8"Тригер блоки и принцип их работы",
+            }
+            local docUrls = {
+               "https://forum.training-server.com/d/6166-kollbeki-wiki",
+               "https://forum.training-server.com/d/22176-spisok-tekstovyh-funktsiy-i-kollbekov",
+               "https://forum.training-server.com/d/22204-cpisok-tekstovyh-funktsiy-i-kollbekov-na-klassicheskom-tekstovom-dvizhke",
+               "https://forum.training-server.com/d/22175-sravnenie-dvizhkov-tekstovyh-funktsiy",
+               "https://forum.training-server.com/d/14526-triger-bloki-i-princip-ix-raboty",
+            }
+            
+            imgui.Text(u8"Открыть справку:")
+            imgui.TextNotify(" >> ", u8"Выберите ресурс")
+            imgui.SameLine()
+            imgui.PushItemWidth(300)
+            imgui.Combo(u8'##developerdocs', combobox.developerdocs, 
+            docDescriptionList, #docDescriptionList)
+            imgui.PopItemWidth()
+            if imgui.TooltipButton(u8"Открыть справку", imgui.ImVec2(120, 25), u8"Открывает справочный ресурс в вашем браузере") then
+               os.execute('explorer "'..docUrls[combobox.developerdocs.v+1]..'"')
+            end
+            
          elseif tabmenu.cb == 2 then
             imgui.PushFont(fonts.multilinetextfont)
             imgui.InputTextMultiline('##textfunctions', textbuffer.textfunctions, imgui.ImVec2(490, 330),
@@ -11962,7 +12067,7 @@ function sampev.onShowDialog(dialogId, style, title, button1, button2, text)
                local lines = {}
                for line in string.gmatch(text, "([^\n]*)") do
                   if line:len() > 2 then
-                     if not line:find('.M.') then
+                     if not line:find('0%s+.M.') then
                         table.insert(lines, line)
                      end
                   end
@@ -12641,7 +12746,7 @@ function sampev.onServerMessage(color, text)
          inicfg.save(ini, configIni)
          if ini.settings.hotkeys and ini.hotkeyactions.keyM then
             if ini.hotkeyactions.keyM:find(".wm") then
-               sampAddChatMessage("[SERVER]: {FFFFFF}Меню управления миром - /vw или клавиша - M", 0x0FF6600)
+               sampAddChatMessage("[SCRIPT]: {FFFFFF}Меню управления миром - /vw или клавиша - M", 0x0FF6600)
             end
          end
          return false
@@ -12711,35 +12816,18 @@ function sampev.onServerMessage(color, text)
          input.error = true
       end
       
-      -- Outdate: Remove later
-      if text:find("Мир успешно загружен") then
+      if text:find("[SERVER].+Мир успешно загружен") then
          dialoghook.loadworld = false
          LastData.lastLoadedWorldNumber = nil
          LastData.lastMinigame = nil
-         sampAddChatMessage("[SCRIPT]: {FFFFFF}Используйте /tpo или метку на карте чтобы телепортироваться.", 0x0FF6600)
+         --sampAddChatMessage("[SCRIPT]: {FFFFFF}Используйте /tpo или метку на карте чтобы телепортироваться.", 0x0FF6600)
          if ini.settings.spawnafterloadvw then
             sampSendChat("/spawnme")
          end
-         if ini.settings.loadworldname and LastData.lastLoadedWorldName then
-            lua_thread.create(function()
-               wait(500)
-               sampSendChat("/vw")
-               wait(500)
-               sampSendDialogResponse(32700, 1, nil)
-               wait(500)
-               sampSetCurrentDialogEditboxText(LastData.lastLoadedWorldName)
-               wait(500)
-               sampCloseCurrentDialogWithButton(1)
-               wait(250)
-               sampCloseCurrentDialogWithButton(0)
-               wait(500)
-               sampAddChatMessage("[SCRIPT]: {FFFFFF}Название мира было автоматически загружено.", 0x0FF6600)
-            end)
-         end
       end
       
-      if text:find("Виртуальный мир успешно создан") 
-      or text:find("Вы создали пробный VIP мир") then
+      if text:find("[SERVER].+Виртуальный мир успешно создан") 
+      or text:find("[SERVER].+Вы создали пробный VIP мир") then
          --LastData.lastWorldName = "{696969}Виртуальный мир"
          WorldJoinInit()
       end
@@ -12763,12 +12851,23 @@ function sampev.onServerMessage(color, text)
       -- admin trollolo
       --{ffa500}[SERVER]: {ffffff}Приносим свои извинения, в качестве компенсации за ущерб купон:
       --{80bcff}https://training-server.com/coupon/s0s1-hy1-t3b3-4-n3-kyp0n-e55c4aefd877894
-
+      
+      --[ERROR]:{FFFFFF} Доступно будет через 2 секунды!
+      
       if text:find("[ERROR].+Это краш объект. Ты че кран") then
          sampAddChatMessage("[SCRIPT]: {FFFFFF}Воспользуйтесь объектами: 1394, 16328", 0x0FF6600)
       end
       
-      if text:find("Не используйте данную функцию часто") then
+      if text:find("[ERROR].+Недоступно в данном режиме | Для выхода введите /exit") then
+         playerdata.isWorldHoster = false
+         ini.tmp.worldhoster = false
+         inicfg.save(ini, configIni)
+      end
+      
+      if text:find("[ERROR].+Не используйте данную функцию часто") 
+      or text:find("[ERROR].+Didn't work! Don't use this feature too often! Once every 30 seconds.") 
+      or text:find("[ERROR].+Нельзя загружать мир, если мир из библиотеки.") 
+      then
          dialoghook.loadworld = false
          LastData.lastLoadedWorldNumber = nil
       end
@@ -12780,7 +12879,7 @@ function sampev.onServerMessage(color, text)
          WorldJoinInit()
       end
       
-      if text:find('Создан объект: (%d+)') then
+      if text:find('[SERVER].+Создан объект: (%d+)') then
          LastObject.localid = text:match('Создан объект: (%d+)')
          if LastData.lastModel then
             local objectName = tostring(sampObjectModelNames[LastData.lastModel])
@@ -12789,7 +12888,7 @@ function sampev.onServerMessage(color, text)
          end
       end
       
-      if text:find('Создан action: (%d+)') then
+      if text:find('[SERVER].+Создан action: (%d+)') then
          LastData.lastAction = text:match('Создан action: (%d+)')
       end
       
@@ -12797,7 +12896,7 @@ function sampev.onServerMessage(color, text)
          LastData.lastAction = text:match('Вы телепортированы к 3D тексту: (%d+)')
       end
       
-      if text:find('Блок: (%d+) был удален') then
+      if text:find('[SERVER].+Блок: (%d+) был удален') then
          LastData.lastCb = nil
       end
       
@@ -12815,26 +12914,32 @@ function sampev.onServerMessage(color, text)
          end)
       end
       
-      if text:find('Выбран предмет: (%d+)') then
+      if text:find('[SERVER].+Выбран предмет: (%d+)') then
          LastObject.localid = text:match('Выбран предмет: (%d+)')
       end
       
-      if text:find('Установлен комадный блок: (%d+)') then
+      if text:find('[SERVER].+Установлен комадный блок: (%d+)') then
          LastData.lastCb = text:match('Установлен комадный блок: (%d+)')
       end
       
-      if text:find('Создан актер ID (%d+)') then
+      if text:find('[SERVER].+Создан актер ID (%d+)') then
          LastData.lastActor = text:match('Создан актер ID (%d+)')
       end
       
-      if text:find('Вы отправлены на спаун!') then
+      if text:find('[SERVER].+Этот мир из библиотеки нельзя сохранять') then 
+         playerdata.isWorldHoster = true
+         ini.tmp.worldhoster = true
+         inicfg.save(ini, configIni)
+      end
+      
+      if text:find('[SERVER].+Вы отправлены на спаун!') then
          sampSendChat("/spawnme")
          playerdata.isWorldHoster = false
          ini.tmp.worldhoster = false
          inicfg.save(ini, configIni)
       end
       
-      if text:find('Удален объект: (%d+)') then
+      if text:find('[SERVER].+Удален объект: (%d+)') then
          LastObject.localid = nil
          if LastRemovedObject.modelid then
             local objectName = tostring(sampObjectModelNames[LastRemovedObject.modelid])
@@ -12843,15 +12948,15 @@ function sampev.onServerMessage(color, text)
          end
       end
       
-      if text:find('Проход (%d+) успешно создан') then
+      if text:find('[SERVER].+Проход (%d+) успешно создан') then
          LastData.lastPass = text:match('Проход (%d+) успешно создан')
       end
       
-      if text:find('Проход (%d+) удален') then
+      if text:find('[SERVER].+Проход (%d+) удален') then
          LastData.lastPass = nil
       end
       
-      if text:find('На объект (%d+)') then
+      if text:find('[SERVER].+На объект (%d+)') then
          LastObject.localid = text:match('.+На объект (%d+)')
          if text:find('слот (%d+)') then
             LastObject.txdslot = text:match('.+слот (%d+)')
@@ -12902,12 +13007,11 @@ function sampev.onServerMessage(color, text)
          return false
       end
       
-      --if text:find('[ERROR]:{FFFFFF} Недоступно!') then
-      if text:find('Недоступно!') then
+      if text:find('[ERROR].+Недоступно!') then
          dialoghook.error = true
       end
       
-      if text:find('Вы присоеденились к миру') then
+      if text:find('[SERVER].+Вы присоеденились к миру') then
          LastData.lastWorldName = string.match(text, "Вы присоеденились к миру: (.+)")
          worldspawnpos.x, worldspawnpos.y, worldspawnpos.z = getCharCoordinates(playerPed)
       end
@@ -12921,35 +13025,6 @@ function sampev.onServerMessage(color, text)
       
       if text:find('[ERROR].+Сейчас нет никого в игре') then
          LastData.lastMinigame = nil
-      end
-      
-      if text:find("контент доступен только со сборки") then
-         sampAddChatMessage("[SCRIPT]: {FFFFFF}Ссылка на скачивание была скопирована в буффер обмена. Подробнее: https://discord.gg/MZQm9kFMAZ", 0x0FF6600)
-         setClipboardText('https://forum.training-server.com/d/20472-chto-takoe-ssmp-i-gde-ego-skachat')
-      end
-      -- [CB] Hook 
-      -- if text:find('%[CB%]%:.+') and color == -10092289 then
-         -- if text:find('вошел') or text:find('вошёл') 
-         -- or text:find('зашел') or text:find('зашёл') 
-         -- or text:find('присоединился') then
-         -- end
-      -- end
-   end
-   
-   if ini.settings.blockhamster and isTrainingSandbox then
-      if text:find("Hamster:") then
-         input.isbot = true
-         chatlog = io.open(getFolderPath(5).."\\GTA San Andreas User Files\\SAMP\\chatlog.txt", "a")
-         chatlog:write(os.date("[%H:%M:%S] ")..text.."\r\n")
-         chatlog:close()
-         return false
-      elseif text:find("{FFA500}%p%p%p") and input.isbot then
-         chatlog = io.open(getFolderPath(5).."\\GTA San Andreas User Files\\SAMP\\chatlog.txt", "a")
-         chatlog:write(os.date("[%H:%M:%S] ")..text.."\r\n")
-         chatlog:close()
-         return false
-      else
-         input.isbot = false
       end
    end
    
@@ -13065,13 +13140,11 @@ function sampev.onServerMessage(color, text)
          newtext = newtext:gsub("%[CB%]%:.", "")
          formatChat = true
       end
+      if newtext:find("* .FFFFFF.") then
+         newtext = newtext:gsub("* {FFFFFF}", "")
+         formatChat = true
+      end
    end
-   
-   -- if text:find("%") then
-      -- newtext = newtext:gsub("%", "#")
-      -- formatChat = true
-      -- return false
-   -- end
    
    if formatChat then 
       return {color, newtext}
@@ -13205,14 +13278,13 @@ function sampev.onSendCommand(command)
             end  
          end
          -- if missing dialog, retry open /world
-         lua_thread.create(function()
-            wait(250)
-            if not sampIsDialogActive() then
-               --sampAddChatMessage("[SYNTAX]: {FFFFFF}/vw доступен только в своем мире", 0x09A9999)
-               wait(250)
-               sampSendChat("/world")
-            end
-         end)
+         -- lua_thread.create(function()
+            -- wait(500)
+            -- if not sampIsDialogActive() then
+               -- --sampAddChatMessage("[SYNTAX]: {FFFFFF}/vw доступен только в своем мире", 0x09A9999)
+               -- sampSendChat("/world")
+            -- end
+         -- end)
          
          return false
       end
@@ -13524,12 +13596,16 @@ function sampev.onSendCommand(command)
       if command:find('(/%a+) (.+)') then
          local cmd, arg = command:match('(/%a+) (.+)')
          local skinid = tonumber(arg)
+         local prevskin = getCharModel(playerPed)
          if type(skinid) == "number" then
             if isValidSkin(skinid) then
-               local currentskin = getCharModel(playerPed)
-               if currentskin ~= skinid then
-                  sampAddChatMessage("[SCRIPT]: {FFFFFF}Вы сменили скин {696969}"..currentskin.."{FFFFFF} на {696969}"..skinid, 0x0FF6600)
-               end
+               lua_thread.create(function()
+                  wait(1000)
+                  local currentskin = getCharModel(playerPed)
+                  if currentskin ~= prevskin then
+                     sampAddChatMessage("[SCRIPT]: {FFFFFF}Вы сменили скин {696969}"..prevskin.."{FFFFFF} на {696969}"..currentskin, 0x0FF6600)
+                  end
+               end)
             end
          end
       end
@@ -13603,8 +13679,8 @@ function sampev.onSendCommand(command)
    end
    
    if isTrainingSandbox and command:find("^/tpnextaction") then
-      if LastData.lastAction then
-         sampSendChat("/tpaction "..LastData.lastAction+1)
+      if tonumber(LastData.lastAction) then
+         sampSendChat("/tpaction "..tonumber(LastData.lastAction)+1)
       else
          sampAddChatMessage("[SCRIPT]: {FFFFFF}Не найден последний action (3D текст). Попробуйте /tpaction <id>", 0x0FF6600)
       end
@@ -13613,8 +13689,8 @@ function sampev.onSendCommand(command)
    
    if isTrainingSandbox and command:find("^/tpprevaction") then
       if LastData.lastAction then
-         if LastData.lastAction >= 0 then
-            sampSendChat("/tpaction "..LastData.lastAction-1)
+         if tonumber(LastData.lastAction) >= 0 then
+            sampSendChat("/tpaction "..tonumber(LastData.lastAction)-1)
          end
       else
          sampAddChatMessage("[SCRIPT]: {FFFFFF}Не найден последний action (3D текст). Попробуйте /tpaction <id>", 0x0FF6600)
