@@ -3,7 +3,7 @@ script_description("Assistant for mappers")
 script_dependencies('imgui', 'lib.samp.events')
 script_properties("work-in-pause")
 script_url("https://github.com/ins1x/MappingToolkit")
-script_version("4.24") -- RC 3
+script_version("4.24") -- RC 4
 -- support sa-mp versions depends on SAMPFUNCS (0.3.7-R1, 0.3.7-R3-1, 0.3.7-R5, 0.3.DL)
 -- script_moonloader(16) moonloader v.0.26 
 -- editor options: tabsize 3, Unix (LF), encoding Windows-1251
@@ -550,6 +550,8 @@ local input = {
    mdodist = imgui.ImInt(100),
    rendselectedmodelid = imgui.ImInt(0),
    rendmaxdist = imgui.ImInt(250),
+   timerconvert = imgui.ImInt(1000),
+   timerconverted = imgui.ImInt(1),
    timelapdelay = imgui.ImInt(5),
    tpstep = imgui.ImInt(3),
    txdid = imgui.ImInt(0),
@@ -623,6 +625,7 @@ local tabmenu = {
    mp = 1,
    cb = 1,
    cbtb = 1,
+   cbhelp = 1,
    cmds = 1,
    lastmenu = 1,
 }
@@ -748,6 +751,7 @@ local combobox = {
    uifontselect = imgui.ImInt(0),
    tpdestination = imgui.ImInt(0),
    developerdocs = imgui.ImInt(0),
+   converttimer = imgui.ImInt(0),
    logs = imgui.ImInt(0)
 }
 
@@ -2820,7 +2824,7 @@ function imgui.OnDrawFrame()
                   input.charanimspeed.v = 1
                end                  
             end
-            
+            imgui.PopItemWidth()
             if imgui.Checkbox(u8"AutoWalk", checkbox.autowalk) then
                -- if checkbox.autowalk.v then
                   -- sampAddChatMessage("[SCRIPT]: {FFFFFF}Чтобы выйти из режима авто-походки нажмите {FF6600}SHIFT{FFFFFF} либо {FF6600}SPACE", 0x0FF6600)
@@ -6242,7 +6246,569 @@ function imgui.OnDrawFrame()
          
          imgui.PopStyleVar()
          
-      -- elseif tabmenu.settings == 7 then
+      elseif tabmenu.settings == 7 then
+         -- if imgui.TooltipButton(u8"Unlock IO", imgui.ImVec2(80, 25), u8:encode("разблокировать инпут если курсор забагался")) then
+            -- imgui.resetIO()
+         -- end
+         --imgui.SameLine()
+         imgui.PushStyleVar(imgui.StyleVar.ItemSpacing, imgui.ImVec2(2, 0))
+         if tabmenu.cb == 1 then
+            imgui.PushStyleColor(imgui.Col.Button, imgui.GetStyle().Colors[imgui.Col.ButtonHovered])
+            if imgui.Button(u8"Управление##cbmanage", imgui.ImVec2(135, 25)) then tabmenu.cb = 1 end
+            imgui.PopStyleColor()
+         else
+            if imgui.Button(u8"Управление##cbmanage", imgui.ImVec2(135, 25)) then tabmenu.cb = 1 end
+         end
+         imgui.SameLine()
+         if tabmenu.cb == 2 then
+            imgui.PushStyleColor(imgui.Col.Button, imgui.GetStyle().Colors[imgui.Col.ButtonHovered])
+            if imgui.Button(u8"Поиск и справка##cbhelpsearch", imgui.ImVec2(135, 25)) then tabmenu.cb = 2 end
+            imgui.PopStyleColor()
+         else
+            if imgui.Button(u8"Поиск и справка##cbhelpsearc", imgui.ImVec2(135, 25)) then tabmenu.cb = 2 end
+         end
+         -- imgui.SameLine()
+         -- if tabmenu.cb == 2 then
+            -- imgui.PushStyleColor(imgui.Col.Button, imgui.GetStyle().Colors[imgui.Col.ButtonHovered])
+            -- if imgui.Button(u8"Текстовые ф-ции", imgui.ImVec2(135, 25)) then tabmenu.cb = 2 end
+            -- imgui.PopStyleColor()
+         -- else
+            -- if imgui.Button(u8"Текстовые ф-ции", imgui.ImVec2(135, 25)) then tabmenu.cb = 2 end
+         -- end
+         -- imgui.SameLine()
+         -- if tabmenu.cb == 3 then
+            -- imgui.PushStyleColor(imgui.Col.Button, imgui.GetStyle().Colors[imgui.Col.ButtonHovered])
+            -- if imgui.Button(u8"Коллбэки", imgui.ImVec2(135, 25)) then tabmenu.cb = 3 end
+            -- imgui.PopStyleColor()
+         -- else
+            -- if imgui.Button(u8"Коллбэки", imgui.ImVec2(135, 25)) then tabmenu.cb = 3 end
+         -- end
+         imgui.PopStyleVar()
+         
+         if tabmenu.cb == 1 then
+            imgui.Spacing()
+            --imgui.Text(u8"Переменные и массивы:")
+            imgui.PushStyleVar(imgui.StyleVar.ItemSpacing, imgui.ImVec2(1, 0.5))
+            if tabmenu.cbtb == 1 then
+               if LastData.lastCb then
+                  imgui.TextColoredRGB("Последний ID КБ: {696969}"..LastData.lastCb)
+                  if imgui.IsItemClicked() then
+                     setClipboardText(tonumber(LastData.lastCb))
+                     sampAddChatMessage("[SCRIPT]: {FFFFFF}Значение скопировано в буффер обмена", 0x0FF6600)
+                  end
+               end
+               if LastData.lastPageCb then
+                  if tonumber(LastData.lastPageCb) > 0 then
+                     imgui.TextColoredRGB("Последняя страница КБ: {696969}"..LastData.lastPageCb)
+                     if imgui.IsItemClicked() then
+                        setClipboardText(tonumber(LastData.lastPageCb))
+                        sampAddChatMessage("[SCRIPT]: {FFFFFF}Значение скопировано в буффер обмена", 0x0FF6600)
+                     end
+                  end
+               end
+               if LastData.lastCbvaluebuffer then
+                  if LastData.lastCbvaluebuffer:len() > 24 then
+                     imgui.TextColoredRGB("Последнее значение КБ:")
+                     imgui.TextColoredRGB("{696969}"..LastData.lastCbvaluebuffer)
+                  else
+                     imgui.TextColoredRGB("Последнее значение КБ: {696969}"..LastData.lastCbvaluebuffer)
+                  end
+                  if imgui.IsItemClicked() then
+                     setClipboardText(LastData.lastCbvaluebuffer)
+                     sampAddChatMessage("[SCRIPT]: {FFFFFF}Значение скопировано в буффер обмена", 0x0FF6600)
+                  end
+               end
+            elseif tabmenu.cbtb == 2 then
+               if LastData.lastTb then
+                  imgui.TextColoredRGB("Последний ID ТБ: {696969}"..LastData.lastTb)
+                  if imgui.IsItemClicked() then
+                     setClipboardText(tonumber(LastData.lastTb))
+                     sampAddChatMessage("[SCRIPT]: {FFFFFF}Значение скопировано в буффер обмена", 0x0FF6600)
+                  end
+               end
+               if LastData.lastTbName then
+                  imgui.TextColoredRGB("Последнее название ТБ: {696969}"..LastData.lastTbName)
+                  if imgui.IsItemClicked() then
+                     setClipboardText(tonumber(LastData.lastTbName))
+                     sampAddChatMessage("[SCRIPT]: {FFFFFF}Значение скопировано в буффер обмена", 0x0FF6600)
+                  end
+               end
+               if LastData.lastTbvaluebuffer then
+                  if LastData.lastTbvaluebuffer:len() > 24 then
+                     imgui.TextColoredRGB("Последнее значение ТБ:")
+                     imgui.TextColoredRGB("{696969}"..LastData.lastTbvaluebuffer)
+                  else
+                     imgui.TextColoredRGB("Последнее значение ТБ: {696969}"..LastData.lastTbvaluebuffer)
+                  end
+                  if imgui.IsItemClicked() then
+                     setClipboardText(LastData.lastTbvaluebuffer)
+                     sampAddChatMessage("[SCRIPT]: {FFFFFF}Значение скопировано в буффер обмена", 0x0FF6600)
+                  end
+               end
+            end
+            imgui.PopStyleVar()
+
+            imgui.Spacing()
+            imgui.Spacing()
+            
+            -- imgui.SetCursorPosX((imgui.GetWindowWidth() - imgui.CalcTextSize(u8"Настройки КБ").x) / 2.0)
+            -- if imgui.TooltipButton(u8"Авто-дополнение КБ", imgui.ImVec2(125, 25), u8"Открыть настройки атодополнения КБ в Тулките") then
+               -- imgui.selectTabMenu(1)
+               -- tabmenu.settings = 9
+            -- end
+            
+            if tabmenu.cbtb == 1 then
+               imgui.PushStyleColor(imgui.Col.Button, imgui.GetStyle().Colors[imgui.Col.ButtonHovered])
+               if imgui.Button(u8"КБ##cbsw", imgui.ImVec2(45, 25)) then tabmenu.cbtb = 1 end
+               imgui.PopStyleColor()
+            else
+               if imgui.Button(u8"КБ##cbsw", imgui.ImVec2(45, 25)) then tabmenu.cbtb = 1 end
+            end
+            imgui.SameLine()
+            if tabmenu.cbtb == 2 then
+               imgui.PushStyleColor(imgui.Col.Button, imgui.GetStyle().Colors[imgui.Col.ButtonHovered])
+               if imgui.Button(u8"ТБ##tbsw", imgui.ImVec2(45, 25)) then tabmenu.cbtb = 2 end
+               imgui.PopStyleColor()
+            else
+               if imgui.Button(u8"ТБ##tbsw", imgui.ImVec2(45, 25)) then tabmenu.cbtb = 2 end
+            end
+            
+            if tabmenu.cbtb == 1 then
+               imgui.SameLine()
+               imgui.Text(u8"<- Управление КБ:")
+               imgui.SameLine()
+               imgui.TextQuestion("( ? )", u8[[
+               Командные блоки(КБ) - это логические блоки позволяющие игрокам создавать
+               уникальный функционал для миров. Вы можете задавать последовательности 
+               различных действий и обработку условий по множеству параметров.
+               ]])
+            elseif tabmenu.cbtb == 2 then
+               imgui.SameLine()
+               imgui.Text(u8"<- Управление ТБ:")
+               imgui.SameLine()
+               imgui.TextQuestion("( ? )", u8[[
+               Тригер блок (ТБ) - используется для монотонных проверок, уменьшения количества
+               командных блоков в системе и соответственно для экономии слотов cb. 
+               ]])
+            end
+            
+            if tabmenu.cbtb == 1 then
+               imgui.PushItemWidth(100)
+               if imgui.TooltipButton(u8"Список = ##Cblistbid", imgui.ImVec2(80, 25), u8"Список командных блоков (/cblist)") then
+                  sampSendChat("/cblist")
+                  dialog.main.v = false
+               end
+               imgui.SameLine()
+               imgui.Text(u8"cbid:")
+               imgui.SameLine()
+               if imgui.InputInt('##CBid', input.cbid, 1, 999) then
+                  if input.cbid.v < 0 then
+                     input.cbid.v = 0
+                  end
+               end
+               imgui.PopItemWidth()
+               imgui.SameLine()
+               if imgui.TooltipButton(u8" <x] ##cbdel", imgui.ImVec2(35, 25), u8"Очистить поле") then
+                  input.cbid.v = 0
+                  imgui.resetIO()
+               end
+               imgui.SameLine()
+               imgui.TextQuestion(" [v] ", u8"Вставить ID последнего КБ")
+               if imgui.IsItemClicked() then
+                  if LastData.lastCb then
+                     input.cbid.v = tonumber(LastData.lastCb)
+                  else
+                     input.cbid.v = 0
+                  end
+               end
+               
+               if imgui.TooltipButton(u8"Редактировать", imgui.ImVec2(115, 25), u8"Редактировать блок (/cbedit <id>)") then
+                  if input.cbid.v then
+                     sampSendChat("/cbedit "..input.cbid.v)
+                     dialog.main.v = false
+                  end
+               end
+               imgui.SameLine()
+               imgui.PushStyleColor(imgui.Col.Button, imgui.ImVec4(0.0, 0.45, 0.0, 1.0))
+               if imgui.TooltipButton(u8"ТП к КБ", imgui.ImVec2(80, 25), u8"Телепортироваться к блоку (/cbtp <id>)") then
+                  if input.cbid.v then
+                     sampSendChat("/cbtp "..input.cbid.v)
+                  end
+               end
+               imgui.PopStyleColor()
+               imgui.SameLine()
+               imgui.PushStyleColor(imgui.Col.Button, imgui.ImVec4(0.2, 0.0, 0.0, 1.0))
+               if imgui.TooltipButton(u8"Удалить", imgui.ImVec2(80, 25), u8"Удалить блок (/cbdell <id>)") then
+                  if input.cbid.v then
+                     sampSendChat("/cbdell "..input.cbid.v)
+                  end
+               end
+               imgui.PopStyleColor()
+               imgui.SameLine()
+               if imgui.TooltipButton(u8"Ближайшие", imgui.ImVec2(85, 25), u8"Cписок кб рядом (по радиусу)") then
+                  sampSendChat("/nearcb 100")
+                  dialog.main.v = false
+               end
+            elseif tabmenu.cbtb == 2 then
+               imgui.PushItemWidth(100)
+               if imgui.TooltipButton(u8"Список = ##Tblistbid", imgui.ImVec2(80, 25), u8"Список триггер-блоков (/tb)") then
+                  sampSendChat("/tb")
+                  dialog.main.v = false
+               end
+               imgui.SameLine()
+               imgui.Text(u8"tbid:")
+               imgui.SameLine()
+               if imgui.InputInt('##TBid', input.tbid, 1, 999) then
+                  if input.tbid.v < 0 then
+                     input.tbid.v = 0
+                  end
+               end
+               imgui.PopItemWidth()
+               imgui.SameLine()
+               if imgui.TooltipButton(u8" <x] ##tbdel", imgui.ImVec2(35, 25), u8"Очистить поле") then
+                  input.tbid.v = 0
+                  imgui.resetIO()
+               end
+               imgui.SameLine()
+               imgui.TextQuestion(" [v] ", u8"Вставить ID последнего ТБ")
+               if imgui.IsItemClicked() then
+                  if LastData.lastTb then
+                     input.tbid.v = tonumber(LastData.lastTb)
+                  else
+                     input.tbid.v = 0
+                  end
+               end
+               
+               if imgui.TooltipButton(u8"Редактировать", imgui.ImVec2(115, 25), u8"Редактировать блок (/cbedit <id>)") then
+                  if input.tbid.v then
+                     sampSendChat("/tb "..input.tbid.v)
+                     dialog.main.v = false
+                  end
+               end
+            end
+            
+            imgui.PushStyleVar(imgui.StyleVar.ItemSpacing, imgui.ImVec2(4, 4))
+            imgui.PushItemWidth(155)
+            imgui.InputText("##search", textbuffer.searchbar)
+            imgui.PopItemWidth()
+  
+            imgui.SameLine()
+            if imgui.TooltipButton(u8"Искать##Search", imgui.ImVec2(65, 25), 
+            u8:encode("Найти созданный блок по имени или части названия")) then
+              if string.len(textbuffer.searchbar.v) > 0 then
+                 if tabmenu.cbtb == 1 then
+                    sampSendChat("/cblist "..tostring(textbuffer.searchbar.v))
+                 elseif tabmenu.cbtb == 2 then
+                    sampSendChat("/tb "..tostring(textbuffer.searchbar.v))
+                 end
+                 dialog.main.v = false
+              end
+            end
+            
+            imgui.SameLine()
+            if imgui.Selectable(" IO ", false, 0, imgui.ImVec2(25, 15)) then
+               imgui.resetIO()
+            end
+            if imgui.IsItemHovered() then
+               imgui.BeginTooltip()
+               imgui.PushTextWrapPos(600)
+               imgui.TextUnformatted(u8"Unlock IO - разблокировать инпут если курсор забагался")
+               imgui.PopTextWrapPos()
+               imgui.EndTooltip()
+            end
+            imgui.PopStyleVar()
+            
+            imgui.Spacing()
+            imgui.Spacing()
+            
+            if imgui.CollapsingHeader(u8"Таймеры:") then
+               imgui.Text(u8"Конвертер милисекунд в")
+               imgui.SameLine()
+               if combobox.converttimer.v == 0 then
+                  imgui.Text(u8"секунды.")
+               elseif combobox.converttimer.v == 1 then
+                  imgui.Text(u8"минуты")
+               elseif combobox.converttimer.v == 2 then
+                  imgui.Text(u8"часы")
+               end
+               imgui.SameLine()
+               imgui.TextQuestion(" ( ? )", u8"Считает только целочисленные значения")
+               
+               imgui.SameLine()
+               if imgui.TooltipButton(u8"Таймеры", imgui.ImVec2(75, 25), u8"Список таймеров мира (/timers)") then
+                  sampSendChat("/timers")
+                  dialog.main.v = false
+               end
+               imgui.SameLine()
+               if imgui.TooltipButton(u8"Откл. все таймеры", imgui.ImVec2(125, 25), 
+               u8"Остановит все таймера в мире. Специально, для случаев когда один из таймеров флудит вам диалогами и вы не можете ничего сделать. (/offtimers)") 
+               then
+                  sampSendChat("/offtimers")
+               end
+               imgui.PushItemWidth(200)
+               if imgui.InputInt(u8'ms.##INPUT_timerconvert', input.timerconvert, imgui.InputTextFlags.CharsDecimal + imgui.InputTextFlags.EnterReturnsTrue) then
+                  if input.timerconvert.v then
+                     if input.timerconvert.v > 0 then
+                        if input.timerconverted.v then
+                           if combobox.converttimer.v == 0 then
+                              input.timerconverted.v = math.floor(tonumber(input.timerconvert.v * 0.001))
+                           elseif combobox.converttimer.v == 1 then 
+                              input.timerconverted.v = math.floor(tonumber(input.timerconvert.v / 60000))
+                           elseif combobox.converttimer.v == 2 then 
+                              input.timerconverted.v = math.floor(tonumber(input.timerconvert.v / 3600000))
+                           end
+                        end
+                     else
+                        input.timerconvert.v = 0
+                     end
+                  end
+               end
+               imgui.PopItemWidth()
+               imgui.SameLine()
+               imgui.PushItemWidth(150)
+               if imgui.InputInt(u8'##INPUT_timerconverted', input.timerconverted, 1, 2147483647) then
+                  if input.timerconverted.v then
+                     if input.timerconverted.v > 0 then
+                        if input.timerconvert.v then
+                           if combobox.converttimer.v == 0 then
+                              input.timerconvert.v = math.floor(tonumber(input.timerconverted.v * 1000))
+                           elseif combobox.converttimer.v == 1 then
+                              input.timerconvert.v = math.floor(tonumber(input.timerconverted.v * 60000))
+                           elseif combobox.converttimer.v == 2 then
+                              input.timerconvert.v = math.floor(tonumber(input.timerconverted.v * 3600000))
+                           end
+                        end
+                     else
+                        input.timerconverted.v = 0
+                     end
+                  end
+               end
+               imgui.SameLine()
+       
+               imgui.PopItemWidth()
+               imgui.SameLine()
+               imgui.PushItemWidth(70)
+               imgui.Combo(u8'##converttimer', combobox.converttimer, {u8"сек.",u8"мин.",u8"час."})
+               imgui.PopItemWidth()
+            end
+            
+            if imgui.CollapsingHeader(u8"Переменные и массивы:") then
+               if imgui.TooltipButton("/server", imgui.ImVec2(75, 25), u8"Список серверных массивов мира") then
+                  sampSendChat("/server")
+                  dialog.main.v = false
+               end
+               imgui.SameLine()
+               if imgui.TooltipButton("/varlist", imgui.ImVec2(75, 25), u8"Список серверных переменных мира") then
+                  sampSendChat("/varlist")
+                  dialog.main.v = false
+               end
+               imgui.SameLine()
+               if imgui.TooltipButton("/pvarlist", imgui.ImVec2(75, 25), u8"Список пользовательских переменных мира") then
+                  sampSendChat("/pvarlist")
+                  dialog.main.v = false
+               end
+               imgui.SameLine()
+               if imgui.TooltipButton("/data", imgui.ImVec2(75, 25), u8"Данные игрока (/data <id>)") then
+                  local res, pid = sampGetPlayerIdByCharHandle(ped)
+                  if res then
+                     sampSendChat("/data ".. pid)
+                     dialog.main.v = false
+                  end
+               end
+               imgui.SameLine()
+               if imgui.TooltipButton("/odata", imgui.ImVec2(75, 25), u8"Массивы объектов") then
+                  sampSendChat("/odata")
+                  dialog.main.v = false
+               end
+            end
+            
+            if imgui.CollapsingHeader(u8"Продвинутые функции:") then
+               if imgui.TooltipButton("/textengine", imgui.ImVec2(75, 25), u8"Переключение движков тектовых команд") then
+                  sampSendChat("/textengine")
+                  dialog.main.v = false
+               end
+               imgui.SameLine()
+               if imgui.TooltipButton("/newcb", imgui.ImVec2(75, 25), u8"Информация по обновлению текстовых команд") then
+                  sampSendChat("/newcb")
+                  dialog.main.v = false
+               end
+               imgui.SameLine()
+               if imgui.TooltipButton("/tracecb", imgui.ImVec2(75, 25), u8"Включить режим отладки вызовов КБ") then
+                  sampSendChat("/tracecb")
+               end
+               imgui.SameLine()
+               if imgui.TooltipButton("/shopmenu", imgui.ImVec2(75, 25), u8"Управление магазинами мира (для textdraw маназинов на КБ)") then
+                  sampSendChat("/shopmenu")
+                  dialog.main.v = false
+               end
+            end
+            
+            if imgui.CollapsingHeader(u8"Автодополнение:") then               
+               if imgui.Checkbox(u8'Автодополнение в диалогах КБ', checkbox.cbvalautocomplete) then
+                  ini.settings.cbvalautocomplete = checkbox.cbvalautocomplete.v
+                  inicfg.save(ini, configIni)
+               end
+               imgui.SameLine()
+               imgui.TextQuestion("( ? )", u8"Использовать авто-дополнение текущих значений в /cblist (только для TRAINING)")
+               
+               if imgui.Checkbox(u8'Сохранять последнюю страницу КБ', checkbox.savepagecb) then
+                  ini.settings.savepagecb = checkbox.savepagecb.v
+                  inicfg.save(ini, configIni)
+               end
+               imgui.SameLine()
+               imgui.TextQuestion("( ? )", u8"Сохраняет последнюю просмотренную страницу при вызове /cblist (только для TRAINING)")
+               
+               if imgui.Checkbox(u8'Изменять способ активации при создании КБ', checkbox.cbnewactivation) then
+                  ini.settings.cbnewactivation = checkbox.cbnewactivation.v
+                  inicfg.save(ini, configIni)
+               end
+               imgui.SameLine()
+               imgui.TextQuestion("( ? )", u8"При создании КБ изменяет активацию по-умолчанию на вашу")
+               
+               if checkbox.cbnewactivation.v then
+                  imgui.PushItemWidth(200)
+                  if imgui.Combo(u8'<- Выберите активацию КБ по-умолчанию##cbactivations', combobox.cbactivations, cbActivationItemsList) then
+                     ini.settings.cbnewactivationitem = combobox.cbactivations.v
+                     inicfg.save(ini, configIni)
+                  end
+                  imgui.PopItemWidth()
+               end
+               
+               imgui.Text(u8"Радиус активации КБ по-умолчанию:")
+               imgui.SameLine()
+               imgui.PushItemWidth(60)
+               --if imgui.InputFloat("##inputcbdefaultradius", input.cbdefaultradius, 0.1, 9999, '%.2f') then
+               if imgui.InputText("##Buffercbdefaultradius", textbuffer.cbdefaultradius, imgui.InputTextFlags.CharsDecimal) then
+                  if tonumber(textbuffer.cbdefaultradius.v) > 0.1 and tonumber(textbuffer.cbdefaultradius.v) <= 9999.9 then
+                     ini.settings.cbdefaultradius = string.format("%.1f", textbuffer.cbdefaultradius.v)
+                     inicfg.save(ini, configIni)
+                  else
+                     textbuffer.cbdefaultradius.v = "0.1"
+                  end
+               end
+               imgui.PopItemWidth()
+               imgui.SameLine()
+               imgui.TextQuestion("( ? )", u8"При создании КБ изменяет радиус активации (Принимает значения от 0.1 до 9999)")
+            end
+            imgui.Spacing()
+
+            
+         elseif tabmenu.cb == 2 then
+            imgui.Spacing()
+            imgui.Spacing()
+            
+            local docDescriptionList = {
+               u8"Коллбэки [WIKI]",
+               u8"Текстовые функции (новый движок)",
+               u8"Текстовые функции и коллбэки (классический)",
+               u8"Сравнение движков текстовых функций",
+               u8"Тригер блоки и принцип их работы",
+            }
+            local docUrls = {
+               "https://forum.training-server.com/d/6166-kollbeki-wiki",
+               "https://forum.training-server.com/d/22176-spisok-tekstovyh-funktsiy-i-kollbekov",
+               "https://forum.training-server.com/d/22204-cpisok-tekstovyh-funktsiy-i-kollbekov-na-klassicheskom-tekstovom-dvizhke",
+               "https://forum.training-server.com/d/22175-sravnenie-dvizhkov-tekstovyh-funktsiy",
+               "https://forum.training-server.com/d/14526-triger-bloki-i-princip-ix-raboty",
+            }
+            
+            -- imgui.TextNotify(" >> ", u8"Выберите ресурс")
+            -- imgui.SameLine()
+            
+            imgui.PushItemWidth(335)
+            imgui.Combo(u8'##developerdocs', combobox.developerdocs, 
+            docDescriptionList, #docDescriptionList)
+            imgui.PopItemWidth()
+            imgui.SameLine()
+            if imgui.TooltipButton(u8"Справка", imgui.ImVec2(80, 25), u8"Открывает справочный ресурс в вашем браузере") then
+               os.execute('explorer "'..docUrls[combobox.developerdocs.v+1]..'"')
+            end
+            
+            imgui.Spacing()
+            
+            imgui.PushStyleVar(imgui.StyleVar.ItemSpacing, imgui.ImVec2(2, 0))
+            if tabmenu.cbhelp == 1 then
+               imgui.PushStyleColor(imgui.Col.Button, imgui.GetStyle().Colors[imgui.Col.ButtonHovered])
+               if imgui.Button(u8"Текстовые ф-ции", imgui.ImVec2(135, 25)) then tabmenu.cbhelp = 1 end
+               imgui.PopStyleColor()
+            else
+               if imgui.Button(u8"Текстовые ф-ции", imgui.ImVec2(135, 25)) then tabmenu.cbhelp = 1 end
+            end
+            imgui.SameLine()
+            if tabmenu.cbhelp == 2 then
+               imgui.PushStyleColor(imgui.Col.Button, imgui.GetStyle().Colors[imgui.Col.ButtonHovered])
+               if imgui.Button(u8"Коллбэки", imgui.ImVec2(135, 25)) then tabmenu.cbhelp = 2 end
+               imgui.PopStyleColor()
+            else
+               if imgui.Button(u8"Коллбэки", imgui.ImVec2(135, 25)) then tabmenu.cbhelp = 2 end
+            end
+            imgui.PopStyleVar()
+         
+            if tabmenu.cbhelp == 1 then
+               imgui.PushFont(fonts.multilinetextfont)
+               imgui.InputTextMultiline('##textfunctions', textbuffer.textfunctions, imgui.ImVec2(490, 280),
+               imgui.InputTextFlags.EnterReturnsTrue + imgui.InputTextFlags.AllowTabInput + imgui.InputTextFlags.ReadOnly)
+               imgui.PopFont()
+            elseif tabmenu.cbhelp == 2 then
+               imgui.PushFont(fonts.multilinetextfont)
+               imgui.InputTextMultiline('##callbacks', textbuffer.callbacks, imgui.ImVec2(490, 280),
+               imgui.InputTextFlags.EnterReturnsTrue + imgui.InputTextFlags.AllowTabInput + imgui.InputTextFlags.ReadOnly)
+               imgui.PopFont()
+            end
+            
+
+            local filepath
+            if tabmenu.cbhelp == 1 then
+               filepath = getGameDirectory().."//moonloader//resource//mappingtoolkit//textfunctions.txt"
+            elseif tabmenu.cbhelp == 2 then   
+               filepath = getGameDirectory().."//moonloader//resource//mappingtoolkit//callbacks.txt"
+            end
+            
+            imgui.PushStyleVar(imgui.StyleVar.ItemSpacing, imgui.ImVec2(4, 4))
+            imgui.PushItemWidth(210)
+            imgui.InputText("##search", textbuffer.searchbar)
+            imgui.PopItemWidth()
+            imgui.SameLine()
+            if imgui.TooltipButton(u8"Поиск##Search", imgui.ImVec2(60, 25), u8:encode("Поиск по части названия либо описанию")) then
+               local results = 0
+               local resultline = 0
+               if string.len(textbuffer.searchbar.v) > 0 then
+                  for line in io.lines(filepath) do
+                     resultline = resultline + 1
+                     local fmtline = u8:decode(line)
+                     if fmtline:find(string.nlower(u8:decode(textbuffer.searchbar.v)), 1, true) then
+                        results = results + 1
+                        --sampAddChatMessage("Строка "..resultline.." : "..u8:decode(line), -1)
+                        sampAddChatMessage(u8:decode(line), -1)
+                        fmtline = fmtline:gsub('# ','#{FFFFFF} ')
+                        fmtline = fmtline:gsub('^#','{696969}#')
+                        sampAddChatMessage(fmtline, -1)
+                     end
+                  end
+               end
+               
+               if results < 1 then
+                  sampAddChatMessage("Результат поиска: {696969}Совпадений не найдено", -1)
+               else
+                  ini.tmp.searchbar = textbuffer.searchbar.v
+                  inicfg.save(ini, configIni)
+               end
+            end
+            imgui.SameLine()
+            if imgui.Selectable(" IO ", false, 0, imgui.ImVec2(25, 15)) then
+               imgui.resetIO()
+            end
+            if imgui.IsItemHovered() then
+               imgui.BeginTooltip()
+               imgui.PushTextWrapPos(600)
+               imgui.TextUnformatted(u8"Unlock IO - разблокировать инпут если курсор забагался")
+               imgui.PopTextWrapPos()
+               imgui.EndTooltip()
+            end
+            imgui.PopStyleVar()
+            
+         end
+      
       elseif tabmenu.settings == 8 then
          if tabmenu.chat == 1 then
             imgui.PushStyleColor(imgui.Col.Button, imgui.GetStyle().Colors[imgui.Col.ButtonHovered])
@@ -6560,6 +7126,8 @@ function imgui.OnDrawFrame()
                      end
                      if statistics.results > 0 then
                         sampAddChatMessage(("[SCRIPT]: {FFFFFF}Найдено %d совпадений в %d строках"):format(statistics.results, statistics.lines), 0x0FF6600)
+                        -- ini.tmp.searchbar = textbuffer.searchbar.v
+                        -- inicfg.save(ini, configIni)
                      else
                         sampAddChatMessage("[SCRIPT]: {FFFFFF}Не найдено совпадений.", 0x0FF6600)
                         if not checkbox.searchregexp.v then
@@ -7499,6 +8067,16 @@ function imgui.OnDrawFrame()
          if imgui.Button(u8"Текстдравы", imgui.ImVec2(105, 30)) then tabmenu.settings = 5 end
       end
       
+      if isTrainingSandbox then
+         if tabmenu.settings == 7 then
+            imgui.PushStyleColor(imgui.Col.Button, imgui.GetStyle().Colors[imgui.Col.ButtonHovered])
+            if imgui.Button(u8"Блоки", imgui.ImVec2(105, 30)) then tabmenu.settings = 7 end
+            imgui.PopStyleColor()
+         else
+            if imgui.Button(u8"Блоки", imgui.ImVec2(105, 30)) then tabmenu.settings = 7 end
+         end
+      end
+      
       if tabmenu.settings == 3 then
          imgui.PushStyleColor(imgui.Col.Button, imgui.GetStyle().Colors[imgui.Col.ButtonHovered])
          if imgui.Button(u8"Камера",imgui.ImVec2(105, 30)) then tabmenu.settings = 3 end  
@@ -7515,7 +8093,6 @@ function imgui.OnDrawFrame()
          if imgui.Button(u8"Прорисовка",imgui.ImVec2(105, 30)) then tabmenu.settings = 4 end 
       end
       
-      --if imgui.Button(u8"Пусто",imgui.ImVec2(105, 30)) then tabmenu.settings = 5 end 
       if tabmenu.settings == 6 then
          imgui.PushStyleColor(imgui.Col.Button, imgui.GetStyle().Colors[imgui.Col.ButtonHovered])
          if imgui.Button(u8"Эффекты",imgui.ImVec2(105, 30)) then tabmenu.settings = 6 end 
@@ -9193,420 +9770,6 @@ function imgui.OnDrawFrame()
                os.execute('explorer "'..docUrls[combobox.developerdocs.v+1]..'"')
             end
          end
-         
-      elseif tabmenu.info == 7 then
-         -- if imgui.TooltipButton(u8"Unlock IO", imgui.ImVec2(80, 25), u8:encode("разблокировать инпут если курсор забагался")) then
-            -- imgui.resetIO()
-         -- end
-         --imgui.SameLine()
-         imgui.PushStyleVar(imgui.StyleVar.ItemSpacing, imgui.ImVec2(2, 0))
-         if tabmenu.cb == 1 then
-            imgui.PushStyleColor(imgui.Col.Button, imgui.GetStyle().Colors[imgui.Col.ButtonHovered])
-            if imgui.Button(u8"Командные блоки", imgui.ImVec2(135, 25)) then tabmenu.cb = 1 end
-            imgui.PopStyleColor()
-         else
-            if imgui.Button(u8"Командные блоки", imgui.ImVec2(135, 25)) then tabmenu.cb = 1 end
-         end
-         imgui.SameLine()
-         if tabmenu.cb == 2 then
-            imgui.PushStyleColor(imgui.Col.Button, imgui.GetStyle().Colors[imgui.Col.ButtonHovered])
-            if imgui.Button(u8"Текстовые ф-ции", imgui.ImVec2(135, 25)) then tabmenu.cb = 2 end
-            imgui.PopStyleColor()
-         else
-            if imgui.Button(u8"Текстовые ф-ции", imgui.ImVec2(135, 25)) then tabmenu.cb = 2 end
-         end
-         imgui.SameLine()
-         if tabmenu.cb == 3 then
-            imgui.PushStyleColor(imgui.Col.Button, imgui.GetStyle().Colors[imgui.Col.ButtonHovered])
-            if imgui.Button(u8"Коллбэки", imgui.ImVec2(135, 25)) then tabmenu.cb = 3 end
-            imgui.PopStyleColor()
-         else
-            if imgui.Button(u8"Коллбэки", imgui.ImVec2(135, 25)) then tabmenu.cb = 3 end
-         end
-         imgui.PopStyleVar()
-         
-         if tabmenu.cb == 1 then
-            imgui.Spacing()
-            --imgui.Text(u8"Переменные и массивы:")
-            imgui.PushStyleVar(imgui.StyleVar.ItemSpacing, imgui.ImVec2(1, 0.5))
-            if tabmenu.cbtb == 1 then
-               if LastData.lastCb then
-                  imgui.TextColoredRGB("Последний ID КБ: {696969}"..LastData.lastCb)
-                  if imgui.IsItemClicked() then
-                     setClipboardText(tonumber(LastData.lastCb))
-                     sampAddChatMessage("[SCRIPT]: {FFFFFF}Значение скопировано в буффер обмена", 0x0FF6600)
-                  end
-               end
-               if LastData.lastPageCb then
-                  if tonumber(LastData.lastPageCb) > 0 then
-                     imgui.TextColoredRGB("Последняя страница КБ: {696969}"..LastData.lastPageCb)
-                     if imgui.IsItemClicked() then
-                        setClipboardText(tonumber(LastData.lastPageCb))
-                        sampAddChatMessage("[SCRIPT]: {FFFFFF}Значение скопировано в буффер обмена", 0x0FF6600)
-                     end
-                  end
-               end
-               if LastData.lastCbvaluebuffer then
-                  imgui.TextColoredRGB("Последнее значение КБ: {696969}"..LastData.lastCbvaluebuffer)
-                  if imgui.IsItemClicked() then
-                     setClipboardText(LastData.lastCbvaluebuffer)
-                     sampAddChatMessage("[SCRIPT]: {FFFFFF}Значение скопировано в буффер обмена", 0x0FF6600)
-                  end
-               end
-            elseif tabmenu.cbtb == 2 then
-               if LastData.lastTb then
-                  imgui.TextColoredRGB("Последний ID ТБ: {696969}"..LastData.lastTb)
-                  if imgui.IsItemClicked() then
-                     setClipboardText(tonumber(LastData.lastTb))
-                     sampAddChatMessage("[SCRIPT]: {FFFFFF}Значение скопировано в буффер обмена", 0x0FF6600)
-                  end
-               end
-               if LastData.lastTbName then
-                  imgui.TextColoredRGB("Последнее название ТБ: {696969}"..LastData.lastTbName)
-                  if imgui.IsItemClicked() then
-                     setClipboardText(tonumber(LastData.lastTbName))
-                     sampAddChatMessage("[SCRIPT]: {FFFFFF}Значение скопировано в буффер обмена", 0x0FF6600)
-                  end
-               end
-               if LastData.lastTbvaluebuffer then
-                  imgui.TextColoredRGB("Последнее значение ТБ: {696969}"..LastData.lastTbvaluebuffer)
-                  if imgui.IsItemClicked() then
-                     setClipboardText(LastData.lastTbvaluebuffer)
-                     sampAddChatMessage("[SCRIPT]: {FFFFFF}Значение скопировано в буффер обмена", 0x0FF6600)
-                  end
-               end
-            end
-            imgui.PopStyleVar()
-            imgui.Spacing()
-            
-            local docDescriptionList = {
-               u8"Коллбэки [WIKI]",
-               u8"Текстовые функции (новый движок)",
-               u8"Текстовые функции и коллбэки (классический)",
-               u8"Сравнение движков текстовых функций",
-               u8"Тригер блоки и принцип их работы",
-            }
-            local docUrls = {
-               "https://forum.training-server.com/d/6166-kollbeki-wiki",
-               "https://forum.training-server.com/d/22176-spisok-tekstovyh-funktsiy-i-kollbekov",
-               "https://forum.training-server.com/d/22204-cpisok-tekstovyh-funktsiy-i-kollbekov-na-klassicheskom-tekstovom-dvizhke",
-               "https://forum.training-server.com/d/22175-sravnenie-dvizhkov-tekstovyh-funktsiy",
-               "https://forum.training-server.com/d/14526-triger-bloki-i-princip-ix-raboty",
-            }
-            
-            -- imgui.TextNotify(" >> ", u8"Выберите ресурс")
-            -- imgui.SameLine()
-            
-            imgui.PushItemWidth(315)
-            imgui.Combo(u8'##developerdocs', combobox.developerdocs, 
-            docDescriptionList, #docDescriptionList)
-            imgui.PopItemWidth()
-            imgui.SameLine()
-            if imgui.TooltipButton(u8"Справка", imgui.ImVec2(80, 25), u8"Открывает справочный ресурс в вашем браузере") then
-               os.execute('explorer "'..docUrls[combobox.developerdocs.v+1]..'"')
-            end
-            
-            imgui.Text(u8"Поиск:")
-            -- imgui.TextNotify("Найти", u8"Поиск текстовых функций КБ по части названия либо описанию")
-            imgui.SameLine()
-            
-            imgui.PushStyleVar(imgui.StyleVar.ItemSpacing, imgui.ImVec2(4, 4))
-            imgui.PushItemWidth(200)
-            imgui.InputText("##search", textbuffer.searchbar)
-            imgui.PopItemWidth()
-            imgui.SameLine()
-            if imgui.TooltipButton(u8"Искать##Search", imgui.ImVec2(65, 25), 
-            u8:encode("Поиск текстовых функций КБ по части названия либо описанию")) then
-               local results = 0
-               local resultline = 0
-               if string.len(textbuffer.searchbar.v) > 0 then
-                  filepath = getGameDirectory().."//moonloader//resource//mappingtoolkit//textfunctions.txt"
-                  for line in io.lines(filepath) do
-                     resultline = resultline + 1
-                     local fmtline = u8:decode(line)
-                     print(fmtline, string.nlower(u8:decode(textbuffer.searchbar.v)))
-                     if fmtline:find(string.nlower(u8:decode(textbuffer.searchbar.v)), 1, true) then
-                        results = results + 1
-                        --sampAddChatMessage("Строка "..resultline.." : "..u8:decode(line), -1)
-                        fmtline = fmtline:gsub('# ','#{FFFFFF} ')
-                        fmtline = fmtline:gsub('^#','{696969}#')
-                        sampAddChatMessage(fmtline, -1)
-                     end
-                  end
-               end
-               if results < 1 then
-                  sampAddChatMessage("Результат поиска: {696969}Совпадений не найдено", -1)
-                  ini.tmp.searchbar = textbuffer.searchbar.v
-                  inicfg.save(ini, configIni)
-               end
-            end
-            
-            imgui.SameLine()
-            if imgui.Selectable(" IO ", false, 0, imgui.ImVec2(25, 15)) then
-               imgui.resetIO()
-            end
-            if imgui.IsItemHovered() then
-               imgui.BeginTooltip()
-               imgui.PushTextWrapPos(600)
-               imgui.TextUnformatted(u8"Unlock IO - разблокировать инпут если курсор забагался")
-               imgui.PopTextWrapPos()
-               imgui.EndTooltip()
-            end
-            imgui.PopStyleVar()
-            
-            imgui.Spacing()
-            imgui.Spacing()
-            
-            -- imgui.SetCursorPosX((imgui.GetWindowWidth() - imgui.CalcTextSize(u8"Настройки КБ").x) / 2.0)
-            -- if imgui.TooltipButton(u8"Авто-дополнение КБ", imgui.ImVec2(125, 25), u8"Открыть настройки атодополнения КБ в Тулките") then
-               -- imgui.selectTabMenu(1)
-               -- tabmenu.settings = 9
-            -- end
-            
-            if tabmenu.cbtb == 1 then
-               imgui.PushStyleColor(imgui.Col.Button, imgui.GetStyle().Colors[imgui.Col.ButtonHovered])
-               if imgui.Button(u8"КБ##cbsw", imgui.ImVec2(45, 25)) then tabmenu.cbtb = 1 end
-               imgui.PopStyleColor()
-            else
-               if imgui.Button(u8"КБ##cbsw", imgui.ImVec2(45, 25)) then tabmenu.cbtb = 1 end
-            end
-            imgui.SameLine()
-            if tabmenu.cbtb == 2 then
-               imgui.PushStyleColor(imgui.Col.Button, imgui.GetStyle().Colors[imgui.Col.ButtonHovered])
-               if imgui.Button(u8"ТБ##tbsw", imgui.ImVec2(45, 25)) then tabmenu.cbtb = 2 end
-               imgui.PopStyleColor()
-            else
-               if imgui.Button(u8"ТБ##tbsw", imgui.ImVec2(45, 25)) then tabmenu.cbtb = 2 end
-            end
-            
-            if tabmenu.cbtb == 1 then
-               imgui.SameLine()
-               imgui.Text(u8"<- Управление КБ:")
-               imgui.SameLine()
-               imgui.TextQuestion("( ? )", u8[[
-               Командные блоки(КБ) - это логические блоки позволяющие игрокам создавать
-               уникальный функционал для миров. Вы можете задавать последовательности 
-               различных действий и обработку условий по множеству параметров.
-               ]])
-            elseif tabmenu.cbtb == 2 then
-               imgui.SameLine()
-               imgui.Text(u8"<- Управление ТБ:")
-               imgui.SameLine()
-               imgui.TextQuestion("( ? )", u8[[
-               Тригер блок (ТБ) - используется для монотонных проверок, уменьшения количества
-               командных блоков в системе и соответственно для экономии слотов cb. 
-               ]])
-            end
-            
-            if tabmenu.cbtb == 1 then
-               imgui.PushItemWidth(100)
-               if imgui.TooltipButton(u8"Список = ##Cblistbid", imgui.ImVec2(80, 25), u8"Список командных блоков (/cblist)") then
-                  sampSendChat("/cblist")
-                  dialog.main.v = false
-               end
-               imgui.SameLine()
-               imgui.Text(u8"cbid:")
-               imgui.SameLine()
-               if imgui.InputInt('##CBid', input.cbid, 1, 999) then
-                  if input.cbid.v < 0 then
-                     input.cbid.v = 0
-                  end
-               end
-               imgui.PopItemWidth()
-               imgui.SameLine()
-               if imgui.TooltipButton(u8" <x] ##cbdel", imgui.ImVec2(35, 25), u8"Очистить поле") then
-                  input.cbid.v = 0
-                  imgui.resetIO()
-               end
-               imgui.SameLine()
-               imgui.TextQuestion(" [v] ", u8"Вставить ID последнего КБ")
-               if imgui.IsItemClicked() then
-                  if LastData.lastCb then
-                     input.cbid.v = tonumber(LastData.lastCb)
-                  else
-                     input.cbid.v = 0
-                  end
-               end
-               
-               if imgui.TooltipButton(u8"Редактировать", imgui.ImVec2(115, 25), u8"Редактировать блок (/cbedit <id>)") then
-                  if input.cbid.v then
-                     sampSendChat("/cbedit "..input.cbid.v)
-                     dialog.main.v = false
-                  end
-               end
-               imgui.SameLine()
-               imgui.PushStyleColor(imgui.Col.Button, imgui.ImVec4(0.0, 0.45, 0.0, 1.0))
-               if imgui.TooltipButton(u8"ТП к КБ", imgui.ImVec2(80, 25), u8"Телепортироваться к блоку (/cbtp <id>)") then
-                  if input.cbid.v then
-                     sampSendChat("/cbtp "..input.cbid.v)
-                  end
-               end
-               imgui.PopStyleColor()
-               imgui.SameLine()
-               imgui.PushStyleColor(imgui.Col.Button, imgui.ImVec4(0.2, 0.0, 0.0, 1.0))
-               if imgui.TooltipButton(u8"Удалить", imgui.ImVec2(80, 25), u8"Удалить блок (/cbdell <id>)") then
-                  if input.cbid.v then
-                     sampSendChat("/cbdell "..input.cbid.v)
-                  end
-               end
-               imgui.PopStyleColor()
-               imgui.SameLine()
-               if imgui.TooltipButton(u8"Ближайшие", imgui.ImVec2(85, 25), u8"Cписок кб рядом (по радиусу)") then
-                  sampSendChat("/nearcb 100")
-                  dialog.main.v = false
-               end
-            elseif tabmenu.cbtb == 2 then
-               imgui.PushItemWidth(100)
-               if imgui.TooltipButton(u8"Список = ##Tblistbid", imgui.ImVec2(80, 25), u8"Список триггер-блоков (/tb)") then
-                  sampSendChat("/tb")
-                  dialog.main.v = false
-               end
-               imgui.SameLine()
-               imgui.Text(u8"tbid:")
-               imgui.SameLine()
-               if imgui.InputInt('##TBid', input.tbid, 1, 999) then
-                  if input.tbid.v < 0 then
-                     input.tbid.v = 0
-                  end
-               end
-               imgui.PopItemWidth()
-               imgui.SameLine()
-               if imgui.TooltipButton(u8" <x] ##tbdel", imgui.ImVec2(35, 25), u8"Очистить поле") then
-                  input.tbid.v = 0
-                  imgui.resetIO()
-               end
-               imgui.SameLine()
-               imgui.TextQuestion(" [v] ", u8"Вставить ID последнего ТБ")
-               if imgui.IsItemClicked() then
-                  if LastData.lastTb then
-                     input.tbid.v = tonumber(LastData.lastTb)
-                  else
-                     input.tbid.v = 0
-                  end
-               end
-               
-               if imgui.TooltipButton(u8"Редактировать", imgui.ImVec2(115, 25), u8"Редактировать блок (/cbedit <id>)") then
-                  if input.tbid.v then
-                     sampSendChat("/tb "..input.tbid.v)
-                     dialog.main.v = false
-                  end
-               end
-            end      
-            
-            imgui.Spacing()
-            if imgui.TooltipButton("/shopmenu", imgui.ImVec2(75, 25), u8"Управление магазинами мира для КБ") then
-               sampSendChat("/shopmenu")
-               dialog.main.v = false
-            end
-            imgui.SameLine()
-            if imgui.TooltipButton("/timers", imgui.ImVec2(75, 25), u8"Список таймеров мира") then
-               sampSendChat("/timers")
-               dialog.main.v = false
-            end
-            
-            imgui.Text(u8"Переменные и массивы:")
-            if imgui.TooltipButton("/server", imgui.ImVec2(75, 25), u8"Список серверных массивов мира") then
-               sampSendChat("/server")
-               dialog.main.v = false
-            end
-            imgui.SameLine()
-            if imgui.TooltipButton("/varlist", imgui.ImVec2(75, 25), u8"Список серверных переменных мира") then
-               sampSendChat("/varlist")
-               dialog.main.v = false
-            end
-            imgui.SameLine()
-            if imgui.TooltipButton("/pvarlist", imgui.ImVec2(75, 25), u8"Список пользовательских переменных мира") then
-               sampSendChat("/pvarlist")
-               dialog.main.v = false
-            end
-            imgui.SameLine()
-            if imgui.TooltipButton("/data", imgui.ImVec2(75, 25), u8"Данные игрока (/data <id>)") then
-               local res, pid = sampGetPlayerIdByCharHandle(ped)
-               if res then
-                  sampSendChat("/data ".. pid)
-                  dialog.main.v = false
-               end
-            end
-            
-            imgui.Text(u8"Продвинутые функции:")
-            if imgui.TooltipButton("/textengine", imgui.ImVec2(75, 25), u8"Переключение движков тектовых команд") then
-               sampSendChat("/textengine")
-               dialog.main.v = false
-            end
-            imgui.SameLine()
-            if imgui.TooltipButton("/newcb", imgui.ImVec2(75, 25), u8"Информация по обновлению текстовых команд") then
-               sampSendChat("/newcb")
-               dialog.main.v = false
-            end
-            imgui.SameLine()
-            if imgui.TooltipButton("/tracecb", imgui.ImVec2(75, 25), u8"Включить режим отладки вызовов КБ") then
-               sampSendChat("/tracecb")
-            end
-            
-            imgui.Spacing()
-
-            
-         elseif tabmenu.cb == 2 then
-            imgui.PushFont(fonts.multilinetextfont)
-            imgui.InputTextMultiline('##textfunctions', textbuffer.textfunctions, imgui.ImVec2(490, 330),
-            imgui.InputTextFlags.EnterReturnsTrue + imgui.InputTextFlags.AllowTabInput + imgui.InputTextFlags.ReadOnly)
-            imgui.PopFont()
-         elseif tabmenu.cb == 3 then
-            imgui.PushFont(fonts.multilinetextfont)
-            imgui.InputTextMultiline('##callbacks', textbuffer.callbacks, imgui.ImVec2(490, 330),
-            imgui.InputTextFlags.EnterReturnsTrue + imgui.InputTextFlags.AllowTabInput + imgui.InputTextFlags.ReadOnly)
-            imgui.PopFont()
-         end
-         
-         if tabmenu.cb > 1 then
-            local filepath
-            if tabmenu.cb == 2 then
-               filepath = getGameDirectory().."//moonloader//resource//mappingtoolkit//textfunctions.txt"
-            elseif tabmenu.cb == 3 then   
-               filepath = getGameDirectory().."//moonloader//resource//mappingtoolkit//callbacks.txt"
-            end
-            imgui.Text(u8"Найти по описанию")
-            imgui.SameLine()
-            
-            imgui.PushStyleVar(imgui.StyleVar.ItemSpacing, imgui.ImVec2(4, 4))
-            imgui.PushItemWidth(200)
-            imgui.InputText("##search", textbuffer.searchbar)
-            imgui.PopItemWidth()
-            imgui.SameLine()
-            if imgui.TooltipButton(u8"Поиск##Search", imgui.ImVec2(60, 25), u8:encode("Поиск по тексту")) then
-               local results = 0
-               local resultline = 0
-               if string.len(textbuffer.searchbar.v) > 0 then
-                  for line in io.lines(filepath) do
-                     resultline = resultline + 1
-                     local fmtline = u8:decode(line)
-                     if fmtline:find(string.nlower(u8:decode(textbuffer.searchbar.v)), 1, true) then
-                        results = results + 1
-                        --sampAddChatMessage("Строка "..resultline.." : "..u8:decode(line), -1)
-                        sampAddChatMessage(u8:decode(line), -1)
-                        fmtline = fmtline:gsub('# ','#{FFFFFF} ')
-                        fmtline = fmtline:gsub('^#','{696969}#')
-                        sampAddChatMessage(fmtline, -1)
-                     end
-                  end
-               end
-               if results < 1 then
-                  sampAddChatMessage("Результат поиска: Совпадений не найдено", -1)
-               end
-            end
-            imgui.SameLine()
-            if imgui.Selectable("Unlock IO", false, 0, imgui.ImVec2(55, 15)) then
-               imgui.resetIO()
-            end
-            if imgui.IsItemHovered() then
-               imgui.BeginTooltip()
-               imgui.PushTextWrapPos(600)
-               imgui.TextUnformatted(u8"Unlock IO - разблокировать инпут если курсор забагался")
-               imgui.PopTextWrapPos()
-               imgui.EndTooltip()
-            end
-            imgui.PopStyleVar()
-         end
       end 
          
       imgui.NextColumn()
@@ -9644,23 +9807,15 @@ function imgui.OnDrawFrame()
          else
             if imgui.Button(u8"Команды", imgui.ImVec2(105, 30)) then tabmenu.info = 6 end
          end
-      
-         if tabmenu.info == 7 then
-            imgui.PushStyleColor(imgui.Col.Button, imgui.GetStyle().Colors[imgui.Col.ButtonHovered])
-            if imgui.Button(u8"КБ", imgui.ImVec2(105, 30)) then tabmenu.info = 7 end
-            imgui.PopStyleColor()
-         else
-            if imgui.Button(u8"КБ", imgui.ImVec2(105, 30)) then tabmenu.info = 7 end
-         end
       end
       
-      if tabmenu.info == 1 then
-         imgui.PushStyleColor(imgui.Col.Button, imgui.GetStyle().Colors[imgui.Col.ButtonHovered])
-         if imgui.Button(u8"About", imgui.ImVec2(105, 30)) then tabmenu.info = 1 end
-         imgui.PopStyleColor()
-      else
-         if imgui.Button(u8"About", imgui.ImVec2(105, 30)) then tabmenu.info = 1 end
-      end
+      -- if tabmenu.info == 1 then
+         -- imgui.PushStyleColor(imgui.Col.Button, imgui.GetStyle().Colors[imgui.Col.ButtonHovered])
+         -- if imgui.Button(u8"About", imgui.ImVec2(105, 30)) then tabmenu.info = 1 end
+         -- imgui.PopStyleColor()
+      -- else
+         -- if imgui.Button(u8"About", imgui.ImVec2(105, 30)) then tabmenu.info = 1 end
+      -- end
       
 
       --imgui.Columns(1)
@@ -12958,7 +13113,13 @@ function sampev.onServerMessage(color, text)
          input.error = true
       end
       
-      if text:find("[SERVER].+Мир успешно загружен") then
+      -- [SERVER]:{FFFFFF} Модератор xWivar установил таймер рестарта сервера на 50 секунд.
+      -- [SERVER]:{FFFFFF} Рестарт сервера произойдет через 15 секунд.
+      
+      if text:find("[SERVER].+Мир успешно загружен") 
+      -- or text:find("Command Blocks: %d+")
+      -- or text:find("Командные Блоки: %d+")
+      then
          dialoghook.loadworld = false
          LastData.lastLoadedWorldNumber = nil
          LastData.lastMinigame = nil
@@ -13083,11 +13244,11 @@ function sampev.onServerMessage(color, text)
       
       if text:find('[SERVER].+Удален объект: (%d+)') then
          LastObject.localid = nil
-         if LastRemovedObject.modelid then
-            local objectName = tostring(sampObjectModelNames[LastRemovedObject.modelid])
-            local newtext = ("%s (%s)"):format(text, objectName)
-            return {color, newtext}
-         end
+         -- if LastRemovedObject.modelid then
+            -- local objectName = tostring(sampObjectModelNames[LastRemovedObject.modelid])
+            -- local newtext = ("%s (%s)"):format(text, objectName)
+            -- return {color, newtext}
+         -- end
       end
       
       if text:find('[SERVER].+Проход (%d+) успешно создан') then

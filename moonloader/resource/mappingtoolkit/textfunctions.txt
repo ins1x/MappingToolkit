@@ -346,3 +346,15 @@
 #tdModelRotX(slot)# #tdModelRotY(slot)# #tdModelRotZ(slot)# - поворот
 #tdModelZoom(slot)# - зум модели в боксе
 #tdModelColor(slot)# - цвет модели в боксе (возвращается 2 параметра)
+
+Серверный инвентарь:
+#winvcount(itemid)#, #wic(itemid)# — количество предмета у игрока.
+#winvslotitem(slot)#, #wisitem(slot)# — itemid в слоте.
+#winvslotcount(slot)#, #wiscount(slot)# — количество в слоте.
+#winvslotdatahidden(slot)#, #wish(slot)# — скрытые данные слота.
+#winvslotdatashown(slot)#, #wiss(slot)# — видимые данные слота.
+#winvslotdisplay(slot)#, #wisd(slot)# — отображаемое количество/видимые данные.
+#winvitemname(itemid)#, #winame(itemid)# — название предмета.
+#winvitemdesc(itemid)#, #widesc(itemid)# — описание предмета.
+#winvitemmax(itemid)#, #wimax(itemid)# — MaxCount предмета.
+#wislots# — лимит слотов игрока.
