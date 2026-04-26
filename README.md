@@ -28,6 +28,7 @@
 Зависимости Moonloader:
 * lua imgui - https://www.blast.hk/threads/19292/
 * lib.samp.events - https://github.com/THE-FYP/SAMP.Lua
+* fAwesome5 - https://github.com/FortAwesome/Font-Awesome
 * lua-requests - https://luarocks.org/modules/jakeg/lua-requests
 
 > модуль **lua-requests** используется только для проверки версий, поэтому установка этого модуля необязательна для работы тулкита
