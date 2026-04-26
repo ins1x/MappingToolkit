@@ -3,7 +3,7 @@ script_description("Assistant for mappers")
 script_dependencies('imgui', 'lib.samp.events')
 script_properties("work-in-pause")
 script_url("https://github.com/ins1x/MappingToolkit")
-script_version("4.24") -- RC 5
+script_version("4.24") -- RC 6
 -- support sa-mp versions depends on SAMPFUNCS (0.3.7-R1, 0.3.7-R3-1, 0.3.7-R5, 0.3.DL)
 -- script_moonloader(16) moonloader v.0.26 
 -- editor options: tabsize 3, Unix (LF), encoding Windows-1251
@@ -21,12 +21,12 @@ script_version("4.24") -- RC 5
 
 local sampev = require 'lib.samp.events'
 local imgui = require 'imgui'
+local fa = require 'fAwesome5'
 local memory = require 'memory'
 local encoding = require 'encoding'
 encoding.default = 'CP1251'
 u8 = encoding.UTF8
 -- require('requests') The lua-requests module is used only for version checking! 
-
 local inicfg = require 'inicfg'
 local configIni = "mappingtoolkit.ini"
 local ini = inicfg.load({
@@ -181,6 +181,7 @@ local ini = inicfg.load({
       movetabwindow = true,
       multilinefont = "trebucbd",
       multilinefontsize = 13.0,
+      fafontsize = 12.0,
       windowsizex = 640,
       windowsizey = 440
    },
@@ -199,6 +200,7 @@ local ini = inicfg.load({
 }, configIni)
 inicfg.save(ini, configIni)
 
+-- imgui macro
 local sizeX, sizeY = getScreenResolution()
 local v = nil
 
@@ -248,8 +250,10 @@ local fonts = {
    objectsrenderfont = renderCreateFont(ini.settings.renderfont, ini.settings.renderfontsize, 5),
    backgroundfont = renderCreateFont(ini.panel.fontname, ini.panel.fontsize, 5),
    infobarfont = renderCreateFont(ini.panel.fontname, 10, 5),
+   fafontpath = 'moonloader/resource/fonts/fa-solid-900.ttf',
    defaultfont = nil,
-   multilinetextfont = nil
+   multilinetextfont = nil,
+   fa = nil,
 }
 
 local edit = {
@@ -1036,6 +1040,11 @@ function main()
          createDirectory("moonloader/resource/mappingtoolkit/history")
       end
       
+      if not doesDirectoryExist("moonloader/resource/fonts") then 
+         createDirectory("moonloader/resource/fonts")
+      end
+      
+      
       if doesFileExist('moonloader/resource/mappingtoolkit/resetsetting.txt') 
       or doesFileExist('moonloader/resetsetting.txt') then
          os.rename(getGameDirectory().."//moonloader//config//mappingtoolkit.ini", getGameDirectory().."//moonloader//config//prevconf_backup_mappingtoolkit.ini")
@@ -1045,6 +1054,12 @@ function main()
          sampAddChatMessage("Резервную копию ваших предыдущих настроек можно найти в moonloader/config.",-1)
          reloadScripts()
       end      
+      
+      if not doesFileExist('moonloader/resource/fonts/fa-solid-900.ttf') then
+         sampAddChatMessage("[Mapping Toolkit] {FFFFFF}Не установлен шрифт {FF0000}fa-solid-900{FFFFFF}! Вам необходимо установить шрифт для корректной работы тулкита!!", 0x0FF0000)
+         sampAddChatMessage("[Mapping Toolkit] {FFFFFF}Ссылка на скачивание скопирована в буффер обмена: https://github.com/FortAwesome/Font-Awesome/blob/master/webfonts/fa-solid-900.ttf", 0x0FF0000)
+         setClipboardText("https://github.com/FortAwesome/Font-Awesome/blob/master/webfonts/fa-solid-900.ttf")
+      end
       
       if not doesFileExist(getFolderPath(0x14)..'\\'..ini.ui.imguifont..'.ttf') then
          ini.ui.imguifont = "trebucbd"
@@ -2205,6 +2220,13 @@ function imgui.BeforeDrawFrame()
       getFolderPath(0x14) .. '\\'..ini.ui.multilinefont..'.ttf',
       ini.ui.multilinefontsize, nil, imgui.GetIO().Fonts:GetGlyphRangesCyrillic())
    end
+   if fonts.fa == nil then
+      local font_config = imgui.ImFontConfig() -- to use 'imgui.ImFontConfig.new()' on error
+      local fa_glyph_ranges = imgui.ImGlyphRanges({ fa.min_range, fa.max_range })
+      font_config.MergeMode = true
+      fonts.fa = imgui.GetIO().Fonts:AddFontFromFileTTF(fonts.fafontpath, 
+      ini.ui.fafontsize, font_config, fa_glyph_ranges)
+   end
 end
 
 function imgui.OnDrawFrame()
@@ -2226,15 +2248,16 @@ function imgui.OnDrawFrame()
       imgui.SetNextWindowSize(imgui.ImVec2(ini.ui.windowsizex, 80))
       imgui.Begin((".::  Mapping Toolkit v%s ::."):format(thisScript().version), dialog.main, 
       imgui.WindowFlags.NoResize + imgui.WindowFlags.NoMove + imgui.WindowFlags.NoScrollbar + imgui.WindowFlags.NoCollapse)
-
+      
+      imgui.PushFont(fonts.fa)
       if tabmenu.main == 1 then
          imgui.PushStyleColor(imgui.Col.Button, imgui.GetStyle().Colors[imgui.Col.ButtonHovered])
-         if imgui.Button(u8"Основное", imgui.ImVec2(105, 30)) then 
+         if imgui.Button(fa.ICON_FA_TH_LIST..u8" Основное", imgui.ImVec2(105, 30)) then 
             imgui.selectTabMenu(1)
          end
          imgui.PopStyleColor()
       else
-         if imgui.Button(u8"Основное", imgui.ImVec2(105, 30)) then 
+         if imgui.Button(fa.ICON_FA_TH_LIST..u8" Основное", imgui.ImVec2(105, 30)) then 
             imgui.selectTabMenu(1)
          end
       end
@@ -2242,12 +2265,12 @@ function imgui.OnDrawFrame()
       imgui.SameLine()
       if tabmenu.main == 2 then
          imgui.PushStyleColor(imgui.Col.Button, imgui.GetStyle().Colors[imgui.Col.ButtonHovered])
-         if imgui.Button(u8"Зона стрима", imgui.ImVec2(105, 30)) then 
+         if imgui.Button(fa.ICON_FA_FILTER..u8" Зона стрима", imgui.ImVec2(105, 30)) then 
             imgui.selectTabMenu(2)
          end
          imgui.PopStyleColor()
       else
-         if imgui.Button(u8"Зона стрима", imgui.ImVec2(105, 30)) then 
+         if imgui.Button(fa.ICON_FA_FILTER..u8" Зона стрима", imgui.ImVec2(105, 30)) then 
             imgui.selectTabMenu(2)
          end
       end
@@ -2255,12 +2278,12 @@ function imgui.OnDrawFrame()
       imgui.SameLine()
       if tabmenu.main == 3 then
          imgui.PushStyleColor(imgui.Col.Button, imgui.GetStyle().Colors[imgui.Col.ButtonHovered])
-         if imgui.Button(u8"Настройки", imgui.ImVec2(105, 30)) then 
+         if imgui.Button(fa.ICON_FA_COG..u8" Настройки", imgui.ImVec2(105, 30)) then 
             imgui.selectTabMenu(3)
          end
          imgui.PopStyleColor()
       else
-         if imgui.Button(u8"Настройки", imgui.ImVec2(105, 30)) then 
+         if imgui.Button(fa.ICON_FA_COG..u8" Настройки", imgui.ImVec2(105, 30)) then 
             imgui.selectTabMenu(3)
          end
       end
@@ -2268,15 +2291,16 @@ function imgui.OnDrawFrame()
       imgui.SameLine()
       if tabmenu.main == 4 then
          imgui.PushStyleColor(imgui.Col.Button, imgui.GetStyle().Colors[imgui.Col.ButtonHovered])
-         if imgui.Button(u8"Поиск", imgui.ImVec2(105, 30)) then 
+         if imgui.Button(fa.ICON_FA_SEARCH..u8" Поиск", imgui.ImVec2(105, 30)) then 
             imgui.selectTabMenu(4)
          end
          imgui.PopStyleColor()
       else
-         if imgui.Button(u8"Поиск", imgui.ImVec2(105, 30)) then 
+         if imgui.Button(fa.ICON_FA_SEARCH..u8" Поиск", imgui.ImVec2(105, 30)) then 
             imgui.selectTabMenu(4)
          end
       end
+      imgui.PopFont()
       
       imgui.SameLine()
       imgui.Text("                 ")
@@ -2397,19 +2421,20 @@ function imgui.OnDrawFrame()
          imgui.TextColoredRGB(string.format("Район: {696969}%s", zone))
       end
       
-      if imgui.TooltipButton(u8"Статистика", imgui.ImVec2(100, 25), u8"Открыть серверную статистику игрока") then
+      imgui.PushFont(fonts.fa)
+      if imgui.TooltipButton(fa.ICON_FA_USER..u8" Статистика ", imgui.ImVec2(100, 25), u8"Открыть серверную статистику игрока") then
          sampSendChat("/stats " .. chosen.player)
          dialog.main.v = false
       end
       imgui.SameLine()
-      if imgui.TooltipButton(u8"Меню игрока", imgui.ImVec2(100, 25), u8"Открыть серверное меню взаимодействия с игроком") then
+      if imgui.TooltipButton(fa.ICON_FA_LIST..u8" Меню игрока ", imgui.ImVec2(100, 25), u8"Открыть серверное меню взаимодействия с игроком") then
          if isTrainingSandbox then
             sampSendChat("/data " .. chosen.player)
          end
          dialog.main.v = false
       end
 
-      if imgui.TooltipButton(u8"Наблюдать", imgui.ImVec2(100, 25), u8"Наблюдать за игроком") then      
+      if imgui.TooltipButton(fa.ICON_FA_EYE..u8" Наблюдать ", imgui.ImVec2(100, 25), u8"Наблюдать за игроком") then      
          if isTrainingSandbox then
             sampSendChat("/sp " .. chosen.player)
          else
@@ -2417,7 +2442,7 @@ function imgui.OnDrawFrame()
          end
       end
       imgui.SameLine()
-      if imgui.TooltipButton(u8"ТП к Игроку", imgui.ImVec2(100, 25), u8"Телепортироваться к игроку") then
+      if imgui.TooltipButton(fa.ICON_FA_MAP..u8" ТП к Игроку ", imgui.ImVec2(100, 25), u8"Телепортироваться к игроку") then
          for k, v in ipairs(getAllChars()) do
             local res, id = sampGetPlayerIdByCharHandle(v)
             if res then
@@ -2437,13 +2462,13 @@ function imgui.OnDrawFrame()
        end
        
        if isTrainingSandbox then
-          if imgui.TooltipButton(u8"Пробить игрока", imgui.ImVec2(205, 25), u8"Проверка игрока на TRAINING-Checker (online)") then
+          if imgui.TooltipButton(fa.ICON_FA_USER_SECRET..u8" Пробить игрока ", imgui.ImVec2(205, 25), u8"Проверка игрока на TRAINING-Checker (online)") then
              local link = 'explorer "https://trainingchecker.vercel.app/player?nickname='..nickname..'"'
              os.execute(link)
           end
        end
        
-       if imgui.TooltipButton(u8(chosen.playerMarker and 'Снять' or 'Установить')..u8" метку", imgui.ImVec2(205, 25), u8"Установить/Снять метку с игрока") then
+       if imgui.TooltipButton(fa.ICON_FA_MAP_MARKER..u8(chosen.playerMarker and ' Снять ' or ' Установить ')..u8"метку", imgui.ImVec2(205, 25), u8"Установить/Снять метку с игрока") then
           if chosen.playerMarker ~= nil then
              removeBlip(chosen.playerMarker)
              chosen.playerMarker = nil
@@ -2460,7 +2485,7 @@ function imgui.OnDrawFrame()
              end
           end
        end
-       
+       imgui.PopFont()
        imgui.End()
    end
    
@@ -2544,23 +2569,24 @@ function imgui.OnDrawFrame()
          imgui.Spacing()
          imgui.Spacing()
          
+         imgui.PushFont(fonts.fa)
          if tabmenu.coords == 1 then
             imgui.PushStyleColor(imgui.Col.Button, imgui.GetStyle().Colors[imgui.Col.ButtonHovered])
-            if imgui.Button(u8"Позиция", imgui.ImVec2(100, 30)) then tabmenu.coords = 1 end
+            if imgui.Button(fa.ICON_FA_MAP_MARKER..u8" Позиция", imgui.ImVec2(120, 30)) then tabmenu.coords = 1 end
             imgui.PopStyleColor()
          else
-            if imgui.Button(u8"Позиция", imgui.ImVec2(100, 30)) then tabmenu.coords = 1 end
+            if imgui.Button(fa.ICON_FA_MAP_MARKER..u8" Позиция", imgui.ImVec2(120, 30)) then tabmenu.coords = 1 end
          end
          
          imgui.SameLine()
          if tabmenu.coords == 2 then
             imgui.PushStyleColor(imgui.Col.Button, imgui.GetStyle().Colors[imgui.Col.ButtonHovered])
-            if imgui.Button(u8"Телепорт", imgui.ImVec2(100, 30)) then 
+            if imgui.Button(fa.ICON_FA_MAP..u8" Телепорт", imgui.ImVec2(120, 30)) then 
                tabmenu.coords = 2 
             end
             imgui.PopStyleColor()
          else
-            if imgui.Button(u8"Телепорт", imgui.ImVec2(100, 30)) then 
+            if imgui.Button(fa.ICON_FA_MAP..u8" Телепорт", imgui.ImVec2(120, 30)) then 
                -- tpcpos.x = positionX
                -- tpcpos.y = positionY
                -- tpcpos.z = positionZ
@@ -2574,16 +2600,16 @@ function imgui.OnDrawFrame()
          imgui.SameLine()
          if tabmenu.coords == 3 then
             imgui.PushStyleColor(imgui.Col.Button, imgui.GetStyle().Colors[imgui.Col.ButtonHovered])
-            if imgui.Button(u8"Сохраненные", imgui.ImVec2(100, 30)) then 
+            if imgui.Button(fa.ICON_FA_SAVE..u8" Сохраненные", imgui.ImVec2(120, 30)) then 
                tabmenu.coords = 3 
             end
             imgui.PopStyleColor()
          else
-            if imgui.Button(u8"Сохраненные", imgui.ImVec2(100, 30)) then 
+            if imgui.Button(fa.ICON_FA_SAVE..u8" Сохраненные", imgui.ImVec2(120, 30)) then 
                tabmenu.coords = 3
             end
          end
-         
+         imgui.PopFont()
          imgui.Spacing()
          
          if tabmenu.coords == 1 then
@@ -2606,7 +2632,8 @@ function imgui.OnDrawFrame()
             
             imgui.Spacing()
             
-            if imgui.TooltipButton(u8"Получить", imgui.ImVec2(72, 25), u8"Получить текущую позицию игрока и сохранить") then
+            imgui.PushFont(fonts.fa)
+            if imgui.TooltipButton(fa.ICON_FA_COPY..u8" Получить ", imgui.ImVec2(72, 25), u8"Получить текущую позицию игрока и сохранить") then
                tpcpos.x = positionX
                tpcpos.y = positionY
                tpcpos.z = positionZ
@@ -2623,7 +2650,7 @@ function imgui.OnDrawFrame()
                end
             end
             imgui.SameLine()
-            if imgui.TooltipButton(u8"Метка", imgui.ImVec2(55, 25), u8"Поставить метку на карте в текущей точке") then
+            if imgui.TooltipButton(fa.ICON_FA_MAP_MARKER..u8" Метка ", imgui.ImVec2(55, 25), u8"Поставить метку на карте в текущей точке") then
                local posX, posY, posZ = getCharCoordinates(playerPed)
           	   local result = setTargetBlipCoordinates(posX, posY, posZ)
                if result then
@@ -2631,27 +2658,27 @@ function imgui.OnDrawFrame()
                end
             end
             imgui.SameLine()
-            if imgui.Button(u8"Прыгнуть вперед", imgui.ImVec2(130, 25)) then
+            if imgui.Button(fa.ICON_FA_HAND_POINT_RIGHT..u8" Прыгнуть вперед ", imgui.ImVec2(130, 25)) then
                if sampIsLocalPlayerSpawned() then
                   JumpForward()
                end
             end
             imgui.SameLine()
-            if imgui.Button(u8"Прыгнуть вверх", imgui.ImVec2(130, 25)) then
+            if imgui.Button(fa.ICON_FA_ARROW_UP..u8" Прыгнуть вверх ", imgui.ImVec2(130, 25)) then
                if sampIsLocalPlayerSpawned() then
                   local posX, posY, posZ = getCharCoordinates(playerPed)
                   setCharCoordinates(playerPed, posX, posY, posZ+10.0)
                end
             end
             
-            if imgui.Button(u8"Провалиться под текстуры", imgui.ImVec2(200, 25)) then
+            if imgui.Button(fa.ICON_FA_ARROW_DOWN..u8" Провалиться под текстуры ", imgui.ImVec2(200, 25)) then
                if sampIsLocalPlayerSpawned() then
                   local posX, posY, posZ = getCharCoordinates(playerPed)
                   setCharCoordinates(playerPed, posX, posY, posZ-3.0)
                end
             end
             imgui.SameLine()
-            if imgui.Button(u8"Вернуться на поверхность", imgui.ImVec2(200, 25)) then
+            if imgui.Button(fa.ICON_FA_STREET_VIEW..u8" Вернуться на поверхность ", imgui.ImVec2(200, 25)) then
                local result, x, y, z = getNearestRoadCoordinates()
                if result then
                   local dist = getDistanceBetweenCoords3d(x, y, z, getCharCoordinates(playerPed))
@@ -2712,7 +2739,7 @@ function imgui.OnDrawFrame()
                   end
                end
             end
-            
+            imgui.PushStyleColor(imgui.Col.Button, imgui.ImVec4(0.5, 0.25, 0.0, 1.0))
             if imgui.TooltipButton(u8"Заспавниться", imgui.ImVec2(130, 25), u8"Отправить SpawnPlayer серверу") then
                sampSpawnPlayer()
                restoreCameraJumpcut()
@@ -2725,7 +2752,9 @@ function imgui.OnDrawFrame()
             if imgui.TooltipButton(u8"Запросить спавн", imgui.ImVec2(130, 25), u8"Отправить SendRequestSpawn серверу") then
                sampSendRequestSpawn()
             end
+            imgui.PopStyleColor()
             
+            imgui.PushStyleColor(imgui.Col.Button, imgui.ImVec4(0.0, 0.45, 0.0, 1.0))
             if isTrainingSandbox then
                --imgui.PushStyleColor(imgui.Col.Button, imgui.ImVec4(0.0, 0.45, 0.0, 1.0))
                if imgui.TooltipButton(u8"Слапнуть себя", imgui.ImVec2(200, 25), u8"Подбросить себя /slapme") then
@@ -2737,18 +2766,20 @@ function imgui.OnDrawFrame()
                end
                --imgui.PopStyleColor()
             end
+            imgui.PopStyleColor()
+            
             if isTrainingSandbox then
-               if imgui.TooltipButton(u8"Выбрать интерьер", imgui.ImVec2(200, 25), u8"Выбрать интерьер для мира /int") then
+               if imgui.TooltipButton(fa.ICON_FA_BUILDING..u8" Выбрать интерьер ", imgui.ImVec2(200, 25), u8"Выбрать интерьер для мира /int") then
                   sampSendChat("/int")
                   dialog.main.v = false
                end
                imgui.SameLine()
-               if imgui.TooltipButton(u8"Выбрать спавн", imgui.ImVec2(200, 25), u8"Выбрать спавн для мира /team") then
+               if imgui.TooltipButton(fa.ICON_FA_MAP..u8" Выбрать спавн ", imgui.ImVec2(200, 25), u8"Выбрать спавн для мира /team") then
                   sampSendChat("/team")
                   dialog.main.v = false
                end
             end
-            
+            imgui.PopFont()
             imgui.Spacing()
          
             if imgui.Checkbox(u8"Игнорировать границы мира", checkbox.noworldbounds) then
@@ -2936,7 +2967,8 @@ function imgui.OnDrawFrame()
             end
             imgui.PopItemWidth()
             
-            if imgui.TooltipButton(u8"Обновить", imgui.ImVec2(105, 25), u8"Обновит значения на вашу текущую позицию") then
+            imgui.PushFont(fonts.fa)
+            if imgui.TooltipButton(fa.ICON_FA_SYNC..u8"Обновить", imgui.ImVec2(105, 25), u8"Обновит значения на вашу текущую позицию") then
                tpcpos.x = positionX
                tpcpos.y = positionY
                tpcpos.z = positionZ
@@ -2944,6 +2976,7 @@ function imgui.OnDrawFrame()
                textbuffer.tpcy.v = string.format("%.1f", tpcpos.y)
                textbuffer.tpcz.v = string.format("%.1f", tpcpos.z)
             end
+            imgui.PopFont()
             
             imgui.SameLine()
             imgui.TextColoredRGB("{007DFF}x:")
@@ -3732,9 +3765,12 @@ function imgui.OnDrawFrame()
             imgui.SameLine()
             imgui.TextQuestion(u8" ( ? ) ", u8"Цвет в формате AARRGGBB")
             imgui.SameLine()
-            if imgui.TooltipButton(u8"Палитра", imgui.ImVec2(85, 25), u8:encode("Перейти на вкладку выбора цвета")) then
+            
+            imgui.PushFont(fonts.fa)
+            if imgui.TooltipButton(fa.ICON_FA_PALETTE..u8" Палитра ", imgui.ImVec2(85, 25), u8:encode("Перейти на вкладку выбора цвета")) then
                dialog.colorpicker.v = not dialog.colorpicker.v 
             end
+            imgui.PopFont()
             
             if imgui.TooltipButton(u8"Затемнить", imgui.ImVec2(105, 25), u8:encode("Затемнить объект")) then
                if LastObject.localid then 
@@ -4217,7 +4253,7 @@ function imgui.OnDrawFrame()
          imgui.PopStyleVar()
          imgui.Spacing()
          
-         if imgui.TooltipButton(u8">> Вернуть камеру <<", imgui.ImVec2(150, 25), u8"Возвразает камеру на стандартные параметры") then
+         if imgui.TooltipButton(u8">> Вернуть камеру <<", imgui.ImVec2(150, 25), u8"Возвращает камеру на стандартные параметры") then
             if checkbox.fixcampos.v then checkbox.fixcampos.v = false end
             restoreCamera()
             restoreCameraJumpcut()
@@ -4881,18 +4917,20 @@ function imgui.OnDrawFrame()
          imgui.TextColoredRGB("{696969}TextDraws")
          --imgui.Link("https://www.open.mp/docs/scripting/functions/TextDrawCreate","TextDraw")
          imgui.SameLine()
+         
+         imgui.PushFont(fonts.fa)
          if tabmenu.txd == 1 then
             imgui.PushStyleColor(imgui.Col.Button, imgui.GetStyle().Colors[imgui.Col.ButtonHovered])
-            if imgui.Button(u8"Редактировать", imgui.ImVec2(115, 25)) then tabmenu.txd = 1 end
+            if imgui.Button(fa.ICON_FA_PEN..u8" Редактировать", imgui.ImVec2(115, 25)) then tabmenu.txd = 1 end
             imgui.PopStyleColor()
          else
-            if imgui.Button(u8"Редактировать", imgui.ImVec2(115, 25)) then tabmenu.txd = 1 end
+            if imgui.Button(fa.ICON_FA_PEN..u8"Редактировать", imgui.ImVec2(115, 25)) then tabmenu.txd = 1 end
          end
          
          imgui.SameLine()
          if tabmenu.txd == 2 then
             imgui.PushStyleColor(imgui.Col.Button, imgui.GetStyle().Colors[imgui.Col.ButtonHovered])
-            if imgui.Button(u8"Экспорт", imgui.ImVec2(75, 25)) then 
+            if imgui.Button(fa.ICON_FA_SAVE..u8" Экспорт", imgui.ImVec2(75, 25)) then 
                local posX, posY = sampTextdrawGetPos(input.txdid.v)
                if posX > 12400 or posY > 12400 then
                   sampAddChatMessage("[SCRIPT]: {FFFFFF}Сначала получите или примените параметры текстдрава!", 0x0FF6600)
@@ -4902,7 +4940,7 @@ function imgui.OnDrawFrame()
             end
             imgui.PopStyleColor()
          else
-            if imgui.Button(u8"Экспорт", imgui.ImVec2(80, 25)) then 
+            if imgui.Button(fa.ICON_FA_SAVE..u8" Экспорт", imgui.ImVec2(80, 25)) then 
                local posX, posY = sampTextdrawGetPos(input.txdid.v)
                if posX > 12400 or posY > 12400 then
                --if sampTextdrawIsExists(input.txdid.v) then
@@ -4916,12 +4954,12 @@ function imgui.OnDrawFrame()
          imgui.SameLine()
          if tabmenu.txd == 3 then
             imgui.PushStyleColor(imgui.Col.Button, imgui.GetStyle().Colors[imgui.Col.ButtonHovered])
-            if imgui.Button(u8"Дополнительно##tabmenutxd3", imgui.ImVec2(115, 25)) then tabmenu.txd = 3 end
+            if imgui.Button(fa.ICON_FA_LIST..u8" Дополнительно##tabmenutxd3", imgui.ImVec2(115, 25)) then tabmenu.txd = 3 end
             imgui.PopStyleColor()
          else
-            if imgui.Button(u8"Дополнительно##tabmenutxd3", imgui.ImVec2(115, 25)) then tabmenu.txd = 3 end
+            if imgui.Button(fa.ICON_FA_LIST..u8" Дополнительно##tabmenutxd3", imgui.ImVec2(115, 25)) then tabmenu.txd = 3 end
          end
-         
+         imgui.PopFont()
          -- if tabmenu.txd == 1 then
             -- local cursorPosX, cursorPosY = getCursorPos()
             -- local pos_x, pos_y = getScreenResolution()
@@ -5074,15 +5112,16 @@ function imgui.OnDrawFrame()
                
                imgui.Text(u8"Положение:")
                imgui.SameLine()
+               imgui.PushFont(fonts.fa)
                if tabmenu.txdalign == 1 then
                   imgui.PushStyleColor(imgui.Col.Button, imgui.GetStyle().Colors[imgui.Col.ButtonHovered])
-                  if imgui.Button(u8"Слева", imgui.ImVec2(70, 25)) then 
+                  if imgui.TooltipButton(fa.ICON_FA_ALIGN_LEFT, imgui.ImVec2(50, 25), u8"Слева") then 
                      tabmenu.txdalign = 1 
                      sampTextdrawSetAlign(input.txdid.v, 1) --alignment 1-left 2-centered 3-right.
                   end
                   imgui.PopStyleColor()
                else
-                  if imgui.Button(u8"Слева", imgui.ImVec2(70, 25)) then 
+                  if imgui.TooltipButton(fa.ICON_FA_ALIGN_LEFT, imgui.ImVec2(50, 25), u8"Слева") then 
                      tabmenu.txdalign = 1 
                      sampTextdrawSetAlign(input.txdid.v, 1)
                   end
@@ -5091,13 +5130,13 @@ function imgui.OnDrawFrame()
                imgui.SameLine()
                if tabmenu.txdalign == 2 then
                   imgui.PushStyleColor(imgui.Col.Button, imgui.GetStyle().Colors[imgui.Col.ButtonHovered])
-                  if imgui.Button(u8"Центр", imgui.ImVec2(70, 25)) then 
+                  if imgui.TooltipButton(fa.ICON_FA_ALIGN_CENTER, imgui.ImVec2(50, 25), u8"Центр") then 
                      tabmenu.txdalign = 2
                      sampTextdrawSetAlign(input.txdid.v, 2)
                   end
                   imgui.PopStyleColor()
                else
-                  if imgui.Button(u8"Центр", imgui.ImVec2(70, 25)) then 
+                  if imgui.TooltipButton(fa.ICON_FA_ALIGN_CENTER, imgui.ImVec2(50, 25), u8"Центр") then 
                      tabmenu.txdalign = 2
                      sampTextdrawSetAlign(input.txdid.v, 2)
                   end
@@ -5106,17 +5145,18 @@ function imgui.OnDrawFrame()
                imgui.SameLine()
                if tabmenu.txdalign == 3 then
                   imgui.PushStyleColor(imgui.Col.Button, imgui.GetStyle().Colors[imgui.Col.ButtonHovered])
-                  if imgui.Button(u8"Справа", imgui.ImVec2(70, 25)) then 
+                  if imgui.TooltipButton(fa.ICON_FA_ALIGN_RIGHT, imgui.ImVec2(50, 25), u8"Справа") then 
                      tabmenu.txdalign = 3
                      sampTextdrawSetAlign(input.txdid.v, 3)
                   end
                   imgui.PopStyleColor()
                else
-                  if imgui.Button(u8"Справа", imgui.ImVec2(70, 25)) then 
+                  if imgui.TooltipButton(fa.ICON_FA_ALIGN_RIGHT, imgui.ImVec2(50, 25), u8"Справа") then 
                      tabmenu.txdalign = 3
                      sampTextdrawSetAlign(input.txdid.v, 3)
                   end
                end
+               imgui.PopFont()
                
                imgui.SameLine()
                if imgui.Checkbox(u8"Пропорционально", checkbox.txdproportional) then
@@ -5303,7 +5343,8 @@ function imgui.OnDrawFrame()
                imgui.PopItemWidth()
             end
             imgui.Spacing()
-            if imgui.TooltipButton(u8"Применить", imgui.ImVec2(125, 30), u8"Обновить и применить текущие параметры") then
+            imgui.PushFont(fonts.fa)
+            if imgui.TooltipButton(fa.ICON_FA_EDIT..u8" Применить", imgui.ImVec2(125, 30), u8"Обновить и применить текущие параметры") then
                imgui.resetIO()
                input.txdselected = true
                local letColorU32 = join_argb(255, input.txdletcolorrgba.v[1]*255, input.txdletcolorrgba.v[2]*255, input.txdletcolorrgba.v[3]*255)
@@ -5376,7 +5417,7 @@ function imgui.OnDrawFrame()
             imgui.SameLine()
             imgui.Text("    ")
             imgui.SameLine()
-            if imgui.TooltipButton(u8"Очистить", imgui.ImVec2(75, 30), u8"Очистить текущий текстдрав") then
+            if imgui.TooltipButton(fa.ICON_FA_ERASER..u8" Очистить", imgui.ImVec2(95, 30), u8"Очистить текущий текстдрав") then
                imgui.resetIO()
                sampTextdrawDelete(input.txdid.v)
                input.txdselected = false
@@ -5434,7 +5475,7 @@ function imgui.OnDrawFrame()
                sampAddChatMessage("[SCRIPT]: {FFFFFF}TextDraw "..tostring(input.txdid.v).." очищен!", 0x0FF6600)
             end
             imgui.SameLine()
-            if imgui.TooltipButton(u8"Получить", imgui.ImVec2(125, 30), u8"Сдампить параметры с выбранного текстдрава") then
+            if imgui.TooltipButton(fa.ICON_FA_COPY..u8" Получить", imgui.ImVec2(125, 30), u8"Сдампить параметры с выбранного текстдрава") then
                input.txdselected = true
                local id = input.txdid.v
                local style = sampTextdrawGetStyle(id)
@@ -5524,6 +5565,7 @@ function imgui.OnDrawFrame()
                   input.txdselected = false
                end
             end
+            imgui.PopFont()
             
          elseif tabmenu.txd == 2 then
             if input.txdselected then
@@ -5908,9 +5950,11 @@ function imgui.OnDrawFrame()
             end
             
             imgui.SameLine()
-            if imgui.TooltipButton(u8"Открыть папку Export", imgui.ImVec2(150, 30), u8"Открыть в проводнике папку с сохраннеными текстдравами") then
+            imgui.PushFont(fonts.fa)
+            if imgui.TooltipButton(fa.ICON_FA_FOLDER..u8" Открыть папку Export", imgui.ImVec2(150, 30), u8"Открыть в проводнике папку с сохраннеными текстдравами") then
                os.execute('explorer '..getGameDirectory().."\\moonloader\\resource\\mappingtoolkit\\export")
             end
+            imgui.PopFont()
             
          elseif tabmenu.txd == 3 then      
             
@@ -6004,22 +6048,24 @@ function imgui.OnDrawFrame()
          
       elseif tabmenu.global == 6 then
          imgui.SetCursorPosX((imgui.GetWindowWidth() - imgui.CalcTextSize(u8"1").x) / 2.2)
+         imgui.PushFont(fonts.fa)
          if tabmenu.effects == 1 then
             imgui.PushStyleColor(imgui.Col.Button, imgui.GetStyle().Colors[imgui.Col.ButtonHovered])
-            if imgui.Button(u8"1", imgui.ImVec2(100, 25)) then tabmenu.effects = 1 end
+            if imgui.Button(fa.ICON_FA_MAGIC, imgui.ImVec2(100, 25)) then tabmenu.effects = 1 end
             imgui.PopStyleColor()
          else
-            if imgui.Button(u8"1", imgui.ImVec2(100, 25)) then tabmenu.effects = 1 end
+            if imgui.Button(fa.ICON_FA_MAGIC, imgui.ImVec2(100, 25)) then tabmenu.effects = 1 end
          end
          imgui.SameLine()
          if tabmenu.effects == 2 then
             imgui.PushStyleColor(imgui.Col.Button, imgui.GetStyle().Colors[imgui.Col.ButtonHovered])
-            if imgui.Button(u8"2", imgui.ImVec2(100, 25)) then tabmenu.effects = 2 end
+            if imgui.Button(fa.ICON_FA_EYE_SLASH, imgui.ImVec2(100, 25)) then tabmenu.effects = 2 end
             imgui.PopStyleColor()
          else
-            if imgui.Button(u8"2", imgui.ImVec2(100, 25)) then tabmenu.effects = 2 end
+            if imgui.Button(fa.ICON_FA_EYE_SLASH, imgui.ImVec2(100, 25)) then tabmenu.effects = 2 end
          end
-         
+         imgui.PopFont()
+          
          -- changes the spacings so that all the elements can fit
          imgui.PushStyleVar(imgui.StyleVar.ItemSpacing, imgui.ImVec2(4, 4))
          
@@ -6256,21 +6302,22 @@ function imgui.OnDrawFrame()
             -- imgui.resetIO()
          -- end
          --imgui.SameLine()
+         imgui.PushFont(fonts.fa)
          imgui.PushStyleVar(imgui.StyleVar.ItemSpacing, imgui.ImVec2(2, 0))
          if tabmenu.cb == 1 then
             imgui.PushStyleColor(imgui.Col.Button, imgui.GetStyle().Colors[imgui.Col.ButtonHovered])
-            if imgui.Button(u8"Управление##cbmanage", imgui.ImVec2(135, 25)) then tabmenu.cb = 1 end
+            if imgui.Button(fa.ICON_FA_TASKS..u8" Управление##cbmanage", imgui.ImVec2(135, 25)) then tabmenu.cb = 1 end
             imgui.PopStyleColor()
          else
-            if imgui.Button(u8"Управление##cbmanage", imgui.ImVec2(135, 25)) then tabmenu.cb = 1 end
+            if imgui.Button(fa.ICON_FA_TASKS..u8" Управление##cbmanage", imgui.ImVec2(135, 25)) then tabmenu.cb = 1 end
          end
          imgui.SameLine()
          if tabmenu.cb == 2 then
             imgui.PushStyleColor(imgui.Col.Button, imgui.GetStyle().Colors[imgui.Col.ButtonHovered])
-            if imgui.Button(u8"Поиск и справка##cbhelpsearch", imgui.ImVec2(135, 25)) then tabmenu.cb = 2 end
+            if imgui.Button(fa.ICON_FA_ARCHIVE..u8" Поиск и справка##cbhelpsearch", imgui.ImVec2(135, 25)) then tabmenu.cb = 2 end
             imgui.PopStyleColor()
          else
-            if imgui.Button(u8"Поиск и справка##cbhelpsearc", imgui.ImVec2(135, 25)) then tabmenu.cb = 2 end
+            if imgui.Button(fa.ICON_FA_ARCHIVE..u8" Поиск и справка##cbhelpsearc", imgui.ImVec2(135, 25)) then tabmenu.cb = 2 end
          end
          -- imgui.SameLine()
          -- if tabmenu.cb == 2 then
@@ -6289,7 +6336,8 @@ function imgui.OnDrawFrame()
             -- if imgui.Button(u8"Коллбэки", imgui.ImVec2(135, 25)) then tabmenu.cb = 3 end
          -- end
          imgui.PopStyleVar()
-         
+         imgui.PopFont()
+          
          if tabmenu.cb == 1 then
             imgui.Spacing()
             --imgui.Text(u8"Переменные и массивы:")
@@ -6398,8 +6446,10 @@ function imgui.OnDrawFrame()
             end
             
             if tabmenu.cbtb == 1 then
+
                imgui.PushItemWidth(100)
-               if imgui.TooltipButton(u8"Список = ##Cblistbid", imgui.ImVec2(80, 25), u8"Список командных блоков (/cblist)") then
+               imgui.PushFont(fonts.fa)
+               if imgui.TooltipButton(fa.ICON_FA_LIST..u8" Список##Cblistbid", imgui.ImVec2(80, 25), u8"Список командных блоков (/cblist)") then
                   sampSendChat("/cblist")
                   dialog.main.v = false
                end
@@ -6413,20 +6463,20 @@ function imgui.OnDrawFrame()
                end
                imgui.PopItemWidth()
                imgui.SameLine()
-               if imgui.TooltipButton(u8" <x] ##cbdel", imgui.ImVec2(35, 25), u8"Очистить поле") then
+               
+               if imgui.TooltipButton(fa.ICON_FA_ERASER..u8"##cbdel", imgui.ImVec2(35, 25), u8"Очистить поле") then
                   input.cbid.v = 0
                   imgui.resetIO()
                end
                imgui.SameLine()
-               imgui.TextQuestion(" [v] ", u8"Вставить ID последнего КБ")
-               if imgui.IsItemClicked() then
+               if imgui.TooltipButton(fa.ICON_FA_PASTE..u8"##cbpaste", imgui.ImVec2(35, 25), u8"Вставить ID последнего КБ") then
                   if LastData.lastCb then
                      input.cbid.v = tonumber(LastData.lastCb)
                   else
                      input.cbid.v = 0
                   end
                end
-               
+               imgui.PopFont()
                if imgui.TooltipButton(u8"Редактировать", imgui.ImVec2(115, 25), u8"Редактировать блок (/cbedit <id>)") then
                   if input.cbid.v then
                      sampSendChat("/cbedit "..input.cbid.v)
@@ -6454,9 +6504,11 @@ function imgui.OnDrawFrame()
                   sampSendChat("/nearcb 100")
                   dialog.main.v = false
                end
+               
             elseif tabmenu.cbtb == 2 then
                imgui.PushItemWidth(100)
-               if imgui.TooltipButton(u8"Список = ##Tblistbid", imgui.ImVec2(80, 25), u8"Список триггер-блоков (/tb)") then
+               imgui.PushFont(fonts.fa)
+               if imgui.TooltipButton(fa.ICON_FA_LIST..u8" Список##Tblistbid ", imgui.ImVec2(80, 25), u8"Список триггер-блоков (/tb)") then
                   sampSendChat("/tb")
                   dialog.main.v = false
                end
@@ -6470,21 +6522,20 @@ function imgui.OnDrawFrame()
                end
                imgui.PopItemWidth()
                imgui.SameLine()
-               if imgui.TooltipButton(u8" <x] ##tbdel", imgui.ImVec2(35, 25), u8"Очистить поле") then
+               if imgui.TooltipButton(fa.ICON_FA_ERASER..u8"##tbdel", imgui.ImVec2(35, 25), u8"Очистить поле") then
                   input.tbid.v = 0
                   imgui.resetIO()
                end
                imgui.SameLine()
-               imgui.TextQuestion(" [v] ", u8"Вставить ID последнего ТБ")
-               if imgui.IsItemClicked() then
+               if imgui.TooltipButton(fa.ICON_FA_PASTE..u8"##tbpaste", imgui.ImVec2(35, 25), u8"Вставить ID последнего ТБ") then
                   if LastData.lastTb then
                      input.tbid.v = tonumber(LastData.lastTb)
                   else
                      input.tbid.v = 0
                   end
                end
-               
-               if imgui.TooltipButton(u8"Редактировать", imgui.ImVec2(115, 25), u8"Редактировать блок (/cbedit <id>)") then
+               imgui.PopFont()
+               if imgui.TooltipButton(u8" Редактировать", imgui.ImVec2(115, 25), u8"Редактировать блок (/cbedit <id>)") then
                   if input.tbid.v then
                      sampSendChat("/tb "..input.tbid.v)
                      dialog.main.v = false
@@ -6540,16 +6591,19 @@ function imgui.OnDrawFrame()
                imgui.TextQuestion(" ( ? )", u8"Считает только целочисленные значения")
                
                imgui.SameLine()
-               if imgui.TooltipButton(u8"Таймеры", imgui.ImVec2(75, 25), u8"Список таймеров мира (/timers)") then
+               imgui.PushFont(fonts.fa)
+               if imgui.TooltipButton(fa.ICON_FA_STOPWATCH..u8" Таймеры ", imgui.ImVec2(75, 25), u8"Список таймеров мира (/timers)") then
                   sampSendChat("/timers")
                   dialog.main.v = false
                end
                imgui.SameLine()
-               if imgui.TooltipButton(u8"Откл. все таймеры", imgui.ImVec2(125, 25), 
+               if imgui.TooltipButton(fa.ICON_FA_STOPWATCH..u8" Откл. все таймеры ", imgui.ImVec2(125, 25), 
                u8"Остановит все таймера в мире. Специально, для случаев когда один из таймеров флудит вам диалогами и вы не можете ничего сделать. (/offtimers)") 
                then
                   sampSendChat("/offtimers")
                end
+               imgui.PopFont()
+               
                imgui.PushItemWidth(200)
                if imgui.InputInt(u8'ms.##INPUT_timerconvert', input.timerconvert, imgui.InputTextFlags.CharsDecimal + imgui.InputTextFlags.EnterReturnsTrue) then
                   if input.timerconvert.v then
@@ -6708,6 +6762,7 @@ function imgui.OnDrawFrame()
                u8"Текстовые функции и коллбэки (классический)",
                u8"Сравнение движков текстовых функций",
                u8"Тригер блоки и принцип их работы",
+               u8"Сallbacks-sequence",
             }
             local docUrls = {
                "https://forum.training-server.com/d/6166-kollbeki-wiki",
@@ -6715,6 +6770,7 @@ function imgui.OnDrawFrame()
                "https://forum.training-server.com/d/22204-cpisok-tekstovyh-funktsiy-i-kollbekov-na-klassicheskom-tekstovom-dvizhke",
                "https://forum.training-server.com/d/22175-sravnenie-dvizhkov-tekstovyh-funktsiy",
                "https://forum.training-server.com/d/14526-triger-bloki-i-princip-ix-raboty",
+               "https://open.mp/docs/scripting/resources/callbacks-sequence",
             }
             
             -- imgui.TextNotify(" >> ", u8"Выберите ресурс")
@@ -6815,29 +6871,32 @@ function imgui.OnDrawFrame()
          end
       
       elseif tabmenu.global == 8 then
+         imgui.PushFont(fonts.fa)
          if tabmenu.chat == 1 then
             imgui.PushStyleColor(imgui.Col.Button, imgui.GetStyle().Colors[imgui.Col.ButtonHovered])
-            if imgui.Button(u8"Опции", imgui.ImVec2(100, 30)) then tabmenu.chat = 1 end
+            if imgui.Button(fa.ICON_FA_TASKS..u8" Опции", imgui.ImVec2(100, 30)) then tabmenu.chat = 1 end
             imgui.PopStyleColor()
          else
-            if imgui.Button(u8"Опции", imgui.ImVec2(100, 30)) then tabmenu.chat = 1 end
+            if imgui.Button(fa.ICON_FA_TASKS..u8" Опции", imgui.ImVec2(100, 30)) then tabmenu.chat = 1 end
          end
          imgui.SameLine()
          if tabmenu.chat == 2 then
             imgui.PushStyleColor(imgui.Col.Button, imgui.GetStyle().Colors[imgui.Col.ButtonHovered])
-            if imgui.Button(u8"Фильтры", imgui.ImVec2(100, 30)) then tabmenu.chat = 2 end
+            if imgui.Button(fa.ICON_FA_FILTER..u8" Фильтры", imgui.ImVec2(100, 30)) then tabmenu.chat = 2 end
             imgui.PopStyleColor()
          else
-            if imgui.Button(u8"Фильтры", imgui.ImVec2(100, 30)) then tabmenu.chat = 2 end
+            if imgui.Button(fa.ICON_FA_FILTER..u8" Фильтры", imgui.ImVec2(100, 30)) then tabmenu.chat = 2 end
          end
          imgui.SameLine()
          if tabmenu.chat == 3 then
             imgui.PushStyleColor(imgui.Col.Button, imgui.GetStyle().Colors[imgui.Col.ButtonHovered])
-            if imgui.Button(u8"Поиск", imgui.ImVec2(100, 30)) then tabmenu.chat = 3 end
+            if imgui.Button(fa.ICON_FA_SEARCH..u8" Найти", imgui.ImVec2(100, 30)) then tabmenu.chat = 3 end
             imgui.PopStyleColor()
          else
-            if imgui.Button(u8"Поиск", imgui.ImVec2(100, 30)) then tabmenu.chat = 3 end
+            if imgui.Button(fa.ICON_FA_SEARCH..u8" Найти", imgui.ImVec2(100, 30)) then tabmenu.chat = 3 end
          end
+         imgui.PopFont()
+         
          imgui.Spacing()
          imgui.Spacing()
          
@@ -6848,26 +6907,27 @@ function imgui.OnDrawFrame()
                imgui.TextColoredRGB("{696969}Chat")
             end
             imgui.SameLine()
-            if imgui.TooltipButton(u8"очистить чат", imgui.ImVec2(90, 25), u8"Очистить чат (Для себя)") then
+            imgui.PushFont(fonts.fa)
+            if imgui.TooltipButton(fa.ICON_FA_ERASER..u8" очистить чат ", imgui.ImVec2(100, 25), u8"Очистить чат (Для себя)") then
                ClearChat()
                sampAddChatMessage("[SCRIPT]: {FFFFFF}Чат был очищен!", 0x0FF6600)
             end
             imgui.SameLine()
-            if imgui.TooltipButton(u8"timestamp", imgui.ImVec2(90, 25), u8"Отображать время в чате") then
+            if imgui.TooltipButton(fa.ICON_FA_STAMP..u8" timestamp ", imgui.ImVec2(90, 25), u8"Отображать время в чате") then
                sampProcessChatInput("/timestamp")
             end
             if isTrainingSandbox then
                imgui.SameLine()
                if ini.settings.savepmmessages then
                   --imgui.PushStyleColor(imgui.Col.Button, imgui.ImVec4(1.0, 1.0, 0.0, 1.0))
-                  if imgui.TooltipButton(u8"pmh", imgui.ImVec2(60, 25), u8"История личных сообщений /pmh") then
+                  if imgui.TooltipButton(fa.ICON_FA_USER_SECRET..u8" pmh ", imgui.ImVec2(60, 25), u8"История личных сообщений /pmh") then
                      sampSendChat("/pmh")
                   end
                   --imgui.PopStyleColor()
                end
             end
             imgui.SameLine()
-            if imgui.TooltipButton(u8"getids", imgui.ImVec2(60, 25), u8"Получить id и ники игроков рядом") then
+            if imgui.TooltipButton(fa.ICON_FA_PASTE..u8" getids", imgui.ImVec2(60, 25), u8"Получить id и ники игроков рядом") then
                copyNearestPlayersToClipboard()
             end
             
@@ -6876,12 +6936,13 @@ function imgui.OnDrawFrame()
             imgui.Spacing()
             
             if isTrainingSandbox then
-               if imgui.TooltipButton(u8"mute", imgui.ImVec2(60, 25), u8"Настройки чата, позволяет заглушить указанный тип сообщений /mute") then
+               if imgui.TooltipButton(fa.ICON_FA_VOLUME_OFF..u8" mute", imgui.ImVec2(60, 25), u8"Настройки чата, позволяет заглушить указанный тип сообщений /mute") then
                   if dialog.main.v then dialog.main.v = false end
                   sampSendChat("/mute")
                end
                imgui.SameLine()
             end
+            imgui.PopFont()
             
             imgui.PushItemWidth(175)
             if imgui.Combo(u8'Чат по-умолчанию##cahtprefixcombo', combobox.chatprefix, chatPrefixNames) then
@@ -7070,7 +7131,8 @@ function imgui.OnDrawFrame()
             imgui.TextColoredRGB("{696969}Поиск по чатлогу")
             imgui.SameLine()
             imgui.SetCursorPosX((imgui.GetWindowWidth() - imgui.CalcTextSize(u8"Экспорт##textsearch").x) / 2)
-            if imgui.TooltipButton(u8"Экспорт##textsearch", imgui.ImVec2(85, 25), u8"Сохранить результаты поиска") then
+            imgui.PushFont(fonts.fa)
+            if imgui.TooltipButton(fa.ICON_FA_SAVE..u8" Экспорт##textsearch ", imgui.ImVec2(85, 25), u8"Сохранить результаты поиска") then
                if #searchresults >= 1 then
                   local filepath = getGameDirectory().."//moonloader//resource//mappingtoolkit//export//exportchat.txt"
                   local file = io.open(filepath, "w")
@@ -7085,7 +7147,7 @@ function imgui.OnDrawFrame()
                end
             end
             imgui.SameLine()
-            if imgui.TooltipButton(u8"chatlog", imgui.ImVec2(85, 25), u8"Открыть лог чата (chatlog.txt)") then
+            if imgui.TooltipButton(fa.ICON_FA_FILE..u8" chatlog ", imgui.ImVec2(85, 25), u8"Открыть лог чата (chatlog.txt)") then
                os.execute('explorer '..getFolderPath(5) ..'\\GTA San Andreas User Files\\SAMP\\chatlog.txt')
             end
             
@@ -7097,7 +7159,7 @@ function imgui.OnDrawFrame()
             end
             imgui.PopItemWidth()
             imgui.SameLine()
-            if imgui.TooltipButton(u8"Найти", imgui.ImVec2(65, 25), u8"Найти ключевое слово в чатлоге") then
+            if imgui.TooltipButton(fa.ICON_FA_SEARCH..u8" Найти ", imgui.ImVec2(65, 25), u8"Найти ключевое слово в чатлоге") then
                imgui.resetIO()
                if string.len(textbuffer.searchbar.v) >= 2 then
                   local filepath = getFolderPath(5)..'\\GTA San Andreas User Files\\SAMP\\chatlog.txt'
@@ -7149,11 +7211,12 @@ function imgui.OnDrawFrame()
                end
             end
             imgui.SameLine()
-            if imgui.TooltipButton(u8"Очистить", imgui.ImVec2(70, 25), u8"Очистить результаты поиска") then
+            if imgui.TooltipButton(fa.ICON_FA_ERASER..u8" Очистить ", imgui.ImVec2(75, 25), u8"Очистить результаты поиска") then
                imgui.resetIO()
                searchresults = {}
                textbuffer.searchbar.v = ""
             end
+            imgui.PopFont()
             
             if imgui.Checkbox(u8"Игнорировать регистр", checkbox.searchaslower) then
             end
@@ -7251,24 +7314,25 @@ function imgui.OnDrawFrame()
          imgui.Spacing()
          
          imgui.PushStyleVar(imgui.StyleVar.ItemSpacing, imgui.ImVec2(5, 2))
-         
+         imgui.PushFont(fonts.fa)
          if tabmenu.credits == 1 then
             imgui.PushStyleColor(imgui.Col.Button, imgui.GetStyle().Colors[imgui.Col.ButtonHovered])
-            if imgui.Button(u8"Благодарности", imgui.ImVec2(200, 30)) then tabmenu.credits = 1 end
+            if imgui.Button(fa.ICON_FA_UNIVERSITY..u8" Благодарности", imgui.ImVec2(200, 30)) then tabmenu.credits = 1 end
             imgui.PopStyleColor()
          else
-            if imgui.Button(u8"Благодарности", imgui.ImVec2(200, 30)) then tabmenu.credits = 1 end
+            if imgui.Button(fa.ICON_FA_UNIVERSITY..u8" Благодарности", imgui.ImVec2(200, 30)) then tabmenu.credits = 1 end
          end
          
          imgui.SameLine()
          if tabmenu.credits == 2 then
             imgui.PushStyleColor(imgui.Col.Button, imgui.GetStyle().Colors[imgui.Col.ButtonHovered])
-            if imgui.Button(u8"Полезные ресурсы", imgui.ImVec2(200, 30)) then tabmenu.credits = 2 end
+            if imgui.Button(fa.ICON_FA_LINK..u8" Полезные ресурсы", imgui.ImVec2(200, 30)) then tabmenu.credits = 2 end
             imgui.PopStyleColor()
          else
-            if imgui.Button(u8"Полезные ресурсы", imgui.ImVec2(200, 30)) then tabmenu.credits = 2 end
+            if imgui.Button(fa.ICON_FA_LINK..u8" Полезные ресурсы", imgui.ImVec2(200, 30)) then tabmenu.credits = 2 end
          end
          imgui.PopStyleVar()
+         imgui.PopFont()
          
          if tabmenu.credits == 1 then
             imgui.Spacing()
@@ -7327,10 +7391,11 @@ function imgui.OnDrawFrame()
          end
          imgui.Spacing()
          imgui.Spacing()
-         if imgui.TooltipButton(u8"Сообщить о ошибке", imgui.ImVec2(180, 25), u8"Жми не стесняйся") then
+         imgui.PushFont(fonts.fa)
+         if imgui.TooltipButton(fa.ICON_FA_BUG..u8" Сообщить о ошибке", imgui.ImVec2(180, 25), u8"Жми не стесняйся") then
             tabmenu.credits = 3
          end
-         if imgui.TooltipButton(u8"Проверить обновления", imgui.ImVec2(180, 25), u8"Проверить наличие обновлений") then
+         if imgui.TooltipButton(fa.ICON_FA_SYNC..u8" Проверить обновления", imgui.ImVec2(180, 25), u8"Проверить наличие обновлений") then
             if not checkScriptUpdates() then
                sampAddChatMessage("{FF6600}Mapping Toolkit  {FFFFFF}Установлена актуальная версия {696969}"..thisScript().version, -1)
                --os.execute('explorer https://github.com/ins1x/MappingToolkit/releases')
@@ -7340,6 +7405,7 @@ function imgui.OnDrawFrame()
                sampAddChatMessage("[SCRIPT]: {FFFFFF}GoogleDrive: https://drive.google.com/drive/folders/1v-LmqAgKGpYYeA1C7aT-rlODTa2OfulT", 0x0FF6600)
             end
          end
+         imgui.PopFont()
          imgui.SameLine()
          if imgui.Checkbox(u8("Проверять обновления автоматически"), checkbox.checkupdates) then
             ini.settings.checkupdates = checkbox.checkupdates.v
@@ -7351,72 +7417,73 @@ function imgui.OnDrawFrame()
       end -- end tabmenu.global
       imgui.NextColumn()
       
+      imgui.PushFont(fonts.fa)
       if tabmenu.global == 1 then
          imgui.PushStyleColor(imgui.Col.Button, imgui.GetStyle().Colors[imgui.Col.ButtonHovered])
-         if imgui.Button(u8"Координаты",imgui.ImVec2(105, 30)) then tabmenu.global = 1 end 
+         if imgui.Button(fa.ICON_FA_ROUTE..u8" Координаты",imgui.ImVec2(105, 30)) then tabmenu.global = 1 end 
          imgui.PopStyleColor()
       else
-         if imgui.Button(u8"Координаты",imgui.ImVec2(105, 30)) then tabmenu.global = 1 end 
+         if imgui.Button(fa.ICON_FA_ROUTE..u8" Координаты",imgui.ImVec2(105, 30)) then tabmenu.global = 1 end 
       end
       
       if tabmenu.global == 2 then
          imgui.PushStyleColor(imgui.Col.Button, imgui.GetStyle().Colors[imgui.Col.ButtonHovered])
-         if imgui.Button(u8"Объекты",imgui.ImVec2(105, 30)) then tabmenu.global = 2 end 
+         if imgui.Button(fa.ICON_FA_TREE..u8" Объекты",imgui.ImVec2(105, 30)) then tabmenu.global = 2 end 
          imgui.PopStyleColor()
       else
-         if imgui.Button(u8"Объекты",imgui.ImVec2(105, 30)) then tabmenu.global = 2 end 
+         if imgui.Button(fa.ICON_FA_TREE..u8" Объекты",imgui.ImVec2(105, 30)) then tabmenu.global = 2 end 
       end
       
       if tabmenu.global == 5 then
          imgui.PushStyleColor(imgui.Col.Button, imgui.GetStyle().Colors[imgui.Col.ButtonHovered])
-         if imgui.Button(u8"Текстдравы", imgui.ImVec2(105, 30)) then tabmenu.global = 5 end
+         if imgui.Button(fa.ICON_FA_PAINT_BRUSH..u8" Текстдравы", imgui.ImVec2(105, 30)) then tabmenu.global = 5 end
          imgui.PopStyleColor()
       else
-         if imgui.Button(u8"Текстдравы", imgui.ImVec2(105, 30)) then tabmenu.global = 5 end
+         if imgui.Button(fa.ICON_FA_PAINT_BRUSH..u8" Текстдравы", imgui.ImVec2(105, 30)) then tabmenu.global = 5 end
       end
       
       if isTrainingSandbox then
          if tabmenu.global == 7 then
             imgui.PushStyleColor(imgui.Col.Button, imgui.GetStyle().Colors[imgui.Col.ButtonHovered])
-            if imgui.Button(u8"Блоки", imgui.ImVec2(105, 30)) then tabmenu.global = 7 end
+            if imgui.Button(fa.ICON_FA_SITEMAP..u8" Блоки", imgui.ImVec2(105, 30)) then tabmenu.global = 7 end
             imgui.PopStyleColor()
          else
-            if imgui.Button(u8"Блоки", imgui.ImVec2(105, 30)) then tabmenu.global = 7 end
+            if imgui.Button(fa.ICON_FA_SITEMAP..u8" Блоки", imgui.ImVec2(105, 30)) then tabmenu.global = 7 end
          end
       end
       
       if tabmenu.global == 3 then
          imgui.PushStyleColor(imgui.Col.Button, imgui.GetStyle().Colors[imgui.Col.ButtonHovered])
-         if imgui.Button(u8"Камера",imgui.ImVec2(105, 30)) then tabmenu.global = 3 end  
+         if imgui.Button(fa.ICON_FA_VIDEO..u8" Камера",imgui.ImVec2(105, 30)) then tabmenu.global = 3 end  
          imgui.PopStyleColor()
       else
-         if imgui.Button(u8"Камера",imgui.ImVec2(105, 30)) then tabmenu.global = 3 end 
+         if imgui.Button(fa.ICON_FA_VIDEO..u8" Камера",imgui.ImVec2(105, 30)) then tabmenu.global = 3 end 
       end
       
       if tabmenu.global == 4 then
          imgui.PushStyleColor(imgui.Col.Button, imgui.GetStyle().Colors[imgui.Col.ButtonHovered])
-         if imgui.Button(u8"Прорисовка",imgui.ImVec2(105, 30)) then tabmenu.global = 4 end 
+         if imgui.Button(fa.ICON_FA_EYE..u8" Прорисовка",imgui.ImVec2(105, 30)) then tabmenu.global = 4 end 
          imgui.PopStyleColor()
       else
-         if imgui.Button(u8"Прорисовка",imgui.ImVec2(105, 30)) then tabmenu.global = 4 end 
+         if imgui.Button(fa.ICON_FA_EYE..u8" Прорисовка",imgui.ImVec2(105, 30)) then tabmenu.global = 4 end 
       end
       
       if tabmenu.global == 6 then
          imgui.PushStyleColor(imgui.Col.Button, imgui.GetStyle().Colors[imgui.Col.ButtonHovered])
-         if imgui.Button(u8"Эффекты",imgui.ImVec2(105, 30)) then tabmenu.global = 6 end 
+         if imgui.Button(fa.ICON_FA_MAGIC..u8" Эффекты",imgui.ImVec2(105, 30)) then tabmenu.global = 6 end 
          imgui.PopStyleColor()
       else
-         if imgui.Button(u8"Эффекты",imgui.ImVec2(105, 30)) then tabmenu.global = 6 end 
+         if imgui.Button(fa.ICON_FA_MAGIC..u8" Эффекты",imgui.ImVec2(105, 30)) then tabmenu.global = 6 end 
       end
       
       if tabmenu.global == 8 then
          imgui.PushStyleColor(imgui.Col.Button, imgui.GetStyle().Colors[imgui.Col.ButtonHovered])
-         if imgui.Button(u8"Чатик",imgui.ImVec2(105, 30)) then tabmenu.global = 8 end 
+         if imgui.Button(fa.ICON_FA_COMMENTS..u8" Чатик",imgui.ImVec2(105, 30)) then tabmenu.global = 8 end 
          imgui.PopStyleColor()
       else
-         if imgui.Button(u8"Чатик",imgui.ImVec2(105, 30)) then tabmenu.global = 8 end 
+         if imgui.Button(fa.ICON_FA_COMMENTS..u8" Чатик",imgui.ImVec2(105, 30)) then tabmenu.global = 8 end 
       end
-      
+      imgui.PopFont()
       --if imgui.Button(u8"Разное",imgui.ImVec2(105, 30)) then tabmenu.global = 10 end 
       
       imgui.Spacing()
@@ -7455,16 +7522,18 @@ function imgui.OnDrawFrame()
          score = sampGetPlayerScore(id)
       end
       
+      imgui.PushFont(fonts.fa)
       if dialog.playerstat.v then
-         if imgui.TooltipButton("[ << ]", imgui.ImVec2(50, 25), u8:encode("Скрыть подробную статистику")) then
+         if imgui.TooltipButton(fa.ICON_FA_USER.."  [ << ] ", imgui.ImVec2(70, 25), u8:encode("Скрыть подробную статистику")) then
             dialog.playerstat.v = not dialog.playerstat.v
          end
       else
-         if imgui.TooltipButton("[ >> ]", imgui.ImVec2(50, 25), u8:encode("Раскрыть подробную статистику")) then
+         if imgui.TooltipButton(fa.ICON_FA_USER.."  [ >> ] ", imgui.ImVec2(70, 25), u8:encode("Раскрыть подробную статистику")) then
             dialog.playerstat.v = not dialog.playerstat.v
             chosen.player = id
          end
       end
+      imgui.PopFont()
       imgui.SameLine()       
       
       imgui.TextColoredRGB("Ваш id: {696969}"..id)
@@ -7511,8 +7580,9 @@ function imgui.OnDrawFrame()
             end
             imgui.SameLine()
             imgui.TextQuestion("( ? )", u8"Блокирует изменение погоды и времени сервером")
-
-            if imgui.TooltipButton(u8(threads.timelap and 'Отключить' or 'Включить')..u8" автосмену времени", 
+            
+            imgui.PushFont(fonts.fa)
+            if imgui.TooltipButton(fa.ICON_FA_STOPWATCH..u8(threads.timelap and ' Отключить' or ' Включить')..u8" автосмену времени", 
             imgui.ImVec2(220, 25), u8"Автосмена времени каждые n секунд (Тест)") then
                if threads.timelap then
                   threads.timelap:terminate()
@@ -7524,6 +7594,7 @@ function imgui.OnDrawFrame()
                   timelap(input.timelapdelay.v)
                end
             end
+            imgui.PopFont()
             
             imgui.SameLine()
             imgui.PushItemWidth(40)
@@ -7577,31 +7648,32 @@ function imgui.OnDrawFrame()
             imgui.PopItemWidth()
             
             --imgui.Text(u8"Пресеты погоды: ")
-            if imgui.Button(u8"Солнечная", imgui.ImVec2(110,25)) then
+            imgui.PushFont(fonts.fa)
+            if imgui.Button(fa.ICON_FA_SUN..u8"Солнечная", imgui.ImVec2(110,25)) then
                slider.weather.v = 0
                ini.settings.weather = slider.weather.v
                setWeather(slider.weather.v)
             end
             imgui.SameLine()
-            if imgui.Button(u8"Тусклая", imgui.ImVec2(110,25)) then
+            if imgui.Button(fa.ICON_FA_TEMPERATURE_LOW..u8"Тусклая", imgui.ImVec2(110,25)) then
                slider.weather.v = 15
                ini.settings.weather = slider.weather.v
                setWeather(slider.weather.v)            
             end
             imgui.SameLine()
-            if imgui.Button(u8"Чистое небо", imgui.ImVec2(110,25)) then
+            if imgui.Button(fa.ICON_FA_FILTER..u8"Чистое небо", imgui.ImVec2(110,25)) then
                slider.weather.v = 10
                ini.settings.weather = slider.weather.v
                setWeather(slider.weather.v)
             end
             imgui.SameLine()
-            if imgui.Button(u8"Жара", imgui.ImVec2(110,25)) then
+            if imgui.Button(fa.ICON_FA_TEMPERATURE_HIGH..u8"Жара", imgui.ImVec2(110,25)) then
                slider.weather.v = 17
                ini.settings.weather = slider.weather.v
                setWeather(slider.weather.v)
             end
             
-            if imgui.Button(u8"Туманная", imgui.ImVec2(110,25)) then
+            if imgui.Button(fa.ICON_FA_SMOG..u8"Туманная", imgui.ImVec2(110,25)) then
                slider.weather.v = 9
                ini.settings.weather = slider.weather.v
                setWeather(slider.weather.v)
@@ -7613,13 +7685,13 @@ function imgui.OnDrawFrame()
                setWeather(slider.weather.v)
             end
             imgui.SameLine()
-            if imgui.Button(u8"Дождливая", imgui.ImVec2(110,25)) then
+            if imgui.Button(fa.ICON_FA_CLOUD_RAIN..u8"Дождливая", imgui.ImVec2(110,25)) then
                slider.weather.v = 16
                ini.settings.weather = slider.weather.v
                setWeather(slider.weather.v)
             end
             imgui.SameLine()
-            if imgui.Button(u8"Облачная", imgui.ImVec2(110,25)) then
+            if imgui.Button(fa.ICON_FA_CLOUD..u8"Облачная", imgui.ImVec2(110,25)) then
                slider.weather.v = 12
                ini.settings.weather = slider.weather.v
                setWeather(slider.weather.v)            
@@ -7652,7 +7724,7 @@ function imgui.OnDrawFrame()
                ini.settings.time = slider.time.v
             end
             imgui.SameLine()
-            if imgui.Button(u8"Ночная", imgui.ImVec2(110,25)) then
+            if imgui.Button(fa.ICON_FA_MOON..u8"Ночная", imgui.ImVec2(110,25)) then
                slider.weather.v = 7
                slider.time.v = 24
                setWeather(slider.weather.v)      
@@ -7688,6 +7760,7 @@ function imgui.OnDrawFrame()
                ini.settings.time = slider.time.v
                inicfg.save(ini, configIni)
             end
+            imgui.PopFont()
             
             imgui.Spacing()          
             imgui.TextColoredRGB("Галерея погоды")
@@ -7729,12 +7802,14 @@ function imgui.OnDrawFrame()
             end
             imgui.PopItemWidth()
             
-            if imgui.TooltipButton(u8(checkbox.showthemesettings.v and 'Скрыть' or 'Показать')..u8" все настройки темы", imgui.ImVec2(250, 25), u8"Отобразить все настройки нижней панели") then
+            imgui.PushFont(fonts.fa)
+            if imgui.TooltipButton(fa.ICON_FA_TASKS..u8(checkbox.showthemesettings.v and ' Скрыть' or ' Показать')..u8" все настройки темы",
+            imgui.ImVec2(250, 25), u8"Отобразить все настройки нижней панели") then
                checkbox.showthemesettings.v = not checkbox.showthemesettings.v 
             end
             imgui.SameLine()
             imgui.PushStyleColor(imgui.Col.Button, imgui.ImVec4(0.2, 0.0, 0.0, 1.0))
-            if imgui.TooltipButton(u8"Сбросить все настройки темы", 
+            if imgui.TooltipButton(fa.ICON_FA_WINDOW_CLOSE..u8" Сбросить все настройки темы", 
             imgui.ImVec2(220, 25), u8"Сбросит все настройки темы на стандартные") then
                ini.ui.imguifont = "trebucbd"
                ini.ui.imguifontsize = 14.0
@@ -7744,6 +7819,7 @@ function imgui.OnDrawFrame()
                ini.ui.movetabwindow = true
                ini.ui.multilinefont = "trebucbd"
                ini.ui.multilinefontsize = 13.0
+               ini.ui.fafontsize = 12.0
                ini.ui.windowsizex = 640
                ini.ui.windowsizey = 440
                inicfg.save(ini, configIni)
@@ -7754,6 +7830,7 @@ function imgui.OnDrawFrame()
                thisScript():reload()
             end
             imgui.PopStyleColor()
+            imgui.PopFont()
             
             if checkbox.showthemesettings.v then
                if imgui.Checkbox(u8'Включить anti-aliasing', checkbox.imguiantialiasing) then
@@ -7775,9 +7852,12 @@ function imgui.OnDrawFrame()
             imgui.SameLine()
             imgui.TextQuestion("( ? )", u8"Отображать панель с различной информацие внизу экрана")
             
-            if imgui.TooltipButton(u8(checkbox.showbottompanelsettings.v and 'Скрыть' or 'Показать')..u8" настройки нижней панели", imgui.ImVec2(250, 25), u8"Отобразить все настройки нижней панели") then
+            imgui.PushFont(fonts.fa)
+            if imgui.TooltipButton(fa.ICON_FA_TASKS..u8(checkbox.showbottompanelsettings.v and ' Скрыть ' or ' Показать ')..u8"настройки нижней панели",
+            imgui.ImVec2(250, 25), u8"Отобразить все настройки нижней панели") then
                checkbox.showbottompanelsettings.v = not checkbox.showbottompanelsettings.v 
             end
+            imgui.PopFont()
             
             if checkbox.showbottompanelsettings.v then
                if imgui.Checkbox(u8'Показывать темный фон для нижней панели', checkbox.panelbackground) then
@@ -8047,14 +8127,15 @@ function imgui.OnDrawFrame()
                   end
                   
                   imgui.SameLine()
-                  if imgui.Button(u8"Сменить скин", imgui.ImVec2(110, 25)) then
+                  imgui.PushFont(fonts.fa)
+                  if imgui.Button(fa.ICON_FA_USER..u8" Сменить скин ", imgui.ImVec2(110, 25)) then
                      if isValidSkin(skinid) then
                         sampSendChat("/skin "..skinid)
                         sampAddChatMessage("[SCRIPT]: {FFFFFF}Вы cменили скин {696969}"..currentskin.."{FFFFFF} на {696969}"..skinid, 0x0FF6600)
                      end
                   end
                   imgui.SameLine()
-                  if imgui.Button(u8"Сохранить скин", imgui.ImVec2(110, 25)) then
+                  if imgui.Button(fa.ICON_FA_SAVE..u8" Сохранить скин ", imgui.ImVec2(110, 25)) then
                      if isValidSkin(skinid) then
                         sampSendChat("/skin "..skinid)
                         ini.settings.saveskin = true
@@ -8064,12 +8145,13 @@ function imgui.OnDrawFrame()
                      end
                   end
                   imgui.SameLine()
-                  if imgui.Button(u8"Сменить скин (Визуал)", imgui.ImVec2(150, 25)) then
+                  if imgui.Button(fa.ICON_FA_EYE..u8" Сменить скин (Визуал) ", imgui.ImVec2(150, 25)) then
                      if isValidSkin(skinid) then
                         setPlayerModel(skinid)
                         sampAddChatMessage("[SCRIPT]: {FFFFFF}Вы визуально cменили скин {696969}"..currentskin.."{FFFFFF} на {696969}"..skinid, 0x0FF6600)
                      end
                   end
+                  imgui.PopFont()
                end
             end
          end
@@ -8182,11 +8264,12 @@ function imgui.OnDrawFrame()
             imgui.TextQuestion("( ? )", u8"Автоматически выгрузит тулкит если вы зайдете на другой сервер\
             (Будет загружать тулкит только для TRAINING-SANDBOX и локалхоста)")
             
-            if imgui.Button(u8"Fastconnect (5 сек)", imgui.ImVec2(200, 25)) then
+            imgui.PushFont(fonts.fa)
+            if imgui.Button(fa.ICON_FA_SYNC..u8" Fastconnect (5 сек)", imgui.ImVec2(200, 25)) then
                Recon(5000)
             end
             imgui.SameLine()
-            if imgui.Button(u8"Reconnect (15 сек)", imgui.ImVec2(200, 25)) then
+            if imgui.Button(fa.ICON_FA_SYNC..u8" Reconnect (15 сек)", imgui.ImVec2(200, 25)) then
                Recon(15500)
             end
             
@@ -8201,6 +8284,7 @@ function imgui.OnDrawFrame()
                sampSetGamestate(1)
             end
             imgui.PopStyleColor()
+            imgui.PopFont()
             
             imgui.Text(u8'Текущий Gamestate: '..gamestates[sampGetGamestate() + 1])
             imgui.PushItemWidth(120)
@@ -8255,10 +8339,12 @@ function imgui.OnDrawFrame()
             -- imgui.SameLine()
             -- imgui.TextQuestion("( ? )", u8"Показывать подсказки по горячим клавишам (например при переходе в режим полета, ретекстура и.т.д)")
             
-            if imgui.TooltipButton(u8"Настроить действия на горячие клавиши",
-            imgui.ImVec2(275, 25), u8"Показать настройки горячих клавиш") then
+            imgui.PushFont(fonts.fa)
+            if imgui.TooltipButton(fa.ICON_FA_KEYBOARD..u8" Настроить действия на горячие клавиши",
+            imgui.ImVec2(295, 25), u8"Показать настройки горячих клавиш") then
                dialog.hotkeys.v = not dialog.hotkeys.v
             end
+            imgui.PopFont()
             
          end
         
@@ -8513,23 +8599,25 @@ function imgui.OnDrawFrame()
             imgui.Text(u8'Последний ID диалога: ' .. sampGetCurrentDialogId())
          end
          
-         if imgui.TooltipButton(u8"Сбросить настройки",imgui.ImVec2(155, 25),u8"Сбросит настройки предварительно сохранив копию текущих настроек") then
+         imgui.PushFont(fonts.fa)
+         if imgui.TooltipButton(fa.ICON_FA_OUTDENT..u8" Сбросить настройки",imgui.ImVec2(155, 25),u8"Сбросит настройки предварительно сохранив копию текущих настроек") then
             os.rename(getGameDirectory().."//moonloader//config//mappingtoolkit.ini", getGameDirectory().."//moonloader//config//backup_mappingtoolkit.ini")
             sampAddChatMessage("[SCRIPT]: {FFFFFF}Настройки были сброшены на стандартные. Тулкит автоматически перезагрузится.",0x0FF6600)
             sampAddChatMessage("[SCRIPT]: {FFFFFF}Резервную копию ваших предыдущих настроек можно найти в {696969}moonloader/config.",0x0FF6600)
             reloadScripts()
          end
          imgui.SameLine()
-         if imgui.TooltipButton(u8"Открыть конфиг",imgui.ImVec2(155, 25),u8"Открыть файл настроек в текстовом редакторе") then
+         if imgui.TooltipButton(fa.ICON_FA_FILE..u8" Открыть конфиг",imgui.ImVec2(155, 25),u8"Открыть файл настроек в текстовом редакторе") then
             folder = getGameDirectory().. "\\moonloader\\config\\"
             os.execute('explorer "'..folder..'"')
          end
          imgui.SameLine()
-         if imgui.TooltipButton(u8"Откат версии",imgui.ImVec2(155, 25),u8"Откатиться на предыдущую версию") then
+         if imgui.TooltipButton(fa.ICON_FA_CODE_BRANCH..u8" Откат версии",imgui.ImVec2(155, 25),u8"Откатиться на предыдущую версию") then
             local scriptParams = thisScript()
             local previousversion = tonumber(scriptParams.version) - 0.01
             os.execute('explorer "https://github.com/ins1x/MappingToolkit/releases/tag/v'..tostring(previousversion)..'"')
          end
+         imgui.PopFont()
       end 
       
       imgui.End()
@@ -8592,7 +8680,8 @@ function imgui.OnDrawFrame()
        exportformat, #exportformat)
        imgui.PopItemWidth()
        imgui.SameLine()
-       if imgui.TooltipButton(u8"Экспортировать", imgui.ImVec2(120, 25), u8:encode("Экспортировать таблицу в файл")) then
+       imgui.PushFont(fonts.fa)
+       if imgui.TooltipButton(fa.ICON_FA_SAVE..u8" Экспортировать", imgui.ImVec2(120, 25), u8:encode("Экспортировать таблицу в файл")) then
           if combobox.exportformat.v == 0 then
              local filepath = getGameDirectory().."//moonloader//resource//mappingtoolkit//export//exportdata.txt"
              local file = io.open(filepath, "w")
@@ -8767,7 +8856,7 @@ function imgui.OnDrawFrame()
        
        if combobox.selecttable.v >= 3 then
           imgui.SameLine()
-          if imgui.TooltipButton(u8"Очистить", imgui.ImVec2(70, 25), u8:encode("Очистить таблицу")) then
+          if imgui.TooltipButton(fa.ICON_FA_ERASER..u8" Очистить", imgui.ImVec2(90, 25), u8:encode("Очистить таблицу")) then
              if combobox.selecttable.v >= 3 then
                 if combobox.selecttable.v == 3 then
                    streamedTextures = {}
@@ -8786,7 +8875,8 @@ function imgui.OnDrawFrame()
              end
           end
        end
-
+       imgui.PopFont()
+       
        if combobox.selecttable.v == 0 then
           imgui.SameLine()
           if imgui.TooltipButton(u8" ? ", imgui.ImVec2(30, 25), u8:encode("Получить справку по функции AddPlayerClass")) then
@@ -9426,45 +9516,47 @@ function imgui.OnDrawFrame()
          imgui.Spacing()
       end
       
+      imgui.PushFont(fonts.fa)
       if tabmenu.onlinesearch == 1 then
          imgui.PushStyleColor(imgui.Col.Button, imgui.GetStyle().Colors[imgui.Col.ButtonHovered])
-         if imgui.Button(u8"Объекты", imgui.ImVec2(85, 25)) then tabmenu.onlinesearch = 1 end
+         if imgui.Button(fa.ICON_FA_TREE..u8" Объекты", imgui.ImVec2(85, 25)) then tabmenu.onlinesearch = 1 end
          imgui.PopStyleColor()
       else
-         if imgui.Button(u8"Объекты", imgui.ImVec2(85, 25)) then tabmenu.onlinesearch = 1 end
+         if imgui.Button(fa.ICON_FA_TREE..u8" Объекты", imgui.ImVec2(85, 25)) then tabmenu.onlinesearch = 1 end
       end
       imgui.SameLine()
       if tabmenu.onlinesearch == 2 then
          imgui.PushStyleColor(imgui.Col.Button, imgui.GetStyle().Colors[imgui.Col.ButtonHovered])
-         if imgui.Button(u8"Текстуры", imgui.ImVec2(85, 25)) then tabmenu.onlinesearch = 2 end
+         if imgui.Button(fa.ICON_FA_PAINT_BRUSH..u8" Текстуры", imgui.ImVec2(85, 25)) then tabmenu.onlinesearch = 2 end
          imgui.PopStyleColor()
       else
-         if imgui.Button(u8"Текстуры", imgui.ImVec2(85, 25)) then tabmenu.onlinesearch = 2 end
+         if imgui.Button(fa.ICON_FA_PAINT_BRUSH..u8" Текстуры", imgui.ImVec2(85, 25)) then tabmenu.onlinesearch = 2 end
       end
       imgui.SameLine()
       if tabmenu.onlinesearch == 3 then
          imgui.PushStyleColor(imgui.Col.Button, imgui.GetStyle().Colors[imgui.Col.ButtonHovered])
-         if imgui.Button(u8"Функции", imgui.ImVec2(85, 25)) then tabmenu.onlinesearch = 3 end
+         if imgui.Button(fa.ICON_FA_SITEMAP..u8" Функции", imgui.ImVec2(85, 25)) then tabmenu.onlinesearch = 3 end
          imgui.PopStyleColor()
       else
-         if imgui.Button(u8"Функции", imgui.ImVec2(85, 25)) then tabmenu.onlinesearch = 3 end
+         if imgui.Button(fa.ICON_FA_SITEMAP..u8" Функции", imgui.ImVec2(85, 25)) then tabmenu.onlinesearch = 3 end
       end
       imgui.SameLine()
       if tabmenu.onlinesearch == 4 then
          imgui.PushStyleColor(imgui.Col.Button, imgui.GetStyle().Colors[imgui.Col.ButtonHovered])
-         if imgui.Button(u8"Избранные", imgui.ImVec2(85, 25)) then tabmenu.onlinesearch = 4 end
+         if imgui.Button(fa.ICON_FA_STAR..u8" Избранные", imgui.ImVec2(85, 25)) then tabmenu.onlinesearch = 4 end
          imgui.PopStyleColor()
       else
-         if imgui.Button(u8"Избранные", imgui.ImVec2(85, 25)) then tabmenu.onlinesearch = 4 end
+         if imgui.Button(fa.ICON_FA_STAR..u8" Избранные", imgui.ImVec2(85, 25)) then tabmenu.onlinesearch = 4 end
       end
       imgui.SameLine()
       if tabmenu.onlinesearch == 6 then
          imgui.PushStyleColor(imgui.Col.Button, imgui.GetStyle().Colors[imgui.Col.ButtonHovered])
-         if imgui.Button(u8"Цвет", imgui.ImVec2(85, 25)) then tabmenu.onlinesearch = 6 end
+         if imgui.Button(fa.ICON_FA_EYE_DROPPER..u8" Цвет", imgui.ImVec2(85, 25)) then tabmenu.onlinesearch = 6 end
          imgui.PopStyleColor()
       else
-         if imgui.Button(u8"Цвет", imgui.ImVec2(85, 25)) then tabmenu.onlinesearch = 6 end
+         if imgui.Button(fa.ICON_FA_EYE_DROPPER..u8" Цвет", imgui.ImVec2(85, 25)) then tabmenu.onlinesearch = 6 end
       end
+      imgui.PopFont()
       imgui.Spacing()
       imgui.Spacing()
          
@@ -9914,7 +10006,8 @@ function imgui.OnDrawFrame()
          end
          
          --if tabmenu.favorites ~= 3 then
-         if imgui.TooltipButton(u8"Обновить", imgui.ImVec2(80, 25), u8:encode("Повторно загрузить текст из файла")) then
+         imgui.PushFont(fonts.fa)
+         if imgui.TooltipButton(fa.ICON_FA_SYNC..u8" Обновить ", imgui.ImVec2(80, 25), u8:encode("Повторно загрузить текст из файла")) then
             local file = io.open(filepath, "r")
             if tabmenu.favorites == 1 then
                textbuffer.favobjects.v = file:read('*a')
@@ -9929,11 +10022,11 @@ function imgui.OnDrawFrame()
          end
          imgui.SameLine()
          if input.readonly then
-            if imgui.TooltipButton(u8"Изменить", imgui.ImVec2(80, 25), u8:encode("Разблокировать для редактирования")) then
+            if imgui.TooltipButton(fa.ICON_FA_EDIT..u8" Изменить ", imgui.ImVec2(80, 25), u8:encode("Разблокировать для редактирования")) then
                input.readonly = false
             end
          else
-            if imgui.TooltipButton(u8"Сохранить", imgui.ImVec2(80, 25), u8:encode("Завершить редактирование")) then
+            if imgui.TooltipButton(fa.ICON_FA_SAVE..u8" Сохранить ", imgui.ImVec2(80, 25), u8:encode("Завершить редактирование")) then
                input.readonly = true
                local file = io.open(filepath, "w")
                if tabmenu.favorites == 1 then
@@ -9949,7 +10042,7 @@ function imgui.OnDrawFrame()
                sampAddChatMessage("[SCRIPT]: {FFFFFF}Сохранено в файл: {696969}"..filepath, 0x0FF6600)
             end
          end
-
+        
          -- if not input.readonly then
             -- imgui.SameLine()
             -- if imgui.TooltipButton(u8"Сохранить", imgui.ImVec2(80, 25), u8:encode("Сохранить избранные")) then
@@ -9969,7 +10062,7 @@ function imgui.OnDrawFrame()
          imgui.PopItemWidth()
          imgui.SameLine()
          
-         if imgui.TooltipButton(u8"Поиск##Search", imgui.ImVec2(60, 25), u8:encode("Поиск по тексту")) then
+         if imgui.TooltipButton(fa.ICON_FA_SEARCH..u8" Поиск##Search", imgui.ImVec2(60, 25), u8:encode("Поиск по тексту")) then
             local results = 0
             local resultline = 0
             if string.len(textbuffer.searchbar.v) > 0 then
@@ -9985,6 +10078,8 @@ function imgui.OnDrawFrame()
                sampAddChatMessage("Результат поиска: Не найдено", -1)
             end
          end
+         imgui.PopFont()
+         
       elseif tabmenu.onlinesearch == 6 then
           
          imgui.PushStyleVar(imgui.StyleVar.ItemSpacing, imgui.ImVec2(2, 2))
@@ -9997,29 +10092,35 @@ function imgui.OnDrawFrame()
          imgui.TextColoredRGB("{FF0000}RR - красная часть цвета, {008000}GG - зеленая, {0000FF}BB - синяя, {FFFFFF}AA - альфа")
          imgui.PopStyleVar()
          
+         imgui.PushFont(fonts.fa)
+         imgui.PushStyleColor(imgui.Col.Button, imgui.ImVec4(0.5, 0.25, 0.0, 1.0))
          if dialog.colorpicker.v then
             imgui.PushStyleColor(imgui.Col.Button, imgui.GetStyle().Colors[imgui.Col.ButtonHovered])
-            if imgui.TooltipButton(u8"Палитра", imgui.ImVec2(115, 25), u8"Палитра") then
+            if imgui.TooltipButton(fa.ICON_FA_PALETTE..u8" Палитра ", imgui.ImVec2(115, 25), u8"Палитра") then
                dialog.colorpicker.v = not dialog.colorpicker.v
             end
             imgui.PopStyleColor()
          else
-            if imgui.TooltipButton(u8"Палитра", imgui.ImVec2(115, 25), u8"Палитра") then
+            if imgui.TooltipButton(fa.ICON_FA_PALETTE..u8" Палитра ", imgui.ImVec2(115, 25), u8"Палитра") then
                dialog.colorpicker.v = not dialog.colorpicker.v
             end
          end
+         imgui.PopStyleColor()
          imgui.SameLine()
+         imgui.PushStyleColor(imgui.Col.Button, imgui.ImVec4(0.5, 0.25, 1.0, 1.0))
          if dialog.colortable.v then
             imgui.PushStyleColor(imgui.Col.Button, imgui.GetStyle().Colors[imgui.Col.ButtonHovered])
-            if imgui.TooltipButton(u8"Таблица цветов", imgui.ImVec2(115, 25), u8"Таблица цветов") then
+            if imgui.TooltipButton(fa.ICON_FA_PAINT_BRUSH..u8" Таблица цветов ", imgui.ImVec2(115, 25), u8"Таблица цветов") then
                dialog.colortable.v = not dialog.colortable.v
             end
             imgui.PopStyleColor()
          else
-            if imgui.TooltipButton(u8"Таблица цветов", imgui.ImVec2(115, 25), u8"Таблица цветов") then
+            if imgui.TooltipButton(fa.ICON_FA_PAINT_BRUSH..u8" Таблица цветов ", imgui.ImVec2(115, 25), u8"Таблица цветов") then
                dialog.colortable.v = not dialog.colortable.v
             end
          end
+         imgui.PopStyleColor()
+         imgui.PopFont()
          
          imgui.Text(u8"Поиск произвольного цвета:")
          imgui.SameLine()
@@ -10055,22 +10156,23 @@ function imgui.OnDrawFrame()
             imgui.PopItemWidth()
             imgui.TextColoredRGB(u8:decode(textbuffer.rgb.v))
             
-            if imgui.Button(u8"Скопировать") then
+            imgui.PushFont(fonts.fa)
+            if imgui.Button(fa.ICON_FA_COPY..u8" Скопировать ") then
                setClipboardText(textbuffer.rgb.v)
                sampAddChatMessage("[SCRIPT]: {FFFFFF}Текст скопирован в буффер обмена", 0x0FF6600)
             end
             imgui.SameLine()
-            if imgui.Button(u8"Сбросить") then
+            if imgui.Button(fa.ICON_FA_ERASER..u8" Сбросить ") then
                textbuffer.rgb.v = ""
                imgui.resetIO()
             end
             imgui.SameLine()
-            if imgui.Button(u8"Отправить в чат") then
+            if imgui.Button(fa.ICON_FA_COMMENTS..u8" Отправить в чат ") then
                sampSetChatInputEnabled(true)
                sampSetChatInputText(u8:decode(textbuffer.rgb.v))
             end
             imgui.SameLine()
-            if imgui.Button(u8"Протестировать") then
+            if imgui.Button(fa.ICON_FA_EYE..u8" Протестировать ") then
                if string.len(textbuffer.rgb.v) > 1 then
                   sampAddChatMessage(u8:decode(textbuffer.rgb.v), -1)
                else
@@ -10080,6 +10182,7 @@ function imgui.OnDrawFrame()
                   sampAddChatMessage(u8:decode(textbuffer.rgb.v), -1)
                end
             end
+            imgui.PopFont()
          end
          
          if imgui.CollapsingHeader(u8"Тест GameText") then
@@ -10137,17 +10240,18 @@ function imgui.OnDrawFrame()
             end
             imgui.PopItemWidth()
             
-            if imgui.Button(u8"Скопировать") then
+            imgui.PushFont(fonts.fa)
+            if imgui.Button(fa.ICON_FA_COPY..u8" Скопировать ") then
                setClipboardText(textbuffer.gametextclr.v)
                sampAddChatMessage("[SCRIPT]: {FFFFFF}Текст скопирован в буффер обмена", 0x0FF6600)
             end
             imgui.SameLine()
-            if imgui.Button(u8"Сбросить") then
+            if imgui.Button(fa.ICON_FA_ERASER..u8" Сбросить ") then
                textbuffer.gametextclr.v = ""
                imgui.resetIO()
             end
             imgui.SameLine()
-            if imgui.Button(u8"Протестировать") then
+            if imgui.Button(fa.ICON_FA_EYE..u8" Протестировать ") then
                if string.len(textbuffer.gametextclr.v) <= 1 then
                   printStyledString("~y~Style "..combobox.gametextstyles.v.."~n~~<~ ~>~", 5000, combobox.gametextstyles.v)
                else
@@ -10155,6 +10259,7 @@ function imgui.OnDrawFrame()
                   printStyledString(u8:decode(textbuffer.gametextclr.v), input.gametexttime.v, style)
                end
             end
+            imgui.PopFont()
          end
          
          imgui.TextColoredRGB("Не нашли нужный цвет? вам сюда")
@@ -10305,13 +10410,14 @@ function imgui.OnDrawFrame()
       imgui.Cond.FirstUseEver, imgui.ImVec2(0.5, 0.5))
       imgui.Begin(u8"Управление", dialog.toolkitmanage)
       
-      if imgui.Button(u8"Перегрузить тулкит",imgui.ImVec2(150, 25)) then
+      imgui.PushFont(fonts.fa)
+      if imgui.Button(fa.ICON_FA_SYNC..u8" Перегрузить тулкит",imgui.ImVec2(150, 25)) then
          sampAddChatMessage("{FF6600}Mapping Toolkit{FFFFFF}  перезагружается.", -1)
          --sampAddChatMessage("Для перезапуска можно использовтаь комбинацию клавиш {696969}CTRL + R.", -1)
          thisScript():reload()
       end
       
-      if imgui.Button(u8"Выгрузить тулкит",imgui.ImVec2(150, 25)) then
+      if imgui.Button(fa.ICON_FA_OUTDENT..u8" Выгрузить тулкит",imgui.ImVec2(150, 25)) then
          sampAddChatMessage("{FF6600}Mapping Toolkit{FFFFFF}  успешно выгружен.", -1)
          sampAddChatMessage("Для повторного запуска используйте комбинацию клавиш {696969}CTRL + R.", -1)
          thisScript():unload()
@@ -10319,14 +10425,14 @@ function imgui.OnDrawFrame()
       
       local thisscript = thisScript()
       if thisscript.frozen then
-         if imgui.Button(u8"Снять с паузы",imgui.ImVec2(150, 25)) then
+         if imgui.Button(fa.ICON_FA_PLAY..u8" Снять с паузы",imgui.ImVec2(150, 25)) then
             thisScript():resume()
             dialog.main.v = true
             dialog.general.v = true
             sampAddChatMessage("{FF6600}Mapping Toolkit{FFFFFF}  поставлен на паузу.", -1)
          end
       else
-         if imgui.Button(u8"Поставить на паузу",imgui.ImVec2(150, 25)) then
+         if imgui.Button(fa.ICON_FA_PAUSE..u8" Поставить на паузу",imgui.ImVec2(150, 25)) then
             dialog.general.v = false
             dialog.settings.v = false
             dialog.streameditems.v = false
@@ -10343,12 +10449,12 @@ function imgui.OnDrawFrame()
          -- reloadScripts()
       -- end
 
-      if imgui.TooltipButton(u8"Открыть конфиг",imgui.ImVec2(150, 25),u8"Открыть файл настроек в текстовом редакторе") then
+      if imgui.TooltipButton(fa.ICON_FA_TASKS..u8" Открыть конфиг",imgui.ImVec2(150, 25),u8"Открыть файл настроек в текстовом редакторе") then
          folder = getGameDirectory().. "\\moonloader\\config\\"
          os.execute('explorer "'..folder..'"')
       end
       
-      if imgui.TooltipButton(u8"Обновление", imgui.ImVec2(150, 25), u8"Проверить наличие обновлений") then
+      if imgui.TooltipButton(fa.ICON_FA_TOOLS..u8" Обновление", imgui.ImVec2(150, 25), u8"Проверить наличие обновлений") then
          if not checkScriptUpdates() then
             sampAddChatMessage("{FF6600}Mapping Toolkit  {FFFFFF}Установлена актуальная версия {696969}"..thisScript().version, -1)
          else
@@ -10358,21 +10464,22 @@ function imgui.OnDrawFrame()
             os.execute('explorer https://github.com/ins1x/MappingToolkit/releases')
          end
       end
-      if imgui.TooltipButton(u8"Отладка", imgui.ImVec2(150, 25), u8"Открыть инструменты для отлдаки") then
-         imgui.selectTabMenu(3, 4)
+      if imgui.TooltipButton(fa.ICON_FA_WRENCH..u8" Отладка", imgui.ImVec2(150, 25), u8"Открыть инструменты для отлдаки") then
+         imgui.selectTabMenu(3, 2)
       end
-      if imgui.TooltipButton(u8"Вики", imgui.ImVec2(72, 25), u8"Открыть wiki по тулкиту на github (Online)") then
+      if imgui.TooltipButton(fa.ICON_FA_UNIVERSITY..u8" Вики", imgui.ImVec2(72, 25), u8"Открыть wiki по тулкиту на github (Online)") then
          sampAddChatMessage("Сейчас вас перенаправит на вики по Mapping Toolkit", -1)
          os.execute('explorer "https://github.com/ins1x/MappingToolkit/wiki"')
       end
       imgui.SameLine()
-      if imgui.TooltipButton(u8"FAQ", imgui.ImVec2(72, 25), u8"Открыть FAQ по тулкиту на github (Online)") then
+      if imgui.TooltipButton(fa.ICON_FA_COMMENTS..u8" FAQ", imgui.ImVec2(72, 25), u8"Открыть FAQ по тулкиту на github (Online)") then
          sampAddChatMessage("Сейчас вас перенаправит на FAQ по Mapping Toolkit", -1)
          os.execute('explorer "https://github.com/ins1x/MappingToolkit/wiki/FAQ-%D0%BF%D0%BE-MappingToolkit"')
       end
       if imgui.TooltipButton(u8" << ", imgui.ImVec2(150, 25), u8"Свернуть") then
          dialog.toolkitmanage.v = false
       end
+      imgui.PopFont()
       imgui.End()
    end
 
@@ -12992,6 +13099,9 @@ function sampev.onServerMessage(color, text)
             dialoghook.loadworld = false
             LastData.lastLoadedWorldNumber = nil
             LastData.lastMinigame = nil
+            if not playerdata.isWorldHoster then
+               playerdata.isWorldHoster = true
+            end
             if ini.settings.spawnafterloadvw then
                sampSendChat("/spawnme")
             end
@@ -15082,14 +15192,14 @@ function sampev.onSendCommand(command)
    end
    
    if isTrainingSandbox and command:find("^/loadvw") then
-      lua_thread.create(function()
-         wait(1500)
-         if not sampIsDialogActive() then
-            sampAddChatMessage("[SYNTAX]: {FFFFFF}/loadvw доступен только в своем мире", 0x09A9999)
-            wait(250)
-            sampSendChat("/world")
-         end
-      end)
+      -- lua_thread.create(function()
+         -- wait(1500)
+         -- if not playerdata.isWorldHoster and not sampIsDialogActive() then
+            -- sampAddChatMessage("[SYNTAX]: {FFFFFF}/loadvw доступен только в своем мире", 0x09A9999)
+            -- wait(250)
+            -- sampSendChat("/world")
+         -- end
+      -- end)
       if command:find('(/%a+) (.+)') then
          local cmd, arg = command:match('(/%a+) (.+)')
          local id = tonumber(arg)
