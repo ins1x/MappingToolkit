@@ -358,3 +358,10 @@
 #winvitemdesc(itemid)#, #widesc(itemid)# — описание предмета.
 #winvitemmax(itemid)#, #wimax(itemid)# — MaxCount предмета.
 #wislots# — лимит слотов игрока.
+#invOccupied(playerid)# - занято слотов
+#invFree(playerid)# - свободно слотов
+#invCount(itemid playerid)# - кол-во
+#invItemModel(itemid)# - модель
+#invHas(itemid count playerid)# - есть ли сколько-то чего-то
+#invSlotModel(itemid slotid)# - модель по слоту
+#invSlotFind(itemid playerid)# - поиск первого попавшегося слота по айди предмета или -1
