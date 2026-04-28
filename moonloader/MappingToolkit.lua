@@ -3,7 +3,7 @@ script_description("Assistant for mappers")
 script_dependencies('imgui', 'lib.samp.events')
 script_properties("work-in-pause")
 script_url("https://github.com/ins1x/MappingToolkit")
-script_version("4.24") -- Release
+script_version("4.25") -- RC1
 -- support sa-mp versions depends on SAMPFUNCS (0.3.7-R1, 0.3.7-R3-1, 0.3.7-R5, 0.3.DL)
 -- script_moonloader(16) moonloader v.0.26 
 -- editor options: tabsize 3, Unix (LF), encoding Windows-1251
@@ -48,6 +48,7 @@ local ini = inicfg.load({
       cbnewactivation = true,
       cbnewactivationitem = 31,
       cbnewdialog = false,
+      cbsavelog = false,
       checkupdates = true,
       chatfilter = true,
       chathidecb = false,
@@ -413,6 +414,7 @@ local checkbox = {
    spawnafterloadvw = imgui.ImBool(ini.settings.spawnafterloadvw),
    loadworldname = imgui.ImBool(ini.settings.loadworldname),
    oldlistdialog = imgui.ImBool(ini.settings.oldlistdialog),
+   cbsavelog = imgui.ImBool(ini.settings.cbsavelog),
    
    showpanel = imgui.ImBool(ini.panel.showpanel),
    panelheadingangle = imgui.ImBool(ini.panel.headingangle),
@@ -538,6 +540,7 @@ local checkbox = {
    verticalborders = imgui.ImBool(false),
    savepagecb = imgui.ImBool(false),
    camparams = imgui.ImBool(false),
+   showradiusrender = imgui.ImBool(false),
    test = imgui.ImBool(false)
 }
 
@@ -587,6 +590,7 @@ local input = {
    orbitspeed = imgui.ImFloat(0.012),
    orbitstartheading = imgui.ImFloat(0.0),
    orbitangle = imgui.ImFloat(0.0),
+   radiusrender = imgui.ImFloat(1.0),
    renderfontsize = imgui.ImInt(ini.settings.renderfontsize),
    reminderdelay = imgui.ImInt(ini.settings.reminderdelay),
    cbdefaultradius = imgui.ImFloat(ini.settings.cbdefaultradius),
@@ -794,6 +798,7 @@ local LastData = {
    lastTextBuffer = "",
    lastClickedTextdrawId = 0,
    lastCheckpointPos = nil,
+   lastCheckpointHandle = nil,
    lastShowedTextdrawId = 0,
    lastDialogInput = nil,
    lastDialogText = nil,
@@ -1224,6 +1229,14 @@ function main()
          file:close()
       end
       
+      if not doesFileExist(getGameDirectory()..
+         "//moonloader//resource//mappingtoolkit//history//cblog.txt") then
+         local file = io.open(getGameDirectory()..
+         "//moonloader//resource//mappingtoolkit//history//cblog.txt", "w")
+         file:write("")
+         file:close()
+      end
+      
       if doesFileExist(getGameDirectory()..'\\moonloader\\resource\\mappingtoolkit\\chatfilter.txt') then
          chatfilterfile = io.open("moonloader/resource/mappingtoolkit/chatfilter.txt", "r")
          for template in chatfilterfile:lines() do
@@ -1269,6 +1282,11 @@ function main()
          if doesFileExist(getGameDirectory()..logpath..'/pmmessages.txt') then
             if getFileSize(logpath..'/pmmessages.txt') > const.maxLogfileSize then
                os.remove(logpath..'/pmmessages.txt')
+            end
+         end
+         if doesFileExist(getGameDirectory()..logpath..'/cblog.txt') then
+            if getFileSize(logpath..'/cblog.txt') > const.maxLogfileSize then
+               os.remove(logpath..'/cblog.txt')
             end
          end
       end
@@ -1969,6 +1987,13 @@ function main()
          renderDrawBox(0, sh-bordersize, sw, bordersize, 0xFF000000)
       end
       
+      if checkbox.showradiusrender.v then
+         local px, py, pz = getCharCoordinates(playerPed)
+         if input.radiusrender.v then
+            Draw3DCircle(px, py, pz-1, input.radiusrender.v, 0xFFD00000)
+         end
+      end
+      
       if playerdata.flymode then
          local x, y = getScreenResolution()
          if not isCharInAnyCar(playerPed) then 
@@ -2633,7 +2658,7 @@ function imgui.OnDrawFrame()
             imgui.Spacing()
             
             imgui.PushFont(fonts.fa)
-            if imgui.TooltipButton(fa.ICON_FA_COPY..u8" Получить ", imgui.ImVec2(72, 25), u8"Получить текущую позицию игрока и сохранить") then
+            if imgui.TooltipButton(fa.ICON_FA_COPY..u8" Получить ", imgui.ImVec2(92, 25), u8"Получить текущую позицию игрока и сохранить") then
                tpcpos.x = positionX
                tpcpos.y = positionY
                tpcpos.z = positionZ
@@ -2650,35 +2675,51 @@ function imgui.OnDrawFrame()
                end
             end
             imgui.SameLine()
-            if imgui.TooltipButton(fa.ICON_FA_MAP_MARKER..u8" Метка ", imgui.ImVec2(55, 25), u8"Поставить метку на карте в текущей точке") then
+            if imgui.TooltipButton(fa.ICON_FA_MAP_MARKER..u8" Метка ", imgui.ImVec2(85, 25), u8"Поставить метку на карте в текущей точке") then
                local posX, posY, posZ = getCharCoordinates(playerPed)
           	   local result = setTargetBlipCoordinates(posX, posY, posZ)
                if result then
                   sampAddChatMessage("[SCRIPT]: {FFFFFF}Метка установлена в текущей точке!", 0x0FF6600)
+               else
+                  sampAddChatMessage("[ERROR]: {FFFFFF}Метка не была установлена!", 0x0CC0000)
+                  sampAddChatMessage("[ERROR]: {FFFFFF}Попробуйте установить метку на карте вручную, а затем повтороно вызвать функцию!", 0x0CC0000)
                end
             end
             imgui.SameLine()
-            if imgui.Button(fa.ICON_FA_HAND_POINT_RIGHT..u8" Прыгнуть вперед ", imgui.ImVec2(130, 25)) then
+            if imgui.Button(fa.ICON_FA_HAND_POINT_RIGHT..u8" Прыгнуть вперед ", imgui.ImVec2(140, 25)) then
                if sampIsLocalPlayerSpawned() then
                   JumpForward()
                end
             end
             imgui.SameLine()
-            if imgui.Button(fa.ICON_FA_ARROW_UP..u8" Прыгнуть вверх ", imgui.ImVec2(130, 25)) then
+            if imgui.Button(fa.ICON_FA_ARROW_UP..u8" Прыгнуть вверх ", imgui.ImVec2(140, 25)) then
                if sampIsLocalPlayerSpawned() then
                   local posX, posY, posZ = getCharCoordinates(playerPed)
                   setCharCoordinates(playerPed, posX, posY, posZ+10.0)
                end
             end
+            --imgui.SameLine()
+            -- if imgui.TooltipButton(fa.ICON_FA_MAP_MARKER..u8" Чекпоинт ", imgui.ImVec2(55, 25), u8"Поставить чекпоинт в текущей точке") then
+               -- local posX, posY, posZ = getCharCoordinates(playerPed)
+               -- local type = 1 
+               -- if not LastData.lastCheckpointHandle then
+          	      -- LastData.lastCheckpointHandle = createCheckpoint(type, posX, posY, posZ, 0,0,0, 2.0)
+                  -- sampAddChatMessage("[SCRIPT]: {FFFFFF}Чекпоинт создан", 0x0FF6600)
+               -- else
+                  -- deleteCheckpoint(LastData.lastCheckpointHandle)
+                  -- LastData.lastCheckpointHandle = nil
+                  -- sampAddChatMessage("[SCRIPT]: {FFFFFF}Чекпоинт удален", 0x0FF6600)
+               -- end
+            -- end
             
-            if imgui.Button(fa.ICON_FA_ARROW_DOWN..u8" Провалиться под текстуры ", imgui.ImVec2(200, 25)) then
+            if imgui.Button(fa.ICON_FA_ARROW_DOWN..u8" Провалиться под текстуры ", imgui.ImVec2(235, 25)) then
                if sampIsLocalPlayerSpawned() then
                   local posX, posY, posZ = getCharCoordinates(playerPed)
                   setCharCoordinates(playerPed, posX, posY, posZ-3.0)
                end
             end
             imgui.SameLine()
-            if imgui.Button(fa.ICON_FA_STREET_VIEW..u8" Вернуться на поверхность ", imgui.ImVec2(200, 25)) then
+            if imgui.TooltipButton(fa.ICON_FA_STREET_VIEW..u8" Вернуться на поверхность ", imgui.ImVec2(235, 25), u8"Вернуться на ближайшую поверхность с коллизией") then
                local result, x, y, z = getNearestRoadCoordinates()
                if result then
                   local dist = getDistanceBetweenCoords3d(x, y, z, getCharCoordinates(playerPed))
@@ -2687,7 +2728,7 @@ function imgui.OnDrawFrame()
                         setCharCoordinates(playerPed, x, y, z + 3.0)
                         sampAddChatMessage("[SCRIPT]: {FFFFFF}Вы телепортированы на ближайшую поверхность", 0x0FF6600)
                      else
-                        sampAddChatMessage(("Ближайшая поверхность слишком далеко (%d m.)"):format(dist), 0x0FF0000)
+                        sampAddChatMessage("[ERROR]: {FFFFFF}"..("Ближайшая поверхность слишком далеко (%d m.)"):format(dist), 0x0CC0000)
                         local posX, posY, posZ = getCharCoordinates(playerPed)
                         setCharCoordinates(playerPed, posX, posY, posZ+3.0)
                      end
@@ -2696,7 +2737,7 @@ function imgui.OnDrawFrame()
                      sampAddChatMessage("[SCRIPT]: {FFFFFF}Вы телепортированы на ближайшую поверхность", 0x0FF6600)
                   end
                else
-                  sampAddChatMessage("Не нашлось ни одной поверхности рядом", 0x0FF0000)
+                  sampAddChatMessage("[ERROR]: {FFFFFF}Не нашлось ни одной поверхности c коллизией по близости", 0x0CC0000)
                   local posX, posY, posZ = getCharCoordinates(playerPed)
                   setCharCoordinates(playerPed, posX, posY, posZ+3.0)
                end
@@ -2704,31 +2745,7 @@ function imgui.OnDrawFrame()
             
             imgui.Spacing()
             imgui.Spacing()
-            -- local filepath = getGameDirectory().."//moonloader//resource//mappingtoolkit//favorites//coordinates.txt"
-            
-            -- if imgui.Button(u8"Добавить", imgui.ImVec2(100, 25)) then
-               -- local file = io.open(filepath, "a")
-               -- file:write(("%s, %.2f, %.2f, %.2f\n"):format("saved point", positionX,positionY,positionZ))
-               -- file:close()
-               -- --sampAddChatMessage("[SCRIPT]: {FFFFFF}Текстдрав был сохранен в /moonloader/resource/mappingtoolkit/export/export_txdtocb.txt", 0x0FF6600)
-               -- sampAddChatMessage("[SCRIPT]: {FFFFFF}Координаты были добавлены в список", 0x0FF6600)
-            -- end
-            -- imgui.SameLine()
-            -- if imgui.Button(u8"Удалить", imgui.ImVec2(100, 25)) then
-            -- end
-            
-            -- local file = io.open(filepath, "r")
-            -- for line in file:lines() do
-               -- if line:len() > 1 then
-                  -- if imgui.Selectable(tostring(line)) then
-                     -- -- for element in string.gmatch(line, "[^,]+") do
-                     -- -- end
-                  -- end
-               -- end
-            -- end
-            -- file:close()
-            
-                     
+
             if worldspawnpos.x then
                if worldspawnpos.x ~= 0 then
                   imgui.TextColoredRGB(string.format("Позиция спавна в мире {007DFF}x: %.1f, {e0364e}y: %.1f, {26b85d}z: %.1f",
@@ -2740,41 +2757,70 @@ function imgui.OnDrawFrame()
                end
             end
             imgui.PushStyleColor(imgui.Col.Button, imgui.ImVec4(0.5, 0.25, 0.0, 1.0))
-            if imgui.TooltipButton(u8"Заспавниться", imgui.ImVec2(130, 25), u8"Отправить SpawnPlayer серверу") then
+            if imgui.TooltipButton(u8"Заспавниться", imgui.ImVec2(115, 25), u8"Отправить SpawnPlayer серверу") then
                sampSpawnPlayer()
                restoreCameraJumpcut()
             end
             imgui.SameLine()
-            if imgui.TooltipButton(u8"Респавн", imgui.ImVec2(130, 25), u8"Отправить SendSpawn серверу") then
+            if imgui.TooltipButton(u8"Респавн", imgui.ImVec2(115, 25), u8"Отправить SendSpawn серверу") then
                sampSendSpawn()
             end
             imgui.SameLine()
-            if imgui.TooltipButton(u8"Запросить спавн", imgui.ImVec2(130, 25), u8"Отправить SendRequestSpawn серверу") then
+            if imgui.TooltipButton(u8"Синхронизация", imgui.ImVec2(115, 25), u8"Отправить ForceSync серверу") then
+               if isCharInAnyCar(playerPed) then
+                  local carhandle = storeCarCharIsInNoSave(playerPed)
+                  local streamed, carid = sampGetVehicleIdByCarHandle(carhandle)
+                  if streamed then
+                     sampForceVehicleSync(carid)--0C81
+                     sampForceTrailerSync(carid)--0C85
+                     --local Ped ped = getCharInCarPassengerSeat(Vehicle car, int seat)
+                     --sampForceUnoccupiedSyncSeatId(int id, int seatId) --0C82
+                     --sampForcePassengerSyncSeatId(int id, int seatId)--0C86
+                  end
+               end
+               sampForceOnfootSync()--0C83
+               sampForceAimSync()--0C84
+               sampForceStatsSync()--0C87
+               sampForceWeaponsSync()
+               sampAddChatMessage("[SCRIPT]: {FFFFFF}Синхронизация завершена", 0x0FF6600)
+            end
+            imgui.SameLine()
+            if imgui.TooltipButton(u8"Запросить спавн", imgui.ImVec2(115, 25), u8"Отправить SendRequestSpawn серверу") then
                sampSendRequestSpawn()
             end
             imgui.PopStyleColor()
             
             imgui.PushStyleColor(imgui.Col.Button, imgui.ImVec4(0.0, 0.45, 0.0, 1.0))
             if isTrainingSandbox then
-               --imgui.PushStyleColor(imgui.Col.Button, imgui.ImVec4(0.0, 0.45, 0.0, 1.0))
-               if imgui.TooltipButton(u8"Слапнуть себя", imgui.ImVec2(200, 25), u8"Подбросить себя /slapme") then
+               if imgui.TooltipButton(u8"Слапнуть себя", imgui.ImVec2(155, 25), u8"Подбросить себя /slapme") then
                   sampSendChat("/slapme")
                end
                imgui.SameLine()
-               if imgui.TooltipButton(u8"Заспавнить себя", imgui.ImVec2(200, 25), u8"Заспавнить себя /spawnme") then
+               if imgui.TooltipButton((checkbox.freezepos.v and u8"Разморозить себя" or u8"Заморозить себя"), 
+               imgui.ImVec2(155, 25), u8"Подбросить себя /slapme") then
+                  checkbox.freezepos.v = not checkbox.freezepos.v
+                  if checkbox.freezepos.v and sampIsLocalPlayerSpawned() then
+                     freezeCharPosition(playerPed, true)
+                  else
+                     freezeCharPosition(playerPed, false)
+                     setPlayerControl(PLAYER_HANDLE, true)
+                     clearCharTasksImmediately(playerPed)
+                  end
+               end
+               imgui.SameLine()
+               if imgui.TooltipButton(u8"Заспавнить себя", imgui.ImVec2(155, 25), u8"Заспавнить себя /spawnme") then
                   sampSendChat("/spawnme")
                end
-               --imgui.PopStyleColor()
             end
             imgui.PopStyleColor()
             
             if isTrainingSandbox then
-               if imgui.TooltipButton(fa.ICON_FA_BUILDING..u8" Выбрать интерьер ", imgui.ImVec2(200, 25), u8"Выбрать интерьер для мира /int") then
+               if imgui.TooltipButton(fa.ICON_FA_BUILDING..u8" Выбрать интерьер ", imgui.ImVec2(235, 25), u8"Выбрать интерьер для мира /int") then
                   sampSendChat("/int")
                   dialog.main.v = false
                end
                imgui.SameLine()
-               if imgui.TooltipButton(fa.ICON_FA_MAP..u8" Выбрать спавн ", imgui.ImVec2(200, 25), u8"Выбрать спавн для мира /team") then
+               if imgui.TooltipButton(fa.ICON_FA_MAP..u8" Выбрать спавн ", imgui.ImVec2(235, 25), u8"Выбрать спавн для мира /team") then
                   sampSendChat("/team")
                   dialog.main.v = false
                end
@@ -2805,13 +2851,6 @@ function imgui.OnDrawFrame()
             end
             imgui.SameLine()
             imgui.TextQuestion("( ? )", u8"Отключает установленные сервером значения гравитации (setGravity)")
-            
-            -- if imgui.TooltipButton(u8"ForceSync", imgui.ImVec2(200, 25), u8"Отправить ForceSync серверу") then
-               -- sampForceAimSync()
-               -- sampForceOnfootSync()
-               -- sampForceStatsSync()
-               -- sampForceWeaponsSync()
-            -- end
             
          elseif tabmenu.coords == 2 then
             
@@ -3665,9 +3704,12 @@ function imgui.OnDrawFrame()
                imgui.TextColoredRGB("{696969}Объект не выбран! Укажите ID объекта ниже")
             end
             
-            if imgui.TooltipButton(u8"Список текстур", imgui.ImVec2(120, 25), u8:encode("Список последних использованных текстур (/tlist)")) then
+            imgui.PushFont(fonts.fa)
+            if imgui.TooltipButton(fa.ICON_FA_LIST..u8" Список текстур ", imgui.ImVec2(120, 25), u8:encode("Список последних использованных текстур (/tlist)")) then
                sampSendChat("/tlist")
             end
+            imgui.PopFont()
+            
             imgui.SameLine()
             imgui.TextColoredRGB("ID:")
             imgui.SameLine()
@@ -3705,7 +3747,8 @@ function imgui.OnDrawFrame()
             -- imgui.SameLine()
             -- imgui.TextQuestion("( ? )", u8"Применить на все слои (только для ретексура)")
             
-            if imgui.TooltipButton(u8"Наложить текстуру", imgui.ImVec2(140, 25), u8:encode("Наложить текcтуру на объект (/texture)")) then
+            imgui.PushFont(fonts.fa)
+            if imgui.TooltipButton(fa.ICON_FA_TABLE..u8" Наложить текстуру ", imgui.ImVec2(140, 25), u8:encode("Наложить текcтуру на объект (/texture)")) then
                if LastObject.localid then
                   edit.mode = 4
                   showRetextureKeysHelp()
@@ -3727,7 +3770,7 @@ function imgui.OnDrawFrame()
                end
             end
             imgui.SameLine()
-            if imgui.TooltipButton(u8"Наложить текст", imgui.ImVec2(140, 25), u8:encode("Наложить текст на объект (/otext)")) then
+            if imgui.TooltipButton(fa.ICON_FA_FONT..u8" Наложить текст ", imgui.ImVec2(140, 25), u8:encode("Наложить текст на объект (/otext)")) then
                if LastObject.localid then
                   sampSendChat("/otext "..LastObject.localid)
                else
@@ -3735,11 +3778,13 @@ function imgui.OnDrawFrame()
                end
                if dialog.main.v then dialog.main.v = false end
             end
+            imgui.PopFont()
             
             --imgui.Spacing()
+            imgui.PushFont(fonts.fa)
             imgui.Text(u8"Цвет:")
             imgui.PushStyleColor(imgui.Col.Button, imgui.ImVec4(0.0, 0.5, 0.0, 1.0))
-            if imgui.TooltipButton(u8"Покрасить", imgui.ImVec2(105, 25), u8:encode("Наложить цвет на объект (/ocolor)")) then
+            if imgui.TooltipButton(fa.ICON_FA_PAINT_BRUSH..u8" Покрасить ", imgui.ImVec2(105, 25), u8:encode("Наложить цвет на объект (/ocolor)")) then
                sampSendChat("/ocolor "..input.txdobject.v.." "..input.txdslot.v.." "..textbuffer.ocolor.v)
             end
             imgui.PopStyleColor()
@@ -3766,11 +3811,11 @@ function imgui.OnDrawFrame()
             imgui.TextQuestion(u8" ( ? ) ", u8"Цвет в формате AARRGGBB")
             imgui.SameLine()
             
-            imgui.PushFont(fonts.fa)
+           
             if imgui.TooltipButton(fa.ICON_FA_PALETTE..u8" Палитра ", imgui.ImVec2(85, 25), u8:encode("Перейти на вкладку выбора цвета")) then
                dialog.colorpicker.v = not dialog.colorpicker.v 
             end
-            imgui.PopFont()
+            
             
             if imgui.TooltipButton(u8"Затемнить", imgui.ImVec2(105, 25), u8:encode("Затемнить объект")) then
                if LastObject.localid then 
@@ -3786,7 +3831,7 @@ function imgui.OnDrawFrame()
                sampSendChat("/ocolor "..input.txdobject.v.." "..input.txdslot.v.." FFFFFFFF")
             end
             imgui.SameLine()
-            if imgui.TooltipButton(u8"Сделать прозрачным", imgui.ImVec2(150, 25), u8:encode("Устанавливает прозрачную текстуру на 0 слой делая объект невидимым")) then
+            if imgui.TooltipButton(fa.ICON_FA_EYE_SLASH..u8" Сделать прозрачным ", imgui.ImVec2(150, 25), u8:encode("Устанавливает прозрачную текстуру на 0 слой делая объект невидимым")) then
                if LastObject.localid then 
                   sampSendChat("/stexture "..LastObject.localid.." 0 8660")
                   sampAddChatMessage("[SCRIPT]: {FFFFFF}Объект "..LastObject.localid.." сделан прозрачным", 0x0FF6600)
@@ -3797,13 +3842,14 @@ function imgui.OnDrawFrame()
             
             --imgui.Spacing()
             imgui.Text(u8"Индексы:")
-            if imgui.TooltipButton(u8"Показать индексы", imgui.ImVec2(140, 25), u8:encode("Показать индексы(слои) на объекте (/sindex)")) then
+            if imgui.TooltipButton(fa.ICON_FA_LIST_OL..u8" Показать индексы ", imgui.ImVec2(140, 25), u8:encode("Показать индексы(слои) на объекте (/sindex)")) then
                sampSendChat("/sindex")
             end
             imgui.SameLine()
-            if imgui.TooltipButton(u8"Очистить текстуры", imgui.ImVec2(140, 25), u8:encode("Очистить все текстуры на объекте (/untexture)")) then
+            if imgui.TooltipButton(fa.ICON_FA_ERASER..u8" Очистить текстуры ", imgui.ImVec2(140, 25), u8:encode("Очистить все текстуры на объекте (/untexture)")) then
                sampSendChat("/untexture")
             end
+            imgui.PopFont()
             -- imgui.SameLine()
             -- if imgui.TooltipButton(u8"Цветные индексы", imgui.ImVec2(140, 25), u8:encode("Покрасить каждый слой на объекте (/cindex)")) then
                -- if LastObject.handle and doesObjectExist(LastObject.handle) then
@@ -3850,6 +3896,11 @@ function imgui.OnDrawFrame()
             imgui.SameLine()
             imgui.TextQuestion("( ? )", u8"Рисует линию к центру объекта с указанием расстояния")
             
+            if imgui.Checkbox(u8("Показать окружность с заданным радиусом"), checkbox.showradiusrender) then
+            end
+            imgui.SameLine()
+            imgui.TextQuestion("( ? )", u8"Рисует окружность вокруг персонажа с указанным радиусом")
+            
             if checkbox.drawlinetomodelid.v then 
                -- if LastObject.modelid and input.rendselectedmodelid.v == 0 then 
                   -- input.rendselectedmodelid.v = LastObject.modelid
@@ -3875,6 +3926,22 @@ function imgui.OnDrawFrame()
                   end
                end
             end
+            
+            if checkbox.showradiusrender.v then 
+               imgui.Text(u8"Радиус: ")
+               imgui.SameLine()
+               imgui.PushItemWidth(95)
+               if imgui.InputFloat('##rendradius', input.radiusrender, 0.1, 300.0) then
+                  if input.radiusrender.v < 0.1 then
+                     input.radiusrender.v = 1.0
+                  end
+               end
+               imgui.PopItemWidth()
+               imgui.SameLine()
+               imgui.TextQuestion("( ? )", u8"Введите значение радиуса окружности")   
+            end
+            
+            imgui.Spacing()
             
             imgui.Text(u8"Макс. дистанция поиска: ")
             imgui.SameLine()
@@ -4005,8 +4072,9 @@ function imgui.OnDrawFrame()
             18	Jaw\
             ")
             
+            imgui.PushFont(fonts.fa)
             if isTrainingSandbox then
-              if imgui.TooltipButton(u8"Наборы аттачей", imgui.ImVec2(200, 25),
+              if imgui.TooltipButton(fa.ICON_FA_SAVE..u8" Наборы аттачей ", imgui.ImVec2(200, 25),
               u8"Открыть ваши наборы аттачей") then
                   sampSendChat("/mn")
                   lua_thread.create(function()
@@ -4016,19 +4084,19 @@ function imgui.OnDrawFrame()
                   dialog.main.v = false
                end
                imgui.SameLine()
-               if imgui.TooltipButton(u8"Меню аттачей на игрока", imgui.ImVec2(200, 25),
+               if imgui.TooltipButton(fa.ICON_FA_EDIT..u8" Меню аттачей на игрока ", imgui.ImVec2(200, 25),
                u8"Открыть меню редактирования аттачей на игрока /att") then
                   sampSendChat("/att")
                   dialog.main.v = false
                end
             end
 
-            if imgui.Button(u8"Скрыть аттачи (Визуально)",imgui.ImVec2(200, 25)) then
+            if imgui.Button(fa.ICON_FA_EYE_SLASH..u8" Скрыть аттачи (Визуально) ",imgui.ImVec2(200, 25)) then
                hideAttaches(true)
                sampAddChatMessage("[SCRIPT]: {FFFFFF}Вы скрыли все аттачи (Визуально для себя)", 0x0FF6600)
             end
             imgui.SameLine()
-            if imgui.Button(u8"Показать аттачи (Визуально)",imgui.ImVec2(200, 25)) then
+            if imgui.Button(fa.ICON_FA_EYE..u8" Показать аттачи (Визуально) ",imgui.ImVec2(200, 25)) then
                hideAttaches(false)
                sampAddChatMessage("[SCRIPT]: {FFFFFF}Вы показали скрытые аттачи", 0x0FF6600)
             end
@@ -4041,6 +4109,8 @@ function imgui.OnDrawFrame()
             if imgui.Button(u8"SA-MP объекты",imgui.ImVec2(200, 25)) then
                os.execute('explorer "https://dev.prineside.com/ru/gtasa_samp_model_id/tag/2-sa-mp/"')
             end
+            imgui.PopFont()
+            
             imgui.Spacing()
             
             imgui.Checkbox(u8("Отслеживать установку аттачей"), checkbox.hooksetattachedobject) 
@@ -4079,6 +4149,7 @@ function imgui.OnDrawFrame()
                end
             end
             
+            imgui.PushFont(fonts.fa)
             if imgui.TooltipButton(u8"ТП к Пикапу", imgui.ImVec2(120, 25), u8"Телепортироваться к пикапу") then
                local x, y, z = getPickupCoordinates(pickup)
                if isAnyPickupAtCoords(x, y, z) then 
@@ -4099,7 +4170,7 @@ function imgui.OnDrawFrame()
                sampSendChat("/pickuplist")
             end
             
-            if imgui.TooltipButton(u8"Метку на пикап", imgui.ImVec2(120, 25), u8"Установить метку на пикап") then
+            if imgui.TooltipButton(fa.ICON_FA_MAP_MARKER..u8" Метку на пикап ", imgui.ImVec2(120, 25), u8"Установить метку на пикап") then
                if LastData.lastPickupBlip then
                   removeBlip(LastData.lastPickupBlip)
                   LastData.lastPickupBlip = nil
@@ -4108,7 +4179,7 @@ function imgui.OnDrawFrame()
                end
             end
             imgui.SameLine()
-            if imgui.TooltipButton(u8"Снять метку", imgui.ImVec2(120, 25), u8"Снимет метку с пикапа") then
+            if imgui.TooltipButton(fa.ICON_FA_BAN..u8" Снять метку ", imgui.ImVec2(120, 25), u8"Снимет метку с пикапа") then
                if LastData.lastPickupBlip then
                   removeBlip(LastData.lastPickupBlip)
                   LastData.lastPickupBlip = nil
@@ -4140,6 +4211,7 @@ function imgui.OnDrawFrame()
             imgui.TextQuestion("( ? )", u8"Выводит сообщение в чат при взятии пикапа")
             
             imgui.PopItemWidth()
+            imgui.PopFont()
             -- for k, pickup in ipairs(getAllPickups()) do
                -- local id = sampGetPickupSampIdByHandle(pickup)
                -- local x, y, z = getPickupCoordinates(pickup)
@@ -4253,7 +4325,8 @@ function imgui.OnDrawFrame()
          imgui.PopStyleVar()
          imgui.Spacing()
          
-         if imgui.TooltipButton(u8">> Вернуть камеру <<", imgui.ImVec2(150, 25), u8"Возвращает камеру на стандартные параметры") then
+         imgui.PushFont(fonts.fa)
+         if imgui.TooltipButton(fa.ICON_FA_VIDEO..u8" Вернуть камеру ", imgui.ImVec2(150, 25), u8"Возвращает камеру на стандартные параметры") then
             if checkbox.fixcampos.v then checkbox.fixcampos.v = false end
             restoreCamera()
             restoreCameraJumpcut()
@@ -4261,13 +4334,14 @@ function imgui.OnDrawFrame()
             sampAddChatMessage("[SCRIPT]: {FFFFFF}Камера возвращена на исходные", 0x0FF6600)
          end
          imgui.SameLine()
-         if imgui.TooltipButton(u8"Авто-поворот", imgui.ImVec2(150, 25), u8"Автоматически повернет игрока на ближайшее направление") then
+         if imgui.TooltipButton(fa.ICON_FA_REDO..u8" Авто-поворот ", imgui.ImVec2(150, 25), u8"Автоматически повернет игрока на ближайшее направление") then
             local angle = math.ceil(getCharHeading(playerPed))
             --local fixangle = 360/8 * math.floor(angle/45)
             local fixangle = 360/4 * math.floor(angle/90)
             setCharHeading(playerPed, fixangle)
             sampAddChatMessage(string.format("[SCRIPT]: {FFFFFF}Направление скорректировано на {1e90ff}%s (%i° -> %i°)", u8:decode(direction()), angle, fixangle), 0x0FF6600)
          end
+         imgui.PopFont()
          
          if imgui.CollapsingHeader(u8"Зафиксированная камера") then
             if imgui.Checkbox(u8("Зафиксировать камеру на координатах"), checkbox.fixcampos) then
@@ -6702,22 +6776,44 @@ function imgui.OnDrawFrame()
                end
             end
             
-            if imgui.CollapsingHeader(u8"Автодополнение:") then               
-               if imgui.Checkbox(u8'Автодополнение в диалогах КБ', checkbox.cbvalautocomplete) then
+            if imgui.CollapsingHeader(u8"Дополнения:") then     
+               
+               if imgui.ToggleButton(u8"Скрывать приставку * для [CB] в чате", checkbox.chathidecb) then
+                  ini.settings.chathidecb = checkbox.chathidecb.v
+                  inicfg.save(ini, configIni)
+               end
+               
+               if imgui.ToggleButton(u8"Сохранять значения блоков КБ в логи", checkbox.cbsavelog) then
+                  ini.settings.cbsavelog = checkbox.cbsavelog.v
+                  inicfg.save(ini, configIni)
+               end
+               
+               if imgui.ToggleButton(u8("Уведомлять о ошибках КБ в мире"), checkbox.cberrorwarnings) then
+                  if checkbox.cberrorwarnings.v then
+                     sampAddChatMessage("[SCRIPT]: {FFFFFF}Включены уведомления о ошибках КБ в мире", 0x0FF6600)
+                     sampAddChatMessage("[WARNING]: {FFFFFF}Будет выводить предупреждения с тегом {FF6600}[WARNING]", 0x0FF6600)
+                  end
+                  ini.settings.cberrorwarnings = checkbox.cberrorwarnings.v
+                  inicfg.save(ini, configIni)
+               end
+               imgui.SameLine()
+               imgui.TextQuestion("( ? )", u8"Будет уведомлять о недопустимых параметрах КБ в мире (Используйте для тестов мира)")
+               
+               if imgui.ToggleButton(u8'Автодополнение в диалогах КБ', checkbox.cbvalautocomplete) then
                   ini.settings.cbvalautocomplete = checkbox.cbvalautocomplete.v
                   inicfg.save(ini, configIni)
                end
                imgui.SameLine()
                imgui.TextQuestion("( ? )", u8"Использовать авто-дополнение текущих значений в /cblist (только для TRAINING)")
                
-               if imgui.Checkbox(u8'Сохранять последнюю страницу КБ', checkbox.savepagecb) then
+               if imgui.ToggleButton(u8'Сохранять последнюю страницу КБ', checkbox.savepagecb) then
                   ini.settings.savepagecb = checkbox.savepagecb.v
                   inicfg.save(ini, configIni)
                end
                imgui.SameLine()
                imgui.TextQuestion("( ? )", u8"Сохраняет последнюю просмотренную страницу при вызове /cblist (только для TRAINING)")
                
-               if imgui.Checkbox(u8'Изменять способ активации при создании КБ', checkbox.cbnewactivation) then
+               if imgui.ToggleButton(u8'Изменять способ активации при создании КБ', checkbox.cbnewactivation) then
                   ini.settings.cbnewactivation = checkbox.cbnewactivation.v
                   inicfg.save(ini, configIni)
                end
@@ -6748,6 +6844,7 @@ function imgui.OnDrawFrame()
                imgui.PopItemWidth()
                imgui.SameLine()
                imgui.TextQuestion("( ? )", u8"При создании КБ изменяет радиус активации (Принимает значения от 0.1 до 9999)")
+               
             end
             imgui.Spacing()
 
@@ -7996,9 +8093,9 @@ function imgui.OnDrawFrame()
                   ini.settings.cberrorwarnings = checkbox.cberrorwarnings.v
                   inicfg.save(ini, configIni)
                end
+               imgui.SameLine()
+               imgui.TextQuestion("( ? )", u8"Будет уведомлять о недопустимых параметрах КБ в мире (Используйте для тестов мира)")
             end
-            imgui.SameLine()
-            imgui.TextQuestion("( ? )", u8"Будет уведомлять о недопустимых параметрах КБ в мире (Используйте для тестов мира)")
             
             if isTrainingSandbox then
                if imgui.Checkbox(u8'Скрывать всплывающие подсказки о системах транспорта', checkbox.skipvehnotify) then
@@ -8079,7 +8176,7 @@ function imgui.OnDrawFrame()
                inicfg.save(ini, configIni)
             end
             imgui.SameLine()
-            imgui.TextQuestion("( ? )", u8"Устанавливать свою погоду и время при входе в мир")
+            imgui.TextQuestion("( ? )", u8"Устанавливать свою погоду и время при входе в мир \n(Настройки берет из раздела 'Погода и время')")
             
             if isTrainingSandbox then
                if imgui.Checkbox(u8'Заспавниться после загрузки мира', checkbox.spawnafterloadvw) then
@@ -8431,24 +8528,6 @@ function imgui.OnDrawFrame()
                   sampAddChatMessage("[SCRIPT]: F/ENTER{FFFFFF} - выйти из режима полета.", 0x0FF6600)
                end
             end
-
-            if imgui.Button(u8'Заморозить на позиции', imgui.ImVec2(180, 25)) then
-               freezeCharPosition(playerPed, true)
-            end
-            imgui.SameLine()
-            if imgui.Button(u8'Разморозить', imgui.ImVec2(180, 25)) then
-               freezeCharPosition(playerPed, false)
-               setPlayerControl(PLAYER_HANDLE, true)
-               lockPlayerControl(false)
-               clearCharTasksImmediately(playerPed)
-            end
-            imgui.SameLine()
-            if imgui.Button(u8'ForceSync', imgui.ImVec2(120, 25)) then
-               sampForceAimSync()
-               sampForceOnfootSync()
-               sampForceStatsSync()
-               sampForceWeaponsSync()
-            end
             
             if imgui.Button(u8'Взять Jetpack', imgui.ImVec2(120, 25)) then
                taskJetpack(playerPed)
@@ -8486,6 +8565,8 @@ function imgui.OnDrawFrame()
                
                if doesFileExist(file) then
                   os.execute('explorer '.. file)
+               else
+                  sampAddChatMessage("[ERROR]: {FFFFFF}Лог не найден!", 0x0CC0000)
                end
             end
             imgui.Spacing()
@@ -9616,13 +9697,16 @@ function imgui.OnDrawFrame()
             imgui.SameLine()
             imgui.TextQuestion("( ? )", u8"Нажмите на текст чтобы вставить в поиск")
          end
-         if imgui.Button(u8"Найти объекты рядом по текущей позиции",imgui.ImVec2(300, 25)) then
+         
+         imgui.PushFont(fonts.fa)
+         if imgui.Button(fa.ICON_FA_MAP_MARKER..u8" Найти объекты рядом по текущей позиции ",imgui.ImVec2(300, 25)) then
             if sampIsLocalPlayerSpawned() then
                local posX, posY, posZ = getCharCoordinates(playerPed)
                local link = string.format('explorer "https://dev.prineside.com/ru/gtasa_samp_model_id/mapsearch/?x=%i&y=%i', posX, posY)
                os.execute(link)
             end
          end
+         imgui.PopFont()
          
          if isTrainingSandbox then
             imgui.TextColoredRGB("Найти объект можно командой: {696969}/osearch <text>")
@@ -12356,6 +12440,12 @@ function sampev.onShowDialog(dialogId, style, title, button1, button2, text)
             local result = tostring(lines[#lines - 1])
             if result and string.len(result) >= 1 then
                LastData.lastCbvaluebuffer = result
+               if ini.settings.cbsavelog then
+                  local file = io.open(getGameDirectory()..
+                  "/moonloader/resource/mappingtoolkit/history/cblog.txt", "a")
+                  file:write(("[%s] cb:%i value:%s\n"):format(tostring(os.date("%d.%m.%Y %X")), LastData.lastCb, result))
+                  file:close()
+               end
             else
                LastData.lastCbvaluebuffer = nil
             end
@@ -13423,7 +13513,7 @@ function sampev.onServerMessage(color, text)
          formatChat = true
       end
       if newtext:find("* .FFFFFF.") then
-         newtext = newtext:gsub("* {FFFFFF}", "")
+         newtext = newtext:gsub("* ", "")
          formatChat = true
       end
    end
@@ -14128,6 +14218,20 @@ function sampev.onSendCommand(command)
           end
       else
          sampAddChatMessage("[SCRIPT]: {FFFFFF}Для радиусного удаления используйте /rdell <radius>", 0x0FF6600)
+      end
+      return false
+   end
+   
+   if isTrainingSandbox and command:find("^/angle") then
+      local cmd, arg = command:match('(/%a+) (.+)')
+      local param = tonumber(arg)
+      if type(param) == "number" then
+         local angle = math.ceil(getCharHeading(playerPed))
+         local newangle = math.floor(angle) + param
+         setCharHeading(playerPed, newangle)
+         sampAddChatMessage(string.format("[SCRIPT]: {FFFFFF}Направление изменено на {1e90ff}%s (%i° -> %i°)", u8:decode(direction()), angle, newangle), 0x0FF6600)
+      else
+         sampAddChatMessage("[SYNTAX]: {FFFFFF}/angle <угол> (поворот персонажа)", 0x09A9999)      
       end
       return false
    end
@@ -15325,20 +15429,29 @@ function sampev.onSendCommand(command)
             return false
          end
          if radius then 
+            checkbox.showradiusrender.v = true
+            input.radiusrender.v = radius
             local px, py, pz = getCharCoordinates(playerPed)
-            Draw3DCircle(px, py, pz-1, radius, 0xFFD00000)
             for _, v in ipairs(getAllObjects()) do
                local _, x, y, z = getObjectCoordinates(v)
                local dist = getDistanceBetweenCoords3d(x, y, z, px, py, pz)
                if dist <= radius then
-                  sampAddChatMessage("Объект id: "..v.." model: {696969}"..getObjectModel(v).."("..tostring(sampObjectModelNames[getObjectModel(v)]).."){FFFFFF} входит в радиус ("..radius..")", -1)
+                  sampAddChatMessage("Объект id: "..v.." model: {696969}"..getObjectModel(v)..
+                  " ("..tostring(sampObjectModelNames[getObjectModel(v)])..
+                  "){FFFFFF} входит в радиус ("..radius..")", -1)
                end
             end
+            sampAddChatMessage("[SYNTAX]: {FFFFFF}Введите /radius без параметров чтобы скрыть круг.", 0x09A9999)
          else
-            sampAddChatMessage("[SCRIPT]: {FFFFFF}укажите радиус (в метрах)!", 0x0FF6600)
+            sampAddChatMessage("[SCRIPT]: {FFFFFF}Укажите радиус (в метрах)!", 0x0FF6600)
          end
       else
-         sampAddChatMessage("[SYNTAX]: {FFFFFF}Используйте /radius <радиус в метрах>!", 0x09A9999)
+         if checkbox.showradiusrender.v then
+            checkbox.showradiusrender.v = false
+            sampAddChatMessage("[SCRIPT]: {FFFFFF}Окружность скрыта", 0x0FF6600)
+         else
+            sampAddChatMessage("[SYNTAX]: {FFFFFF}Используйте /radius <радиус в метрах>!", 0x09A9999)
+         end
       end
       return false
    end
