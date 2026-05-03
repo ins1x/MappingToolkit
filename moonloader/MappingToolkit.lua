@@ -3,7 +3,7 @@ script_description("Assistant for mappers")
 script_dependencies('imgui', 'lib.samp.events')
 script_properties("work-in-pause")
 script_url("https://github.com/ins1x/MappingToolkit")
-script_version("4.25") -- RC1
+script_version("4.25") -- RC2
 -- support sa-mp versions depends on SAMPFUNCS (0.3.7-R1, 0.3.7-R3-1, 0.3.7-R5, 0.3.DL)
 -- script_moonloader(16) moonloader v.0.26 
 -- editor options: tabsize 3, Unix (LF), encoding Windows-1251
@@ -6393,22 +6393,6 @@ function imgui.OnDrawFrame()
          else
             if imgui.Button(fa.ICON_FA_ARCHIVE..u8" Поиск и справка##cbhelpsearc", imgui.ImVec2(135, 25)) then tabmenu.cb = 2 end
          end
-         -- imgui.SameLine()
-         -- if tabmenu.cb == 2 then
-            -- imgui.PushStyleColor(imgui.Col.Button, imgui.GetStyle().Colors[imgui.Col.ButtonHovered])
-            -- if imgui.Button(u8"Текстовые ф-ции", imgui.ImVec2(135, 25)) then tabmenu.cb = 2 end
-            -- imgui.PopStyleColor()
-         -- else
-            -- if imgui.Button(u8"Текстовые ф-ции", imgui.ImVec2(135, 25)) then tabmenu.cb = 2 end
-         -- end
-         -- imgui.SameLine()
-         -- if tabmenu.cb == 3 then
-            -- imgui.PushStyleColor(imgui.Col.Button, imgui.GetStyle().Colors[imgui.Col.ButtonHovered])
-            -- if imgui.Button(u8"Коллбэки", imgui.ImVec2(135, 25)) then tabmenu.cb = 3 end
-            -- imgui.PopStyleColor()
-         -- else
-            -- if imgui.Button(u8"Коллбэки", imgui.ImVec2(135, 25)) then tabmenu.cb = 3 end
-         -- end
          imgui.PopStyleVar()
          imgui.PopFont()
           
@@ -6936,8 +6920,6 @@ function imgui.OnDrawFrame()
                      local fmtline = u8:decode(line)
                      if fmtline:find(string.nlower(u8:decode(textbuffer.searchbar.v)), 1, true) then
                         results = results + 1
-                        --sampAddChatMessage("Строка "..resultline.." : "..u8:decode(line), -1)
-                        sampAddChatMessage(u8:decode(line), -1)
                         fmtline = fmtline:gsub('# ','#{FFFFFF} ')
                         fmtline = fmtline:gsub('^#','{696969}#')
                         sampAddChatMessage(fmtline, -1)
@@ -9699,10 +9681,17 @@ function imgui.OnDrawFrame()
          end
          
          imgui.PushFont(fonts.fa)
-         if imgui.Button(fa.ICON_FA_MAP_MARKER..u8" Найти объекты рядом по текущей позиции ",imgui.ImVec2(300, 25)) then
+         if imgui.Button(fa.ICON_FA_MAP_MARKER..u8" Найти объекты рядом по текущей позиции на dev.prineside.com",imgui.ImVec2(450, 25)) then
             if sampIsLocalPlayerSpawned() then
                local posX, posY, posZ = getCharCoordinates(playerPed)
                local link = string.format('explorer "https://dev.prineside.com/ru/gtasa_samp_model_id/mapsearch/?x=%i&y=%i', posX, posY)
+               os.execute(link)
+            end
+         end
+         if imgui.Button(fa.ICON_FA_MAP_MARKER..u8" Найти объекты рядом по текущей позиции на gtastuff.com",imgui.ImVec2(450, 25)) then
+            if sampIsLocalPlayerSpawned() then
+               local posX, posY, posZ = getCharCoordinates(playerPed)
+               local link = string.format('explorer "https://gtastuff.com/models/?x=%i&y=%i', posX, posY)
                os.execute(link)
             end
          end
@@ -12170,22 +12159,25 @@ function sampev.onShowDialog(dialogId, style, title, button1, button2, text)
          return {dialogId, style, title, button1, button2, newtext}
       end
       
-      if title:find('Изменить 3D текст') then
-         if ini.settings.cbvalautocomplete then
-            local result = text:match('[:].*')
-            if result then
-               result = result:gsub("\n","")
-               result = result:gsub("  ","")
-               result = result:gsub(":","")
-               LastData.lastTextBuffer = result
-               lua_thread.create(function()
-                  wait(250)
-                  sampSetCurrentDialogEditboxText(tostring(LastData.lastTextBuffer))
-               end)
+      if title:find('Изменить 3D текст') 
+      or title:find('Edit 3D Text') then
+         if style == 1 then
+            if ini.settings.cbvalautocomplete then
+               local result = text:match('[:].*')
+               if result then
+                  result = result:gsub("\n","")
+                  result = result:gsub("  ","")
+                  result = result:gsub(":","")
+                  LastData.lastTextBuffer = result
+                  lua_thread.create(function()
+                     wait(250)
+                     sampSetCurrentDialogEditboxText(tostring(LastData.lastTextBuffer))
+                  end)
+               end
             end
+            local newtext = text:gsub("\n","")
+            return {dialogId, style, title, button1, button2, newtext}
          end
-         local newtext = text:gsub("\n","")
-         return {dialogId, style, title, button1, button2, newtext}
       end
       
       if title:find('Меню актера') then
@@ -13263,9 +13255,15 @@ function sampev.onServerMessage(color, text)
       if text:find('[SERVER].+Создан action: (%d+)') then
          LastData.lastAction = text:match('Создан action: (%d+)')
       end
-      
+      if text:find('[SERVER].+Action created: (%d+)') then
+         LastData.lastAction = text:match('Action created: (%d+)')
+      end
+      -- '[SERVER].+You deleted 3D text: (%d+)'
       if text:find("[SERVER].+Вы телепортированы к 3D тексту: (%d+)") then
          LastData.lastAction = text:match('Вы телепортированы к 3D тексту: (%d+)')
+      end
+      if text:find("[SERVER].+You teleported to 3D text: (%d+)") then
+         LastData.lastAction = text:match('You teleported to 3D text: (%d+)')
       end
       
       if text:find('[SERVER].+Блок: (%d+) был удален') then
@@ -14135,24 +14133,24 @@ function sampev.onSendCommand(command)
       end
    end
    
-   if isTrainingSandbox then
-      if command:find("^/actionlist") or command:find("^/alist$") then
-         sampAddChatMessage("[SCRIPT]: {FFFFFF} Обратите внимание что internalid не совпадает с id сервера!", 0x0FF6600)
-         sampAddChatMessage("Список 3d текстов (/action):", -1)
-         for id = 1024, 2048 do -- on Training started 1024 
-            if sampIs3dTextDefined(id) then
-               local text, color, posX, posY, posZ, streamdistance, ignoreWalls, playerId, vehicleId = sampGet3dTextInfoById(id)
-               if playerId == 65535 and vehicleId == 65535 and streamdistance == 10 then
-                  local pX, pY, pZ = getCharCoordinates(playerPed)
-                  local distance = getDistanceBetweenCoords3d(posX, posY, posZ, pX, pY, pZ)
-                  sampAddChatMessage(("Action id(internal): %i, distance: %.1f m., text: %s"):format(id-1024, distance, text), color)
-               end
-            end
-         end
-         sampAddChatMessage("[SCRIPT]: {FFFFFF}Для редактирования используйте /editaction <id>, или телепортируйтесь /tpaction <id>", 0x0FF6600)
-         return false
-      end
-   end
+   -- if isTrainingSandbox then
+      -- if command:find("^/actionlist") or command:find("^/alist$") then
+         -- sampAddChatMessage("[SCRIPT]: {FFFFFF} Обратите внимание что internalid не совпадает с id сервера!", 0x0FF6600)
+         -- sampAddChatMessage("Список 3d текстов (/action):", -1)
+         -- for id = 1024, 2048 do -- on Training started 1024 
+            -- if sampIs3dTextDefined(id) then
+               -- local text, color, posX, posY, posZ, streamdistance, ignoreWalls, playerId, vehicleId = sampGet3dTextInfoById(id)
+               -- if playerId == 65535 and vehicleId == 65535 and streamdistance == 10 then
+                  -- local pX, pY, pZ = getCharCoordinates(playerPed)
+                  -- local distance = getDistanceBetweenCoords3d(posX, posY, posZ, pX, pY, pZ)
+                  -- sampAddChatMessage(("Action id(internal): %i, distance: %.1f m., text: %s"):format(id-1024, distance, text), color)
+               -- end
+            -- end
+         -- end
+         -- sampAddChatMessage("[SCRIPT]: {FFFFFF}Для редактирования используйте /editaction <id>, или телепортируйтесь /tpaction <id>", 0x0FF6600)
+         -- return false
+      -- end
+   -- end
    
    if isTrainingSandbox then
       if command:find("^/actorlist") or command:find("^/actors") then
