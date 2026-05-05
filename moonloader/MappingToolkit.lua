@@ -3,7 +3,7 @@ script_description("Assistant for mappers")
 script_dependencies('imgui', 'lib.samp.events')
 script_properties("work-in-pause")
 script_url("https://github.com/ins1x/MappingToolkit")
-script_version("4.25") -- RC2
+script_version("4.25") -- RC3
 -- support sa-mp versions depends on SAMPFUNCS (0.3.7-R1, 0.3.7-R3-1, 0.3.7-R5, 0.3.DL)
 -- script_moonloader(16) moonloader v.0.26 
 -- editor options: tabsize 3, Unix (LF), encoding Windows-1251
@@ -116,7 +116,6 @@ local ini = inicfg.load({
       tabclickcopy = false,
       tabclickstat = false,
       time = 12,
-      txtmacros = true,
       trailerspawnfix = true,
       usecustomcamdist = false,
       weather = 0,
@@ -762,6 +761,7 @@ local combobox = {
    uifontselect = imgui.ImInt(0),
    tpdestination = imgui.ImInt(0),
    developerdocs = imgui.ImInt(0),
+   searchsource = imgui.ImInt(0),
    converttimer = imgui.ImInt(0),
    logs = imgui.ImInt(0)
 }
@@ -9582,49 +9582,55 @@ function imgui.OnDrawFrame()
       imgui.PushFont(fonts.fa)
       if tabmenu.onlinesearch == 1 then
          imgui.PushStyleColor(imgui.Col.Button, imgui.GetStyle().Colors[imgui.Col.ButtonHovered])
-         if imgui.Button(fa.ICON_FA_TREE..u8" Объекты", imgui.ImVec2(85, 25)) then tabmenu.onlinesearch = 1 end
+         if imgui.Button(fa.ICON_FA_TREE..u8" Объекты", imgui.ImVec2(90, 25)) then tabmenu.onlinesearch = 1 end
          imgui.PopStyleColor()
       else
-         if imgui.Button(fa.ICON_FA_TREE..u8" Объекты", imgui.ImVec2(85, 25)) then tabmenu.onlinesearch = 1 end
+         if imgui.Button(fa.ICON_FA_TREE..u8" Объекты", imgui.ImVec2(90, 25)) then tabmenu.onlinesearch = 1 end
       end
       imgui.SameLine()
       if tabmenu.onlinesearch == 2 then
          imgui.PushStyleColor(imgui.Col.Button, imgui.GetStyle().Colors[imgui.Col.ButtonHovered])
-         if imgui.Button(fa.ICON_FA_PAINT_BRUSH..u8" Текстуры", imgui.ImVec2(85, 25)) then tabmenu.onlinesearch = 2 end
+         if imgui.Button(fa.ICON_FA_PAINT_BRUSH..u8" Текстуры", imgui.ImVec2(90, 25)) then tabmenu.onlinesearch = 2 end
          imgui.PopStyleColor()
       else
-         if imgui.Button(fa.ICON_FA_PAINT_BRUSH..u8" Текстуры", imgui.ImVec2(85, 25)) then tabmenu.onlinesearch = 2 end
+         if imgui.Button(fa.ICON_FA_PAINT_BRUSH..u8" Текстуры", imgui.ImVec2(90, 25)) then tabmenu.onlinesearch = 2 end
       end
       imgui.SameLine()
       if tabmenu.onlinesearch == 3 then
          imgui.PushStyleColor(imgui.Col.Button, imgui.GetStyle().Colors[imgui.Col.ButtonHovered])
-         if imgui.Button(fa.ICON_FA_SITEMAP..u8" Функции", imgui.ImVec2(85, 25)) then tabmenu.onlinesearch = 3 end
+         if imgui.Button(fa.ICON_FA_SITEMAP..u8" Функции", imgui.ImVec2(90, 25)) then tabmenu.onlinesearch = 3 end
          imgui.PopStyleColor()
       else
-         if imgui.Button(fa.ICON_FA_SITEMAP..u8" Функции", imgui.ImVec2(85, 25)) then tabmenu.onlinesearch = 3 end
+         if imgui.Button(fa.ICON_FA_SITEMAP..u8" Функции", imgui.ImVec2(90, 25)) then tabmenu.onlinesearch = 3 end
       end
       imgui.SameLine()
       if tabmenu.onlinesearch == 4 then
          imgui.PushStyleColor(imgui.Col.Button, imgui.GetStyle().Colors[imgui.Col.ButtonHovered])
-         if imgui.Button(fa.ICON_FA_STAR..u8" Избранные", imgui.ImVec2(85, 25)) then tabmenu.onlinesearch = 4 end
+         if imgui.Button(fa.ICON_FA_STAR..u8" Избранные", imgui.ImVec2(90, 25)) then tabmenu.onlinesearch = 4 end
          imgui.PopStyleColor()
       else
-         if imgui.Button(fa.ICON_FA_STAR..u8" Избранные", imgui.ImVec2(85, 25)) then tabmenu.onlinesearch = 4 end
+         if imgui.Button(fa.ICON_FA_STAR..u8" Избранные", imgui.ImVec2(90, 25)) then tabmenu.onlinesearch = 4 end
       end
       imgui.SameLine()
       if tabmenu.onlinesearch == 6 then
          imgui.PushStyleColor(imgui.Col.Button, imgui.GetStyle().Colors[imgui.Col.ButtonHovered])
-         if imgui.Button(fa.ICON_FA_EYE_DROPPER..u8" Цвет", imgui.ImVec2(85, 25)) then tabmenu.onlinesearch = 6 end
+         if imgui.Button(fa.ICON_FA_EYE_DROPPER..u8" Цвет", imgui.ImVec2(90, 25)) then tabmenu.onlinesearch = 6 end
          imgui.PopStyleColor()
       else
-         if imgui.Button(fa.ICON_FA_EYE_DROPPER..u8" Цвет", imgui.ImVec2(85, 25)) then tabmenu.onlinesearch = 6 end
+         if imgui.Button(fa.ICON_FA_EYE_DROPPER..u8" Цвет", imgui.ImVec2(90, 25)) then tabmenu.onlinesearch = 6 end
       end
       imgui.PopFont()
       imgui.Spacing()
       imgui.Spacing()
          
       if tabmenu.onlinesearch == 1 then
-      
+         
+         local sourceDescriptionList = {
+            u8"dev.prineside.com",
+            u8"gtastuff.com",
+            u8"osearch",
+         }
+         
          imgui.Text(u8"Введите ключевое слово, ID или название модели:")
          imgui.PushItemWidth(220)
          if imgui.InputText("##CheckObject", textbuffer.objectid) then
@@ -9632,10 +9638,31 @@ function imgui.OnDrawFrame()
          imgui.PopItemWidth()
          
          imgui.SameLine()
-         if imgui.Button(u8"Найти",imgui.ImVec2(72, 25)) then
+         imgui.PushItemWidth(145)
+         imgui.Combo(u8'##searchsource', combobox.searchsource, 
+         sourceDescriptionList, #sourceDescriptionList)
+         imgui.PopItemWidth()
+         
+         imgui.SameLine()
+         imgui.PushFont(fonts.fa)
+         if imgui.Button(u8" Найти "..fa.ICON_FA_SEARCH,imgui.ImVec2(72, 25)) then
             if string.len(textbuffer.objectid.v) > 3 then
-               local link = 'explorer "https://dev.prineside.com/ru/gtasa_samp_model_id/search/?q='.. u8:decode(textbuffer.objectid.v)..'"'
-               os.execute(link)
+               local link
+               if combobox.searchsource.v == 0 then
+                  link = 'explorer "https://dev.prineside.com/ru/gtasa_samp_model_id/search/?q='.. u8:decode(textbuffer.objectid.v)..'"'
+                  os.execute(link)
+               elseif combobox.searchsource.v == 1 then
+                  link = 'explorer "https://gtastuff.com/models/?q='.. u8:decode(textbuffer.objectid.v)..'"'
+                  os.execute(link)
+               elseif combobox.searchsource.v == 2 then
+                  if isTrainingSandbox then
+                     sampSendChat("/osearch "..u8:decode(textbuffer.objectid.v))
+                     dialog.main.v = false
+                  else
+                     sampAddChatMessage("[ERROR]: {FFFFFF}Данный тип поиска не поддерживается для вашего сервера", 0x0CC0000)
+                  end
+               end
+
                if string.len(textbuffer.objectid.v) <= 24 then
                   ini.tmp.osearch = textbuffer.objectid.v
                   inicfg.save(ini, configIni)
@@ -9644,21 +9671,8 @@ function imgui.OnDrawFrame()
                sampAddChatMessage("[SCRIPT]: {FFFFFF}Введите больше 3-х символов для поиска",0x0FF6600)
             end
          end
-         if isTrainingSandbox then       
-            imgui.SameLine()
-            if imgui.Button(u8"/osearch",imgui.ImVec2(72, 25)) then
-               if string.len(textbuffer.objectid.v) > 3 then
-                  sampSendChat("/osearch "..u8:decode(textbuffer.objectid.v))
-                  if string.len(textbuffer.objectid.v) <= 24 then
-                     ini.tmp.osearch = textbuffer.objectid.v
-                     inicfg.save(ini, configIni)
-                  end
-                  dialog.main.v = false
-               else
-                  sampAddChatMessage("[SCRIPT]: {FFFFFF}Введите больше 3-х символов для поиска",0x0FF6600)
-               end
-            end
-         end
+         imgui.PopFont()
+         
          local closestObjectId = getClosestObjectId()
          if closestObjectId then
             local model = getObjectModel(closestObjectId)
@@ -9681,18 +9695,21 @@ function imgui.OnDrawFrame()
          end
          
          imgui.PushFont(fonts.fa)
-         if imgui.Button(fa.ICON_FA_MAP_MARKER..u8" Найти объекты рядом по текущей позиции на dev.prineside.com",imgui.ImVec2(450, 25)) then
-            if sampIsLocalPlayerSpawned() then
-               local posX, posY, posZ = getCharCoordinates(playerPed)
-               local link = string.format('explorer "https://dev.prineside.com/ru/gtasa_samp_model_id/mapsearch/?x=%i&y=%i', posX, posY)
-               os.execute(link)
+         if combobox.searchsource.v == 0 then
+            if imgui.Button(fa.ICON_FA_MAP_MARKER..u8" Найти объекты рядом по текущей позиции",imgui.ImVec2(300, 25)) then
+               if sampIsLocalPlayerSpawned() then
+                  local posX, posY, posZ = getCharCoordinates(playerPed)
+                  local link = string.format('explorer "https://dev.prineside.com/ru/gtasa_samp_model_id/mapsearch/?x=%i&y=%i', posX, posY)
+                  os.execute(link)
+               end
             end
-         end
-         if imgui.Button(fa.ICON_FA_MAP_MARKER..u8" Найти объекты рядом по текущей позиции на gtastuff.com",imgui.ImVec2(450, 25)) then
-            if sampIsLocalPlayerSpawned() then
-               local posX, posY, posZ = getCharCoordinates(playerPed)
-               local link = string.format('explorer "https://gtastuff.com/models/?x=%i&y=%i', posX, posY)
-               os.execute(link)
+         elseif combobox.searchsource.v == 1 then
+            if imgui.Button(fa.ICON_FA_MAP_MARKER..u8" Найти объекты рядом по текущей позиции",imgui.ImVec2(300, 25)) then
+               if sampIsLocalPlayerSpawned() then
+                  local posX, posY, posZ = getCharCoordinates(playerPed)
+                  local link = string.format('explorer "https://gtastuff.com/models/?x=%i&y=%i', posX, posY)
+                  os.execute(link)
+               end
             end
          end
          imgui.PopFont()
@@ -9746,70 +9763,77 @@ function imgui.OnDrawFrame()
          imgui.Link("https://www.adv-rp.com/decor/", "adv-rp")
          
       elseif tabmenu.onlinesearch == 2 then
+         local sourceDescriptionList = {
+            u8"textures.xyin.ws",
+            u8"gtxd.net",
+            u8"tsearch",
+         }
          
          imgui.Text(u8"Введите ключевое слово для поиска (на латинице):")
          imgui.PushItemWidth(220)
          if imgui.InputText("##CheckObject", textbuffer.objectid) then
          end
          imgui.PopItemWidth()
+         
          imgui.SameLine()
+         imgui.PushItemWidth(145)
+         imgui.Combo(u8'##searchsource', combobox.searchsource, 
+         sourceDescriptionList, #sourceDescriptionList)
+         imgui.PopItemWidth()
+         
+         imgui.SameLine()
+         imgui.PushFont(fonts.fa)
+         if imgui.Button(u8" Найти "..fa.ICON_FA_SEARCH,imgui.ImVec2(72, 25)) then
+            if string.len(textbuffer.objectid.v) > 3 then
+               local link
+               if combobox.searchsource.v == 0 then
+                  if checkbox.searchtxdignoredups.v then
+                     link = 'explorer "https://textures.xyin.ws/?page=textures&limit=100&nodups=1&search='.. u8:decode(textbuffer.objectid.v)..'"'
+                  else
+                     link = 'explorer "https://textures.xyin.ws/?page=textures&limit=100&search='.. u8:decode(textbuffer.objectid.v)..'"'
+                  end
+                  os.execute(link)
+               elseif combobox.searchsource.v == 1 then
+                  if checkbox.searchtxdignoredups.v then
+                     link = 'explorer "https://gtxd.net/?search='.. u8:decode(textbuffer.objectid.v)..'&page=1&show=100&noDuplicates=1"'
+                  else
+                     link = 'explorer "https://gtxd.net/?search='.. u8:decode(textbuffer.objectid.v)..'&page=1&show=100"'
+                  end
+                  os.execute(link)
+               elseif combobox.searchsource.v == 2 then
+                  if isTrainingSandbox then
+                     if LastObject.txdid ~= nil and LastObject.txdslot ~= nil then
+                        if string.len(textbuffer.objectid.v) > 3 then
+                           sampSendChat(string.format("/tsearch %d %d %s", 
+                           LastObject.txdid, LastObject.txdslot, u8:decode(textbuffer.objectid.v)))
+                           dialog.main.v = false
+                        else
+                           sampAddChatMessage("[SCRIPT]: {FFFFFF}Введите больше 3-х символов для поиска",0x0FF6600)
+                        end
+                     else
+                        if string.len(textbuffer.objectid.v) > 3 then
+                           sampSendChat("/tsearch "..tostring(u8:decode(textbuffer.objectid.v)))
+                        else
+                           sampAddChatMessage("[SCRIPT]: {FFFFFF}Введите больше 3-х символов для поиска",0x0FF6600)
+                        end
+                     end
+                  else
+                     sampAddChatMessage("[ERROR]: {FFFFFF}Данный тип поиска не поддерживается для вашего сервера", 0x0CC0000)
+                  end
+               end
+
+               if string.len(textbuffer.objectid.v) <= 24 then
+                  ini.tmp.osearch = textbuffer.objectid.v
+                  inicfg.save(ini, configIni)
+               end
+            else
+               sampAddChatMessage("[SCRIPT]: {FFFFFF}Введите больше 3-х символов для поиска",0x0FF6600)
+            end
+         end
+         imgui.PopFont()
+         
          imgui.Checkbox(u8"Скрывать дубликаты", checkbox.searchtxdignoredups)
          
-         if imgui.Button(u8"Искать на textures.xyin.ws",imgui.ImVec2(195, 25)) then
-            if string.len(textbuffer.objectid.v) > 3 then
-               local link
-               if checkbox.searchtxdignoredups.v then
-                  link = 'explorer "https://textures.xyin.ws/?page=textures&limit=100&nodups=1&search='.. u8:decode(textbuffer.objectid.v)..'"'
-               else
-                  link = 'explorer "https://textures.xyin.ws/?page=textures&limit=100&search='.. u8:decode(textbuffer.objectid.v)..'"'
-               end
-               os.execute(link)
-               if string.len(textbuffer.objectid.v) <= 24 then
-                  ini.tmp.osearch = textbuffer.objectid.v
-                  inicfg.save(ini, configIni)
-               end
-            else
-               sampAddChatMessage("[SCRIPT]: {FFFFFF}Введите больше 3-х символов для поиска",0x0FF6600)
-            end
-         end
-         imgui.SameLine()            
-         if imgui.Button(u8"Искать на gtxd.net",imgui.ImVec2(165, 25)) then
-            if string.len(textbuffer.objectid.v) > 3 then
-               local link
-               if checkbox.searchtxdignoredups.v then
-                  link = 'explorer "https://gtxd.net/?search='.. u8:decode(textbuffer.objectid.v)..'&page=1&show=100&noDuplicates=1"'
-               else
-                  link = 'explorer "https://gtxd.net/?search='.. u8:decode(textbuffer.objectid.v)..'&page=1&show=100"'
-               end
-               os.execute(link)
-               if string.len(textbuffer.objectid.v) <= 24 then
-                  ini.tmp.osearch = textbuffer.objectid.v
-                  inicfg.save(ini, configIni)
-               end
-            else
-               sampAddChatMessage("[SCRIPT]: {FFFFFF}Введите больше 3-х символов для поиска",0x0FF6600)
-            end
-         end 
-         if isTrainingSandbox then
-            imgui.SameLine()
-            if imgui.Button(u8"/tsearch",imgui.ImVec2(72, 25)) then
-               if LastObject.txdid ~= nil and LastObject.txdslot ~= nil then
-                  if string.len(textbuffer.objectid.v) > 3 then
-                     sampSendChat(string.format("/tsearch %d %d %s", 
-                     LastObject.txdid, LastObject.txdslot, u8:decode(textbuffer.objectid.v)))
-                     dialog.main.v = false
-                  else
-                     sampAddChatMessage("[SCRIPT]: {FFFFFF}Введите больше 3-х символов для поиска",0x0FF6600)
-                  end
-               else
-                  if string.len(textbuffer.objectid.v) > 3 then
-                     sampSendChat("/tsearch "..tostring(u8:decode(textbuffer.objectid.v)))
-                  else
-                     sampAddChatMessage("[SCRIPT]: {FFFFFF}Введите больше 3-х символов для поиска",0x0FF6600)
-                  end
-               end
-            end
-         end
          if LastObject.txdid ~= nil then
             local txdtable = sampTextureList[LastObject.txdid+1]
             local txdname = tostring(txdtable[3])
@@ -9876,16 +9900,37 @@ function imgui.OnDrawFrame()
          imgui.TextColoredRGB("Показать использованные за сеанс текстуры: {696969}/tlist")
          imgui.Spacing()
       elseif tabmenu.onlinesearch == 3 then
+      
+         local sourceDescriptionList = {
+            u8"open.mp",
+            u8"blast.hk(docuwiki)",
+         }
+         
          imgui.Text(u8"Введите ключевое слово, или название функции:")
          imgui.PushItemWidth(220)
          if imgui.InputText("##CheckObject", textbuffer.objectid) then
          end
          imgui.PopItemWidth()
          
-         if imgui.Button(u8"Найти на open.mp",imgui.ImVec2(120, 25)) then
+         imgui.SameLine()
+         imgui.PushItemWidth(145)
+         imgui.Combo(u8'##searchsource', combobox.searchsource, 
+         sourceDescriptionList, #sourceDescriptionList)
+         imgui.PopItemWidth()
+         
+         imgui.SameLine()
+         imgui.PushFont(fonts.fa)
+         if imgui.Button(u8" Найти "..fa.ICON_FA_SEARCH,imgui.ImVec2(72, 25)) then
             if string.len(textbuffer.objectid.v) > 3 then
-               local link = 'explorer "https://open.mp/search?q='.. u8:decode(textbuffer.objectid.v)..'"'
-               os.execute(link)
+               local link
+               if combobox.searchsource.v == 0 then
+                  link = 'explorer "https://open.mp/search?q='.. u8:decode(textbuffer.objectid.v)..'"'
+                  os.execute(link)
+               elseif combobox.searchsource.v == 1 then
+                  link = 'explorer "https://blast.hk/dokuwiki/start?q='.. u8:decode(textbuffer.objectid.v)..'&do=search"'
+                  os.execute(link)
+               end
+
                if string.len(textbuffer.objectid.v) <= 24 then
                   ini.tmp.osearch = textbuffer.objectid.v
                   inicfg.save(ini, configIni)
@@ -9894,20 +9939,8 @@ function imgui.OnDrawFrame()
                sampAddChatMessage("[SCRIPT]: {FFFFFF}Введите больше 3-х символов для поиска",0x0FF6600)
             end
          end
-         imgui.SameLine()
-         if imgui.Button(u8"Найти на blast.hk(docuwiki)",imgui.ImVec2(175, 25)) then
-            if string.len(textbuffer.objectid.v) > 2 then
-               local link = 'explorer "https://blast.hk/dokuwiki/start?q='.. u8:decode(textbuffer.objectid.v)..'&do=search"'
-               os.execute(link)
-               if string.len(textbuffer.objectid.v) <= 24 then
-                  ini.tmp.osearch = textbuffer.objectid.v
-                  inicfg.save(ini, configIni)
-               end
-            else
-               sampAddChatMessage("[SCRIPT]: {FFFFFF}Введите больше 2-х символов для поиска",0x0FF6600)
-            end
-         end
-         
+         imgui.PopFont()
+                  
          imgui.Spacing()
          
          local docDescriptionList = {
@@ -9938,6 +9971,7 @@ function imgui.OnDrawFrame()
          imgui.Combo(u8'##developerdocs', combobox.developerdocs, 
          docDescriptionList, #docDescriptionList)
          imgui.PopItemWidth()
+         imgui.SameLine()
          if imgui.TooltipButton(u8"Открыть справку", imgui.ImVec2(120, 25), u8"Открывает справочный ресурс в вашем браузере") then
             os.execute('explorer "'..docUrls[combobox.developerdocs.v+1]..'"')
          end
@@ -12161,13 +12195,14 @@ function sampev.onShowDialog(dialogId, style, title, button1, button2, text)
       
       if title:find('Изменить 3D текст') 
       or title:find('Edit 3D Text') then
-         if style == 1 then
+         if style == 1 and text:find("@") then
             if ini.settings.cbvalautocomplete then
-               local result = text:match('[:].*')
+               --local result = text:match('[:].*')
+               local result = text:match('{80BCFF}.*')
                if result then
                   result = result:gsub("\n","")
                   result = result:gsub("  ","")
-                  result = result:gsub(":","")
+                  --result = result:gsub(":","")
                   LastData.lastTextBuffer = result
                   lua_thread.create(function()
                      wait(250)
@@ -12175,7 +12210,7 @@ function sampev.onShowDialog(dialogId, style, title, button1, button2, text)
                   end)
                end
             end
-            local newtext = text:gsub("\n","")
+            local newtext = text:gsub("\n"," ")
             return {dialogId, style, title, button1, button2, newtext}
          end
       end
@@ -12354,7 +12389,7 @@ function sampev.onShowDialog(dialogId, style, title, button1, button2, text)
             return {dialogId, style, title, button1, button2, newtext}
          end
          
-         if text:find('Укажите текст') then
+         if text:find('Укажите текст') or text:find('Specify text') then
             if dialoghook.action then
                local newtext = text ..
                "\n\n{696969}Нажмите CTRL + SHIFT + V или RMB чтобы вставить последнее значение\n"
@@ -14068,6 +14103,17 @@ function sampev.onSendCommand(command)
       return false
    end
    
+   if isTrainingSandbox and command:find("^/editaction") then
+      --dialoghook.action = true
+      if command:find('(/%a+) (.+)') then
+         local cmd, arg = command:match('(/%a+) (.+)')
+         local id = tonumber(arg)
+         if type(id) == "number" then
+            LastData.lastAction = id
+         end
+      end
+   end
+   
    if isTrainingSandbox and command:find("^/action") then
       -- sampAddChatMessage("[SCRIPT]: {FFFFFF}Рекомендуется использовать /otext вместо /action", 0x0FF6600)
       dialoghook.action = true
@@ -14132,25 +14178,6 @@ function sampev.onSendCommand(command)
          end
       end
    end
-   
-   -- if isTrainingSandbox then
-      -- if command:find("^/actionlist") or command:find("^/alist$") then
-         -- sampAddChatMessage("[SCRIPT]: {FFFFFF} Обратите внимание что internalid не совпадает с id сервера!", 0x0FF6600)
-         -- sampAddChatMessage("Список 3d текстов (/action):", -1)
-         -- for id = 1024, 2048 do -- on Training started 1024 
-            -- if sampIs3dTextDefined(id) then
-               -- local text, color, posX, posY, posZ, streamdistance, ignoreWalls, playerId, vehicleId = sampGet3dTextInfoById(id)
-               -- if playerId == 65535 and vehicleId == 65535 and streamdistance == 10 then
-                  -- local pX, pY, pZ = getCharCoordinates(playerPed)
-                  -- local distance = getDistanceBetweenCoords3d(posX, posY, posZ, pX, pY, pZ)
-                  -- sampAddChatMessage(("Action id(internal): %i, distance: %.1f m., text: %s"):format(id-1024, distance, text), color)
-               -- end
-            -- end
-         -- end
-         -- sampAddChatMessage("[SCRIPT]: {FFFFFF}Для редактирования используйте /editaction <id>, или телепортируйтесь /tpaction <id>", 0x0FF6600)
-         -- return false
-      -- end
-   -- end
    
    if isTrainingSandbox then
       if command:find("^/actorlist") or command:find("^/actors") then
@@ -15549,258 +15576,6 @@ function sampev.onSendChat(message)
       end
    end
    
-   if ini.settings.txtmacros then
-      -- Text macros in TRAINING style format
-      -- https://forum.training-server.com/d/10021-tekstovye-komandy-funktsii-kb
-      local text = message
-      local formatted = false
-      local posX, posY, posZ = getCharCoordinates(playerPed)
-      
-      if message:match("#skin#") then
-         formatted = true
-         text = text:gsub("#skin#", tostring(getCharModel(playerPed)))
-      end
-      
-      if message:match("#playerid#") then
-         formatted = true
-         text = text:gsub("#playerid#", tostring(getLocalPlayerId()))
-      end
-      
-      if message:match("#nickname#") then
-         formatted = true
-         text = text:gsub("#nickname#", tostring(sampGetPlayerNickname(getLocalPlayerId())))
-      end
-      
-      if message:match("#name#") then
-         formatted = true
-         text = text:gsub("#name#", tostring(sampGetPlayerNickname(getLocalPlayerId())))
-      end
-      
-      if message:match("#x#") then
-         formatted = true
-         text = text:gsub("#x#", string.format("%.2f", posX))
-      end
-      
-      if message:match("#y#") then
-         formatted = true
-         text = text:gsub("#y#", string.format("%.2f", posY))
-      end
-      
-      if message:match("#z#") then
-         formatted = true
-         text = text:gsub("#z#", string.format("%.2f", posZ))
-      end
-      
-      if message:match("#xyz#") then
-         formatted = true
-         text = text:gsub("#xyz#", string.format("%.2f %.2f %.2f", posX, posY, posZ))
-      end
-      
-      if message:match("#fa#") then
-         formatted = true
-         local angle = math.ceil(getCharHeading(playerPed))
-         text = text:gsub("#fa#", string.format("%.2f", angle))
-      end
-      
-      if message:match("#speed#") then
-         formatted = true
-         if isCharInAnyCar(playerPed) then
-            local vehicle = storeCarCharIsInNoSave(playerPed)
-            local speed = getCarSpeed(vehicle)
-            text = text:gsub("#speed#", tostring(speed))
-         else
-            local speed = getCharSpeed(playerPed)
-            text = text:gsub("#speed#", string.format("%.1f", speed))
-         end
-      end
-      
-      if message:match("#gun#") then
-         formatted = true
-         text = text:gsub("#gun#", tostring(getCurrentCharWeapon(playerPed)))
-      end
-      
-      if message:match("#health#") then
-         formatted = true
-         text = text:gsub("#health#", tostring(sampGetPlayerHealth(playerPed)))
-      end
-      
-      if message:match("#armor#") then
-         formatted = true
-         text = text:gsub("#armor#", tostring(sampGetPlayerArmor(playerPed)))
-      end
-      
-      if message:match("#ping#") then
-         formatted = true
-         text = text:gsub("#ping#", tostring(sampGetPlayerPing(playerPed)))
-      end
-      
-      if message:match("#score#") then
-         formatted = true
-         text = text:gsub("#score#", tostring(sampGetPlayerScore(playerPed)))
-      end
-      
-      if message:match("#time#") then
-         formatted = true
-         local hours, mins = getTimeOfDay()
-         text = text:gsub("#time#", string.format("%d", hours))
-      end
-      
-      if message:match("#weather#") then
-         formatted = true
-         text = text:gsub("#weather#", string.format("%d", LastData.lastWeather))
-      end
-      
-      if message:match("#wanted#") then
-         formatted = true
-         local result, level = storeWantedLevel(playerPed)
-         text = text:gsub("#wanted#", tostring(level))
-      end
-      
-      if message:match("#vehicle#") then
-         formatted = true
-         if isCharInAnyCar(playerPed) then
-            local carhandle = storeCarCharIsInNoSave(playerPed)
-            local streamed, carId = sampGetVehicleIdByCarHandle(carhandle)
-            text = text:gsub("#vehicle#", tostring(carId))
-         end
-      end
-      
-      if message:match("#vehModel#") then
-         formatted = true
-         if isCharInAnyCar(playerPed) then
-            local carhandle = storeCarCharIsInNoSave(playerPed)
-            text = text:gsub("#vehModel#", tostring(getCarModel(carhandle)))
-         end
-      end
-      
-      if message:match("#vehName#") then
-         formatted = true
-         if isCharInAnyCar(playerPed) then
-            local carhandle = storeCarCharIsInNoSave(playerPed)
-            text = text:gsub("#vehName#", 
-            tostring(VehicleNames[getCarModel(carhandle)-399]))
-         end
-      end
-      
-      if message:match("#vehHealth#") then
-         formatted = true
-         if isCharInAnyCar(playerPed) then
-            local carhandle = storeCarCharIsInNoSave(playerPed)
-            text = text:gsub("#vehHealth#", tostring(getCarHealth(carhandle)))
-         end
-      end
-      
-      if message:match("#zone#") then
-         formatted = true
-         zone = getZoneName(posX, posY, posZ)
-         text = text:gsub("#zone#", tostring(zone))
-      end
-      
-      if message:match("#timestamp#") then
-         formatted = true
-         text = text:gsub("#timestamp#", tostring(os.time(os.date("!*t"))))
-      end
-      
-      if message:match("#date#") then
-         formatted = true
-         text = text:gsub("#date#", tostring(os.date("%d.%m.%Y")))
-      end
-      
-      if message:match("#hour#") then
-         formatted = true
-         text = text:gsub("#hour#", tostring(os.date("%H")))
-      end
-      
-      if message:match("#min#") then
-         formatted = true
-         text = text:gsub("#min#", tostring(os.date("%M")))
-      end
-      
-      if message:match("#sec#") then
-         formatted = true
-         text = text:gsub("#sec#", tostring(os.date("%S")))
-      end
-      
-      if message:match("#online#") then
-         formatted = true
-         local tmpplayers = {}
-         for i = 0, sampGetMaxPlayerId(false) do
-            if sampIsPlayerConnected(i) then
-               table.insert(tmpplayers, i)
-            end
-         end
-         local online = tonumber(#tmpplayers)
-         text = text:gsub("#online#", tostring(online))
-      end
-      
-      if message:match("#randomPlayer#") then
-         formatted = true
-         local tmpplayers = {}
-         for i = 0, sampGetMaxPlayerId(false) do
-            if sampIsPlayerConnected(i) then
-               table.insert(tmpplayers, i)
-            end
-         end
-         local rand = math.random(tonumber(#tmpplayers))
-         local player = tmpplayers[rand]
-         text = text:gsub("#randomPlayer#", tostring(player))
-      end
-      
-      if message:match("#random.(%d.*).#") then
-         formatted = true
-         local result = message:match("#random.(%d.*).#")
-         local tmp = {}
-         for token in string.gmatch(result, "[%d]+") do
-            table.insert(tmp, token)
-         end
-         local randomnum = math.random(tmp[1], tmp[2])
-         text = text:gsub("#random.(.*).#", tostring(randomnum))
-      end
-      
-       if message:match("#gunName#") then
-         formatted = true
-         local weapon = getCurrentCharWeapon(playerPed)
-         text = text:gsub("#gunName#", tostring(weaponNames[weapon]))
-      end
-      
-      if message:match("#getGunName.(%d.*).#") then
-         formatted = true
-         local result = message:match("#getGunName.(%d.*).#")
-         text = text:gsub("#getGunName.(%d.*).#", 
-         tostring(weaponNames[tonumber(result)]))
-      end
-      
-      if message:match("#getVehName.(%d.*).#") then
-         formatted = true
-         local result = message:match("#getVehName.(%d.*).#")
-         local res, carhandle = sampGetCarHandleBySampVehicleId(tonumber(result))
-         text = text:gsub("#getVehName.(%d.*).#", 
-         tostring(VehicleNames[getCarModel(carhandle)-399]))
-      end
-      
-      if message:match("#getPlayerName.(%d.*).#") then
-         formatted = true
-         local result = message:match("#getPlayerName.(%d.*).#")
-         text = text:gsub("#getPlayerName.(%d.*).#", 
-         tostring(sampGetPlayerNickname(result)))
-      end
-      
-      if ini.settings.chatprefix > 0 then
-         formatted = true
-         text = chatPrefixList[combobox.chatprefix.v+1].." "..text
-         if ini.settings.chatprefix >= 4 then
-            sampSendChat(text)
-            formatted = false
-            return false
-         end
-      end
-      
-      if formatted then
-         return {text}
-      end
-      formatted = false
-      
-   end
 end
 
 function sampev.onSetVehicleVelocity(turn, velocity)
