@@ -3,7 +3,7 @@ script_description("Assistant for mappers")
 script_dependencies('imgui', 'lib.samp.events')
 script_properties("work-in-pause")
 script_url("https://github.com/ins1x/MappingToolkit")
-script_version("4.25") -- RC3
+script_version("4.25") -- RC4
 -- support sa-mp versions depends on SAMPFUNCS (0.3.7-R1, 0.3.7-R3-1, 0.3.7-R5, 0.3.DL)
 -- script_moonloader(16) moonloader v.0.26 
 -- editor options: tabsize 3, Unix (LF), encoding Windows-1251
@@ -320,6 +320,8 @@ local dialog = {
    hotkeys = imgui.ImBool(false), 
    colorpicker = imgui.ImBool(false),
    colortable = imgui.ImBool(false),
+   tsearch = imgui.ImBool(false),
+   osearch = imgui.ImBool(false),
 }
 
 local dialoghook = {
@@ -3211,14 +3213,15 @@ function imgui.OnDrawFrame()
              -- inicfg.save(ini, configIni)
           end
           imgui.PopItemWidth()
-           imgui.SameLine()
+          imgui.SameLine()
           imgui.Checkbox(u8"дата-время", checkbox.cordlinedatetime)
           imgui.SameLine()
           imgui.Checkbox(u8"разделитель", checkbox.cordlineseparator)
           --imgui.SameLine()
           
+          imgui.PushFont(fonts.fa)
           imgui.SetCursorPosX((imgui.GetWindowWidth() - imgui.CalcTextSize(u8"Добавить##addtocordslist").x) / 2)
-          if imgui.TooltipButton(u8"Добавить##addtocordslist", imgui.ImVec2(100, 30), u8"Добавить текущие координаты") then
+          if imgui.TooltipButton(fa.ICON_FA_PLUS..u8"Добавить##addtocordslist", imgui.ImVec2(100, 30), u8"Добавить текущие координаты") then
              --if sampIsLocalPlayerSpawned() then
              --end
          -- imgui.Text(string.format(u8"Направление: %s  %i°", direction(), angle))
@@ -3284,7 +3287,7 @@ function imgui.OnDrawFrame()
              file:close()
           end
           imgui.SameLine()
-          if imgui.TooltipButton(u8"Очистить", imgui.ImVec2(100, 25), u8"Полностью очистить список кооррдинат") then
+          if imgui.TooltipButton(fa.ICON_FA_ERASER..u8"Очистить", imgui.ImVec2(100, 25), u8"Полностью очистить список кооррдинат") then
              local filepath = getGameDirectory().."//moonloader//resource//mappingtoolkit//favorites//cordlist.txt"
              local file = io.open(filepath, "w")
              file:write("")
@@ -3298,6 +3301,7 @@ function imgui.OnDrawFrame()
           end
           imgui.Spacing()
           imgui.Spacing()
+          imgui.PopFont()
           
           imgui.PushFont(fonts.multilinetextfont)
           imgui.InputTextMultiline('##cordlist', textbuffer.cordlist, imgui.ImVec2(490, 150),
@@ -3305,7 +3309,7 @@ function imgui.OnDrawFrame()
           imgui.PopFont()
           
        end
-        
+       
       elseif tabmenu.global == 2 then
          
          --imgui.TextColoredRGB("{696969}EditMode: "..editmodes[edit.mode+1])
@@ -7991,6 +7995,7 @@ function imgui.OnDrawFrame()
                end
             end
             imgui.Text(u8"Радар:")
+            imgui.PushFont(fonts.fa)
             if imgui.Checkbox(u8'Показывать ID над HUD', checkbox.showidonhud) then
                ini.settings.showidonhud = checkbox.showidonhud.v
                inicfg.save(ini, configIni)
@@ -8001,7 +8006,7 @@ function imgui.OnDrawFrame()
             imgui.SameLine()
             imgui.TextQuestion("( ? )", u8"Отображать ваш ID над худом (вверху экрана с правой стороны)")
             
-            if imgui.Button(u8(ini.settings.showhud and 'Скрыть' or 'Показать')..u8" HUD", imgui.ImVec2(100, 25)) then
+            if imgui.Button(u8(ini.settings.showhud and 'Скрыть' or 'Показать')..u8" HUD "..fa.ICON_FA_COMPASS, imgui.ImVec2(100, 25)) then
                ini.settings.showhud = not ini.settings.showhud
                inicfg.save(ini, configIni)
                if ini.settings.showhud then
@@ -8013,7 +8018,7 @@ function imgui.OnDrawFrame()
                end
             end
             imgui.SameLine()
-            if imgui.Button(u8(ini.settings.nokillchat and 'Показать' or 'Скрыть')..u8" Killchat", imgui.ImVec2(125, 25)) then
+            if imgui.Button(u8(ini.settings.nokillchat and 'Показать' or 'Скрыть')..u8" Killchat "..fa.ICON_FA_ALIGN_JUSTIFY, imgui.ImVec2(125, 25)) then
                ini.settings.nokillchat = not ini.settings.nokillchat
                print(ini.settings.nokillchat)
                inicfg.save(ini, configIni)
@@ -8024,6 +8029,7 @@ function imgui.OnDrawFrame()
                   setVirtualKeyDown(0x78, false)
                end)
             end
+            imgui.PopFont()
             
             if imgui.Checkbox(u8'Отключать радар в интерьерах', checkbox.nointeriorradar) then
                ini.settings.nointeriorradar = checkbox.nointeriorradar.v
@@ -9553,14 +9559,10 @@ function imgui.OnDrawFrame()
       end
          
       if tabmenu.onlinesearch == 1 then
-         imgui.Text(u8"В этом разделе вы можете найти объекты через сайт")
-         imgui.SameLine()
-         imgui.Link("https://dev.prineside.com/ru/gtasa_samp_model_id/", "dev.prineside.com")
-         imgui.SameLine()
-         imgui.TextQuestion("( ? )", u8"Все запросы перенаправляет в ваш браузер")
+         imgui.Text(u8"В этом разделе вы можете найти объекты (online)")
          imgui.Spacing()
       elseif tabmenu.onlinesearch == 2 then
-         imgui.Text(u8"В этом разделе вы можете найти текстуры (онлайн)")
+         imgui.Text(u8"В этом разделе вы можете найти текстуры (online)")
          imgui.SameLine()
          -- imgui.Link("https://textures.xyin.ws/?page=textures&limit=100", "textures.xyin.ws")
          -- imgui.SameLine()
@@ -9695,7 +9697,11 @@ function imgui.OnDrawFrame()
          end
          
          imgui.PushFont(fonts.fa)
+         if imgui.Button(u8" Категории "..fa.ICON_FA_LIST_OL, imgui.ImVec2(140, 25)) then
+            dialog.osearch.v = not dialog.osearch.v
+         end
          if combobox.searchsource.v == 0 then
+            imgui.SameLine()
             if imgui.Button(fa.ICON_FA_MAP_MARKER..u8" Найти объекты рядом по текущей позиции",imgui.ImVec2(300, 25)) then
                if sampIsLocalPlayerSpawned() then
                   local posX, posY, posZ = getCharCoordinates(playerPed)
@@ -9704,6 +9710,7 @@ function imgui.OnDrawFrame()
                end
             end
          elseif combobox.searchsource.v == 1 then
+            imgui.SameLine()
             if imgui.Button(fa.ICON_FA_MAP_MARKER..u8" Найти объекты рядом по текущей позиции",imgui.ImVec2(300, 25)) then
                if sampIsLocalPlayerSpawned() then
                   local posX, posY, posZ = getCharCoordinates(playerPed)
@@ -9718,32 +9725,6 @@ function imgui.OnDrawFrame()
             imgui.TextColoredRGB("Найти объект можно командой: {696969}/osearch <text>")
             imgui.TextColoredRGB("Просмотреть список использованных объектов: {696969}/olist")
          end
-       
-         imgui.Spacing()
-         imgui.Spacing()
-         if imgui.Button(u8"Все объекты без коллизии",imgui.ImVec2(220, 25)) then
-            os.execute('explorer "https://dev.prineside.com/ru/gtasa_samp_model_id/customsearch/?c%5B%5D=1&s=id-asc&bc=0&bb=-1&bt=-1&ba=-1"')
-         end
-         imgui.SameLine()
-         if imgui.Button(u8"Все разрушаемые объекты",imgui.ImVec2(220, 25)) then
-            os.execute('explorer "https://dev.prineside.com/ru/gtasa_samp_model_id/customsearch/?c%5B%5D=1&s=id-asc&bc=-1&bb=1&bt=-1&ba=-1"')
-         end
-         
-         if imgui.Button(u8"Все отображаемые по времени",imgui.ImVec2(220, 25)) then
-            os.execute('explorer "https://dev.prineside.com/ru/gtasa_samp_model_id/customsearch/?c%5B%5D=1&s=id-asc&bc=-1&bb=-1&bt=1&ba=-1"')
-         end
-         imgui.SameLine()
-         if imgui.Button(u8"Все объекты с анимацией",imgui.ImVec2(220, 25)) then
-            os.execute('explorer "https://dev.prineside.com/ru/gtasa_samp_model_id/customsearch/?c%5B%5D=1&s=id-asc&bc=-1&bb=-1&bt=-1&ba=1"')
-         end
-         
-         if imgui.Button(u8"Детали конструкций",imgui.ImVec2(220, 25)) then
-            os.execute('explorer "https://dev.prineside.com/ru/gtasa_samp_model_id/category/construction/"')
-         end
-         imgui.SameLine()
-         if imgui.Button(u8"Частицы (Партиклы)",imgui.ImVec2(220, 25)) then
-            os.execute('explorer "https://dev.prineside.com/ru/gtasa_samp_model_id/category/samp-particles/"')
-         end
          
          imgui.Spacing()
          imgui.TextColoredRGB("Карта объектов которые не видны редакторами карт")
@@ -9753,14 +9734,6 @@ function imgui.OnDrawFrame()
          imgui.TextColoredRGB("Локации с текстурными багами в карте")
          imgui.SameLine()
          imgui.Link("https://pawn.wiki/index.php?showtopic=28682", "pawn.wiki")
-         
-         imgui.TextColoredRGB("Объекты которые не видны в редакторе карт")
-         imgui.SameLine()
-         imgui.Link("https://pawn.wiki/index.php?showtopic=31763", "pawn.wiki")
-         
-         imgui.TextColoredRGB("Объекты для декораций")
-         imgui.SameLine()
-         imgui.Link("https://www.adv-rp.com/decor/", "adv-rp")
          
       elseif tabmenu.onlinesearch == 2 then
          local sourceDescriptionList = {
@@ -9830,8 +9803,12 @@ function imgui.OnDrawFrame()
                sampAddChatMessage("[SCRIPT]: {FFFFFF}Введите больше 3-х символов для поиска",0x0FF6600)
             end
          end
-         imgui.PopFont()
          
+         if imgui.Button(u8" Категории "..fa.ICON_FA_LIST_OL, imgui.ImVec2(140, 25)) then
+            dialog.tsearch.v = not dialog.tsearch.v
+         end
+         imgui.PopFont()  
+         imgui.SameLine()
          imgui.Checkbox(u8"Скрывать дубликаты", checkbox.searchtxdignoredups)
          
          if LastObject.txdid ~= nil then
@@ -9843,51 +9820,18 @@ function imgui.OnDrawFrame()
             end
          end
          
-         local txdSearchFilters = {
-            "Wood", 
-            "- door", "- floor", "- board", 
-            "Metal", 
-            "- rust", "- fence",  "- beam", 
-            "Window", 
-            "- glass",
-            "Block",
-            "- brick", "- tile", "- panel", "- wall", "- box",
-            "Land",
-            "- rock", "- stone", "- grass", "- tree",
-            "- veg", "- sand", "- line",
-            "Indust",
-            "- fact", "- wires",
-            --"etc",
-            "barr", "light", "house", "sign"
-         }
-         
-         imgui.Spacing()
-         imgui.Text(u8"Выберите категорию")
-         imgui.PushItemWidth(170)
-         imgui.SameLine()
-         if imgui.Combo(u8'##Gamestates', combobox.txdsearchfilter, txdSearchFilters) then
-            local rawstring = tostring(txdSearchFilters[combobox.txdsearchfilter.v+1])
-            rawstring = string.gsub(rawstring, "-", "")
-            rawstring = string.gsub(rawstring, " ", "")
-            textbuffer.objectid.v = rawstring
-         end
-         imgui.PopItemWidth()
-         
-         imgui.Spacing()
-         imgui.TextColoredRGB("Список текстур TXD по категориям на")
-         imgui.SameLine()
-         imgui.Link("https://dev.prineside.com/ru/gtasa_samp_game_texture/view/", "dev.prineside.com")
-         
          imgui.Spacing()
          imgui.PushItemWidth(170)
          if imgui.Combo(u8'< Выбор шрифта##comboboxfontname', combobox.fonts, PopularFonts) then
          end
          imgui.PopItemWidth()
          imgui.SameLine()
-         if imgui.TooltipButton(u8"Просмотреть", imgui.ImVec2(120, 25), u8"Превью набора символов в шрифте (онлайн)") then
+         imgui.PushFont(fonts.fa)
+         if imgui.TooltipButton(u8" Посмотреть шрифт "..fa.ICON_FA_FONT, imgui.ImVec2(150, 25), u8"Превью набора символов в шрифте (онлайн)") then
             local fontlink = string.format('explorer "https://flamingtext.ru/Font-Search?q=%s"', tostring(PopularFonts[combobox.fonts.v+1]))
             os.execute(fontlink)
          end
+         imgui.PopFont()
          imgui.Spacing()
          
          if isTrainingSandbox then
@@ -10372,6 +10316,10 @@ function imgui.OnDrawFrame()
          imgui.TextColoredRGB("Не нашли нужный цвет? вам сюда")
          imgui.SameLine()
          imgui.Link("encycolorpedia.com", u8"encycolorpedia.com")
+         imgui.SameLine()
+         imgui.TextColoredRGB("или")
+         imgui.SameLine()
+         imgui.Link("https://colorscheme.ru/html-colors.html", u8"colorscheme.ru")
       end
       imgui.End()
    end
@@ -11207,6 +11155,276 @@ function imgui.OnDrawFrame()
       imgui.End()
    end
    
+   if dialog.tsearch.v then
+      imgui.SetNextWindowPos(imgui.ImVec2(sizeX / 8, sizeY / 3),
+      imgui.Cond.FirstUseEver, imgui.ImVec2(0.5, 0.5))
+      imgui.SetNextWindowSize(imgui.ImVec2(355, 350))
+      imgui.Begin(u8"Категории текстур", dialog.tsearch)
+      
+      if imgui.TreeNodeEx(u8"Список текстур по категориям", 32) then
+         if imgui.TreeNode(u8"Материалы") then
+            if imgui.TreeNode(u8"Дерево") then
+               if imgui.Selectable(u8"Деревянные") then
+                  textbuffer.objectid.v = "wood"
+               end
+               if imgui.Selectable(u8"Напольное") then
+                  textbuffer.objectid.v = "floor"
+               end
+               if imgui.Selectable(u8"Доска") then
+                  textbuffer.objectid.v = "board"
+               end
+               imgui.TreePop()
+            end
+            
+            if imgui.TreeNode(u8"Метал") then
+               if imgui.Selectable(u8"Металлические") then
+                  textbuffer.objectid.v = "metal"
+               end
+               if imgui.Selectable(u8"Ржавые") then
+                  textbuffer.objectid.v = "rust"
+               end
+               imgui.TreePop()
+            end
+            
+            if imgui.Selectable(u8"Стекло") then
+               textbuffer.objectid.v = "glass"
+            end
+            
+            if imgui.TreeNode(u8"Блоки") then
+               if imgui.Selectable(u8"Кирпичи") then
+                  textbuffer.objectid.v = "brick"
+               end
+               if imgui.Selectable(u8"Плитка") then
+                  textbuffer.objectid.v = "tile"
+               end
+               if imgui.Selectable(u8"Панели") then
+                  textbuffer.objectid.v = "panel"
+               end
+               if imgui.Selectable(u8"Стены") then
+                  textbuffer.objectid.v = "wall"
+               end
+               imgui.TreePop()
+            end
+            imgui.TreePop()
+         end
+         
+         if imgui.TreeNode(u8"Земля") then
+            if imgui.Selectable(u8"Камни") then
+               textbuffer.objectid.v = "stone"
+            end
+            if imgui.Selectable(u8"Песок") then
+               textbuffer.objectid.v = "sand"
+            end
+            if imgui.Selectable(u8"Горы") then
+               textbuffer.objectid.v = "rock"
+            end
+            imgui.TreePop()
+         end
+         
+         if imgui.TreeNode(u8"Растения") then
+            if imgui.Selectable(u8"Трава") then
+               textbuffer.objectid.v = "grass"
+            end
+            if imgui.Selectable(u8"Деревья") then
+               textbuffer.objectid.v = "tree"
+            end
+            if imgui.Selectable(u8"Цветы") then
+               textbuffer.objectid.v = "flower"
+            end
+            imgui.TreePop()
+         end
+         
+         if imgui.Selectable(u8"Освещение") then
+            textbuffer.objectid.v = "light"
+         end
+         if imgui.Selectable(u8"Знаки") then
+            textbuffer.objectid.v = "sign"
+         end
+         imgui.TreePop()
+      end
+      
+      imgui.Spacing()
+      imgui.TextColoredRGB("Список текстур TXD по категориям на")
+      imgui.SameLine()
+      imgui.Link("https://dev.prineside.com/ru/gtasa_samp_game_texture/view/", "dev.prineside.com")
+         
+      imgui.End()
+   end
+   
+   if dialog.osearch.v then
+      imgui.SetNextWindowPos(imgui.ImVec2(sizeX / 7, sizeY / 2.5),
+      imgui.Cond.FirstUseEver, imgui.ImVec2(0.5, 0.5))
+      imgui.SetNextWindowSize(imgui.ImVec2(325, 400))
+      imgui.Begin(u8"Категории объектов", dialog.osearch)
+      
+      local searchrequest
+      local searchtype = combobox.searchsource.v
+      if combobox.searchsource.v == 0 then
+         searchrequest = "https://dev.prineside.com/ru/gtasa_samp_model_id/category/"
+      elseif combobox.searchsource.v == 1 then
+         searchrequest = "https://gtastuff.com/models/?category="
+      end
+      
+      imgui.PushFont(fonts.fa)
+      imgui.TextColoredRGB("{696969}Все запросы перенаправляет в ваш браузер")
+      imgui.Spacing()
+      
+      if imgui.TreeNodeEx(u8"Список объектов по категориям", 32) then
+         if imgui.Selectable(u8"- SA:MP объекты "..fa.ICON_FA_MAP) then
+            if searchtype == 0 then
+               os.execute('explorer "https://dev.prineside.com/ru/gtasa_samp_model_id/tag/2-sa-mp/"')
+            elseif searchtype == 1 then
+               os.execute('explorer "'..searchrequest..'samp'..'"')
+            end
+         end
+         if imgui.TreeNode(u8"GTA модели"..fa.ICON_FA_CLONE) then
+             if imgui.Selectable(u8"- Оружие "..fa.ICON_FA_HAMMER) then
+               if searchtype == 0 then
+                  os.execute('explorer "'..searchrequest..'signs-billboards-and-statues'..'"')
+               elseif searchtype == 1 then
+                  os.execute('explorer "'..searchrequest..'weapons'..'"')
+               elseif searchtype == 2 then
+                  sampSendChat("/osearch "..'weapons')
+               end
+            end
+            if imgui.Selectable(u8"- Скины "..fa.ICON_FA_TSHIRT) then
+               if searchtype == 0 then
+                  os.execute('explorer "https://open.mp/ru/docs/scripting/resources/skins"')
+               elseif searchtype == 1 then
+                  os.execute('explorer "'..searchrequest..'peds'..'"')
+               elseif searchtype == 2 then
+                  sampSendChat("/osearch "..'ped')
+               end
+            end
+            if imgui.Selectable(u8"- Машины "..fa.ICON_FA_CAR) then
+               if searchtype == 0 then
+                  os.execute('explorer "https://open.mp/ru/docs/scripting/resources/vehicleid"')
+               elseif searchtype == 1 then
+                  os.execute('explorer "'..searchrequest..'vehicles'..'"')
+               elseif searchtype == 2 then
+                  sampSendChat("/osearch "..'veh')
+               end
+            end
+            if imgui.Selectable(u8"- Иконки "..fa.ICON_FA_HEART) then
+               if searchtype == 0 then
+                  os.execute('explorer "'..searchrequest..'pickups-and-icons'..'"')
+               elseif searchtype == 1 then
+                  os.execute('explorer "https://open.mp/ru/docs/scripting/resources/pickupids"')
+               end
+            end
+            imgui.TreePop()
+         end
+         if imgui.TreeNode(u8"Блоки и конструкции "..fa.ICON_FA_CLONE) then
+            if imgui.Selectable(u8"- Детали конструкций") then
+               os.execute('explorer "https://dev.prineside.com/ru/gtasa_samp_model_id/category/construction/"')
+            end
+            imgui.TreePop()
+         end
+         if imgui.Selectable(u8"- Здания "..fa.ICON_FA_BUILDING) then
+            os.execute('explorer "'..searchrequest..'buildings'..'"')
+         end
+         if imgui.Selectable(u8"- Индустриальные "..fa.ICON_FA_INDUSTRY) then
+            os.execute('explorer "'..searchrequest..'industrial'..'"')
+         end
+         if imgui.TreeNode(u8"Интерьер "..fa.ICON_FA_CHAIR) then
+            if imgui.Selectable(u8"- Все объекты для интерьера "..fa.ICON_FA_LIST) then
+               if searchtype == 0 then
+                  os.execute('explorer "'..searchrequest..'interior-objects'..'"')
+               elseif searchtype == 1 then
+                  os.execute('explorer "'..searchrequest..'interior'..'"')
+               elseif searchtype == 2 then
+                  sampSendChat("/osearch "..'inter')
+               end
+            end
+            if imgui.Selectable(u8"- Объекты для декораций ") then
+               os.execute('explorer "https://www.adv-rp.com/decor/"')
+            end
+            imgui.TreePop()
+         end
+         if imgui.Selectable(u8"- Знаки и вывески "..fa.ICON_FA_MAP_SIGNS) then
+            if searchtype == 0 then
+               os.execute('explorer "'..searchrequest..'signs-billboards-and-statues'..'"')
+            elseif searchtype == 1 then
+               os.execute('explorer "'..searchrequest..'signs'..'"')
+            elseif searchtype == 2 then
+               sampSendChat("/osearch "..'sign')
+            end
+         end
+         if imgui.Selectable(u8"- Дорожные и транспортные "..fa.ICON_FA_ROAD) then
+            if searchtype == 0 then
+               os.execute('explorer "'..searchrequest..'transportation'..'"')
+            elseif searchtype == 1 then
+               os.execute('explorer "'..searchrequest..'roads'..'"')
+            elseif searchtype == 2 then
+               sampSendChat("/osearch "..'road')
+            end
+         end
+         if imgui.Selectable(u8"- Природа "..fa.ICON_FA_TREE) then
+            if searchtype == 0 then
+               os.execute('explorer "'..searchrequest..'nature'..'"')
+            elseif searchtype == 1 then
+               os.execute('explorer "'..searchrequest..'nature'..'"')
+            elseif searchtype == 2 then
+               sampSendChat("/osearch "..'nature')
+            end
+         end
+         if imgui.Selectable(u8"- Объекты окружения "..fa.ICON_FA_PUZZLE_PIECE) then
+            if searchtype == 0 then
+               os.execute('explorer "'..searchrequest..'shop-items'..'"')
+            elseif searchtype == 1 then
+               os.execute('explorer "'..searchrequest..'props'..'"')
+            elseif searchtype == 2 then
+               sampSendChat("/osearch "..'prop')
+            end
+         end
+         if imgui.Selectable(u8"- Разное "..fa.ICON_FA_SPLOTCH) then
+            if searchtype == 0 then
+               os.execute('explorer "'..searchrequest..'misc'..'"')
+            elseif searchtype == 1 then
+               os.execute('explorer "'..searchrequest..'miscellaneous'..'"')
+            elseif searchtype == 2 then
+               sampSendChat("/osearch "..'misc')
+            end
+         end
+         if imgui.Selectable(u8"- Эффекты (Партиклы) "..fa.ICON_FA_MAGIC) then
+            if searchtype == 0 then
+               os.execute('explorer "'..searchrequest..'samp-particles'..'"')
+            elseif searchtype == 1 then
+               os.execute('explorer "'..searchrequest..'effects'..'"')
+            elseif searchtype == 2 then
+               sampSendChat("/osearch "..'part')
+            end
+         end
+         imgui.TreePop()
+      end
+      if imgui.TreeNode(u8"По свойствам "..fa.ICON_FA_VECTOR_SQUARE) then
+         if imgui.Selectable(u8"Все объекты без коллизии") then
+            if searchtype == 0 then
+               os.execute('explorer "https://dev.prineside.com/ru/gtasa_samp_model_id/customsearch/?c%5B%5D=1&s=id-asc&bc=0&bb=-1&bt=-1&ba=-1"')
+            elseif searchtype == 1 then
+               os.execute('explorer "'..searchrequest..'lods'..'"')
+            elseif searchtype == 2 then
+               sampSendChat("/osearch "..'lod')
+            end  
+         end
+         if imgui.Selectable(u8"Все разрушаемые объекты") then
+            os.execute('explorer "https://dev.prineside.com/ru/gtasa_samp_model_id/customsearch/?c%5B%5D=1&s=id-asc&bc=-1&bb=1&bt=-1&ba=-1"')
+         end
+         if imgui.Selectable(u8"Все отображаемые по времени") then
+            os.execute('explorer "https://dev.prineside.com/ru/gtasa_samp_model_id/customsearch/?c%5B%5D=1&s=id-asc&bc=-1&bb=-1&bt=1&ba=-1"')
+         end
+         if imgui.Selectable(u8"Все объекты с анимацией") then
+            os.execute('explorer "https://dev.prineside.com/ru/gtasa_samp_model_id/customsearch/?c%5B%5D=1&s=id-asc&bc=-1&bb=-1&bt=-1&ba=1"')
+         end
+         if imgui.Selectable(u8"Объекты которые не видны в редакторе карт") then
+            os.execute('explorer "https://pawn.wiki/index.php?showtopic=31763"')
+         end
+         imgui.TreePop()
+      end
+      imgui.PopFont()
+      imgui.End()
+   end
+   
    if dialog.objectinfo.v then
       imgui.SetNextWindowPos(imgui.ImVec2(sizeX / 7, sizeY / 2),
       imgui.Cond.FirstUseEver, imgui.ImVec2(0.5, 0.5))
@@ -11325,14 +11543,15 @@ function imgui.OnDrawFrame()
       imgui.Spacing()
       imgui.Spacing()
       
-      if imgui.TooltipButton(u8"Инфо (online)", imgui.ImVec2(120, 25), u8"Посмотреть подробную информацию по объекту на Prineside DevTools") then            
+      imgui.PushFont(fonts.fa)
+      if imgui.TooltipButton(fa.ICON_FA_SEARCH..u8" Инфо (online) ", imgui.ImVec2(120, 25), u8"Посмотреть подробную информацию по объекту на Prineside DevTools") then            
          local link = 'explorer "https://dev.prineside.com/ru/gtasa_samp_model_id/search/?q='..modelid..'"'
          os.execute(link)
       end
       
       if isTrainingSandbox then
          imgui.SameLine()
-         if imgui.TooltipButton(u8"Инфо (/oinfo)", imgui.ImVec2(120, 25), u8"Посмотреть подробную информацию по объекту (серверной командой)") then            
+         if imgui.TooltipButton(fa.ICON_FA_LIST..u8" Инфо (/oinfo) ", imgui.ImVec2(120, 25), u8"Посмотреть подробную информацию по объекту (серверной командой)") then            
             if LastObject.localid then
                sampSendChat("/oinfo")
             else
@@ -11341,7 +11560,7 @@ function imgui.OnDrawFrame()
          end
       end
       
-      if imgui.TooltipButton(u8"В избранное", imgui.ImVec2(120, 25), u8"Добавит объект в список избранных") then
+      if imgui.TooltipButton(fa.ICON_FA_STAR..u8" В избранное ", imgui.ImVec2(120, 25), u8"Добавит объект в список избранных") then
          favfile = io.open(getGameDirectory() ..
          "//moonloader//resource//mappingtoolkit//favorites//objects.txt", "a")
          favfile:write(" ,"..modelid.."("..tostring(sampObjectModelNames[modelid])..")")
@@ -11349,7 +11568,7 @@ function imgui.OnDrawFrame()
          sampAddChatMessage("Объект {696969}"..modelid.."{FFFFFF} добавлен в файл избранных {696969}(favorites.txt)", -1)
       end
       imgui.SameLine()
-      if imgui.TooltipButton(u8"Похожие объекты", imgui.ImVec2(120, 25), u8"Найти похожие объекты (/osearch)") then
+      if imgui.TooltipButton(fa.ICON_FA_FILTER..u8" Похожие объекты ", imgui.ImVec2(120, 25), u8"Найти похожие объекты (/osearch)") then
          local modelName = tostring(sampObjectModelNames[LastObject.modelid])
          local searchobj = string.match(modelName, "%a*")
          local findedobj = 0
@@ -11376,7 +11595,7 @@ function imgui.OnDrawFrame()
          end
       end
       
-      if imgui.TooltipButton(u8"ТП к объекту", imgui.ImVec2(120, 25), u8"Телепорт к объекту (системный)") then
+      if imgui.TooltipButton(fa.ICON_FA_MAP_MARKER..u8" ТП к объекту ", imgui.ImVec2(120, 25), u8"Телепорт к объекту (системный)") then
          local result, x, y, z
          if chosen.object == LastObject.handle then
             result = true
@@ -11405,7 +11624,7 @@ function imgui.OnDrawFrame()
       end
       imgui.SameLine()
       if chosen.object == LastObject.handle then
-         if imgui.TooltipButton(u8"Экспортировать", imgui.ImVec2(120, 25), u8"Выведет строчку в формате создания объекта для filterscript") then
+         if imgui.TooltipButton(fa.ICON_FA_SAVE..u8" Экспортировать ", imgui.ImVec2(120, 25), u8"Выведет строчку в формате создания объекта для filterscript") then
             if LastObject.txdname ~= nil then
                if not LastObject.rotation.x ~= nil then
                   sampAddChatMessage(string.format("tmpobjid = CreateObject(%i, %.2f, %.2f, %.2f, %.2f, %.2f, %.2f);", LastObject.modelid, LastObject.position.x, LastObject.position.y, LastObject.position.z, LastObject.rotation.x, LastObject.rotation.y, LastObject.rotation.z), -1)
@@ -11437,7 +11656,7 @@ function imgui.OnDrawFrame()
             end
          end
       end             
-      
+      imgui.PopFont()
       imgui.Spacing()
       imgui.End()
    end
@@ -12470,7 +12689,12 @@ function sampev.onShowDialog(dialogId, style, title, button1, button2, text)
                if ini.settings.cbsavelog then
                   local file = io.open(getGameDirectory()..
                   "/moonloader/resource/mappingtoolkit/history/cblog.txt", "a")
-                  file:write(("[%s] cb:%i value:%s\n"):format(tostring(os.date("%d.%m.%Y %X")), LastData.lastCb, result))
+                  if not LastData.lastCb then
+                     cbid = -1
+                  else 
+                     cbid = LastData.lastCb
+                  end
+                  file:write(("[%s] cb:%i value:%s\n"):format(tostring(os.date("%d.%m.%Y %X")), cbid, result))
                   file:close()
                end
             else
