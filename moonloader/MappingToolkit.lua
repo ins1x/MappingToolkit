@@ -3,7 +3,7 @@ script_description("Assistant for mappers")
 script_dependencies('imgui', 'lib.samp.events')
 script_properties("work-in-pause")
 script_url("https://github.com/ins1x/MappingToolkit")
-script_version("4.25") -- RC4
+script_version("4.25") -- RC5
 -- support sa-mp versions depends on SAMPFUNCS (0.3.7-R1, 0.3.7-R3-1, 0.3.7-R5, 0.3.DL)
 -- script_moonloader(16) moonloader v.0.26 
 -- editor options: tabsize 3, Unix (LF), encoding Windows-1251
@@ -360,6 +360,7 @@ local dialoghook = {
    devmenutoggle = false,
    prevdialog = false,
    nextdialog = false,
+   cbaction = false,
 }
 
 local checkbox = {
@@ -581,7 +582,6 @@ local input = {
    txdmodelclr1 = imgui.ImInt(1),
    txdmodelclr2 = imgui.ImInt(1),
    txdshowtime = imgui.ImInt(-1),
-   txdclickid = imgui.ImInt(0),
    txdslot = imgui.ImInt(0),
    txdobject = imgui.ImInt(0),
    pickupid = imgui.ImInt(0),
@@ -759,10 +759,12 @@ local combobox = {
    txdsearchfilter = imgui.ImInt(0),
    txdexport = imgui.ImInt(0),
    txdtype = imgui.ImInt(0),
+   txdstyle = imgui.ImInt(0),
    exportformat = imgui.ImInt(0),
    uifontselect = imgui.ImInt(0),
    tpdestination = imgui.ImInt(0),
    developerdocs = imgui.ImInt(0),
+   docs = imgui.ImInt(0),
    searchsource = imgui.ImInt(0),
    converttimer = imgui.ImInt(0),
    logs = imgui.ImInt(0)
@@ -4729,7 +4731,8 @@ function imgui.OnDrawFrame()
             imgui.PopItemWidth()
             
             imgui.SameLine()
-            if imgui.Button(u8"Сбросить", imgui.ImVec2(70, 25)) then
+            imgui.PushFont(fonts.fa)
+            if imgui.Button(fa.ICON_FA_ERASER..u8" Сбросить", imgui.ImVec2(75, 25)) then
                input.flymodespeed.v = 0.30
                input.flymodemaxspeed.v = 50.0
                ini.settings.flymodemaxspeed = input.flymodemaxspeed.v
@@ -4738,7 +4741,7 @@ function imgui.OnDrawFrame()
                inicfg.save(ini, configIni)
             end
             
-            if imgui.Button(u8"Помощь", imgui.ImVec2(125, 25)) then
+            if imgui.Button(fa.ICON_FA_UNIVERSITY..u8" Помощь", imgui.ImVec2(125, 25)) then
                sampAddChatMessage("[SCRIPT]: {FFFFFF}Управление в режиме полета (Flymode):", 0x0FF6600)
                sampAddChatMessage("[SCRIPT]: {FF6600}Пробел{FFFFFF} - переместиться вверх {FF6600}CTRL{FFFFFF} - переместиться вниз", 0x0FF6600)
                sampAddChatMessage("[SCRIPT]: {FF6600}ЛКМ{FFFFFF} - ускориться {FF6600}ПКМ{FFFFFF} - замедлиться", 0x0FF6600)
@@ -4747,10 +4750,10 @@ function imgui.OnDrawFrame()
                sampAddChatMessage("[SCRIPT]: {FF6600}Боковые клавиши мыши{FFFFFF} - переместиться вверх-вниз", 0x0FF6600)
             end
             imgui.SameLine()
-            if imgui.Button(u8"Режим полета", imgui.ImVec2(220, 25)) then
+            if imgui.Button(fa.ICON_FA_PLANE..u8" Режим полета", imgui.ImVec2(225, 25)) then
                sampSendChat("/flymode")
             end
-            
+            imgui.PopFont()
             -- imgui.TextColoredRGB("Ускорение в режиме полета (На нажатие клавиш мыши)")
             -- if imgui.SliderFloat(u8"##flymodepower", slider.flymodepower, 0.1, 50.0) then
                -- local power = slider.flymodepower.v
@@ -5037,6 +5040,9 @@ function imgui.OnDrawFrame()
          else
             if imgui.Button(fa.ICON_FA_LIST..u8" Дополнительно##tabmenutxd3", imgui.ImVec2(115, 25)) then tabmenu.txd = 3 end
          end
+         
+         imgui.SameLine()
+         
          imgui.PopFont()
          -- if tabmenu.txd == 1 then
             -- local cursorPosX, cursorPosY = getCursorPos()
@@ -5055,11 +5061,15 @@ function imgui.OnDrawFrame()
          if tabmenu.txd == 1 then
             
             if dialog.txdlist.v then
-               if imgui.TooltipButton("[ > ]", imgui.ImVec2(40, 25), u8"Скрыть список текстдравов") then
+               imgui.PushStyleColor(imgui.Col.Button, imgui.GetStyle().Colors[imgui.Col.ButtonHovered])
+               if imgui.TooltipButton("[ > ]", imgui.ImVec2(40, 25), 
+               u8"Скрыть список текстдравов") then
                   dialog.txdlist.v = not dialog.txdlist.v
                end
+               imgui.PopStyleColor()
             else
-               if imgui.TooltipButton("[ < ]", imgui.ImVec2(40, 25), u8"Раскрыть список текстдравов") then
+               if imgui.TooltipButton("[ < ]", imgui.ImVec2(40, 25), 
+               u8"Раскрыть список текстдравов") then
                   dialog.txdlist.v = not dialog.txdlist.v
                end
             end
@@ -5101,15 +5111,22 @@ function imgui.OnDrawFrame()
                imgui.PushItemWidth(85)
                imgui.Text(u8"Стиль:")
                imgui.SameLine()
-               if imgui.InputInt(u8'##INPUT_STYLE', input.txdstyle, 1, 5) then
-                  if input.txdstyle.v > 5 or input.txdstyle.v < 0 then
-                     input.txdstyle.v = 0
-                  end
+               imgui.PushItemWidth(120)
+               local txdStyleList = {u8"0. Граффити", u8"1. Обычный текст", u8"2. Строгий", u8"3. Жирный", u8"4. TXD спрайт", u8"5. Модель"}
+               if imgui.Combo(u8'##txdstylelist', combobox.txdstyle, txdStyleList) then
+                  input.txdstyle.v = tonumber(combobox.txdstyle.v)
                   sampTextdrawSetStyle(input.txdid.v, tonumber(input.txdstyle.v))
                end
                imgui.PopItemWidth()
-               imgui.SameLine()
-               imgui.TextQuestion("( ? )", u8"Стиль шрифта \n0. Граффити\n1. Обычный текст\n2. Строгий\n3. Жирный\n4. TXD спрайт\n5. Модель")
+               -- if imgui.InputInt(u8'##INPUT_STYLE', input.txdstyle, 1, 5) then
+                  -- if input.txdstyle.v > 5 or input.txdstyle.v < 0 then
+                     -- input.txdstyle.v = 0
+                  -- end
+                  -- sampTextdrawSetStyle(input.txdid.v, tonumber(input.txdstyle.v))
+               -- end
+               -- imgui.PopItemWidth()
+               -- imgui.SameLine()
+               -- imgui.TextQuestion("( ? )", u8"Стиль шрифта \n0. Граффити\n1. Обычный текст\n2. Строгий\n3. Жирный\n4. TXD спрайт\n5. Модель")
             end
             
             imgui.TextColoredRGB("Координаты:")
@@ -5188,7 +5205,7 @@ function imgui.OnDrawFrame()
                   end
                end
                
-               imgui.Text(u8"Положение:")
+               imgui.Text(u8"Положение букв:")
                imgui.SameLine()
                imgui.PushFont(fonts.fa)
                if tabmenu.txdalign == 1 then
@@ -5318,12 +5335,14 @@ function imgui.OnDrawFrame()
                imgui.InputTextFlags.EnterReturnsTrue + imgui.InputTextFlags.AllowTabInput)
                imgui.PopItemWidth()
                imgui.SameLine()
-               if imgui.TooltipButton(u8"Онлайн браузер", imgui.ImVec2(125, 25), 
+               imgui.PushFont(fonts.fa)
+               if imgui.TooltipButton(fa.ICON_FA_MAGIC..u8" Онлайн браузер", imgui.ImVec2(135, 25), 
                u8"Предпросмотр спрайта онлайн через pawnokit.ru") then
                   --local link = 'explorer "https://encycolorpedia.com/search?q='..textbuffer.txdsprite.v..'"'
                   os.execute('explorer "https://pawnokit.ru/en/txmngr"')
                end
                imgui.TextColoredRGB("{696969}Предпросмотр спрайтов на текущий момент недоступен!")
+               imgui.PopFont()
                
                imgui.Spacing()
                if imgui.TreeNode(u8"Помощь по TXD спрайтам:") then
@@ -5495,7 +5514,8 @@ function imgui.OnDrawFrame()
             imgui.SameLine()
             imgui.Text("    ")
             imgui.SameLine()
-            if imgui.TooltipButton(fa.ICON_FA_ERASER..u8" Очистить", imgui.ImVec2(95, 30), u8"Очистить текущий текстдрав") then
+            if imgui.TooltipButton(fa.ICON_FA_ERASER..u8" ##txdclean", imgui.ImVec2(45, 30),
+            u8"Очистить текущий текстдрав") then
                imgui.resetIO()
                sampTextdrawDelete(input.txdid.v)
                input.txdselected = false
@@ -5553,94 +5573,36 @@ function imgui.OnDrawFrame()
                sampAddChatMessage("[SCRIPT]: {FFFFFF}TextDraw "..tostring(input.txdid.v).." очищен!", 0x0FF6600)
             end
             imgui.SameLine()
-            if imgui.TooltipButton(fa.ICON_FA_COPY..u8" Получить", imgui.ImVec2(125, 30), u8"Сдампить параметры с выбранного текстдрава") then
-               input.txdselected = true
-               local id = input.txdid.v
-               local style = sampTextdrawGetStyle(id)
-               if style < 16 then
-                  local posX, posY = sampTextdrawGetPos(id)
-                  local align = sampTextdrawGetAlign(id)
-                  local prop = sampTextdrawGetProportional(id)
-                  local text = sampTextdrawGetString(id)
-                  local shadow, shadowColor = sampTextdrawGetShadowColor(id)
-                  local outline, outlineColor = sampTextdrawGetOutlineColor(id)
-                  local model, rotX, rotY, rotZ, zoom, clr1, clr2 = sampTextdrawGetModelRotationZoomVehColor(id)
-                  local letSizeX, letSizeY, letColor = sampTextdrawGetLetterSizeAndColor(id)
-                  local box, boxColor, boxSizeX, boxSizeY = sampTextdrawGetBoxEnabledColorAndSize(id)
-                  
-                  local letColorArgb = string.upper(string.sub(bit.tohex(letColor), 1, 8))
-                  local outlineColorArgb = string.upper(string.sub(bit.tohex(outlineColor), 1, 8))
-                  local boxColorArgb = string.upper(string.sub(bit.tohex(boxColor), 1, 8))
-                  
-                  local a, r, g, b = explode_argb(letColor)
-                  input.txdletcolorrgba.v[4] = a/255
-                  input.txdletcolorrgba.v[1] = r/255
-                  input.txdletcolorrgba.v[2] = g/255
-                  input.txdletcolorrgba.v[3] = b/255
-                  
-                  local a, r, g, b = explode_argb(outlineColor)
-                  input.txdoutlinecolorrgba.v[4] = a/255
-                  input.txdoutlinecolorrgba.v[1] = r/255
-                  input.txdoutlinecolorrgba.v[2] = g/255
-                  input.txdoutlinecolorrgba.v[3] = b/255
-                  
-                  local a, r, g, b = explode_argb(boxColor)
-                  input.txdboxcolorrgba.v[4] = a/255
-                  input.txdboxcolorrgba.v[1] = r/255
-                  input.txdboxcolorrgba.v[2] = g/255
-                  input.txdboxcolorrgba.v[3] = b/255
-                  
-                  input.txdposx.v = posX
-                  input.txdposy.v = posY
-                  input.txdlettersizex.v = letSizeX
-                  input.txdlettersizey.v = letSizeY
-                  textbuffer.txdletcolor.v = letColorArgb
-                  
-                  input.txdstyle.v = style
-                  tabmenu.align = align
-                  if prop > 0 then
-                     checkbox.txdproportional.v = true
-                  else
-                     checkbox.txdproportional.v = false
-                  end
-                  
-                  if shadow > 0 then
-                     checkbox.txdsetshadow.v = true
-                  else
-                     checkbox.txdsetshadow.v = false
-                  end
-                  
-                  if outline > 0 then
-                     textbuffer.txdoutlinecolor.v = outlineColorArgb
-                  end
-                  
-                  if box > 0 then
-                     checkbox.txdusebox.v = true
-                     input.txdboxsizex.v = boxSizeX
-                     input.txdboxsizey.v = boxSizeY
-                     textbuffer.txdboxcolor.v = boxColorArgb
-                  else
-                     checkbox.txdusebox.v = false
-                  end
-                  
-                  input.txdmodel.v = model
-                  input.txdmodelrx.v = rotX
-                  input.txdmodelry.v = rotY
-                  input.txdmodelrz.v = rotZ
-                  input.txdmodelzoom.v = zoom
-                  
-                  if clr1 == 65535 then
-                     input.txdmodelclr1.v = 1
-                     input.txdmodelclr2.v = 1
-                  else
-                     input.txdmodelclr1.v = clr1
-                     input.txdmodelclr2.v = clr2
-                  end
-                  
-                  textbuffer.txdstring.v = tostring(text)
-               else
-                  sampAddChatMessage("[SCRIPT]: {FFFFFF}Текстдрав несуществует! Укажите реальный ID", 0x0FF6600)
-                  input.txdselected = false
+            if imgui.TooltipButton(fa.ICON_FA_COPY..u8" ##txdget", 
+            imgui.ImVec2(45, 30), u8"Сдампить параметры с выбранного текстдрава") then
+               dumpTextdrawById(input.txdid.v)
+            end
+            
+            imgui.SameLine()
+            if imgui.TooltipButton(fa.ICON_FA_MOUSE_POINTER..u8" ##txdpress", imgui.ImVec2(45, 30),
+            u8"Нажать на выбранный текстдрав") then
+               sampSendClickTextdraw(input.txdid.v)
+            end
+            imgui.SameLine()
+            if imgui.TooltipButton(fa.ICON_FA_EYE_SLASH..u8" ##txdhide", imgui.ImVec2(45, 30),
+            u8"Скрыть выбранный текстдрав") then
+               sampTextdrawSetPos(input.txdid.v, 6400, 6400)
+            end
+            imgui.SameLine()
+            if imgui.TooltipButton(fa.ICON_FA_TRASH..u8" ##txddell", imgui.ImVec2(45, 30), 
+            u8"Удалить выбранный текстдрав полностью") then
+               sampTextdrawDelete(input.txdid.v)
+            end
+            imgui.SameLine()
+            if dialog.colorpicker.v then
+               imgui.PushStyleColor(imgui.Col.Button, imgui.GetStyle().Colors[imgui.Col.ButtonHovered])
+               if imgui.TooltipButton(fa.ICON_FA_PALETTE..u8" ##palette", imgui.ImVec2(45, 30), u8"Палитра с выбором цвета") then
+                  dialog.colorpicker.v = not dialog.colorpicker.v
+               end
+               imgui.PopStyleColor()
+            else
+               if imgui.TooltipButton(fa.ICON_FA_PALETTE..u8" ##palette", imgui.ImVec2(45, 30), u8"Палитра с выбором цвета") then
+                  dialog.colorpicker.v = not dialog.colorpicker.v
                end
             end
             imgui.PopFont()
@@ -5847,15 +5809,17 @@ function imgui.OnDrawFrame()
                   id, posX, posY, boxSizeX, boxSizeY, style, letSizeX, letSizeY, letColorArgb, outlineColorArgb, 
                   outline, shadow, reversedAlign, clickable, showtime, text)
                end
+               
+               imgui.PushFont(fonts.fa)
                if input.txdselected then
-                  if imgui.TooltipButton(u8"Скопировать", imgui.ImVec2(125, 30), u8"Скопировать в буффер обмена") then
+                  if imgui.TooltipButton(fa.ICON_FA_COPY..u8" Скопировать", imgui.ImVec2(125, 30), u8"Скопировать в буффер обмена") then
                      setClipboardText(exportText)
                      sampAddChatMessage("[SCRIPT]: {FFFFFF}Параметры текстдрава скопированы в буффер обмена в формате КБ", 0x0FF6600)
                   end
                end
                imgui.SameLine()
                if input.txdselected then
-                  if imgui.TooltipButton(u8"Сохранить в файл", imgui.ImVec2(125, 30), u8"Сохранить в текстовый файл") then
+                  if imgui.TooltipButton(fa.ICON_FA_SAVE..u8" Сохранить в файл", imgui.ImVec2(130, 30), u8"Сохранить в текстовый файл") then
                      local filepath = getGameDirectory().."//moonloader//resource//mappingtoolkit//export//export_txdtocb.txt"
                      local file = io.open(filepath, "w")
                      file:write("// MappingTollkit: Exported TXDtoCB format:\n")
@@ -5874,6 +5838,7 @@ function imgui.OnDrawFrame()
                      sampAddChatMessage("[SCRIPT]: {FFFFFF}Текстдрав был сохранен в /moonloader/resource/mappingtoolkit/export/export_txdtocb.txt", 0x0FF6600)
                   end
                end
+               imgui.PopFont()
             
             elseif combobox.txdexport.v == 1 then
                imgui.TextColoredRGB(('{CDCDCD}new Text:{696969}TextDraw%i;{CDCDCD}'):format(id))
@@ -5913,7 +5878,8 @@ function imgui.OnDrawFrame()
                
                imgui.Spacing()
                if input.txdselected then
-                  if imgui.TooltipButton(u8"Сохранить в файл", imgui.ImVec2(125, 30), u8"Сохранить в текстовый файл") then
+                  imgui.PushFont(fonts.fa)
+                  if imgui.TooltipButton(fa.ICON_FA_SAVE..u8" Сохранить в файл", imgui.ImVec2(130, 30), u8"Сохранить в текстовый файл") then
                      local filepath = getGameDirectory().."//moonloader//resource//mappingtoolkit//export//export_textdraw.pwn"
                      local file = io.open(filepath, "w")
                      file:write(('new Text:TextDraw%i;\n'):format(id))
@@ -5949,6 +5915,7 @@ function imgui.OnDrawFrame()
                      file:close()
                      sampAddChatMessage("[SCRIPT]: {FFFFFF}Текстдрав был сохранен в /moonloader/resource/mappingtoolkit/export/export_textdraw.pwn", 0x0FF6600)
                   end
+                  imgui.PopFont()
                end
             elseif combobox.txdexport.v == 2 then
                imgui.TextColoredRGB(('{CDCDCD}new PlayerText:{696969}PlayerTextDraw%i[MAX_PLAYERS];{CDCDCD}'):format(id))
@@ -5988,7 +5955,8 @@ function imgui.OnDrawFrame()
                
                imgui.Spacing()
                if input.txdselected then
-                  if imgui.TooltipButton(u8"Сохранить в файл", imgui.ImVec2(125, 30), u8"Сохранить в текстовый файл") then
+                  imgui.PushFont(fonts.fa)
+                  if imgui.TooltipButton(fa.ICON_FA_SAVE..u8" Сохранить в файл", imgui.ImVec2(130, 30), u8"Сохранить в текстовый файл") then
                      local filepath = getGameDirectory().."//moonloader//resource//mappingtoolkit//export//export_playertextdraw.pwn"
                      local file = io.open(filepath, "w")
                      file:write(('new PlayerText:PlayerTextDraw%i[MAX_PLAYERS];\n'):format(id))
@@ -6024,6 +5992,7 @@ function imgui.OnDrawFrame()
                      file:close()
                      sampAddChatMessage("[SCRIPT]: {FFFFFF}Текстдрав был сохранен в /moonloader/resource/mappingtoolkit/export/export_playertextdraw.pwn", 0x0FF6600)
                   end
+                   imgui.PopFont()
                end
             end
             
@@ -6054,6 +6023,9 @@ function imgui.OnDrawFrame()
                imgui.Text(u8"Последний показанный текстдрав: "..LastData.lastShowedTextdrawId)
             end
             imgui.PopStyleVar()
+            
+            imgui.Spacing()
+            imgui.Spacing()
             
             imgui.Checkbox(u8'Выводить параметры текстдрава в чат, при его показе', checkbox.txdparamsonshow)
             imgui.SameLine()
@@ -6086,37 +6058,24 @@ function imgui.OnDrawFrame()
             imgui.SameLine()
             imgui.TextQuestion("( ? )", u8"Скрывает все текстдравы визуально для вас")
             
-            imgui.Text(u8"Кликнуть текстдрав по ID: ")
-            imgui.PushItemWidth(40)
-            if imgui.InputInt('ID##INPUT_txdclickid', input.txdclickid, 0) then
-               if input.txdclickid.v < 0 and input.txdclickid.v > 2048 then
-                  input.txdclickid.v = 0
-               end
-            end
-            imgui.SameLine()
-            if imgui.Button(u8"Нажать", imgui.ImVec2(100, 25)) then
-               sampSendClickTextdraw(input.txdclickid.v)
-            end
-            imgui.SameLine()
-            if imgui.Button(u8"Удалить", imgui.ImVec2(100, 25)) then
-               sampTextdrawDelete(input.txdclickid.v)
-            end
-            
+            imgui.PushFont(fonts.fa)
             imgui.Spacing()
             imgui.Text(u8"Онлайн сервисы:")
-            if imgui.TooltipButton(u8"Конвертер символов (Онлайн)", imgui.ImVec2(200, 25),
+            if imgui.TooltipButton(fa.ICON_FA_FONT..u8" Конвертер символов (Онлайн)", imgui.ImVec2(220, 25),
             u8"Данный сервис предназначен для перевода кириллических (русских) GameText, TextDraw символов в поддерживаемый GTA-русификаторами формат.")
             then
                local link = 'explorer "https://pawnokit.ru/ru/text_conv"'
                os.execute(link)
             end
             imgui.SameLine()
-            if imgui.TooltipButton(u8"TextDrawEditor (Онлайн)", imgui.ImVec2(200, 25),
+            if imgui.TooltipButton(fa.ICON_FA_EDIT..u8" TextDrawEditor (Онлайн)", imgui.ImVec2(220, 25),
             u8"Онлайн редактор текстдравов для SA:MP")
             then
                local link = 'explorer "https://leonardo541.github.io/TextDrawEditor/"'
                os.execute(link)
             end
+            imgui.PopFont()
+         
             --imgui.SameLine()
             --if imgui.Button(u8"Включить курсор", imgui.ImVec2(100, 25)) then
                --showCursor(true, true) -- showCursor(bool show, [bool lockControls])
@@ -6538,13 +6497,59 @@ function imgui.OnDrawFrame()
                      input.cbid.v = 0
                   end
                end
-               imgui.PopFont()
-               if imgui.TooltipButton(u8"Редактировать", imgui.ImVec2(115, 25), u8"Редактировать блок (/cbedit <id>)") then
+               
+               if ini.settings.cbsavelog then
+                  imgui.SameLine()
+                  if imgui.TooltipButton(fa.ICON_FA_FILE..u8" Логи КБ##cbfile", imgui.ImVec2(70, 25),
+                  u8"Показать логи КБ (вывести в чат)") then
+                     local counter = 0
+                     local totallines = 0
+                     local maxlines = 20
+                     
+                     local filepath = getGameDirectory()..
+                     "//moonloader//resource//mappingtoolkit//history//cblog.txt"
+                     
+                     if not doesFileExist(filepath) then
+                        local file = io.open(filepath, "w")
+                        file:write("")
+                        file:close()
+                     end
+                     
+                     for line in io.lines(filepath) do
+                        totallines = totallines + 1
+                     end
+                     
+                     if totallines >= 1 then
+                        sampAddChatMessage("Лог командных блоков:", -1)
+                     end
+                     
+                     if totallines > maxlines then
+                        local limit = totallines - maxlines
+                        for line in io.lines(filepath) do
+                           counter = counter + 1
+                           if counter > limit then
+                              sampAddChatMessage(line, 0x0FFFFFF)
+                           end
+                        end
+                     else
+                        for line in io.lines(filepath) do
+                           counter = counter + 1
+                           sampAddChatMessage(line, 0x0FFFFFF)
+                        end
+                     end
+                     
+                     if counter == 0 then
+                        sampAddChatMessage("Лог пуст", -1)
+                     end
+                  end
+               end
+               if imgui.TooltipButton(fa.ICON_FA_EDIT..u8" Редактировать", imgui.ImVec2(115, 25), u8"Редактировать блок (/cbedit <id>)") then
                   if input.cbid.v then
                      sampSendChat("/cbedit "..input.cbid.v)
                      dialog.main.v = false
                   end
                end
+               imgui.PopFont()
                imgui.SameLine()
                imgui.PushStyleColor(imgui.Col.Button, imgui.ImVec4(0.0, 0.45, 0.0, 1.0))
                if imgui.TooltipButton(u8"ТП к КБ", imgui.ImVec2(80, 25), u8"Телепортироваться к блоку (/cbtp <id>)") then
@@ -6596,13 +6601,13 @@ function imgui.OnDrawFrame()
                      input.tbid.v = 0
                   end
                end
-               imgui.PopFont()
-               if imgui.TooltipButton(u8" Редактировать", imgui.ImVec2(115, 25), u8"Редактировать блок (/cbedit <id>)") then
+               if imgui.TooltipButton(fa.ICON_FA_EDIT..u8" Редактировать", imgui.ImVec2(115, 25), u8"Редактировать блок (/tb <name>)") then
                   if input.tbid.v then
                      sampSendChat("/tb "..input.tbid.v)
                      dialog.main.v = false
                   end
                end
+               imgui.PopFont()
             end
             
             imgui.PushStyleVar(imgui.StyleVar.ItemSpacing, imgui.ImVec2(4, 4))
@@ -6847,7 +6852,8 @@ function imgui.OnDrawFrame()
                u8"Текстовые функции и коллбэки (классический)",
                u8"Сравнение движков текстовых функций",
                u8"Тригер блоки и принцип их работы",
-               u8"Сallbacks-sequence",
+               u8"Справка по Сallbacks на open.mp",
+               u8"Очередность вызова (Сallbacks-sequence)",
             }
             local docUrls = {
                "https://forum.training-server.com/d/6166-kollbeki-wiki",
@@ -6855,11 +6861,9 @@ function imgui.OnDrawFrame()
                "https://forum.training-server.com/d/22204-cpisok-tekstovyh-funktsiy-i-kollbekov-na-klassicheskom-tekstovom-dvizhke",
                "https://forum.training-server.com/d/22175-sravnenie-dvizhkov-tekstovyh-funktsiy",
                "https://forum.training-server.com/d/14526-triger-bloki-i-princip-ix-raboty",
+               "https://open.mp/docs/scripting/callbacks/OnActorStreamIn",
                "https://open.mp/docs/scripting/resources/callbacks-sequence",
             }
-            
-            -- imgui.TextNotify(" >> ", u8"Выберите ресурс")
-            -- imgui.SameLine()
             
             imgui.PushItemWidth(335)
             imgui.Combo(u8'##developerdocs', combobox.developerdocs, 
@@ -7607,11 +7611,13 @@ function imgui.OnDrawFrame()
       
       imgui.PushFont(fonts.fa)
       if dialog.playerstat.v then
-         if imgui.TooltipButton(fa.ICON_FA_USER.."  [ << ] ", imgui.ImVec2(70, 25), u8:encode("Скрыть подробную статистику")) then
+         if imgui.TooltipButton(fa.ICON_FA_USER.."  [ << ] ", imgui.ImVec2(70, 25), 
+         u8:encode("Скрыть подробную статистику")) then
             dialog.playerstat.v = not dialog.playerstat.v
          end
       else
-         if imgui.TooltipButton(fa.ICON_FA_USER.."  [ >> ] ", imgui.ImVec2(70, 25), u8:encode("Раскрыть подробную статистику")) then
+         if imgui.TooltipButton(fa.ICON_FA_USER.."  [ >> ] ", imgui.ImVec2(70, 25), 
+         u8:encode("Раскрыть подробную статистику")) then
             dialog.playerstat.v = not dialog.playerstat.v
             chosen.player = id
          end
@@ -9559,17 +9565,17 @@ function imgui.OnDrawFrame()
       end
          
       if tabmenu.onlinesearch == 1 then
-         imgui.Text(u8"В этом разделе вы можете найти объекты (online)")
+         imgui.Text(u8"В этом разделе вы можете найти объекты")
          imgui.Spacing()
       elseif tabmenu.onlinesearch == 2 then
-         imgui.Text(u8"В этом разделе вы можете найти текстуры (online)")
+         imgui.Text(u8"В этом разделе вы можете найти текстуры")
          imgui.SameLine()
          -- imgui.Link("https://textures.xyin.ws/?page=textures&limit=100", "textures.xyin.ws")
          -- imgui.SameLine()
          imgui.TextQuestion("( ? )", u8"Все запросы перенаправляет в ваш браузер")
          imgui.Spacing()
       elseif tabmenu.onlinesearch == 3 then
-         imgui.Text(u8"Раздел для разработчиков. Поиск референсов по функциям (онлайн)")
+         imgui.Text(u8"Раздел для разработчиков. Поиск документации по функциям и API")
          imgui.SameLine()
          imgui.TextQuestion("( ? )", u8"Все запросы перенаправляет в ваш браузер")
          imgui.Spacing()
@@ -9697,9 +9703,13 @@ function imgui.OnDrawFrame()
          end
          
          imgui.PushFont(fonts.fa)
+         
+         imgui.PushStyleColor(imgui.Col.Button, imgui.ImVec4(0.01, 0.37, 0.69, 1.00))
          if imgui.Button(u8" Категории "..fa.ICON_FA_LIST_OL, imgui.ImVec2(140, 25)) then
             dialog.osearch.v = not dialog.osearch.v
          end
+         imgui.PopStyleColor()
+         
          if combobox.searchsource.v == 0 then
             imgui.SameLine()
             if imgui.Button(fa.ICON_FA_MAP_MARKER..u8" Найти объекты рядом по текущей позиции",imgui.ImVec2(300, 25)) then
@@ -9739,6 +9749,7 @@ function imgui.OnDrawFrame()
          local sourceDescriptionList = {
             u8"textures.xyin.ws",
             u8"gtxd.net",
+            u8"gtastuff.com",
             u8"tsearch",
          }
          
@@ -9774,6 +9785,13 @@ function imgui.OnDrawFrame()
                   end
                   os.execute(link)
                elseif combobox.searchsource.v == 2 then
+                  if checkbox.searchtxdignoredups.v then
+                     link = 'explorer "https://gtastuff.com/textures/?q='.. u8:decode(textbuffer.objectid.v)..'"'
+                  else
+                     link = 'explorer "https://gtastuff.com/textures/?q='.. u8:decode(textbuffer.objectid.v)..'"'
+                  end
+                  os.execute(link)
+               elseif combobox.searchsource.v == 3 then
                   if isTrainingSandbox then
                      if LastObject.txdid ~= nil and LastObject.txdslot ~= nil then
                         if string.len(textbuffer.objectid.v) > 3 then
@@ -9804,12 +9822,14 @@ function imgui.OnDrawFrame()
             end
          end
          
+         imgui.PushStyleColor(imgui.Col.Button, imgui.ImVec4(0.01, 0.37, 0.69, 1.00))
          if imgui.Button(u8" Категории "..fa.ICON_FA_LIST_OL, imgui.ImVec2(140, 25)) then
             dialog.tsearch.v = not dialog.tsearch.v
          end
          imgui.PopFont()  
          imgui.SameLine()
          imgui.Checkbox(u8"Скрывать дубликаты", checkbox.searchtxdignoredups)
+         imgui.PopStyleColor()
          
          if LastObject.txdid ~= nil then
             local txdtable = sampTextureList[LastObject.txdid+1]
@@ -9887,7 +9907,258 @@ function imgui.OnDrawFrame()
                   
          imgui.Spacing()
          
+         if isTrainingSandbox then
+            imgui.Text(u8"Поиск по КБ и текстовым функциям:")
+            local filepath = getGameDirectory().."//moonloader//resource//mappingtoolkit//textfunctions.txt"
+            
+            imgui.PushStyleVar(imgui.StyleVar.ItemSpacing, imgui.ImVec2(4, 4))
+            imgui.PushItemWidth(220)
+            imgui.InputText("##searchcb", textbuffer.searchbar)
+            imgui.PopItemWidth()
+            imgui.SameLine()
+            imgui.PushFont(fonts.fa)
+            imgui.PushStyleColor(imgui.Col.Button, imgui.ImVec4(0.5, 0.25, 0.0, 1.0))
+            if imgui.TooltipButton(fa.ICON_FA_SITEMAP..u8" Поиск##Searchcb", 
+            imgui.ImVec2(80, 25), u8:encode("Поиск по части названия либо описанию")) then
+               local results = 0
+               local resultline = 0
+               if string.len(textbuffer.searchbar.v) > 0 then
+                  for line in io.lines(filepath) do
+                     resultline = resultline + 1
+                     local fmtline = u8:decode(line)
+                     if fmtline:find(string.nlower(u8:decode(textbuffer.searchbar.v)), 1, true) then
+                        results = results + 1
+                        fmtline = fmtline:gsub('# ','#{FFFFFF} ')
+                        fmtline = fmtline:gsub('^#','{696969}#')
+                        sampAddChatMessage(fmtline, -1)
+                     end
+                  end
+               end
+               
+               if results < 1 then
+                  sampAddChatMessage("Результат поиска: {696969}Совпадений не найдено", -1)
+               else
+                  ini.tmp.searchbar = textbuffer.searchbar.v
+                  inicfg.save(ini, configIni)
+               end
+            end
+            imgui.PopStyleColor()
+            imgui.PopFont()
+            imgui.SameLine()
+            if imgui.Selectable(" IO ", false, 0, imgui.ImVec2(25, 15)) then
+               imgui.resetIO()
+            end
+            if imgui.IsItemHovered() then
+               imgui.BeginTooltip()
+               imgui.PushTextWrapPos(600)
+               imgui.TextUnformatted(u8"Unlock IO - разблокировать инпут если курсор забагался")
+               imgui.PopTextWrapPos()
+               imgui.EndTooltip()
+            end
+            imgui.PopStyleVar()
+            
+            imgui.SameLine()
+            imgui.PushFont(fonts.fa)
+            if imgui.TooltipButton(fa.ICON_FA_ARCHIVE..u8" Справка по КБ", 
+            imgui.ImVec2(110, 25), u8"Открыть раздел справки по КБ") then
+               imgui.selectTabMenu(1, 7)
+               tabmenu.cb = 2
+            end
+            imgui.PopFont()
+         end         
+         
          local docDescriptionList = {
+            "Angle Modes",
+            "Animations",
+            "Body parts",
+            "Bone IDs",
+            "Bullet Hit Types",
+            "Callbacks Sequence",
+            "Camera Cut Styles",
+            "Camera Modes",
+            "Car Component IDs",
+            "Click Sources",
+            "Color List",
+            "Component slots",
+            "Connection status",
+            "Constants",
+            "Crime List",
+            "Damage Status",
+            "Dialog Styles",
+            "Door States",
+            "Download Request Types",
+            "Escape Codes",
+            "Explosion Lists",
+            "Fighting Styles",
+            "File Modes",
+            "File Seek Whence",
+            "Floatround Modes",
+            "GameText Styles",
+            "Glossary",
+            "Hex Colors",
+            "HTTP Error Response Codes",
+            "HTTP Request Methods",
+            "Interiorids",
+            "Keys",
+            "Vehicle Landing Gear States",
+            "Light States",
+            "Limits",
+            "Map Icons",
+            "Map Icon Styles",
+            "Marker Modes",
+            "Material Text Alignments",
+            "Material Text Sizes",
+            "Network Stats",
+            "NPC Constants",
+            "Object Edition Response Types",
+            "opcodes",
+            "Original Car Colors",
+            "Paintjobs",
+            "Panel States",
+            "Path Nodes",
+            "Pickup IDs",
+            "Pickup Types",
+            "Player States",
+            "Pvar Types",
+            "Types Of Race Checkpoints",
+            "Record Types",
+            "SA-MP Objects",
+            "Select Object Types",
+            "Shop Names",
+            "Skins",
+            "Sound IDs",
+            "Special Actions",
+            "Spectate Modes",
+            "Spectate Types",
+            "SQLite Open Flags",
+            "Scripting Basics",
+            "Starting IDs",
+            "Svar Types",
+            "Material Text Alignments",
+            "Textdraws",
+            "TextDraw Sprites",
+            "Tire States",
+            "Vehicle Door Status",
+            "Vehicle Light Status",
+            "Vehicle Panel Status",
+            "Vehicle Tire Status",
+            "Vehicle Color IDs",
+            "Vehicle Health",
+            "Vehicle IDs",
+            "Vehicle Information Types",
+            "Vending Machines",
+            "Weapon IDs",
+            "Weapon Skills",
+            "Weapon Slots",
+            "Weapon States",
+            "Weather IDs",
+         }
+         local docUrls = {
+            "https://open.mp/docs/scripting/resources/anglemodes",
+            "https://open.mp/docs/scripting/resources/animations",
+            "https://open.mp/docs/scripting/resources/bodyparts",
+            "https://open.mp/docs/scripting/resources/boneids",
+            "https://open.mp/docs/scripting/resources/bullethittypes",
+            "https://open.mp/docs/scripting/resources/callbackssequence",
+            "https://open.mp/docs/scripting/resources/cameracutstyles",
+            "https://open.mp/docs/scripting/resources/cameramodes",
+            "https://open.mp/docs/scripting/resources/carcomponentids",
+            "https://open.mp/docs/scripting/resources/clicksources",
+            "https://open.mp/docs/scripting/resources/colorlist",
+            "https://open.mp/docs/scripting/resources/componentslots",
+            "https://open.mp/docs/scripting/resources/connectionstatus",
+            "https://open.mp/docs/scripting/resources/constants",
+            "https://open.mp/docs/scripting/resources/crimelist",
+            "https://open.mp/docs/scripting/resources/damagestatus",
+            "https://open.mp/docs/scripting/resources/dialogstyles",
+            "https://open.mp/docs/scripting/resources/doorstates",
+            "https://open.mp/docs/scripting/resources/downloadrequesttypes",
+            "https://open.mp/docs/scripting/resources/escapecodes",
+            "https://open.mp/docs/scripting/resources/explosionlists",
+            "https://open.mp/docs/scripting/resources/fightingstyles",
+            "https://open.mp/docs/scripting/resources/filemodes",
+            "https://open.mp/docs/scripting/resources/fileseekwhence",
+            "https://open.mp/docs/scripting/resources/floatroundmodes",
+            "https://open.mp/docs/scripting/resources/gametextstyles",
+            "https://open.mp/docs/scripting/resources/glossary",
+            "https://open.mp/docs/scripting/resources/hexcolors",
+            "https://open.mp/docs/scripting/resources/httperrorresponsecodes",
+            "https://open.mp/docs/scripting/resources/httprequestmethods",
+            "https://open.mp/docs/scripting/resources/interiorids",
+            "https://open.mp/docs/scripting/resources/keys",
+            "https://open.mp/docs/scripting/resources/vehiclelandinggearstates",
+            "https://open.mp/docs/scripting/resources/lightstates",
+            "https://open.mp/docs/scripting/resources/limits",
+            "https://open.mp/docs/scripting/resources/mapicons",
+            "https://open.mp/docs/scripting/resources/mapiconstyles",
+            "https://open.mp/docs/scripting/resources/markermodes",
+            "https://open.mp/docs/scripting/resources/materialtextalignments",
+            "https://open.mp/docs/scripting/resources/materialtextsizes",
+            "https://open.mp/docs/scripting/resources/networkstats",
+            "https://open.mp/docs/scripting/resources/npcconstants",
+            "https://open.mp/docs/scripting/resources/objecteditionresponsetypes",
+            "https://open.mp/docs/scripting/resources/opcodes",
+            "https://open.mp/docs/scripting/resources/originalcarcolors",
+            "https://open.mp/docs/scripting/resources/paintjobs",
+            "https://open.mp/docs/scripting/resources/panelstates",
+            "https://open.mp/docs/scripting/resources/pathnodes",
+            "https://open.mp/docs/scripting/resources/pickupids",
+            "https://open.mp/docs/scripting/resources/pickuptypes",
+            "https://open.mp/docs/scripting/resources/playerstates",
+            "https://open.mp/docs/scripting/resources/pvartypes",
+            "https://open.mp/docs/scripting/resources/typesofracecheckpoints",
+            "https://open.mp/docs/scripting/resources/recordtypes",
+            "https://open.mp/docs/scripting/resources/sa-mpobjects",
+            "https://open.mp/docs/scripting/resources/selectobjecttypes",
+            "https://open.mp/docs/scripting/resources/shopnames",
+            "https://open.mp/docs/scripting/resources/skins",
+            "https://open.mp/docs/scripting/resources/soundids",
+            "https://open.mp/docs/scripting/resources/specialactions",
+            "https://open.mp/docs/scripting/resources/spectatemodes",
+            "https://open.mp/docs/scripting/resources/spectatetypes",
+            "https://open.mp/docs/scripting/resources/sqliteopenflags",
+            "https://open.mp/docs/scripting/resources/scriptingbasics",
+            "https://open.mp/docs/scripting/resources/startingids",
+            "https://open.mp/docs/scripting/resources/svartypes",
+            "https://open.mp/docs/scripting/resources/materialtextalignments",
+            "https://open.mp/docs/scripting/resources/textdraws",
+            "https://open.mp/docs/scripting/resources/textdrawsprites",
+            "https://open.mp/docs/scripting/resources/tirestates",
+            "https://open.mp/docs/scripting/resources/vehicledoorstatus",
+            "https://open.mp/docs/scripting/resources/vehiclelightstatus",
+            "https://open.mp/docs/scripting/resources/vehiclepanelstatus",
+            "https://open.mp/docs/scripting/resources/vehicletirestatus",
+            "https://open.mp/docs/scripting/resources/vehiclecolorids",
+            "https://open.mp/docs/scripting/resources/vehiclehealth",
+            "https://open.mp/docs/scripting/resources/vehicleids",
+            "https://open.mp/docs/scripting/resources/vehicleinformationtypes",
+            "https://open.mp/docs/scripting/resources/vendingmachines",
+            "https://open.mp/docs/scripting/resources/weaponids",
+            "https://open.mp/docs/scripting/resources/weaponskills",
+            "https://open.mp/docs/scripting/resources/weaponslots",
+            "https://open.mp/docs/scripting/resources/weaponstates",
+            "https://open.mp/docs/scripting/resources/weatherids",
+         }
+         
+         imgui.Spacing()
+         imgui.Text(u8"Прочие ресурсы для разработчиков:")
+         --imgui.Text(u8"Open.mp scripting resources:")
+         imgui.PushItemWidth(265)
+         imgui.Combo(u8'##docs', combobox.docs, 
+         docDescriptionList, #docDescriptionList)
+         imgui.PopItemWidth()
+         imgui.SameLine()
+         
+         imgui.PushFont(fonts.fa)
+         imgui.PushStyleColor(imgui.Col.Button, imgui.ImVec4(0.5, 0.25, 1.0, 1.0))
+         if imgui.TooltipButton(fa.ICON_FA_USER_GRADUATE..u8" Открыть (open.mp)##doc",
+         imgui.ImVec2(150, 25), u8"Открывает справочный ресурс в вашем браузере") then
+            os.execute('explorer "'..docUrls[combobox.docs.v+1]..'"')
+         end
+         imgui.PopStyleColor()
+         imgui.PopFont()
+         
+         local devDocDescriptionList = {
             u8"Документация по SAMP/Open.mp",
             u8"Библиотека SAMP.lua",
             u8"Список RPC и Packet list",
@@ -9897,7 +10168,7 @@ function imgui.OnDrawFrame()
             u8"Dear ImGui API",
             u8"Key codes",
          }
-         local docUrls = {
+         local devDocUrls = {
             "https://open.mp/docs",
             "https://github.com/THE-FYP/SAMP.Lua/blob/master/samp/events.lua",
             "https://github.com/Brunoo16/samp-packet-list/wiki",
@@ -9908,18 +10179,18 @@ function imgui.OnDrawFrame()
             "https://learn.microsoft.com/en-us/windows/win32/inputdev/virtual-key-codes",
          }
          
-         imgui.Text(u8"Выберите справочный ресурс:")
-         imgui.TextNotify(" >> ", u8"Выберите ресурс")
-         imgui.SameLine()
-         imgui.PushItemWidth(275)
+         --imgui.Text(u8"Документация для разработчиков:")
+         imgui.PushItemWidth(265)
          imgui.Combo(u8'##developerdocs', combobox.developerdocs, 
-         docDescriptionList, #docDescriptionList)
+         devDocDescriptionList, #devDocDescriptionList)
          imgui.PopItemWidth()
          imgui.SameLine()
-         if imgui.TooltipButton(u8"Открыть справку", imgui.ImVec2(120, 25), u8"Открывает справочный ресурс в вашем браузере") then
-            os.execute('explorer "'..docUrls[combobox.developerdocs.v+1]..'"')
+         imgui.PushFont(fonts.fa)
+         if imgui.TooltipButton(fa.ICON_FA_LAPTOP_CODE..u8" Открыть справку##devdoc", imgui.ImVec2(150, 25), u8"Открывает справочный ресурс в вашем браузере") then
+            os.execute('explorer "'..devDocUrls[combobox.developerdocs.v+1]..'"')
          end
-
+         imgui.PopFont()
+      
       elseif tabmenu.onlinesearch == 4 then
       
          local symbols = 0
@@ -10147,12 +10418,12 @@ function imgui.OnDrawFrame()
          imgui.PushStyleColor(imgui.Col.Button, imgui.ImVec4(0.5, 0.25, 0.0, 1.0))
          if dialog.colorpicker.v then
             imgui.PushStyleColor(imgui.Col.Button, imgui.GetStyle().Colors[imgui.Col.ButtonHovered])
-            if imgui.TooltipButton(fa.ICON_FA_PALETTE..u8" Палитра ", imgui.ImVec2(115, 25), u8"Палитра") then
+            if imgui.TooltipButton(fa.ICON_FA_PALETTE..u8" Палитра ", imgui.ImVec2(120, 25), u8"Палитра с выбором цвета") then
                dialog.colorpicker.v = not dialog.colorpicker.v
             end
             imgui.PopStyleColor()
          else
-            if imgui.TooltipButton(fa.ICON_FA_PALETTE..u8" Палитра ", imgui.ImVec2(115, 25), u8"Палитра") then
+            if imgui.TooltipButton(fa.ICON_FA_PALETTE..u8" Палитра ", imgui.ImVec2(120, 25), u8"Палитра с выбором цвета") then
                dialog.colorpicker.v = not dialog.colorpicker.v
             end
          end
@@ -10161,12 +10432,12 @@ function imgui.OnDrawFrame()
          imgui.PushStyleColor(imgui.Col.Button, imgui.ImVec4(0.5, 0.25, 1.0, 1.0))
          if dialog.colortable.v then
             imgui.PushStyleColor(imgui.Col.Button, imgui.GetStyle().Colors[imgui.Col.ButtonHovered])
-            if imgui.TooltipButton(fa.ICON_FA_PAINT_BRUSH..u8" Таблица цветов ", imgui.ImVec2(115, 25), u8"Таблица цветов") then
+            if imgui.TooltipButton(fa.ICON_FA_PAINT_BRUSH..u8" Таблица цветов ", imgui.ImVec2(135, 25), u8"Таблица цветов") then
                dialog.colortable.v = not dialog.colortable.v
             end
             imgui.PopStyleColor()
          else
-            if imgui.TooltipButton(fa.ICON_FA_PAINT_BRUSH..u8" Таблица цветов ", imgui.ImVec2(115, 25), u8"Таблица цветов") then
+            if imgui.TooltipButton(fa.ICON_FA_PAINT_BRUSH..u8" Таблица цветов ", imgui.ImVec2(135, 25), u8"Таблица цветов") then
                dialog.colortable.v = not dialog.colortable.v
             end
          end
@@ -10181,7 +10452,8 @@ function imgui.OnDrawFrame()
          end
          imgui.PopItemWidth()
          imgui.SameLine()
-         if imgui.TooltipButton(u8"Найти", imgui.ImVec2(60, 25), 
+         imgui.PushFont(fonts.fa)
+         if imgui.TooltipButton(fa.ICON_FA_SEARCH..u8" Найти", imgui.ImVec2(80, 25), 
          u8"Найти цвет на сайте encycolorpedia.com") then
             if string.len(textbuffer.colorsearch.v) > 2 then
                local link = 'explorer "https://encycolorpedia.com/search?q='..tostring(textbuffer.colorsearch.v..'"')
@@ -10191,11 +10463,12 @@ function imgui.OnDrawFrame()
             end
          end
          imgui.SameLine()
-         if imgui.TooltipButton(u8"Найти цвет по скрину", imgui.ImVec2(150, 25), 
+         if imgui.TooltipButton(fa.ICON_FA_IMAGE..u8" Найти цвет по скрину", imgui.ImVec2(180, 25), 
             u8"Найти цвет по скрину на сайте imagecolorpicker.com") then
             os.execute('explorer "https://imagecolorpicker.com/"')
             os.execute('explorer '..getFolderPath(5) ..'\\GTA San Andreas User Files\\SAMP\\screens')
          end
+         imgui.PopFont()
          
          imgui.Spacing()
          
@@ -10441,12 +10714,16 @@ function imgui.OnDrawFrame()
    if dialog.dialogtext.v then
       imgui.SetNextWindowPos(imgui.ImVec2(sizeX / 8, sizeY / 3),
       imgui.Cond.FirstUseEver, imgui.ImVec2(0.5, 0.5))
-      imgui.SetNextWindowSize(imgui.ImVec2(345, 250))
+      imgui.SetNextWindowSize(imgui.ImVec2(345, 350))
       imgui.Begin(u8"Диалог - ID:"..sampGetCurrentDialogId(), dialog.dialogtext)
       
       if LastData.lastDialogTitle then
          if string.len(LastData.lastDialogTitle) > 1 then
             imgui.TextColoredRGB(LastData.lastDialogTitle)
+            if imgui.IsItemClicked() then
+               setClipboardText(tostring(LastData.lastDialogTitle))
+               sampAddChatMessage("Заголовк скопирован в буффер обмена", -1)
+            end
          else
             imgui.TextColoredRGB("{696969}Диалог без заголовка")
          end
@@ -10454,7 +10731,19 @@ function imgui.OnDrawFrame()
          imgui.TextColoredRGB("{696969}Диалог без заголовка")
       end
       
-      imgui.InputTextMultiline('##dialogtext', textbuffer.dialogtext, imgui.ImVec2(320, 180),
+      imgui.PushFont(fonts.fa)
+      if imgui.Button(fa.ICON_FA_COPY..u8" Скопировать ") then
+         setClipboardText(textbuffer.dialogtext.v)
+         sampAddChatMessage("[SCRIPT]: {FFFFFF}Текст диалога скопирован в буффер обмена", 0x0FF6600)
+      end
+      imgui.SameLine()
+      if imgui.Button(fa.ICON_FA_ERASER..u8" Сбросить ") then
+         textbuffer.dialogtext.v = ""
+         imgui.resetIO()
+      end
+      imgui.PopFont()
+      
+      imgui.InputTextMultiline('##dialogtext', textbuffer.dialogtext, imgui.ImVec2(320, 250),
       imgui.InputTextFlags.EnterReturnsTrue + imgui.InputTextFlags.AllowTabInput)
                
       imgui.End()
@@ -11129,27 +11418,31 @@ function imgui.OnDrawFrame()
    end
    
    if dialog.txdlist.v then
-      imgui.SetNextWindowPos(imgui.ImVec2(sizeX / 7, sizeY / 3),
+      imgui.SetNextWindowPos(imgui.ImVec2(sizeX / 8, sizeY / 3),
       imgui.Cond.FirstUseEver, imgui.ImVec2(0.5, 0.5))
-      imgui.SetNextWindowSize(imgui.ImVec2(260, 250))
-      imgui.Begin(u8"Список TextDraws", dialog.txdlist)
+      imgui.SetNextWindowSize(imgui.ImVec2(350, 360))
+      imgui.Begin(u8"Список активных TextDraws", dialog.txdlist)
       
       local row = 0
       
       for id = 1, 2048 do
          if sampTextdrawIsExists(id) then
             local text = sampTextdrawGetString(id)
-            imgui.TextColoredRGB("{696969}"..id)
+            imgui.TextColoredRGB("{696969}id: "..id)
             imgui.SameLine()
             if imgui.Selectable(("%s"):format(text)) then
                input.txdid.v = id
+               dumpTextdrawById(input.txdid.v)
             end
             row = row + 1
          end
       end
       
+      imgui.Spacing()
       if row == 0 then
          imgui.TextColoredRGB("{696969}Не найдено текстдравов")
+      else
+         imgui.TextColoredRGB("{696969}Нажмите на текст чтобы выбрать текстдрав")
       end
       
       imgui.End()
@@ -11173,6 +11466,12 @@ function imgui.OnDrawFrame()
                if imgui.Selectable(u8"Доска") then
                   textbuffer.objectid.v = "board"
                end
+               if imgui.Selectable(u8"Доска 2") then
+                  textbuffer.objectid.v = "plank"
+               end
+               if imgui.Selectable(u8"Потертые") then
+                  textbuffer.objectid.v = "sheet"
+               end
                imgui.TreePop()
             end
             
@@ -11180,22 +11479,42 @@ function imgui.OnDrawFrame()
                if imgui.Selectable(u8"Металлические") then
                   textbuffer.objectid.v = "metal"
                end
+               if imgui.Selectable(u8"Сталь") then
+                  textbuffer.objectid.v = "steal"
+               end
                if imgui.Selectable(u8"Ржавые") then
                   textbuffer.objectid.v = "rust"
                end
+               if imgui.Selectable(u8"Забор") then
+                  textbuffer.objectid.v = "fence"
+               end
+               if imgui.Selectable(u8"Сетка") then
+                  textbuffer.objectid.v = "mesh"
+               end
+               if imgui.Selectable(u8"Гаражные") then
+                  textbuffer.objectid.v = "garage"
+               end
+               if imgui.Selectable(u8"Со свалки") then
+                  textbuffer.objectid.v = "scrpyd"
+               end
+               if imgui.Selectable(u8"Столбы") then
+                  textbuffer.objectid.v = "pillar"
+               end
+               if imgui.Selectable(u8"Балки") then
+                  textbuffer.objectid.v = "banding"
+               end
                imgui.TreePop()
-            end
-            
-            if imgui.Selectable(u8"Стекло") then
-               textbuffer.objectid.v = "glass"
             end
             
             if imgui.TreeNode(u8"Блоки") then
                if imgui.Selectable(u8"Кирпичи") then
                   textbuffer.objectid.v = "brick"
                end
-               if imgui.Selectable(u8"Плитка") then
+               if imgui.Selectable(u8"Плитка интерьерная") then
                   textbuffer.objectid.v = "tile"
+               end
+               if imgui.Selectable(u8"Плитка уличная") then
+                  textbuffer.objectid.v = "pave"
                end
                if imgui.Selectable(u8"Панели") then
                   textbuffer.objectid.v = "panel"
@@ -11205,10 +11524,61 @@ function imgui.OnDrawFrame()
                end
                imgui.TreePop()
             end
+            
+            if imgui.TreeNode(u8"Ткани") then
+               if imgui.Selectable(u8"Ткань") then
+                  textbuffer.objectid.v = "fabric"
+               end
+               if imgui.Selectable(u8"Бандана") then
+                  textbuffer.objectid.v = "bandana"
+               end
+               if imgui.Selectable(u8"Ковролин") then
+                  textbuffer.objectid.v = "carp"
+               end
+               imgui.TreePop()
+            end
+            
+            if imgui.TreeNode(u8"Бетон") then
+               if imgui.Selectable(u8"Бетон") then
+                  textbuffer.objectid.v = "conc"
+               end
+               if imgui.Selectable(u8"Мокрый") then
+                  textbuffer.objectid.v = "dry"
+               end
+               if imgui.Selectable(u8"Подземка") then
+                  textbuffer.objectid.v = "sub"
+               end
+               if imgui.Selectable(u8"Заброшенные") then
+                  textbuffer.objectid.v = "ab"
+               end
+               imgui.TreePop()
+            end
+               
+            if imgui.Selectable(u8"Мрамор") then
+               textbuffer.objectid.v = "marble"
+            end
+            if imgui.Selectable(u8"Стекло") then
+               textbuffer.objectid.v = "glass"
+            end
+            if imgui.Selectable(u8"Пластик") then
+               textbuffer.objectid.v = "plast"
+            end
+            if imgui.Selectable(u8"Крыша") then
+               textbuffer.objectid.v = "roof"
+            end
+            if imgui.Selectable(u8"Бумага") then
+               textbuffer.objectid.v = "paper"
+            end
+            if imgui.Selectable(u8"Гофра") then
+               textbuffer.objectid.v = "corru"
+            end
+            if imgui.Selectable(u8"Прочие") then
+               textbuffer.objectid.v = "mat"
+            end
             imgui.TreePop()
          end
          
-         if imgui.TreeNode(u8"Земля") then
+         if imgui.TreeNode(u8"Ландшафт") then
             if imgui.Selectable(u8"Камни") then
                textbuffer.objectid.v = "stone"
             end
@@ -11218,10 +11588,19 @@ function imgui.OnDrawFrame()
             if imgui.Selectable(u8"Горы") then
                textbuffer.objectid.v = "rock"
             end
+            if imgui.Selectable(u8"Грязь") then
+               textbuffer.objectid.v = "dirty"
+            end
+            if imgui.Selectable(u8"Лесное") then
+               textbuffer.objectid.v = "forest"
+            end
+            if imgui.Selectable(u8"Гравий") then
+               textbuffer.objectid.v = "gravel"
+            end
             imgui.TreePop()
          end
          
-         if imgui.TreeNode(u8"Растения") then
+         if imgui.TreeNode(u8"Растения и деревья") then
             if imgui.Selectable(u8"Трава") then
                textbuffer.objectid.v = "grass"
             end
@@ -11231,14 +11610,99 @@ function imgui.OnDrawFrame()
             if imgui.Selectable(u8"Цветы") then
                textbuffer.objectid.v = "flower"
             end
+            if imgui.Selectable(u8"Растения") then
+               textbuffer.objectid.v = "weg_"
+            end
+            if imgui.Selectable(u8"Изгородь") then
+               textbuffer.objectid.v = "hedge"
+            end
+            imgui.TreePop()
+         end
+         
+         if imgui.TreeNode(u8"Интерьер") then
+            if imgui.Selectable(u8"Двери") then
+               textbuffer.objectid.v = "door"
+            end
+            if imgui.Selectable(u8"Окна") then
+               textbuffer.objectid.v = "window"
+            end
+            if imgui.Selectable(u8"Обои") then
+               textbuffer.objectid.v = "walp"
+            end
+            if imgui.Selectable(u8"Занавески") then
+               textbuffer.objectid.v = "curt"
+            end
+            if imgui.Selectable(u8"Жалюзи") then
+               textbuffer.objectid.v = "blind"
+            end
+            if imgui.Selectable(u8"Ковры") then
+               textbuffer.objectid.v = "carp"
+            end
+            if imgui.Selectable(u8"Картины") then
+               textbuffer.objectid.v = "paint"
+            end
+            if imgui.Selectable(u8"Рамки") then
+               textbuffer.objectid.v = "frame"
+            end
+            if imgui.Selectable(u8"Кухня") then
+               --textbuffer.objectid.v = "ah_"
+               textbuffer.objectid.v = "kitch"
+            end
+            if imgui.Selectable(u8"Казино") then
+               textbuffer.objectid.v = "casino"
+            end
+            if imgui.Selectable(u8"Ящики") then
+               textbuffer.objectid.v = "corru"
+            end
+            imgui.TreePop()
+         end
+         
+         if imgui.TreeNode(u8"Знаки и вывески") then
+            if imgui.Selectable(u8"Знаки") then
+               textbuffer.objectid.v = "sign"
+            end
+            if imgui.Selectable(u8"Иконки") then
+               textbuffer.objectid.v = "icon"
+            end
+            if imgui.Selectable(u8"Вывески из бара") then
+               textbuffer.objectid.v = "bbar"
+            end
+            if imgui.Selectable(u8"Магазины") then
+               textbuffer.objectid.v = "shop"
+            end
+            if imgui.Selectable(u8"Граффити") then
+               textbuffer.objectid.v = "graf"
+            end
+            imgui.TreePop()
+         end
+         
+         if imgui.TreeNode(u8"Дорожные") then
+            if imgui.Selectable(u8"Дороги") then
+               textbuffer.objectid.v = "roads"
+            end
+            if imgui.Selectable(u8"Хайвей") then
+               textbuffer.objectid.v = "hiway"
+            end
+            if imgui.Selectable(u8"Плохая дорога") then
+               textbuffer.objectid.v = "craproad"
+            end
+            if imgui.Selectable(u8"Грязная дорога") then
+               textbuffer.objectid.v = "dirtyroad"
+            end
+            if imgui.Selectable(u8"Баррикады") then
+               textbuffer.objectid.v = "barr"
+            end
+            if imgui.Selectable(u8"Разметка") then
+               textbuffer.objectid.v = "chev"
+            end
             imgui.TreePop()
          end
          
          if imgui.Selectable(u8"Освещение") then
             textbuffer.objectid.v = "light"
          end
-         if imgui.Selectable(u8"Знаки") then
-            textbuffer.objectid.v = "sign"
+         if imgui.Selectable(u8"Мусор") then
+            textbuffer.objectid.v = "rubb"
          end
          imgui.TreePop()
       end
@@ -11280,7 +11744,7 @@ function imgui.OnDrawFrame()
          if imgui.TreeNode(u8"GTA модели"..fa.ICON_FA_CLONE) then
              if imgui.Selectable(u8"- Оружие "..fa.ICON_FA_HAMMER) then
                if searchtype == 0 then
-                  os.execute('explorer "'..searchrequest..'signs-billboards-and-statues'..'"')
+                  os.execute('explorer "'..searchrequest..'weapon-models'..'"')
                elseif searchtype == 1 then
                   os.execute('explorer "'..searchrequest..'weapons'..'"')
                elseif searchtype == 2 then
@@ -11804,6 +12268,7 @@ function sampev.onSendDialogResponse(dialogId, button, listboxId, input)
          dialoghook.prevdialog = false
          dialoghook.cblist = false
          dialoghook.tblist = false
+         dialoghook.cbaction = false
       end
       
       if button == 1 and dialoghook.action then
@@ -11972,6 +12437,27 @@ function sampev.onSendDialogResponse(dialogId, button, listboxId, input)
             wait(1000)
             dialoghook.exitdialog = false
          end)
+      end
+      
+      if button == 1 and ini.settings.cbsavelog and dialoghook.cbaction then
+         local caption = sampGetDialogCaption()
+         if not caption:find("Страница") then
+            if input then
+               if not LastData.lastCb then
+                  cbid = -1
+               else 
+                  cbid = LastData.lastCb
+               end
+               
+               if not input:find("Действие") and not input:find("Значение")
+               and not input:find("N/A") then
+                  local file = io.open(getGameDirectory()..
+                  "/moonloader/resource/mappingtoolkit/history/cblog.txt", "a")
+                  file:write(("[%s] cb:%i %s\n"):format(tostring(os.date("%d.%m.%Y %X")), cbid, input))
+                  file:close()
+               end
+            end
+         end
       end
       
       if ini.settings.cbvalautocomplete then
@@ -12405,6 +12891,7 @@ function sampev.onShowDialog(dialogId, style, title, button1, button2, text)
          dialoghook.prevdialog = false
          dialoghook.nextdialog = false
          dialoghook.cblist = false
+         dialoghook.cbaction = true
       end
       
       if title:find('Edit Attach') then
@@ -12446,7 +12933,6 @@ function sampev.onShowDialog(dialogId, style, title, button1, button2, text)
                dialoghook.loadworld = false
             end)
          end
-         
       end
       
       if title:find('Редактор актера') then
@@ -12473,7 +12959,7 @@ function sampev.onShowDialog(dialogId, style, title, button1, button2, text)
       
       if title:find('Выбор анимации') then
          if text:find('Введите анимацию в такой последовательности') then
-            LastData.lastLink = 'https://www.open.mp/docs/scripting/resources/animations'
+            LastData.lastLink = 'https://open.mp/animations?library=MUSCULAR&animation=MuscleWalk'
             local newtext = "{FFFFFF}".. text .. 
             "\n{007FFF}".. LastData.lastLink ..
             "\n{696969}Нажмите CTRL + SHIFT + L чтобы открыть ссылку в браузере\n"
@@ -12686,17 +13172,6 @@ function sampev.onShowDialog(dialogId, style, title, button1, button2, text)
             local result = tostring(lines[#lines - 1])
             if result and string.len(result) >= 1 then
                LastData.lastCbvaluebuffer = result
-               if ini.settings.cbsavelog then
-                  local file = io.open(getGameDirectory()..
-                  "/moonloader/resource/mappingtoolkit/history/cblog.txt", "a")
-                  if not LastData.lastCb then
-                     cbid = -1
-                  else 
-                     cbid = LastData.lastCb
-                  end
-                  file:write(("[%s] cb:%i value:%s\n"):format(tostring(os.date("%d.%m.%Y %X")), cbid, result))
-                  file:close()
-               end
             else
                LastData.lastCbvaluebuffer = nil
             end
@@ -15397,6 +15872,7 @@ function sampev.onSendCommand(command)
    if isTrainingSandbox and command:find("^/cblist") then
       LastData.lastTbvaluebuffer = nil
       dialoghook.cblist = true
+      dialoghook.cbaction = true
       local cmd, arg = command:match('(/%a+) (.+)')
       if not arg then
          local searchobj = tostring(arg)
@@ -17354,6 +17830,98 @@ function Restream()
       sampAddChatMessage("[SCRIPT]: {FFFFFF}Рестрим завершен", 0x0FF6600)
    end
    end)
+end
+
+function dumpTextdrawById(id)
+   input.txdselected = true
+   local id = input.txdid.v
+   local style = sampTextdrawGetStyle(id)
+   if style < 16 then
+      local posX, posY = sampTextdrawGetPos(id)
+      local align = sampTextdrawGetAlign(id)
+      local prop = sampTextdrawGetProportional(id)
+      local text = sampTextdrawGetString(id)
+      local shadow, shadowColor = sampTextdrawGetShadowColor(id)
+      local outline, outlineColor = sampTextdrawGetOutlineColor(id)
+      local model, rotX, rotY, rotZ, zoom, clr1, clr2 = sampTextdrawGetModelRotationZoomVehColor(id)
+      local letSizeX, letSizeY, letColor = sampTextdrawGetLetterSizeAndColor(id)
+      local box, boxColor, boxSizeX, boxSizeY = sampTextdrawGetBoxEnabledColorAndSize(id)
+      
+      local letColorArgb = string.upper(string.sub(bit.tohex(letColor), 1, 8))
+      local outlineColorArgb = string.upper(string.sub(bit.tohex(outlineColor), 1, 8))
+      local boxColorArgb = string.upper(string.sub(bit.tohex(boxColor), 1, 8))
+      
+      local a, r, g, b = explode_argb(letColor)
+      input.txdletcolorrgba.v[4] = a/255
+      input.txdletcolorrgba.v[1] = r/255
+      input.txdletcolorrgba.v[2] = g/255
+      input.txdletcolorrgba.v[3] = b/255
+      
+      local a, r, g, b = explode_argb(outlineColor)
+      input.txdoutlinecolorrgba.v[4] = a/255
+      input.txdoutlinecolorrgba.v[1] = r/255
+      input.txdoutlinecolorrgba.v[2] = g/255
+      input.txdoutlinecolorrgba.v[3] = b/255
+      
+      local a, r, g, b = explode_argb(boxColor)
+      input.txdboxcolorrgba.v[4] = a/255
+      input.txdboxcolorrgba.v[1] = r/255
+      input.txdboxcolorrgba.v[2] = g/255
+      input.txdboxcolorrgba.v[3] = b/255
+      
+      input.txdposx.v = posX
+      input.txdposy.v = posY
+      input.txdlettersizex.v = letSizeX
+      input.txdlettersizey.v = letSizeY
+      textbuffer.txdletcolor.v = letColorArgb
+      
+      input.txdstyle.v = style
+      combobox.txdstyle.v = style
+      tabmenu.align = align
+      if prop > 0 then
+         checkbox.txdproportional.v = true
+      else
+         checkbox.txdproportional.v = false
+      end
+      
+      if shadow > 0 then
+         checkbox.txdsetshadow.v = true
+      else
+         checkbox.txdsetshadow.v = false
+      end
+      
+      if outline > 0 then
+         textbuffer.txdoutlinecolor.v = outlineColorArgb
+      end
+      
+      if box > 0 then
+         checkbox.txdusebox.v = true
+         input.txdboxsizex.v = boxSizeX
+         input.txdboxsizey.v = boxSizeY
+         textbuffer.txdboxcolor.v = boxColorArgb
+      else
+         checkbox.txdusebox.v = false
+      end
+      
+      input.txdmodel.v = model
+      input.txdmodelrx.v = rotX
+      input.txdmodelry.v = rotY
+      input.txdmodelrz.v = rotZ
+      input.txdmodelzoom.v = zoom
+      
+      if clr1 == 65535 then
+         input.txdmodelclr1.v = 1
+         input.txdmodelclr2.v = 1
+      else
+         input.txdmodelclr1.v = clr1
+         input.txdmodelclr2.v = clr2
+      end
+      
+      textbuffer.txdstring.v = tostring(text)
+   else
+      sampAddChatMessage("[SCRIPT]: {FFFFFF}Текстдрав несуществует! Укажите реальный ID", 0x0FF6600)
+      input.txdselected = false
+   end
 end
 
 function copyNearestPlayersToClipboard()
