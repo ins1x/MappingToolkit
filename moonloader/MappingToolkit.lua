@@ -3,7 +3,7 @@ script_description("Assistant for mappers")
 script_dependencies('imgui', 'lib.samp.events')
 script_properties("work-in-pause")
 script_url("https://github.com/ins1x/MappingToolkit")
-script_version("4.25") -- RC5
+script_version("4.25") -- Release
 -- support sa-mp versions depends on SAMPFUNCS (0.3.7-R1, 0.3.7-R3-1, 0.3.7-R5, 0.3.DL)
 -- script_moonloader(16) moonloader v.0.26 
 -- editor options: tabsize 3, Unix (LF), encoding Windows-1251
@@ -14,10 +14,7 @@ script_version("4.25") -- RC5
 -- A convenient graphical interface on imgui is provided to manage all the options. 
 -- The toolkit provides additional functions for working with textures and objects,
 -- fixes some game bugs, supplements server commands and dialogs.
-
 -- More information on the toolkit's capabilities is on the wiki. 
--- Designed for TRAINING-SANDBOX. It can work on other projects, 
--- but most of the features will be unavailable.
 
 local sampev = require 'lib.samp.events'
 local imgui = require 'imgui'
@@ -241,7 +238,7 @@ local streamedMapIcons = {
 vehiclesTotal = 0
 playersTotal = 0
 
-local fixcam = {x = 0.0, y = 0.0, z = 0.0}
+--local fixcam = {x = 0.0, y = 0.0, z = 0.0}
 local cam = {x = 0.0, y = 0.0, z = 0.0}
 local tpcpos = {x = 0.0, y = 0.0, z = 0.0}
 local worldspawnpos = {x = 0.0, y = 0.0, z = 0.0}
@@ -537,6 +534,7 @@ local checkbox = {
    unsafeteleport = imgui.ImBool(false),
    showbottompanelsettings = imgui.ImBool(false),
    showthemesettings = imgui.ImBool(false),
+   veccam = imgui.ImBool(false),
    orbitcam = imgui.ImBool(false),
    sideborders = imgui.ImBool(false),
    verticalborders = imgui.ImBool(false),
@@ -591,6 +589,15 @@ local input = {
    orbitspeed = imgui.ImFloat(0.012),
    orbitstartheading = imgui.ImFloat(0.0),
    orbitangle = imgui.ImFloat(0.0),
+   camx = imgui.ImFloat(0.0),
+   camy = imgui.ImFloat(0.0),
+   camz = imgui.ImFloat(0.0),
+   fixcamx = imgui.ImFloat(0.0),
+   fixcamy = imgui.ImFloat(0.0),
+   fixcamz = imgui.ImFloat(0.0),
+   veccamx = imgui.ImFloat(0.0),
+   veccamy = imgui.ImFloat(0.0),
+   veccamz = imgui.ImFloat(0.0),
    radiusrender = imgui.ImFloat(1.0),
    renderfontsize = imgui.ImInt(ini.settings.renderfontsize),
    reminderdelay = imgui.ImInt(ini.settings.reminderdelay),
@@ -657,9 +664,6 @@ local textbuffer = {
    ocolor = imgui.ImBuffer(12),
    objectid = imgui.ImBuffer(48),
    rgb = imgui.ImBuffer(256),
-   fixcamx = imgui.ImBuffer(12),
-   fixcamy = imgui.ImBuffer(12),
-   fixcamz = imgui.ImBuffer(12),
    camx = imgui.ImBuffer(12),
    camy = imgui.ImBuffer(12),
    camz = imgui.ImBuffer(12),
@@ -1344,13 +1348,16 @@ function main()
       end
       
       if ini.settings.checkupdates then
-         if ini.tmp.lastupdatecheck then
-            if os.time() > ini.tmp.lastupdatecheck + 86400 then
-               checkScriptUpdates()
+         local ip, port = sampGetCurrentServerAddress()
+         if not ip:find("127.0.0.1") then
+            if ini.tmp.lastupdatecheck then
+               if os.time() > ini.tmp.lastupdatecheck + 86400 then
+                  checkScriptUpdates()
+                  ini.tmp.lastupdatecheck = os.time()
+               end
+            else
                ini.tmp.lastupdatecheck = os.time()
             end
-         else
-            ini.tmp.lastupdatecheck = os.time()
          end
       end
 
@@ -1559,7 +1566,7 @@ function main()
          -- CTRL + SHIFT + V or RMB to paste
          if isKeyDown(0x11) and isKeyDown(0x10) and isKeyDown(0x56) or isKeyDown(0x02)
          and not sampIsChatInputActive() and not isPauseMenuActive()
-         and not isSampfuncsConsoleActive() then  
+         and not isSampfuncsConsoleActive() and sampIsDialogActive then  
             if ini.settings.cbvalautocomplete and LastData.lastCbvaluebuffer then
                lua_thread.create(function()
                   wait(50)
@@ -1918,8 +1925,8 @@ function main()
       end
       
       if checkbox.fixcampos.v then
-         setFixedCameraPosition(fixcam.x, fixcam.y, fixcam.z, 0.0, 0.0, 0.0)
-         pointCameraAtPoint(fixcam.x, fixcam.y, fixcam.z, 2) 
+         setFixedCameraPosition(input.fixcamx.v, input.fixcamy.v, input.fixcamz.v, 0.0, 0.0, 0.0)
+         pointCameraAtPoint(input.fixcamx.v, input.fixcamy.v, input.fixcamz.v, 2) 
       end
       
       if checkbox.lockcambehind.v then
@@ -2795,27 +2802,36 @@ function imgui.OnDrawFrame()
             imgui.PopStyleColor()
             
             imgui.PushStyleColor(imgui.Col.Button, imgui.ImVec4(0.0, 0.45, 0.0, 1.0))
-            if isTrainingSandbox then
-               if imgui.TooltipButton(u8"Слапнуть себя", imgui.ImVec2(155, 25), u8"Подбросить себя /slapme") then
+            
+            if imgui.TooltipButton(u8"Слапнуть себя", imgui.ImVec2(155, 25), u8"Подбросить себя /slapme") then
+               if isTrainingSandbox then 
                   sampSendChat("/slapme")
-               end
-               imgui.SameLine()
-               if imgui.TooltipButton((checkbox.freezepos.v and u8"Разморозить себя" or u8"Заморозить себя"), 
-               imgui.ImVec2(155, 25), u8"Подбросить себя /slapme") then
-                  checkbox.freezepos.v = not checkbox.freezepos.v
-                  if checkbox.freezepos.v and sampIsLocalPlayerSpawned() then
-                     freezeCharPosition(playerPed, true)
-                  else
-                     freezeCharPosition(playerPed, false)
-                     setPlayerControl(PLAYER_HANDLE, true)
-                     clearCharTasksImmediately(playerPed)
-                  end
-               end
-               imgui.SameLine()
-               if imgui.TooltipButton(u8"Заспавнить себя", imgui.ImVec2(155, 25), u8"Заспавнить себя /spawnme") then
-                  sampSendChat("/spawnme")
+               else
+                  local x, y, z = getCharCoordinates(playerPed)
+                  setCharCoordinates(playerPed, x + 0.5, y, z + 1)
                end
             end
+            imgui.SameLine()
+            if imgui.TooltipButton((checkbox.freezepos.v and u8"Разморозить себя" or u8"Заморозить себя"), 
+            imgui.ImVec2(155, 25), u8"Вернуть управление персонажем") then
+               checkbox.freezepos.v = not checkbox.freezepos.v
+               if checkbox.freezepos.v and sampIsLocalPlayerSpawned() then
+                  freezeCharPosition(playerPed, true)
+               else
+                  freezeCharPosition(playerPed, false)
+                  setPlayerControl(PLAYER_HANDLE, true)
+                  clearCharTasksImmediately(playerPed)
+               end
+            end
+            imgui.SameLine()
+            if imgui.TooltipButton(u8"Заспавнить себя", imgui.ImVec2(155, 25), u8"Заспавнить себя /spawnme") then
+               if isTrainingSandbox then 
+                  sampSendChat("/spawnme")
+               else
+                  sampAddChatMessage("[SCRIPT]: {FFFFFF}Недоступно для текущего сервера.", 0x0FF6600)
+               end
+            end
+            
             imgui.PopStyleColor()
             
             if isTrainingSandbox then
@@ -3449,17 +3465,19 @@ function imgui.OnDrawFrame()
                
          if isTrainingSandbox then
             if LastObject.modelid then
-               if imgui.TooltipButton(u8"Редактировать", imgui.ImVec2(95, 25), u8:encode("Редактировать текущий объект (/oe)")) then
+               imgui.PushFont(fonts.fa)
+               if imgui.TooltipButton(fa.ICON_FA_EDIT..u8" Редактировать", imgui.ImVec2(105, 25), u8:encode("Редактировать текущий объект (/oe)")) then
                   sampSendChat("/oe")
                end
                imgui.SameLine()
-               if imgui.TooltipButton(u8"Копировать", imgui.ImVec2(95, 25), u8:encode("Копировать текущий объект (/clone)")) then
+               if imgui.TooltipButton(fa.ICON_FA_COPY..u8" Копировать", imgui.ImVec2(95, 25), u8:encode("Копировать текущий объект (/clone)")) then
                   sampSendChat("/clone")
                end
                imgui.SameLine()
-               if imgui.TooltipButton(u8"Удалить", imgui.ImVec2(75, 25), u8:encode("Удалить текущий объект (/od)")) then
+               if imgui.TooltipButton(fa.ICON_FA_ERASER..u8" Удалить", imgui.ImVec2(75, 25), u8:encode("Удалить текущий объект (/od)")) then
                   sampSendChat("/od")
                end
+               imgui.PopFont()
             end
             if LastObject.modelid and LastObject.localid then
                imgui.SameLine()
@@ -3508,7 +3526,7 @@ function imgui.OnDrawFrame()
                end
                if LastRemovedObject.modelid then
                   imgui.SameLine()
-                  if imgui.TooltipButton(u8"/undo", imgui.ImVec2(65, 25), u8:encode("Восстановить удаленный объект")) then
+                  if imgui.TooltipButton(u8"/undo", imgui.ImVec2(75, 25), u8:encode("Восстановить удаленный объект")) then
                      sampSendChat("/undo")
                   end
                end
@@ -4352,14 +4370,13 @@ function imgui.OnDrawFrame()
          if imgui.CollapsingHeader(u8"Зафиксированная камера") then
             if imgui.Checkbox(u8("Зафиксировать камеру на координатах"), checkbox.fixcampos) then
                if checkbox.fixcampos.v then
-                  fixcam.x = camX           
-                  fixcam.y = camY           
-                  fixcam.z = camZ
-                  textbuffer.fixcamx.v = string.format("%.1f", fixcam.x)
-                  textbuffer.fixcamy.v = string.format("%.1f", fixcam.y)
-                  textbuffer.fixcamz.v = string.format("%.1f", fixcam.z)
+                  input.fixcamx.v = tonumber(camX)
+                  input.fixcamy.v = tonumber(camY)
+                  input.fixcamz.v = tonumber(camZ)
                else 
                   restoreCamera()
+                  restoreCameraJumpcut()
+                  setCameraBehindPlayer()
                end
             end
             imgui.SameLine()
@@ -4368,26 +4385,20 @@ function imgui.OnDrawFrame()
             if checkbox.fixcampos.v then        
                imgui.Text("x:")
                imgui.SameLine()
-               imgui.PushItemWidth(70)
-               if imgui.InputText("##FixcamxBuffer", textbuffer.fixcamx, imgui.InputTextFlags.CharsDecimal) then
-                  fixcam.x = tonumber(textbuffer.fixcamx.v)
-               end
+               imgui.PushItemWidth(90)
+               imgui.InputFloat('##fixcamx', input.fixcamx)
                imgui.PopItemWidth()
                imgui.SameLine()
                imgui.Text("y:")
                imgui.SameLine()
-               imgui.PushItemWidth(70)
-               if imgui.InputText("##FixcamyBuffer", textbuffer.fixcamy, imgui.InputTextFlags.CharsDecimal) then
-                  fixcam.y = tonumber(textbuffer.fixcamy.v)
-               end
+               imgui.PushItemWidth(90)
+               imgui.InputFloat('##fixcamy', input.fixcamy)
                imgui.PopItemWidth()
                imgui.SameLine()
                imgui.Text("z:")
                imgui.SameLine()
-               imgui.PushItemWidth(70)
-               if imgui.InputText("##FixcamzBuffer", textbuffer.fixcamz, imgui.InputTextFlags.CharsDecimal) then
-                  fixcam.z = tonumber(textbuffer.fixcamz.v)
-               end
+               imgui.PushItemWidth(90)
+               imgui.InputFloat('##fixcamz', input.fixcamz)
                imgui.PopItemWidth()
             end
             
@@ -4417,20 +4428,21 @@ function imgui.OnDrawFrame()
             imgui.TextQuestion("( ? )", u8"Будет полностью игнорировать смену камеры сервером")
          
             imgui.Text(u8"Прикрепить камеру:")
-            if imgui.Button(u8"Позади игрока", imgui.ImVec2(225, 25)) then
+            imgui.PushFont(fonts.fa)
+            if imgui.Button(fa.ICON_FA_VIDEO..u8" Позади игрока", imgui.ImVec2(225, 25)) then
                if checkbox.fixcampos.v then checkbox.fixcampos.v = false end
                sampAddChatMessage("[SCRIPT]: {FFFFFF}Камера установлена позади игрока", 0x0FF6600)
                setCameraBehindPlayer()
             end
             imgui.SameLine()
-            if imgui.Button(u8"Фиксированная в текущей точке", imgui.ImVec2(225, 25)) then
+            if imgui.Button(fa.ICON_FA_MAP_MARKER..u8" Фиксированная в текущей точке", imgui.ImVec2(225, 25)) then
                local mode = 15 -- Fixed camera (non-moving) - used for Pay 'n' Spray, chase camera, tune shops, entering buildings, buying food etc.
                local switchstyle = 1 --(1 - CAMERA_MOVE 2 - CAMERA_CUT)
                pointCameraAtChar(playerPed, mode, switchstyle)
                sampAddChatMessage("[SCRIPT]: {FFFFFF}Камера закреплена в текущей точке", 0x0FF6600)
             end
             
-            if imgui.Button(u8"На ближайшего игрока", imgui.ImVec2(225, 25)) then
+            if imgui.Button(fa.ICON_FA_USER..u8" На ближайшего игрока", imgui.ImVec2(225, 25)) then
                if getClosestPlayerId() ~= -1 and getClosestPlayerId() ~= getLocalPlayerId() then
                   local result, ped = sampGetCharHandleBySampPlayerId(getClosestPlayerId())
                   local mode = 4 -- https://sampwiki.blast.hk/wiki/CameraModes
@@ -4442,7 +4454,7 @@ function imgui.OnDrawFrame()
                end
             end
             imgui.SameLine()
-            if imgui.Button(u8"На ближайший транспорт", imgui.ImVec2(225, 25)) then
+            if imgui.Button(fa.ICON_FA_CAR..u8" На ближайший транспорт", imgui.ImVec2(225, 25)) then
                local closestcarhandle, closestcarid = getClosestCar()
                if closestcarhandle then
                   local mode = 18 -- Normal car (+skimmer+helicopter+airplane), several variable distances.
@@ -4453,99 +4465,113 @@ function imgui.OnDrawFrame()
                   sampAddChatMessage("[SCRIPT]: {FFFFFF}Не найден ближайший транспорт", 0x0FF6600)
                end
             end
+            imgui.PopFont()
          end
          if imgui.CollapsingHeader(u8"Перемещение камеры") then
-            --local camX, camY, camZ = getActiveCameraCoordinates()
-            --cameraSetVectorMove(camX, camY, camZ, posX, posY, posZ, 5000, false)
-            if textbuffer.camx.v == textbuffer.fixcamx.v  
-            or textbuffer.camy.v == textbuffer.fixcamx.v
-            or textbuffer.camz.v == textbuffer.fixcamz.v then
+            
+            if input.camx.v == input.veccamx.v
+            or input.camx.v == input.veccamx.v
+            or input.camx.v == input.veccamx.v then
                imgui.TextColoredRGB("{696969}Все конечные значения перемещения камеры, должны отличаться от начальных!")
             end
             
-            if string.len(textbuffer.fixcamx.v) < 1
-            or string.len(textbuffer.fixcamx.v) < 1
-            or string.len(textbuffer.fixcamz.v) < 1 then
+            if input.veccamx.v == 0.0
+            or input.veccamx.v == 0.0
+            or input.veccamx.v == 0.0 then
                imgui.TextColoredRGB("{696969}Введите конечную позицию для перемещения камеры!")
             end
             
             if not checkbox.holdcam.v then
-               cam.x = camX           
-               cam.y = camY           
-               cam.z = camZ
-               if cam.z and cam.y and cam.z then
-                  textbuffer.camx.v = string.format("%.1f", cam.x)
-                  textbuffer.camy.v = string.format("%.1f", cam.y)
-                  textbuffer.camz.v = string.format("%.1f", cam.z)
-               end
+               input.camx.v = camX           
+               input.camy.v = camY           
+               input.camz.v = camZ
             end
             
             imgui.Text(u8"Начальная позиция:")
+            imgui.PushFont(fonts.fa)
+            if imgui.TooltipButton(fa.ICON_FA_PASTE..u8" ##pastestart", imgui.ImVec2(35, 25),
+            u8"Вставить текущую позицию камеры") then
+               input.camx.v = camX
+               input.camy.v = camY
+               input.camz.v = camZ
+            end
+            imgui.PopFont()
+            
+            imgui.SameLine()
             imgui.Text("x:")
             imgui.SameLine()
-            imgui.PushItemWidth(70)
-            if imgui.InputText("##camxBuffer", textbuffer.camx, imgui.InputTextFlags.CharsDecimal) then
-               cam.x = tonumber(textbuffer.camx.v)
-            end
+            imgui.PushItemWidth(90)
+            imgui.InputFloat('##camx', input.camx)
             imgui.PopItemWidth()
             imgui.SameLine()
             imgui.Text("y:")
             imgui.SameLine()
-            imgui.PushItemWidth(70)
-            if imgui.InputText("##camyBuffer", textbuffer.camy, imgui.InputTextFlags.CharsDecimal) then
-               cam.y = tonumber(textbuffer.camy.v)
-            end
+            imgui.PushItemWidth(90)
+            imgui.InputFloat('##camy', input.camy)
             imgui.PopItemWidth()
             imgui.SameLine()
             imgui.Text("z:")
             imgui.SameLine()
-            imgui.PushItemWidth(70)
-            if imgui.InputText("##camzBuffer", textbuffer.camz, imgui.InputTextFlags.CharsDecimal) then
-               cam.z = tonumber(textbuffer.camz.v)
-            end
+            imgui.PushItemWidth(90)
+            imgui.InputFloat('##camz', input.camz)
             imgui.PopItemWidth()
             
-            imgui.SameLine()
-            if imgui.Checkbox(u8"Удерживать", checkbox.holdcam) then
+            
+            imgui.SameLine()    
+            imgui.PushFont(fonts.fa)
+            if checkbox.holdcam.v then
+               imgui.PushStyleColor(imgui.Col.Button, imgui.GetStyle().Colors[imgui.Col.ButtonHovered])
+               if imgui.TooltipButton(fa.ICON_FA_MAP_PIN..u8"##holdcam",
+               imgui.ImVec2(45, 25), u8"Удерживать текущие значения камеры") then
+                  checkbox.holdcam.v = not checkbox.holdcam.v
+               end
+               imgui.PopStyleColor()
+            else
+               if imgui.TooltipButton(fa.ICON_FA_MAP_PIN..u8"##holdcam",
+               imgui.ImVec2(45, 25), u8"Удерживать текущие значения камеры") then
+                  checkbox.holdcam.v = not checkbox.holdcam.v
+               end
             end
-            imgui.SameLine()
-            imgui.TextQuestion("( ? )", u8"Будет удерживать текущие значения камеры")
             
             imgui.Text(u8"Конечная позиция:")
+            
+            if imgui.TooltipButton(fa.ICON_FA_PASTE..u8" ##pasteend", imgui.ImVec2(35, 25),
+            u8"Вставить текущую позицию камеры") then
+               input.veccamx.v = camX
+               input.veccamy.v = camY
+               input.veccamz.v = camZ
+            end
+            imgui.PopFont()
+            
+            imgui.SameLine()
             imgui.Text("x:")
             imgui.SameLine()
-            imgui.PushItemWidth(70)
-            if imgui.InputText("##FixcamxBuffer", textbuffer.fixcamx, imgui.InputTextFlags.CharsDecimal) then
-               fixcam.x = tonumber(textbuffer.fixcamx.v)
-            end
+            imgui.PushItemWidth(90)
+            imgui.InputFloat('##veccamx', input.veccamx)
             imgui.PopItemWidth()
             imgui.SameLine()
             imgui.Text("y:")
             imgui.SameLine()
-            imgui.PushItemWidth(70)
-            if imgui.InputText("##FixcamyBuffer", textbuffer.fixcamy, imgui.InputTextFlags.CharsDecimal) then
-               fixcam.y = tonumber(textbuffer.fixcamy.v)
-            end
+            imgui.PushItemWidth(90)
+            imgui.InputFloat('##veccamy', input.veccamy)
             imgui.PopItemWidth()
             imgui.SameLine()
             imgui.Text("z:")
             imgui.SameLine()
-            imgui.PushItemWidth(70)
-            if imgui.InputText("##FixcamzBuffer", textbuffer.fixcamz, imgui.InputTextFlags.CharsDecimal) then
-               fixcam.z = tonumber(textbuffer.fixcamz.v)
-            end
+            imgui.PushItemWidth(90)
+            imgui.InputFloat('##veccamz', input.veccamz)
             imgui.PopItemWidth()
             
             imgui.SameLine()
-            if imgui.Button(u8"Копировать", imgui.ImVec2(100, 25)) then
-               textbuffer.fixcamx.v = string.format("%.1f", cam.x)
-               textbuffer.fixcamy.v = string.format("%.1f", cam.y)
-               textbuffer.fixcamz.v = string.format("%.1f", cam.z)
+            imgui.PushFont(fonts.fa)
+            if imgui.TooltipButton(fa.ICON_FA_COPY..u8" ##copystart", imgui.ImVec2(45, 25),
+            u8"Копировать параметры из начальной позиции в конечную") then
+               input.veccamx.v = input.camx.v
+               input.veccamy.v = input.camy.v
+               input.veccamz.v = input.camz.v
             end
-            imgui.SameLine()
-            imgui.TextQuestion("( ? )", u8"Скопирует значения с начальной позиции")
             
-            imgui.Text(u8"Время:")
+            imgui.Text(fa.ICON_FA_STOPWATCH..u8" Время:")
             imgui.SameLine()
             imgui.PushItemWidth(55)
             imgui.InputInt('ms.##CamDelay', input.camdelay, 0)
@@ -4555,17 +4581,28 @@ function imgui.OnDrawFrame()
             if imgui.Checkbox(u8"Плавное движение", checkbox.smoothcam) then
             end
             imgui.SameLine()
-            imgui.TextQuestion("( ? )", u8"Устанвливает плавное движение камеры при перемещении")
+            imgui.TextQuestion("( ? )", u8"Устанавливает плавное движение камеры при перемещении")
             
-            if imgui.Button(u8"Переместить камеру", imgui.ImVec2(150, 25)) then
-               cameraSetVectorMove(cam.x, cam.y, cam.z, fixcam.x, fixcam.y, fixcam.z, 
-               input.camdelay.v, checkbox.smoothcam.v)
+            if imgui.TooltipButton(checkbox.veccam.v 
+            and fa.ICON_FA_VIDEO..u8" Вернуть начальную камеру" or fa.ICON_FA_VIDEO..u8" Переместить камеру",
+            imgui.ImVec2(225, 25), u8"Плавное перемещение камеры от начальных координат в конечные") then
+               checkbox.veccam.v = not checkbox.veccam.v
+               if checkbox.veccam.v then 
+                  cameraSetVectorMove(input.camx.v, input.camy.v, input.camz.v, 
+                  input.veccamx.v, input.veccamy.v, input.veccamz.v, 
+                  input.camdelay.v, checkbox.smoothcam.v)
+                  --cameraSetVectorTrack(input.camx.v, input.camy.v, input.camz.v, input.veccamx.v, input.veccamy.v, input.veccamz.v, input.camdelay.v, checkbox.smoothcam.v)
+               else
+                  cameraSetVectorMove(input.camx.v, input.camy.v, input.camz.v, 
+                  input.veccamx.v, input.veccamy.v, input.veccamz.v, 
+                  0, checkbox.smoothcam.v)
+                  restoreCamera()
+                  restoreCameraJumpcut()
+                  setCameraBehindPlayer()
+               end
             end
-            imgui.SameLine()
-            if imgui.Button(u8"Векторное перемещение камеры", imgui.ImVec2(220, 25)) then
-               cameraSetVectorTrack(cam.x, cam.y, cam.z, fixcam.x, fixcam.y, fixcam.z, input.camdelay.v, checkbox.smoothcam.v)
-               sampAddChatMessage("[SCRIPT]: {FFFFFF}Укажите конечную позицию!", 0x0FF6600)
-            end
+
+            imgui.PopFont()
          end
          
          if imgui.CollapsingHeader(u8"Орбитальная камера") then
@@ -4573,8 +4610,11 @@ function imgui.OnDrawFrame()
             imgui.SliderFloat(u8'Радиус орбиты (m)', input.orbitradius, 2.0, 20.0, "%.1f m")
             imgui.SliderFloat(u8'Высота камеры (m)', input.orbitheight, -2.0, 8.0, "%.1f m")
             imgui.SliderFloat(u8'Скорость вращения', input.orbitspeed, 0.002, 0.05, "%.3f")
-                
-            if imgui.Button(checkbox.orbitcam.v and u8"Отключить орбитальную камеру" or u8"Включить орбитальную камеру", imgui.ImVec2(225, 25)) then
+            
+            imgui.PushFont(fonts.fa)
+            if imgui.Button(checkbox.orbitcam.v 
+            and fa.ICON_FA_CIRCLE_NOTCH..u8" Отключить орбитальную камеру" or fa.ICON_FA_CIRCLE_NOTCH..u8" Включить орбитальную камеру", 
+            imgui.ImVec2(225, 25)) then
                checkbox.orbitcam.v = not checkbox.orbitcam.v
                if checkbox.orbitcam.v then 
                   input.orbitstartheading.v = getCharHeading(playerPed)
@@ -4584,6 +4624,7 @@ function imgui.OnDrawFrame()
                   setCameraBehindPlayer()
                end
             end
+            imgui.PopFont()
          end
          
          if imgui.CollapsingHeader(u8"Дистанция камеры") then
@@ -7636,13 +7677,6 @@ function imgui.OnDrawFrame()
          sampAddChatMessage("Ник скопирован в буффер обмена", -1)
          setClipboardText(nickname)
       end
-      imgui.SameLine()
-      imgui.TextColoredRGB(string.format("FPS: {696969}%i", playerdata.fps))
-      --imgui.TextColoredRGB(string.format("Ffs imgui: {696969}%.3f s.", imgui.GetIO().DeltaTime))
-      if imgui.IsItemClicked() then
-         runSampfuncsConsoleCommand("fps")
-      end
-      
       imgui.Spacing()
       
       if tabmenu.settings == 1 then  
@@ -8493,6 +8527,12 @@ function imgui.OnDrawFrame()
             imgui.Text(isPlayerControlLocked(playerPed) and u8('Управление: Заблокированно') or u8('Управление: Доступно'))
             imgui.Text(sampIsLocalPlayerSpawned() and u8('Заспавнен: Да') or u8('Заспавнен: Нет'))
             imgui.Text(string.format(u8"Курсор: %s", cursormodesList[cursormode+1]))
+            imgui.Text(string.format("FPS: %i", playerdata.fps))
+            if imgui.IsItemClicked() then
+               runSampfuncsConsoleCommand("fps")
+            end
+            -- imgui.TextColoredRGB(string.format("imgui deltatime: {696969}%.3f s.", imgui.GetIO().DeltaTime))
+      
             imgui.Spacing()
             
             imgui.TextColoredRGB("{FF0000}Эти функции могут триггерить античит! Будьте разумны в использовании")
@@ -8530,7 +8570,10 @@ function imgui.OnDrawFrame()
             if imgui.Button(u8'Выбор класса', imgui.ImVec2(120, 25)) then
                local skin = getCharModel(playerPed)
                sampRequestClass(skin)
-               --setPlayerModel(skin)
+            end
+            imgui.SameLine()
+            if imgui.Button(u8'Очистить анимки', imgui.ImVec2(120, 25)) then
+               sampSendChat("/clearnims")
             end
          end
          
@@ -8675,19 +8718,24 @@ function imgui.OnDrawFrame()
          end
          
          imgui.PushFont(fonts.fa)
-         if imgui.TooltipButton(fa.ICON_FA_OUTDENT..u8" Сбросить настройки",imgui.ImVec2(155, 25),u8"Сбросит настройки предварительно сохранив копию текущих настроек") then
+         if imgui.TooltipButton(fa.ICON_FA_OUTDENT..u8" Сбросить настройки",imgui.ImVec2(145, 25),u8"Сбросит настройки предварительно сохранив копию текущих настроек") then
             os.rename(getGameDirectory().."//moonloader//config//mappingtoolkit.ini", getGameDirectory().."//moonloader//config//backup_mappingtoolkit.ini")
             sampAddChatMessage("[SCRIPT]: {FFFFFF}Настройки были сброшены на стандартные. Тулкит автоматически перезагрузится.",0x0FF6600)
             sampAddChatMessage("[SCRIPT]: {FFFFFF}Резервную копию ваших предыдущих настроек можно найти в {696969}moonloader/config.",0x0FF6600)
             reloadScripts()
          end
          imgui.SameLine()
-         if imgui.TooltipButton(fa.ICON_FA_FILE..u8" Открыть конфиг",imgui.ImVec2(155, 25),u8"Открыть файл настроек в текстовом редакторе") then
-            folder = getGameDirectory().. "\\moonloader\\config\\"
+         if imgui.TooltipButton(fa.ICON_FA_FILE..u8" Открыть конфиг",imgui.ImVec2(145, 25),u8"Открыть файл настроек в текстовом редакторе") then
+            folder = getGameDirectory().. "\\moonloader\\config\\mappingtoolkit.ini"
             os.execute('explorer "'..folder..'"')
          end
          imgui.SameLine()
-         if imgui.TooltipButton(fa.ICON_FA_CODE_BRANCH..u8" Откат версии",imgui.ImVec2(155, 25),u8"Откатиться на предыдущую версию") then
+         if imgui.TooltipButton(fa.ICON_FA_FILE..u8" Открыть ресурсы",imgui.ImVec2(145, 25),u8"Открыть каталог ресурсов в проводнике") then
+            folder = getGameDirectory().. "\\moonloader\\resource\\mappingtoolkit"
+            os.execute('explorer "'..folder..'"')
+         end
+         imgui.SameLine()
+         if imgui.TooltipButton(fa.ICON_FA_CODE_BRANCH..u8" Откат версии",imgui.ImVec2(145, 25),u8"Откатиться на предыдущую версию") then
             local scriptParams = thisScript()
             local previousversion = tonumber(scriptParams.version) - 0.01
             os.execute('explorer "https://github.com/ins1x/MappingToolkit/releases/tag/v'..tostring(previousversion)..'"')
@@ -9745,6 +9793,10 @@ function imgui.OnDrawFrame()
          imgui.SameLine()
          imgui.Link("https://pawn.wiki/index.php?showtopic=28682", "pawn.wiki")
          
+         imgui.TextColoredRGB("Обширный список GTA объектов с фотографиями")
+         imgui.SameLine()
+         imgui.Link("https://pawnokit.ru/ru/objects_id", "pawnokit.ru")
+         
       elseif tabmenu.onlinesearch == 2 then
          local sourceDescriptionList = {
             u8"textures.xyin.ws",
@@ -9867,7 +9919,7 @@ function imgui.OnDrawFrame()
       
          local sourceDescriptionList = {
             u8"open.mp",
-            u8"blast.hk(docuwiki)",
+            u8"blast.hk (docuwiki)",
          }
          
          imgui.Text(u8"Введите ключевое слово, или название функции:")
@@ -10167,6 +10219,8 @@ function imgui.OnDrawFrame()
             u8"Опкоды Sampfuncs",
             u8"Dear ImGui API",
             u8"Key codes",
+            u8"SAMP API headers",
+            u8"CLEO Opcodes",
          }
          local devDocUrls = {
             "https://open.mp/docs",
@@ -10177,6 +10231,8 @@ function imgui.OnDrawFrame()
             "https://wiki.blast.hk/t/opcode/sampfuncs",
             "https://github.com/ocornut/imgui/blob/master/imgui.h",
             "https://learn.microsoft.com/en-us/windows/win32/inputdev/virtual-key-codes",
+            "https://github.com/DpO4uLa/SAMP_API/blob/main/SAMP_API_ONE_HEADER/SAMP/SAMP.hpp",
+            "https://wiki.blast.hk/t/opcode/cleo",
          }
          
          --imgui.Text(u8"Документация для разработчиков:")
@@ -10742,6 +10798,17 @@ function imgui.OnDrawFrame()
          imgui.resetIO()
       end
       imgui.PopFont()
+      imgui.SameLine()
+      if imgui.Selectable(" IO ", false, 0, imgui.ImVec2(25, 15)) then
+         imgui.resetIO()
+      end
+      if imgui.IsItemHovered() then
+         imgui.BeginTooltip()
+         imgui.PushTextWrapPos(600)
+         imgui.TextUnformatted(u8"Unlock IO - разблокировать инпут если курсор забагался")
+         imgui.PopTextWrapPos()
+         imgui.EndTooltip()
+      end
       
       imgui.InputTextMultiline('##dialogtext', textbuffer.dialogtext, imgui.ImVec2(320, 250),
       imgui.InputTextFlags.EnterReturnsTrue + imgui.InputTextFlags.AllowTabInput)
@@ -10794,7 +10861,7 @@ function imgui.OnDrawFrame()
       -- end
 
       if imgui.TooltipButton(fa.ICON_FA_TASKS..u8" Открыть конфиг",imgui.ImVec2(150, 25),u8"Открыть файл настроек в текстовом редакторе") then
-         folder = getGameDirectory().. "\\moonloader\\config\\"
+         folder = getGameDirectory().. "\\moonloader\\config\\mappingtoolkit.ini"
          os.execute('explorer "'..folder..'"')
       end
       
@@ -14134,7 +14201,10 @@ function sampev.onServerMessage(color, text)
    
    if checkbox.chatmentions.v then
       -- add words to ignore mentions here
-      local ignorewords = {"ADS", "мин", "часов", "сек", "место", "дней"}
+      local ignorewords = {
+         "ADS", "мин", "часов", "сек", "место", "дней",
+         "sec", "min", "hour", "days", "place"
+      }
       
       local searchresult = 0
       for i, word in ipairs(ignorewords) do
@@ -14822,33 +14892,31 @@ function sampev.onSendCommand(command)
       end
    end
    
-   if isTrainingSandbox 
-   and command:find("^/pickuplist$") 
-   or command:find("^/passlist$") then
+   if command:find("^/pickuplist$") then
       local pickupcounter = 0
       for i = 1, 4096 do
-          local pickup = sampGetPickupHandleBySampId(i)
-          local pool = sampGetPickupPoolPtr()
-          local mdid = (i * 20) + 61444 + pool
-          local pickupmodel = readMemory(mdid, 4, false)
-          
-          local x, y, z = getPickupCoordinates(pickup)
-          local px, py, pz = getCharCoordinates(playerPed)
-          local dist = getDistanceBetweenCoords3d(px, py, pz, x, y, z)
-          
-          if mdid and pickupmodel then
-             if pickupmodel ~= 0 and dist <= 1000 then
-                pickupcounter = pickupcounter + 1
-                sampAddChatMessage(("Pickup id(internal):{696969} %i, {FFFFFF}distance:{696969} %.1f {FFFFFF}m., model: {696969}%i(%s)")
-                :format(i, dist, pickupmodel, tostring(sampObjectModelNames[pickupmodel])), -1)
-             end
-          end
-       end
-       if pickupcounter == 0 then
-          sampAddChatMessage("[SCRIPT]: {FFFFFF}Не найдено элементов в зоне стрима!", 0x0FF6600)
-       end
-       return false
-    end
+         local pickup = sampGetPickupHandleBySampId(i)
+         local pool = sampGetPickupPoolPtr()
+         local mdid = (i * 20) + 61444 + pool
+         local pickupmodel = readMemory(mdid, 4, false)
+         
+         local x, y, z = getPickupCoordinates(pickup)
+         local px, py, pz = getCharCoordinates(playerPed)
+         local dist = getDistanceBetweenCoords3d(px, py, pz, x, y, z)
+         
+         if mdid and pickupmodel then
+            if pickupmodel ~= 0 and dist <= 1000 then
+               pickupcounter = pickupcounter + 1
+               sampAddChatMessage(("Pickup id(internal):{696969} %i, {FFFFFF}distance:{696969} %.1f {FFFFFF}m., model: {696969}%i(%s)")
+               :format(i, dist, pickupmodel, tostring(sampObjectModelNames[pickupmodel])), -1)
+            end
+         end
+      end
+      if pickupcounter == 0 then
+         sampAddChatMessage("[SCRIPT]: {FFFFFF}Не найдено элементов в зоне стрима!", 0x0FF6600)
+      end
+      return false
+   end
    
    if isTrainingSandbox and command:find("^/editpass") then
       if command:find('(/%a+) (.+)') then
@@ -15011,17 +15079,6 @@ function sampev.onSendCommand(command)
       sampSendChat("/menu")
       return false
    end
-   
-   -- if isTrainingSandbox and command:find("^/accept") then
-      -- if not command:find('(/%a+) (.+)') then
-         -- if LastData.lastAccept then
-            -- lua_thread.create(function()
-               -- wait(1000)
-               -- sampSendChat(tostring("/accept"..LastData.lastAccept))
-            -- end)
-         -- end
-      -- end
-   -- end
    
    if isTrainingSandbox and command:find("^/gotocar") then
       if command:find('(/%a+) (.+)') then
@@ -15191,8 +15248,6 @@ function sampev.onSendCommand(command)
          local model = tonumber(modelid)
          if type(id) == "number" and type(model) then
             if model and isValidObjectModel(model) then 
-               -- LastRemovedObject.modelid = model
-               -- LastData.lastModel = model
                local objectName = tostring(sampObjectModelNames[model])
                sampAddChatMessage(("[SCRIPT]: {FFFFFF}Модель объекта %d заменена на %d (%s)"):format(id, model, objectName), 0x0FF6600)
             end
@@ -15311,7 +15366,6 @@ function sampev.onSendCommand(command)
    end
    
    if command:find("^/tlist") or command:find("^/textures") then
-
       local counter = 0
       local totallines = 0
       local maxlines = 25
@@ -15673,7 +15727,6 @@ function sampev.onSendCommand(command)
    if command:find("^/tpo") then
       if playerdata.flymode then
          toggleFlyMode(false)
-         --sampAddChatMessage("[SCRIPT]: {FFFFFF}Сперва выйдите из режима полета", 0x0FF6600)
          lua_thread.create(function()
             wait(500)
             toggleFlyMode(true)
@@ -16008,14 +16061,13 @@ function sampev.onSendCommand(command)
       checkbox.fixcampos.v = not checkbox.fixcampos.v
       local camX, camY, camZ = getActiveCameraCoordinates()
       if checkbox.fixcampos.v then
-         fixcam.x = camX
-         fixcam.y = camY           
-         fixcam.z = camZ
-         textbuffer.fixcamx.v = string.format("%.1f", fixcam.x)
-         textbuffer.fixcamy.v = string.format("%.1f", fixcam.y)
-         textbuffer.fixcamz.v = string.format("%.1f", fixcam.z)
+         input.fixcamx.v = camX
+         input.fixcamy.v = camY           
+         input.fixcamz.v = camZ
       else 
          restoreCamera()
+         restoreCameraJumpcut()
+         setCameraBehindPlayer()
       end
       return false
    end
@@ -16272,6 +16324,21 @@ function sampev.onSendChat(message)
       
       if message:find("^.дшые$")then
          sampSendChat("/list")
+         return false
+      end
+      
+      if message:find("^.дщфвмц$")then
+         sampSendChat("/loadvw")
+         return false
+      end
+      
+      if message:find("^.ызфцтьу$")then
+         sampSendChat("/spawnme")
+         return false
+      end
+      
+      if message:find("^.еидшые$")then
+         sampSendChat("/tblist")
          return false
       end
    end
@@ -17076,6 +17143,7 @@ function toggleFlyMode(mode)
 end
 
 function sampev.onSendPlayerSync(data)
+   -- flymode sync
    local speed_player_sync = 1.8
    if not playerdata.flymode then return end
    local sync = getMoveSpeed(getCharHeading(playerPed), speed_player_sync)
@@ -17302,6 +17370,13 @@ end
 
 -- function trim(s)
    -- return (s:gsub("^%s*(.-)%s*$", "%1"))
+-- end
+
+-- separatedigits
+-- tostring(num):reverse():gsub("(%d%d%d)", "%1 "):reverse()
+
+-- function isCharAiming(ped)
+   -- return memory.getint8(getCharPointer(ped) + 0x528, false) == 19
 -- end
 
 function hotkeyActionInit()
