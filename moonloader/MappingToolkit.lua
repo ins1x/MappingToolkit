@@ -3,7 +3,7 @@ script_description("Assistant for mappers")
 script_dependencies('imgui', 'lib.samp.events')
 script_properties("work-in-pause")
 script_url("https://github.com/ins1x/MappingToolkit")
-script_version("4.25") -- Release
+script_version("4.26") -- RC 1
 -- support sa-mp versions depends on SAMPFUNCS (0.3.7-R1, 0.3.7-R3-1, 0.3.7-R5, 0.3.DL)
 -- script_moonloader(16) moonloader v.0.26 
 -- editor options: tabsize 3, Unix (LF), encoding Windows-1251
@@ -524,6 +524,7 @@ local checkbox = {
    pickupinfo = imgui.ImBool(false),
    lockcambehind = imgui.ImBool(false),
    lockcamfront = imgui.ImBool(false),
+   lockcamup = imgui.ImBool(false),
    streammemmax = imgui.ImBool(false),
    drunkcam = imgui.ImBool(false),
    cordlinedatetime = imgui.ImBool(false),
@@ -1935,6 +1936,12 @@ function main()
       
       if checkbox.lockcamfront.v then
          setCameraInFrontOfPlayer()
+      end
+      
+      if checkbox.lockcamup.v then
+         local posX, posY, posZ = getCharCoordinates(playerPed)
+         setFixedCameraPosition(posX, posY, posZ + 20, 0.0, 90, 0.0)
+         pointCameraAtPoint(posX,posY,posZ-100,2)
       end
       
       if checkbox.drunkcam.v then
@@ -4422,11 +4429,26 @@ function imgui.OnDrawFrame()
             imgui.SameLine()
             imgui.TextQuestion("( ? )", u8"Зафиксирует положение камеры спереди игрока (Режим селфи)")
             
+            if imgui.Checkbox(u8("Зафиксировать камеру сверху над игроком"), checkbox.lockcamup) then
+               if checkbox.lockcambehind.v then checkbox.lockcambehind.v = false end
+               if checkbox.fixcampos.v then
+                  checkbox.lockcamfront.v = false
+                  sampAddChatMessage("[SCRIPT]: {FFFFFF}Сперва разблокируйте положение камеры", 0x0FF6600)
+               end
+               if not checkbox.lockcamup.v then
+                  restoreCamera()
+                  restoreCameraJumpcut()
+                  setCameraBehindPlayer()
+               end
+            end
+            imgui.SameLine()
+            imgui.TextQuestion("( ? )", u8"Зафиксирует положение камеры над игроком (Как в GTA2)")
+            
             if imgui.Checkbox(u8'Запретить изменять положение камеры', checkbox.lockcamchange) then
             end
             imgui.SameLine()
             imgui.TextQuestion("( ? )", u8"Будет полностью игнорировать смену камеры сервером")
-         
+            
             imgui.Text(u8"Прикрепить камеру:")
             imgui.PushFont(fonts.fa)
             if imgui.Button(fa.ICON_FA_VIDEO..u8" Позади игрока", imgui.ImVec2(225, 25)) then
@@ -4435,7 +4457,7 @@ function imgui.OnDrawFrame()
                setCameraBehindPlayer()
             end
             imgui.SameLine()
-            if imgui.Button(fa.ICON_FA_MAP_MARKER..u8" Фиксированная в текущей точке", imgui.ImVec2(225, 25)) then
+            if imgui.Button(fa.ICON_FA_MAP_MARKER..u8" Закрепить в текущей точке", imgui.ImVec2(225, 25)) then
                local mode = 15 -- Fixed camera (non-moving) - used for Pay 'n' Spray, chase camera, tune shops, entering buildings, buying food etc.
                local switchstyle = 1 --(1 - CAMERA_MOVE 2 - CAMERA_CUT)
                pointCameraAtChar(playerPed, mode, switchstyle)
@@ -7192,17 +7214,18 @@ function imgui.OnDrawFrame()
                      file:close()
                   end
                   
-                  if imgui.TooltipButton(u8"Обновить", imgui.ImVec2(80, 25), u8:encode("Загрузить шаблоны из файла chatfilter.txt")) then
+                  imgui.PushFont(fonts.fa)
+                  if imgui.TooltipButton(fa.ICON_FA_SYNC..u8" Обновить", imgui.ImVec2(85, 25), u8:encode("Загрузить шаблоны из файла chatfilter.txt")) then
                      local file = io.open(filedata.filepath, "r")
                      textbuffer.chatfilters.v = file:read('*a')
                      file:close()
                   end
                   imgui.SameLine()
-                  if imgui.TooltipButton(u8"Изменить", imgui.ImVec2(80, 25), u8:encode("Разблокировать для редактирования")) then
+                  if imgui.TooltipButton(fa.ICON_FA_EDIT..u8" Изменить", imgui.ImVec2(85, 25), u8:encode("Разблокировать для редактирования")) then
                      input.readonly = false
                   end
                   imgui.SameLine()
-                  if imgui.TooltipButton(u8"Сохранить", imgui.ImVec2(80, 25), u8:encode("Сохранить шаблоны в chatfilter.txt")) then
+                  if imgui.TooltipButton(fa.ICON_FA_SAVE..u8" Сохранить", imgui.ImVec2(85, 25), u8:encode("Сохранить шаблоны в chatfilter.txt")) then
                      if not input.readonly then
                         local file = io.open(filedata.filepath, "w")
                         file:write(textbuffer.chatfilters.v)
@@ -7213,14 +7236,15 @@ function imgui.OnDrawFrame()
                      end
                   end
                   imgui.SameLine()
-                  if imgui.TooltipButton(u8"Помощь", imgui.ImVec2(80, 25), u8:encode("Гайд по паттернам (Онлайн)")) then
+                  if imgui.TooltipButton(fa.ICON_FA_UNIVERSITY..u8" Помощь", imgui.ImVec2(85, 25), u8:encode("Гайд по паттернам (Онлайн)")) then
                      os.execute('explorer https://www.blast.hk/threads/62661/')
                   end
                   imgui.SameLine()
-                  if imgui.TooltipButton(u8"Отключить", imgui.ImVec2(80, 25), u8"Отключить расширенные фильтры для чата") then
+                  if imgui.TooltipButton(fa.ICON_FA_BAN..u8" Отключить", imgui.ImVec2(85, 25), u8"Отключить расширенные фильтры для чата") then
                      ini.settings.chatfilter = false
                      inicfg.save(ini, configIni)
                   end
+                  imgui.PopFont()
                   
                   imgui.PushFont(fonts.multilinetextfont)
                   if input.readonly then
@@ -16379,8 +16403,14 @@ function onExitScript()
    if not sampIsDialogActive() then
       showCursor(false)
    end
+   
+   -- resore camera
    setCameraDistanceActivated(0)
    setCameraDistance(0)
+   restoreCamera()
+   restoreCameraJumpcut()
+   setCameraBehindPlayer()
+   
    patch_samp_time_set(false)
    toggleFlyMode(false)
 end
