@@ -1,7 +1,8 @@
 <h1 align="center">Mapping Toolkit</h1>
 <p align="center">
     <a href="https://www.sa-mp.mp/"><img src="https://img.shields.io/badge/made%20for-GTA%20SA--MP-blue"></a>
-    <a href="https://training-server.com/"><img src="https://img.shields.io/badge/Server-TRAINING%20SANDBOX%20-yellow"></a>
+    <img alt="GitHub Release" src="https://img.shields.io/github/v/release/ins1x/MappingToolkit?color=blue">
+    <img alt="GitHub Downloads (all assets, all releases)" src="https://img.shields.io/github/downloads/ins1x/MappingToolkit/total?color=blue">
 </p>
 
 ###### The following description is in Russian, because it is the main language of the user base.
@@ -50,8 +51,6 @@
 
 ## Документация
 
-[![github](https://img.shields.io/badge/Wiki-Github-black)](https://github.com/ins1x/MappingToolkit/wiki)
-[![forum training](https://img.shields.io/badge/Forum-TRAINING_SANDBOX-yellow)](https://forum.training-server.com/d/19708-luamappingtoolkit/)  
 Обсуждение работы и обновлений тулкита на [форуме TRAINING-SANDBOX](https://forum.training-server.com/d/19708-luamappingtoolkit/)  
 
 * [FAQ - Ответы на часто задаваемы вопросы по скрипту](https://github.com/ins1x/MappingToolkit/wiki/FAQ-%D0%BF%D0%BE-MappingToolkit)  
@@ -61,7 +60,8 @@
 
 ##
 
-[![](https://www.gs4u.net/ru/350x20/s/271881.png)](https://www.gs4u.net/ru/s/271881.html)
-[![](https://img.shields.io/badge/Server-TRAINING%20SANDBOX%20-yellow)](https://training-server.com/)
+<!-- [![](https://www.gs4u.net/ru/350x20/s/271881.png)](https://www.gs4u.net/ru/s/271881.html) -->
+[![](https://img.shields.io/badge/Server-TRAINING%20SANDBOX%20-blue)](https://training-server.com/)
+[![github](https://img.shields.io/badge/Wiki-Github-black)](https://github.com/ins1x/MappingToolkit/wiki)
 
 
